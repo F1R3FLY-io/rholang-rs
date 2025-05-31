@@ -1,8 +1,9 @@
 [workspace]
-members  = ["rholang", "crypto", "models", "shared", "rspace++", "rspace++/libs/rspace_rhotypes"]
+members  = ["rholang", "crypto", "models", "shared", "rspace++", "rspace++/libs/rspace_rhotypes", "shell"]
 resolver = "2"
 
 [workspace.dependencies]
+rholang = { path = "rholang" }
 crypto = { path = "crypto" }
 models = { path = "models" }
 shared = { path = "shared" }
@@ -47,7 +48,8 @@ rstest = "*"
 proptest-derive = "*"
 counter = "*"
 multiset = "*"
-
+rustyline = "*"
+rustyline-async = "*"
 
 [profile.dev]
 debug = true
