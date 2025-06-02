@@ -1,42 +1,53 @@
-use rustyline::error::ReadlineError;
-use rustyline::{DefaultEditor, Result};
+mod main_sync;
+mod interpreter;
 
-fn fake_interpreter(line: String) -> Result<String> {
-    // This function is a placeholder for the actual interpreter logic.
-    // It simulates reading lines from the user and processing them.
-    Ok(line)
-}
+use rustyline_async::{Readline, ReadlineEvent};
+use std::io::Write;
+use std::time::Duration;
+use tokio::time::sleep;
 
-fn main() -> Result<()> {
-    // `()` can be used when no completer is required
-    let mut rl = DefaultEditor::new()?;
-    #[cfg(feature = "with-file-history")]
-    if rl.load_history("history.txt").is_err() {
-        println!("No previous history.");
-    }
-    loop {
-        let readline = rl.readline(">> ");
-        match readline {
-            Ok(line) => {
-                rl.add_history_entry(line.as_str())?;
-                let result = fake_interpreter(line)?;
-                println!("Line: {}", result);
-            },
-            Err(ReadlineError::Interrupted) => {
-                println!("CTRL-C");
-                break
-            },
-            Err(ReadlineError::Eof) => {
-                println!("CTRL-D");
-                break
-            },
-            Err(err) => {
-                println!("Error: {:?}", err);
-                break
-            }
-        }
-    }
-    #[cfg(feature = "with-file-history")]
-    rl.save_history("history.txt");
-    Ok(())
+use interpreter::{FakeInterpreter, Interpreter};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+	let (mut rl, mut stdout) = Readline::new(">>> ".into())?;
+	let interpreter = FakeInterpreter;
+
+	rl.should_print_line_on(false, false);
+
+	loop {
+		tokio::select! {
+			// _ = sleep(Duration::from_secs(1)) => {
+			// 	writeln!(stdout, "Message received!")?;
+			// }
+			cmd = rl.readline() => match cmd {
+				Ok(ReadlineEvent::Line(line)) => {
+					writeln!(stdout, "You entered: {line:?}")?;
+					rl.add_history_entry(line.clone());
+					if line == "quit" {
+						break;
+					}
+					let result = interpreter.interpret(line).await;
+					match result {
+						Ok(output) => writeln!(stdout, "Output: {output}")?,
+						Err(e) => writeln!(stdout, "Error interpreting line: {e}")?,
+					}
+				}
+				Ok(ReadlineEvent::Eof) => {
+					writeln!(stdout, "<EOF>")?;
+					break;
+				}
+				Ok(ReadlineEvent::Interrupted) => {
+					// writeln!(stdout, "^C")?;
+					continue;
+				}
+				Err(e) => {
+					writeln!(stdout, "Error: {e:?}")?;
+					break;
+				}
+			}
+		}
+	}
+	rl.flush()?;
+	Ok(())
 }
