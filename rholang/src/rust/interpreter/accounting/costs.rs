@@ -15,6 +15,12 @@ pub struct Cost {
 }
 
 impl Cost {
+    pub fn default() -> Self {
+        Cost {
+            value: 999999999999999999, // Arbitrary large value
+            operation: "default".to_string(),
+        }
+    }
     pub fn create(value: i64, operation: String) -> Cost {
         Cost { value, operation }
     }
