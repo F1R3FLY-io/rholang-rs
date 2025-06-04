@@ -1,6 +1,6 @@
 use anyhow::Result;
 use rstest::rstest;
-use tokio::test;
+use tokio;
 
 use shell::interpreter::{FakeInterpreter, Interpreter};
 
@@ -15,10 +15,14 @@ async fn test_fake_interpreter_returns_input() -> Result<()> {
     Ok(())
 }
 
+
 #[rstest]
+#[case("println(\"Hello, World!\");", "println(\"Hello, World!\");")]
+#[case("let x = 42;", "let x = 42;")]
 #[case("println(\"test\");", "println(\"test\");")]
 #[case("1 + 1", "1 + 1")]
 #[case("", "")]
+#[async_std::test]
 async fn test_fake_interpreter_with_various_inputs(
     #[case] input: String,
     #[case] expected: String
@@ -27,5 +31,5 @@ async fn test_fake_interpreter_with_various_inputs(
     let result = interpreter.interpret(input).await?;
 
     assert_eq!(result, expected);
-    Ok()
+    Ok(())
 }

@@ -1,9 +1,11 @@
 use std::io::Write;
 
 use anyhow::Result;
+use rstest::rstest;
 use tokio::time::{sleep, Duration};
 
-use crate::interpreter::{FakeInterpreter, Interpreter};
+// Correctly import from the shell crate
+use shell::interpreter::{FakeInterpreter, Interpreter};
 
 #[tokio::test]
 async fn test_interpreter_receives_commands() -> Result<()> {
@@ -39,7 +41,7 @@ async fn test_interpreter_error_handling() -> Result<()> {
 
 // This is a simplified version of how main.rs processes commands
 // It allows us to test the command processing logic without the full readline interface
-async fn process_command(interpreter: impl Interpreter, command: String) -> Result<String> {
+async fn process_command(interpreter: &impl Interpreter, command: String) -> Result<String> {
     if command == "quit" {
         return Ok("quit".to_string());
     }

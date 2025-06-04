@@ -1,11 +1,8 @@
 mod main_sync;
-mod interpreter;
-// mod rh_interpreter;
+pub mod interpreter;
 
 use rustyline_async::{Readline, ReadlineEvent};
 use std::io::Write;
-use std::time::Duration;
-use tokio::time::sleep;
 
 use interpreter::{FakeInterpreter, Interpreter};
 

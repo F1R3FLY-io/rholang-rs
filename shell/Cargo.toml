@@ -3,8 +3,13 @@ name = "shell"
 version = "0.1.0"
 edition = "2024"
 
+# Add lib configuration to expose crate modules to tests
+[lib]
+name = "shell"
+path = "src/lib.rs"
+
 [[bin]]
-name = "rhshell"
+name = "rhosh"
 path = "src/main.rs"
 
 [dependencies]
@@ -17,6 +22,7 @@ rustyline-async = { workspace = true }
 
 [dev-dependencies]
 rstest = { workspace = true }
+async-std = { version = "1.10", features = ["attributes"] }
 
 
 
