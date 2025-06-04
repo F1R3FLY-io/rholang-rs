@@ -12,7 +12,7 @@ async fn test_fake_interpreter_returns_input() -> Result<()> {
     let result = interpreter.interpret(input.clone()).await?;
 
     assert_eq!(result, input);
-    Ok()
+    Ok(())
 }
 
 #[rstest]
@@ -20,7 +20,7 @@ async fn test_fake_interpreter_returns_input() -> Result<()> {
 #[case("1 + 1", "1 + 1")]
 #[case("", "")]
 async fn test_fake_interpreter_with_various_inputs(
-    #[case] input: String, 
+    #[case] input: String,
     #[case] expected: String
 ) -> Result<()> {
     let interpreter = FakeInterpreter;
