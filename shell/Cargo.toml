@@ -3,12 +3,25 @@ name = "shell"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "shell"
+path = "src/lib.rs"
+
+[[bin]]
+name = "shell"
+path = "src/main.rs"
+
 [dependencies]
+anyhow = "1.0.98"
+async-trait = "0.1.73"
+rustyline-async = "0.4.0"
+tokio = { version = "1.45.0", features = ["full"] }
 rustyline = { workspace = true}
 rholang = { workspace = true }
-rustyline-async = { workspace = true }
-tokio = { workspace = true }
 log = { workspace = true }
-async-trait = "0.1.88"
-anyhow = "1.0.98"
+
+[dev-dependencies]
+rstest = "0.19.0"
+
+
 
