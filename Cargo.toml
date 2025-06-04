@@ -1,6 +1,15 @@
 [workspace]
+members = [
+    "shell",
+]
 
 [workspace.dependencies]
+anyhow = "*"
+async-trait = "*"
+tokio = { version = "*", features = ["full"] }
+rustyline-async = "*"
+rustyline = "*"
+rstest = "*"
 
 [profile.dev]
 debug = true

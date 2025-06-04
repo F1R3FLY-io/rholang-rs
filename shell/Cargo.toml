@@ -1,0 +1,22 @@
+[package]
+name = "shell"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "shell"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+rustyline =  { workspace = true }
+rustyline-async = { workspace = true }
+
+
+[dev-dependencies]
+rstest = { workspace = true }
+
+
+
