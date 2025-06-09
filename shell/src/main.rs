@@ -15,31 +15,32 @@ struct Args {
     multiline: bool,
 }
 
+fn help_message() -> String {
+    "Available commands:" .to_string() +
+    "\n  .help, - Show this help message" +
+    "\n  .mode - Toggle between multiline and single line modes" +
+    "\n  .list - List all edited lines" +
+    "\n  .delete or .del - Remove the last edited line" +
+    "\n  .reset or Ctrl+C - Interrupt current input (in multiline mode: clear buffer)" +
+    "\n  .quit - Exit the shell"
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
-    if args.multiline {
-        writeln!(
-            std::io::stdout(),
-            "Multiline mode, to call command press enter twice."
-        )?;
-    } else {
-        writeln!(
-            std::io::stdout(),
-            "Single line mode, each command executes immediately."
-        )?;
-    }
-
     writeln!(
         std::io::stdout(),
-        "Available commands:\n  .mode or \\mode - Toggle between multiline/single-line modes\n  .help or \\help - Show all available commands\n"
+        "{}", help_message()
     )?;
+    
+    let mut prompt = ">>> ".to_string();
 
-    let (mut rl, mut stdout) = Readline::new(">>> ".to_string())?;
+    let (mut rl, mut stdout) = Readline::new(prompt.clone())?;
     let interpreter = FakeInterpreter;
     let mut buffer: Vec<String> = Vec::new();
     let mut multiline = args.multiline;
+
 
     rl.should_print_line_on(true, false);
 
@@ -52,13 +53,63 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd = rl.readline() => match cmd {
                 Ok(ReadlineEvent::Line(line)) => {
                     let line = line.trim().to_string();
+                    
+                    if line.starts_with('.'){
+                        // Handle special commands starting with '.'
+                        if line == ".help" {
+                            writeln!(stdout, "{}", help_message())?;
+                        } 
+                        else if line == ".mode" {
+                            // Toggle multiline mode
+                            multiline = !multiline;
+                            let mode_message = if multiline {
+                                "Switched to multiline mode (enter twice to execute)"
+                            } else {
+                                buffer.clear();
+                                rl.update_prompt(">>> ").expect("Can't update prompt");
+                                "Switched to single line mode"
+                            };
+                            writeln!(stdout, "{mode_message}")?;
+                        } 
+                        else if line == ".quit" {
+                            writeln!(stdout, "Exiting shell...")?;
+                            break;
+                        }
+                        else if line == ".list" {
+                            writeln!(stdout, "Edited lines:")?;
+                            for line in buffer.clone().iter(){
+                                writeln!(stdout, "{line}")?;
+                            }
+                        }
+                        else if line == ".delete" || line == ".del" {
+                            if !buffer.is_empty() {
+                                let removed = buffer.pop().unwrap();
+                                writeln!(stdout, "Removed last line: {removed}")?;
+                            } else {
+                                writeln!(stdout, "Buffer is empty, nothing to delete")?;
+                            }
+                        }
+                        else if line == ".reset" {
+                            buffer.clear();
+                            rl.update_prompt(">>> ").expect("Can't update prompt");
+                            writeln!(stdout, "Buffer reset")?;
+                        }
+                        else if line == ".buffer" {
+                            writeln!(stdout, "Current buffer: {:?}", buffer)?;
+                        } 
+                        else {
+                            writeln!(stdout, "Unknown command: {line}")?;
+                        }
+                        continue;
+                    }
+                    
+                    rl.add_history_entry(line.clone());
 
                     let command  = if (multiline){
                         if buffer.is_empty() {
                             if(line.is_empty()) {
                                 continue;
                             }
-                            rl.add_history_entry(line.clone());
                             buffer = vec![line];
                             rl.update_prompt("... ").expect("Can't update prompt");
                             continue;
@@ -76,31 +127,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         if line.is_empty() {
                             continue;
                         }
-                        rl.add_history_entry(line.clone());
                         line
                     };
-                    
-                    // Special commands
-                    if command == "quit" || command == "exit" {
-                        break;
-                    } else if command == ".mode" || command == "\\mode" {
-                        // Toggle multiline mode
-                        multiline = !multiline;
-                        let mode_message = if multiline {
-                            "Switched to multiline mode (enter twice to execute)"
-                        } else {
-                            "Switched to single line mode"
-                        };
-                        writeln!(stdout, "{mode_message}")?;
-                        continue;
-                    } else if command == ".help" || command == "\\help" || command == "help" {
-                        writeln!(stdout, "Available commands:")?;
-                        writeln!(stdout, "  .help, \\help, help - Show this help message")?;
-                        writeln!(stdout, "  .mode, \\mode - Toggle between multiline and single line modes")?;
-                        writeln!(stdout, "  Ctrl+C - Interrupt current input (in multiline mode: clear buffer)")?;
-                        writeln!(stdout, "  quit, exit - Exit the shell")?;
-                        continue;
-                    }
 
                     writeln!(stdout, "Executing code: {command}")?;
                     let result = interpreter.interpret(command).await;
