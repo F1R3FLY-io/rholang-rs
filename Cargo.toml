@@ -11,6 +11,8 @@ tokio = { version = "*", features = ["rt", "rt-multi-thread", "full"] }
 rustyline-async = "*"
 rustyline = "*"
 rstest = "*"
+clap = { version = "*", features = ["derive"] }
+async-std = { version = "*", features = ["attributes"] }
 
 [profile.dev]
 debug = true
