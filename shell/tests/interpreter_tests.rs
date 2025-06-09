@@ -15,7 +15,6 @@ async fn test_fake_interpreter_returns_input() -> Result<()> {
     Ok(())
 }
 
-
 #[rstest]
 #[case("println(\"Hello, World!\");", "println(\"Hello, World!\");")]
 #[case("let x = 42;", "let x = 42;")]
@@ -25,7 +24,7 @@ async fn test_fake_interpreter_returns_input() -> Result<()> {
 #[async_std::test]
 async fn test_fake_interpreter_with_various_inputs(
     #[case] input: String,
-    #[case] expected: String
+    #[case] expected: String,
 ) -> Result<()> {
     let interpreter = FakeInterpreter;
     let result = interpreter.interpret(input).await?;

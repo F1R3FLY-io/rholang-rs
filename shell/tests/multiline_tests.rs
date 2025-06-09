@@ -3,10 +3,10 @@ use rstest::rstest;
 use tokio::time::Duration;
 
 use std::io::Write;
+use std::io::{BufRead, BufReader};
+use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
-use std::process::{Command, Stdio, Child};
-use std::io::{BufRead, BufReader};
 
 use shell::interpreter::{FakeInterpreter, Interpreter};
 
@@ -32,7 +32,10 @@ impl MultilineTestShell {
             .stdout(Stdio::piped())
             .spawn()?;
 
-        let stdout = child.stdout.take().ok_or_else(|| anyhow::anyhow!("Failed to capture stdout"))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("Failed to capture stdout"))?;
         let stdin = child.stdin.take();
 
         let (tx, rx) = channel();
@@ -114,22 +117,27 @@ async fn test_shell_multiline_input() -> Result<()> {
     // Read initial output which should contain the welcome message
     let initial_output = shell.read_output(500);
     assert!(
-        initial_output.iter().any(|line| line.contains("Multiline mode")),
-        "Missing welcome message in output: {:?}", initial_output
+        initial_output
+            .iter()
+            .any(|line| line.contains("Multiline mode")),
+        "Missing welcome message in output: {:?}",
+        initial_output
     );
 
     // Send a multiline command
     shell.send_multiline_command(vec![
         "let x = 10;",
         "let y = 20;",
-        "println!(\"{}\", x + y);"
+        "println!(\"{}\", x + y);",
     ])?;
 
     // Check the response
     let output = shell.read_output(500);
     assert!(
-        output.iter().any(|line| line.contains("Executing code: let x = 10;\nlet y = 20;\nprintln!(\"{}\", x + y);")),
-        "Shell didn't show correct multiline command: {:?}", output
+        output.iter().any(|line| line
+            .contains("Executing code: let x = 10;\nlet y = 20;\nprintln!(\"{}\", x + y);")),
+        "Shell didn't show correct multiline command: {:?}",
+        output
     );
 
     Ok(())
@@ -159,9 +167,12 @@ async fn test_shell_multiline_interrupted() -> Result<()> {
     // Check the response
     let output = shell.read_output(500);
     assert!(
-        output.iter().any(|line| line.contains("Executing code: println!(\"After interrupt\")") ||
-                          line.contains("Output: println!(\"After interrupt\")") ),
-        "Shell didn't recover after interrupt: {:?}", output
+        output.iter().any(
+            |line| line.contains("Executing code: println!(\"After interrupt\")")
+                || line.contains("Output: println!(\"After interrupt\")")
+        ),
+        "Shell didn't recover after interrupt: {:?}",
+        output
     );
 
     Ok(())
@@ -196,7 +207,7 @@ async fn test_multiline_buffer_handling() -> Result<()> {
 #[tokio::test]
 async fn test_multiline_commands_joined_correctly(
     #[case] input_lines: Vec<&str>,
-    #[case] expected: &str
+    #[case] expected: &str,
 ) -> Result<()> {
     let interpreter = FakeInterpreter;
 
@@ -220,8 +231,11 @@ async fn test_shell_single_line_mode() -> Result<()> {
     // Read initial output which should contain the welcome message
     let initial_output = shell.read_output(500);
     assert!(
-        initial_output.iter().any(|line| line.contains("Single line mode")),
-        "Missing single line mode message in output: {:?}", initial_output
+        initial_output
+            .iter()
+            .any(|line| line.contains("Single line mode")),
+        "Missing single line mode message in output: {:?}",
+        initial_output
     );
 
     // Send a single line command (no empty line needed)
@@ -230,8 +244,11 @@ async fn test_shell_single_line_mode() -> Result<()> {
     // Check the response (should execute immediately)
     let output = shell.read_output(500);
     assert!(
-        output.iter().any(|line| line.contains("Executing code: let x = 10 + 20;")),
-        "Shell didn't execute single line command: {:?}", output
+        output
+            .iter()
+            .any(|line| line.contains("Executing code: let x = 10 + 20;")),
+        "Shell didn't execute single line command: {:?}",
+        output
     );
 
     // Try to send what would be a multiline command in multiline mode
@@ -240,8 +257,11 @@ async fn test_shell_single_line_mode() -> Result<()> {
     // This should be executed immediately in single line mode
     let output = shell.read_output(500);
     assert!(
-        output.iter().any(|line| line.contains("Executing code: if true {")),
-        "Shell didn't execute command in single line mode: {:?}", output
+        output
+            .iter()
+            .any(|line| line.contains("Executing code: if true {")),
+        "Shell didn't execute command in single line mode: {:?}",
+        output
     );
 
     Ok(())
@@ -262,8 +282,11 @@ async fn test_toggle_multiline_mode() -> Result<()> {
     // Check that mode was switched
     let output = shell.read_output(500);
     assert!(
-        output.iter().any(|line| line.contains("Switched to multiline mode")),
-        "Mode not switched to multiline: {:?}", output
+        output
+            .iter()
+            .any(|line| line.contains("Switched to multiline mode")),
+        "Mode not switched to multiline: {:?}",
+        output
     );
 
     // Try to send a multiline command now
@@ -275,8 +298,11 @@ async fn test_toggle_multiline_mode() -> Result<()> {
     // Verify the multiline command was processed correctly
     let output = shell.read_output(500);
     assert!(
-        output.iter().any(|line| line.contains("Executing code: for i in 0..3")),
-        "Multiline command not processed correctly after mode switch: {:?}", output
+        output
+            .iter()
+            .any(|line| line.contains("Executing code: for i in 0..3")),
+        "Multiline command not processed correctly after mode switch: {:?}",
+        output
     );
 
     // Toggle back to single line mode
@@ -285,8 +311,11 @@ async fn test_toggle_multiline_mode() -> Result<()> {
     // Check that mode was switched back
     let output = shell.read_output(500);
     assert!(
-        output.iter().any(|line| line.contains("Switched to single line mode")),
-        "Mode not switched to single line: {:?}", output
+        output
+            .iter()
+            .any(|line| line.contains("Switched to single line mode")),
+        "Mode not switched to single line: {:?}",
+        output
     );
 
     // Try to send a command that would be multiline in multiline mode
@@ -295,8 +324,11 @@ async fn test_toggle_multiline_mode() -> Result<()> {
     // This should execute immediately in single line mode
     let output = shell.read_output(500);
     assert!(
-        output.iter().any(|line| line.contains("Executing code: if true {")),
-        "Command not executed immediately after switching back to single line mode: {:?}", output
+        output
+            .iter()
+            .any(|line| line.contains("Executing code: if true {")),
+        "Command not executed immediately after switching back to single line mode: {:?}",
+        output
     );
 
     Ok(())

@@ -13,6 +13,7 @@ This project implements a Rust-based interpreter for the Rholang programming lan
 - **Rho-Calculus Foundation**: Based on reflective higher-order process calculus
 - **Blockchain Optimized**: Designed to prevent common smart contract vulnerabilities
 - **Scalable Architecture**: Uses Directed Acyclic Graphs (DAGs) for improved scalability
+- **JSON Support**: Built-in JSON serialization and deserialization for Rholang data types
 
 ## Project Goals
 
@@ -139,6 +140,8 @@ rholang-rs/
 │   │   ├── main.rs      # Shell entry point
 │   │   ├── lib.rs       # Library modules
 │   │   ├── interpreter.rs    # Core interpreter logic
+│   │   ├── rholang_types.rs  # Rholang data types with JSON support
+│   │   ├── json_commands.rs  # JSON import/export functionality
 │   │   ├── rh_interpreter.rs # Rholang-specific interpreter
 │   │   └── main_sync.rs # Synchronous main alternative
 │   └── tests/           # Shell integration tests
@@ -202,6 +205,78 @@ new helloworld, stdout(`rho:io:stdout`) in {
   helloworld!("Hello, World!")
 }
 ```
+
+## JSON Support
+
+The interpreter now includes comprehensive JSON support for Rholang data types, enabling easy serialization and deserialization of Rholang values.
+
+### Supported Data Types
+
+The following Rholang data types can be converted to/from JSON:
+
+- **Nil**: Represents empty/null values
+- **Bool**: Boolean true/false values
+- **Int**: 64-bit signed integers
+- **String**: UTF-8 text strings
+- **List**: Ordered collections of Rholang values
+- **Map**: Key-value mappings (string keys to Rholang values)
+- **Process**: Serialized process representations
+
+### JSON API
+
+```rust
+use shell::rholang_types::RholangValue;
+use shell::json_commands::JsonCommands;
+
+// Create a Rholang value
+let value = RholangValue::List(vec![
+    RholangValue::Int(42),
+    RholangValue::String("hello".to_string()),
+    RholangValue::Bool(true)
+]);
+
+// Convert to JSON string
+let json = value.to_json()?;
+
+// Parse from JSON string
+let parsed = RholangValue::from_json(&json)?;
+
+// Export to file
+JsonCommands::export_to_file(&value, "data.json")?;
+
+// Import from file
+let imported = JsonCommands::import_from_file("data.json")?;
+```
+
+### Example JSON Format
+
+```json
+{
+  "type": "List",
+  "value": [
+    {
+      "type": "Int",
+      "value": 42
+    },
+    {
+      "type": "String", 
+      "value": "hello"
+    },
+    {
+      "type": "Bool",
+      "value": true
+    }
+  ]
+}
+```
+
+### Features
+
+- **Type-safe serialization**: Each value includes its type information
+- **File I/O**: Import and export JSON files
+- **Validation**: JSON validation before parsing
+- **Metadata support**: Expressions can include optional metadata
+- **Error handling**: Comprehensive error reporting for invalid JSON
 
 ## Contributing
 

@@ -28,7 +28,10 @@ impl TestShell {
             .stdout(Stdio::piped())
             .spawn()?;
 
-        let stdout = child.stdout.take().ok_or_else(|| anyhow!("Failed to capture stdout"))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| anyhow!("Failed to capture stdout"))?;
         let stdin = child.stdin.take();
 
         let (tx, rx) = channel();
@@ -97,7 +100,11 @@ fn test_shell_basic_interaction() -> Result<()> {
 
     // Check for the prompt in initial output
     let initial_output = shell.read_output(500);
-    assert!(initial_output.is_empty(), "Unexpected initial output: {:?}", initial_output);
+    assert!(
+        initial_output.is_empty(),
+        "Unexpected initial output: {:?}",
+        initial_output
+    );
 
     // Send a simple command
     shell.send_command("echo test")?;
@@ -105,8 +112,11 @@ fn test_shell_basic_interaction() -> Result<()> {
     // Check the response
     let output = shell.read_output(500);
     assert!(
-        output.iter().any(|line| line.contains("You entered: \"echo test\"")),
-        "Shell didn't echo our command: {:?}", output
+        output
+            .iter()
+            .any(|line| line.contains("You entered: \"echo test\"")),
+        "Shell didn't echo our command: {:?}",
+        output
     );
 
     // Exit the shell

@@ -16,31 +16,27 @@ struct Args {
 }
 
 fn help_message() -> String {
-    "Available commands:" .to_string() +
-    "\n  .help, - Show this help message" +
-    "\n  .mode - Toggle between multiline and single line modes" +
-    "\n  .list - List all edited lines" +
-    "\n  .delete or .del - Remove the last edited line" +
-    "\n  .reset or Ctrl+C - Interrupt current input (in multiline mode: clear buffer)" +
-    "\n  .quit - Exit the shell"
+    "Available commands:".to_string()
+        + "\n  .help, - Show this help message"
+        + "\n  .mode - Toggle between multiline and single line modes"
+        + "\n  .list - List all edited lines"
+        + "\n  .delete or .del - Remove the last edited line"
+        + "\n  .reset or Ctrl+C - Interrupt current input (in multiline mode: clear buffer)"
+        + "\n  .quit - Exit the shell"
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
-    writeln!(
-        std::io::stdout(),
-        "{}", help_message()
-    )?;
-    
+    writeln!(std::io::stdout(), "{}", help_message())?;
+
     let prompt = ">>> ".to_string();
 
     let (mut rl, mut stdout) = Readline::new(prompt.clone())?;
     let interpreter = FakeInterpreter;
     let mut buffer: Vec<String> = Vec::new();
     let mut multiline = args.multiline;
-
 
     rl.should_print_line_on(true, false);
 
@@ -53,12 +49,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd = rl.readline() => match cmd {
                 Ok(ReadlineEvent::Line(line)) => {
                     let line = line.trim().to_string();
-                    
+
                     if line.starts_with('.'){
                         // Handle special commands starting with '.'
                         if line == ".help" {
                             writeln!(stdout, "{}", help_message())?;
-                        } 
+                        }
                         else if line == ".mode" {
                             // Toggle multiline mode
                             multiline = !multiline;
@@ -70,7 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 "Switched to single line mode"
                             };
                             writeln!(stdout, "{mode_message}")?;
-                        } 
+                        }
                         else if line == ".quit" {
                             writeln!(stdout, "Exiting shell...")?;
                             break;
@@ -96,13 +92,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                         else if line == ".buffer" {
                             writeln!(stdout, "Current buffer: {:?}", buffer)?;
-                        } 
+                        }
                         else {
                             writeln!(stdout, "Unknown command: {line}")?;
                         }
                         continue;
                     }
-                    
+
                     rl.add_history_entry(line.clone());
 
                     let command  = if multiline {
