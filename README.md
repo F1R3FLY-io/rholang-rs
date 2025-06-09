@@ -278,7 +278,7 @@ let imported = JsonCommands::import_from_file("data.json")?;
 - **Metadata support**: Expressions can include optional metadata
 - **Error handling**: Comprehensive error reporting for invalid JSON
 
-## Contributing
+## [Contributing](./docs/CONTRIBUTING.md)
 
 1. Fork the repository
 2. Create a feature branch
@@ -287,7 +287,14 @@ let imported = JsonCommands::import_from_file("data.json")?;
 
 ## License
 
-This project is part of the F1r3fly open-source ecosystem.
+This project is part of the Sovereign Source License open-source ecosystem.
+
+## Project Planning
+
+- [📋 Roadmap](./ROADMAP.md) - Detailed development plan and milestones
+- [🤝 Contributing](./docs/CONTRIBUTING.md) - How to contribute to the project
+- [🐛 Report Issues](https://github.com/your-username/rholang-rs/issues/new/choose) - Bug reports and feature requests
+- [💬 Discussions](https://github.com/your-username/rholang-rs/discussions) - Questions and community discussions
 
 ## Resources
 
