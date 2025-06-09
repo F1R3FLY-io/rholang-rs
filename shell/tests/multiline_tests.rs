@@ -17,9 +17,17 @@ struct MultilineTestShell {
 }
 
 impl MultilineTestShell {
-    fn new() -> Result<Self> {
+    fn new(multiline: bool) -> Result<Self> {
+        let mut args = vec!["run", "--quiet", "--bin", "rhosh"];
+
+        if multiline {
+            args.push("--multiline");
+        } else {
+            args.push("--no-multiline");
+        }
+
         let mut child = Command::new("cargo")
-            .args(["run", "--quiet", "--bin", "shell"])
+            .args(args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()?;
@@ -101,7 +109,7 @@ impl Drop for MultilineTestShell {
 #[tokio::test]
 #[ignore] // Ignore by default as this requires running the full binary
 async fn test_shell_multiline_input() -> Result<()> {
-    let mut shell = MultilineTestShell::new()?;
+    let mut shell = MultilineTestShell::new(true)?;
 
     // Read initial output which should contain the welcome message
     let initial_output = shell.read_output(500);
@@ -130,7 +138,7 @@ async fn test_shell_multiline_input() -> Result<()> {
 #[tokio::test]
 #[ignore] // Ignore by default as this requires running the full binary
 async fn test_shell_multiline_interrupted() -> Result<()> {
-    let mut shell = MultilineTestShell::new()?;
+    let mut shell = MultilineTestShell::new(true)?;
 
     // Clear initial output
     shell.read_output(500);
@@ -200,6 +208,96 @@ async fn test_multiline_commands_joined_correctly(
 
     // Verify the result
     assert_eq!(result, expected);
+
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore] // Ignore by default as this requires running the full binary
+async fn test_shell_single_line_mode() -> Result<()> {
+    let mut shell = MultilineTestShell::new(false)?;
+
+    // Read initial output which should contain the welcome message
+    let initial_output = shell.read_output(500);
+    assert!(
+        initial_output.iter().any(|line| line.contains("Single line mode")),
+        "Missing single line mode message in output: {:?}", initial_output
+    );
+
+    // Send a single line command (no empty line needed)
+    shell.send_line("let x = 10 + 20;")?;
+
+    // Check the response (should execute immediately)
+    let output = shell.read_output(500);
+    assert!(
+        output.iter().any(|line| line.contains("Executing code: let x = 10 + 20;")),
+        "Shell didn't execute single line command: {:?}", output
+    );
+
+    // Try to send what would be a multiline command in multiline mode
+    shell.send_line("if true {")?;
+
+    // This should be executed immediately in single line mode
+    let output = shell.read_output(500);
+    assert!(
+        output.iter().any(|line| line.contains("Executing code: if true {")),
+        "Shell didn't execute command in single line mode: {:?}", output
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore] // Ignore by default as this requires running the full binary
+async fn test_toggle_multiline_mode() -> Result<()> {
+    // Start in single line mode
+    let mut shell = MultilineTestShell::new(false)?;
+
+    // Clear initial output
+    shell.read_output(500);
+
+    // Toggle to multiline mode using the command
+    shell.send_line(".mode")?;
+
+    // Check that mode was switched
+    let output = shell.read_output(500);
+    assert!(
+        output.iter().any(|line| line.contains("Switched to multiline mode")),
+        "Mode not switched to multiline: {:?}", output
+    );
+
+    // Try to send a multiline command now
+    shell.send_line("for i in 0..3 {")?;
+    shell.send_line("    println!({i});")?;
+    shell.send_line("}")?;
+    shell.send_line("")?; // Execute in multiline mode
+
+    // Verify the multiline command was processed correctly
+    let output = shell.read_output(500);
+    assert!(
+        output.iter().any(|line| line.contains("Executing code: for i in 0..3")),
+        "Multiline command not processed correctly after mode switch: {:?}", output
+    );
+
+    // Toggle back to single line mode
+    shell.send_line(".mode")?;
+
+    // Check that mode was switched back
+    let output = shell.read_output(500);
+    assert!(
+        output.iter().any(|line| line.contains("Switched to single line mode")),
+        "Mode not switched to single line: {:?}", output
+    );
+
+    // Try to send a command that would be multiline in multiline mode
+    shell.send_line("if true {")?;
+
+    // This should execute immediately in single line mode
+    let output = shell.read_output(500);
+    assert!(
+        output.iter().any(|line| line.contains("Executing code: if true {")),
+        "Command not executed immediately after switching back to single line mode: {:?}", output
+    );
 
     Ok(())
 }
