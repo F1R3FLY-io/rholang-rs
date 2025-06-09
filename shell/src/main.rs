@@ -1,92 +1,79 @@
 mod main_sync;
 pub mod interpreter;
-pub mod multiline_helper;
 
 use rustyline_async::{Readline, ReadlineEvent};
 use std::io::Write;
 
 use interpreter::{FakeInterpreter, Interpreter};
-use multiline_helper::process_line;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut prompt = ">>> ";
-    let (mut rl, mut stdout) = Readline::new(prompt.into())?;
+	writeln!(std::io::stdout(), "Multiline mode, to call command press enter twice.\n")?;
+    let (mut rl, mut stdout) = Readline::new(">>> ".to_string())?;
     let interpreter = FakeInterpreter;
-    let mut buffer = String::new();
-    let mut in_multiline_mode = false;
+    let mut buffer: Vec<String> = Vec::new();
 
-    rl.should_print_line_on(false, false);
+    rl.should_print_line_on(true, false);
 
-    loop {
-        // Update prompt if needed
-        let current_prompt = if in_multiline_mode { "... " } else { ">>> " };
-        if prompt != current_prompt {
-            prompt = current_prompt;
-            // Recreate readline with new prompt
-            (rl, stdout) = Readline::new(prompt.into())?;
-            rl.should_print_line_on(false, false);
-        }
+	loop {
+		tokio::select! {
+			// _ = sleep(Duration::from_secs(1)) => {
+			// 	writeln!(stdout, "Message received!")?;
+			// }
 
-        tokio::select! {
-            cmd = rl.readline() => match cmd {
-                Ok(ReadlineEvent::Line(line)) => {
-                    // Add to history only complete commands
-                    if !in_multiline_mode {
-                        rl.add_history_entry(line.clone());
-                    }
+			cmd = rl.readline() => match cmd {
+				Ok(ReadlineEvent::Line(line)) => {
+					if buffer.is_empty() {
+						let line = line.trim().to_string();
+						if(line.is_empty()) {
+							continue;
+						}
+						rl.add_history_entry(line.clone());
+						buffer = vec![line];
+						rl.update_prompt("... ").expect("Can't update prompt");
+						continue;
+					}
 
-                    // Handle special commands
-                    if !in_multiline_mode && line == "quit" {
-                        writeln!(stdout, "Goodbye!")?;
-                        break;
-                    }
+					if(!line.is_empty()) {
+						buffer.push(line);
+						continue;
+					}
 
-                    // Process the line and check if we're ready to execute
-                    let ready_to_execute = process_line(&line, &mut buffer, &mut in_multiline_mode);
+					// let history_buffer = buffer.clone().join(" ");
+					let command = buffer.join("\n");
+					buffer.clear();
+					rl.update_prompt(">>> ").expect("Can't update prompt");
 
-                    // Show appropriate messages based on state
-                    if !in_multiline_mode && line.is_empty() {
-                        writeln!(stdout, "Entering multiline mode. Type an empty line twice to execute.")?;
-                    } else if ready_to_execute {
-                        // Execute the command
-                        writeln!(stdout, "Executing code:")?;
-                        writeln!(stdout, "---------------------")?;
-                        writeln!(stdout, "{}", buffer)?;
-                        writeln!(stdout, "---------------------")?;
+					if command == "quit" {
+						break;
+					}
 
-                        // Send to interpreter
-                        let result = interpreter.interpret(buffer.clone()).await;
-                        match result {
-                            Ok(output) => writeln!(stdout, "Output: {output}")?,
-                            Err(e) => writeln!(stdout, "Error interpreting code: {e}")?,
-                        }
+					// rl.add_history_entry(history_buffer);
 
-                        // Reset buffer
-                        buffer.clear();
-                    }
-                }
-                Ok(ReadlineEvent::Eof) => {
-                    writeln!(stdout, "<EOF>")?;
-                    break;
-                }
-                Ok(ReadlineEvent::Interrupted) => {
-                    // Clear the buffer and exit multiline mode if we're interrupted
-                    if in_multiline_mode || !buffer.is_empty() {
-                        writeln!(stdout, "^C (Cleared buffer)")?;
-                        buffer.clear();
-                        in_multiline_mode = false;
-                    } else {
-                        continue;
-                    }
-                }
-                Err(e) => {
-                    writeln!(stdout, "Error: {e:?}")?;
-                    break;
-                }
-            }
-        }
-    }
-    rl.flush()?;
-    Ok(())
+					writeln!(stdout, "Executing code: {command}")?;
+
+					let result = interpreter.interpret(command).await;
+					match result {
+						Ok(output) => writeln!(stdout, "Output: {output}")?,
+						Err(e) => writeln!(stdout, "Error interpreting line: {e}")?,
+					}
+				}
+				Ok(ReadlineEvent::Eof) => {
+					break;
+				}
+				Ok(ReadlineEvent::Interrupted) => {
+					writeln!(stdout, "Reset")?;
+					buffer.clear();
+					rl.update_prompt(">>> ").expect("Can't update prompt");
+					continue;
+				}
+				Err(e) => {
+					writeln!(stdout, "Error: {e:?}")?;
+					break;
+				}
+			}
+		}
+	}
+	rl.flush()?;
+	Ok(())
 }
