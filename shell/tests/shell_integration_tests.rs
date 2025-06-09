@@ -1,6 +1,6 @@
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, Command, Stdio};
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{channel, Receiver};
 use std::thread;
 use std::time::Duration;
 
@@ -13,9 +13,17 @@ struct TestShell {
 }
 
 impl TestShell {
-    fn new() -> Result<Self> {
+    fn new(multiline: bool) -> Result<Self> {
+        let mut args = vec!["run", "--quiet", "--bin", "rhosh"];
+
+        if multiline {
+            args.push("--multiline");
+        } else {
+            args.push("--no-multiline");
+        }
+
         let mut child = Command::new("cargo")
-            .args(["run", "--quiet", "--bin", "shell"])
+            .args(args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()?;
@@ -85,7 +93,7 @@ impl Drop for TestShell {
 #[test]
 #[ignore] // Ignore by default as this requires running the full binary
 fn test_shell_basic_interaction() -> Result<()> {
-    let mut shell = TestShell::new()?;
+    let mut shell = TestShell::new(true)?; // Use multiline mode by default
 
     // Check for the prompt in initial output
     let initial_output = shell.read_output(500);
