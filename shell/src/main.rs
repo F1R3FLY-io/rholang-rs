@@ -34,7 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "{}", help_message()
     )?;
     
-    let mut prompt = ">>> ".to_string();
+    let prompt = ">>> ".to_string();
 
     let (mut rl, mut stdout) = Readline::new(prompt.clone())?;
     let interpreter = FakeInterpreter;
@@ -105,9 +105,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     
                     rl.add_history_entry(line.clone());
 
-                    let command  = if (multiline){
+                    let command  = if multiline {
                         if buffer.is_empty() {
-                            if(line.is_empty()) {
+                            if line.is_empty() {
                                 continue;
                             }
                             buffer = vec![line];
@@ -115,7 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             continue;
                         }
 
-                        if(!line.is_empty()) {
+                        if !line.is_empty() {
                             buffer.push(line);
                             continue;
                         }

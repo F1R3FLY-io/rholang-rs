@@ -1,12 +1,14 @@
 use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, Result};
 
+#[allow(dead_code)]
 fn fake_interpreter(line: String) -> Result<String> {
     // This function is a placeholder for the actual interpreter logic.
     // It simulates reading lines from the user and processing them.
     Ok(line)
 }
 
+#[allow(dead_code)]
 fn main() -> Result<()> {
     // `()` can be used when no completer is required
     let mut rl = DefaultEditor::new()?;

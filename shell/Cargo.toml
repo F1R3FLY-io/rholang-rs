@@ -1,7 +1,7 @@
 [package]
 name = "shell"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 # Add lib configuration to expose crate modules to tests
 [lib]
@@ -11,6 +11,9 @@ path = "src/lib.rs"
 [[bin]]
 name = "rhosh"
 path = "src/main.rs"
+
+[features]
+with-file-history = []
 
 [dependencies]
 anyhow = { workspace = true }
