@@ -43,11 +43,9 @@ impl MultilineTestShell {
         // Start a thread to read from the shell's stdout
         thread::spawn(move || {
             let reader = BufReader::new(stdout);
-            for line in reader.lines() {
-                if let Ok(line) = line {
-                    if tx.send(line).is_err() {
-                        break;
-                    }
+            for line in reader.lines().map_while(Result::ok) {
+                if tx.send(line).is_err() {
+                    break;
                 }
             }
         });

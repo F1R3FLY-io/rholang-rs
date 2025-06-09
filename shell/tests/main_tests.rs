@@ -1,8 +1,4 @@
-use std::io::Write;
-
 use anyhow::Result;
-use rstest::rstest;
-use tokio::time::{sleep, Duration};
 
 // Correctly import from the shell crate
 use shell::interpreter::{FakeInterpreter, Interpreter};

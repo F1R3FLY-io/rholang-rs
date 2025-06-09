@@ -39,6 +39,6 @@ fn main() -> Result<()> {
         }
     }
     #[cfg(feature = "with-file-history")]
-    rl.save_history("history.txt");
+    let _ = rl.save_history("history.txt");
     Ok(())
 }

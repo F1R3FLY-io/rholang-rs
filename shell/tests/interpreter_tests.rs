@@ -1,6 +1,5 @@
 use anyhow::Result;
 use rstest::rstest;
-use tokio;
 
 use shell::interpreter::{FakeInterpreter, Interpreter};
 
