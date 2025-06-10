@@ -1,5 +1,4 @@
 pub mod interpreter;
-mod main_sync;
 
 use clap::Parser;
 use rustyline_async::{Readline, ReadlineEvent};
@@ -46,9 +45,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         tokio::select! {
-            // _ = sleep(Duration::from_secs(1)) => {
-            // 	writeln!(stdout, "Message received!")?;
-            // }
 
             cmd = rl.readline() => match cmd {
                 Ok(ReadlineEvent::Line(line)) => {
