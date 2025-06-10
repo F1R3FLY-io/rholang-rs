@@ -2,14 +2,14 @@ use async_trait::async_trait;
 use anyhow::Result;
 
 #[async_trait]
-pub trait Interpreter {
+pub trait InterpreterProvider {
     async fn interpret(&self, code: String) -> Result<String>;
 }
 
-pub struct FakeInterpreter;
+pub struct FakeInterpreterProvider;
 
 #[async_trait]
-impl Interpreter for FakeInterpreter {
+impl InterpreterProvider for FakeInterpreterProvider {
     async fn interpret(&self, code: String) -> Result<String> {
         // Fake implementation: just returns the input code
         Ok(code)

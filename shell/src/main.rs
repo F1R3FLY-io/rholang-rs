@@ -1,10 +1,10 @@
-pub mod interpreter;
+pub mod providers;
 
 use clap::Parser;
 use rustyline_async::{Readline, ReadlineEvent};
 use std::io::Write;
 
-use interpreter::{FakeInterpreter, Interpreter};
+use providers::{FakeInterpreterProvider, InterpreterProvider};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let prompt = ">>> ".to_string();
 
     let (mut rl, mut stdout) = Readline::new(prompt.clone())?;
-    let interpreter = FakeInterpreter;
+    let interpreter = FakeInterpreterProvider;
     let mut buffer: Vec<String> = Vec::new();
     let mut multiline = args.multiline;
 

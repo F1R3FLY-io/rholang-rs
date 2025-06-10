@@ -1,16 +1,12 @@
-use std::io::Write;
-
 use anyhow::Result;
-use rstest::rstest;
-use tokio::time::{sleep, Duration};
 
 // Correctly import from the shell crate
-use shell::interpreter::{FakeInterpreter, Interpreter};
+use shell::providers::{FakeInterpreterProvider, InterpreterProvider};
 
 #[tokio::test]
 async fn test_interpreter_receives_commands() -> Result<()> {
     // Create a FakeInterpreter
-    let interpreter = FakeInterpreter;
+    let interpreter = FakeInterpreterProvider;
 
     // Call our interpreter
     let result1 = interpreter.interpret("command1".to_string()).await?;
@@ -25,7 +21,7 @@ async fn test_interpreter_receives_commands() -> Result<()> {
 
 #[tokio::test]
 async fn test_interpreter_error_handling() -> Result<()> {
-    let interpreter = FakeInterpreter;
+    let interpreter = FakeInterpreterProvider;
 
     // FakeInterpreter always returns Ok with the input string,
     // so we need to modify this test to match that behavior
@@ -41,7 +37,7 @@ async fn test_interpreter_error_handling() -> Result<()> {
 
 // This is a simplified version of how main.rs processes commands
 // It allows us to test the command processing logic without the full readline interface
-async fn process_command(interpreter: &impl Interpreter, command: String) -> Result<String> {
+async fn process_command(interpreter: &impl InterpreterProvider, command: String) -> Result<String> {
     if command == "quit" {
         return Ok("quit".to_string());
     }
@@ -51,7 +47,7 @@ async fn process_command(interpreter: &impl Interpreter, command: String) -> Res
 
 #[tokio::test]
 async fn test_process_command() -> Result<()> {
-    let interpreter = FakeInterpreter;
+    let interpreter = FakeInterpreterProvider;
 
     // Test normal command (FakeInterpreter returns the input)
     let result = process_command(&interpreter, "test_cmd".to_string()).await?;

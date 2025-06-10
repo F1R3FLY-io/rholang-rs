@@ -8,7 +8,7 @@ use std::thread;
 use std::process::{Command, Stdio, Child};
 use std::io::{BufRead, BufReader};
 
-use shell::interpreter::{FakeInterpreter, Interpreter};
+use shell::providers::{FakeInterpreterProvider, InterpreterProvider};
 
 struct MultilineTestShell {
     child: Child,
@@ -170,7 +170,7 @@ async fn test_shell_multiline_interrupted() -> Result<()> {
 #[tokio::test]
 async fn test_multiline_buffer_handling() -> Result<()> {
     // This test uses direct Interpreter functionality
-    let interpreter = FakeInterpreter;
+    let interpreter = FakeInterpreterProvider;
 
     // Create a simulated multiline command
     let line1 = "for i in 0..3 {".to_string();
@@ -198,7 +198,7 @@ async fn test_multiline_commands_joined_correctly(
     #[case] input_lines: Vec<&str>,
     #[case] expected: &str
 ) -> Result<()> {
-    let interpreter = FakeInterpreter;
+    let interpreter = FakeInterpreterProvider;
 
     // Join the lines with newlines (simulating how main.rs does it)
     let command = input_lines.join("\n");
