@@ -374,15 +374,31 @@ async fn test_process_multiline_input_execute() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_process_single_line_input_empty() {
-    let command = process_single_line_input("".to_string());
+async fn test_process_single_line_input_empty() -> Result<()> {
+    let mut buffer = Vec::new();
+    let mut multiline = false;
+
+    let command =
+        process_single_line_input("".to_string(), &mut buffer, &mut multiline, |_| Ok(()))?;
 
     assert!(command.is_none(), "Empty line should not produce a command");
+    assert!(buffer.is_empty(), "Buffer should remain empty");
+    assert!(!multiline, "Mode should remain single line");
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn test_process_single_line_input_with_content() {
-    let command = process_single_line_input("let x = 10;".to_string());
+async fn test_process_single_line_input_with_content() -> Result<()> {
+    let mut buffer = Vec::new();
+    let mut multiline = false;
+
+    let command = process_single_line_input(
+        "let x = 10;".to_string(),
+        &mut buffer,
+        &mut multiline,
+        |_| Ok(()),
+    )?;
 
     assert!(command.is_some(), "Non-empty line should produce a command");
     assert_eq!(
@@ -390,6 +406,36 @@ async fn test_process_single_line_input_with_content() {
         "let x = 10;",
         "Command should be the input line"
     );
+    assert!(buffer.is_empty(), "Buffer should remain empty");
+    assert!(!multiline, "Mode should remain single line");
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_process_single_line_input_with_brackets() -> Result<()> {
+    let mut buffer = Vec::new();
+    let mut multiline = false;
+
+    let command = process_single_line_input(
+        "for (x <- y) {".to_string(),
+        &mut buffer,
+        &mut multiline,
+        |_| Ok(()),
+    )?;
+
+    assert!(
+        command.is_none(),
+        "Line ending inside brackets should not produce a command"
+    );
+    assert_eq!(buffer.len(), 1, "Buffer should have one item");
+    assert_eq!(
+        buffer[0], "for (x <- y) {",
+        "Buffer should contain the input line"
+    );
+    assert!(multiline, "Mode should switch to multiline");
+
+    Ok(())
 }
 
 #[tokio::test]
