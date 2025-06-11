@@ -9,8 +9,8 @@ async fn test_interpreter_receives_commands() -> Result<()> {
     let interpreter = FakeInterpreterProvider;
 
     // Call our interpreter
-    let result1 = interpreter.interpret("command1".to_string()).await?;
-    let result2 = interpreter.interpret("command2".to_string()).await?;
+    let result1 = interpreter.interpret("command1").await?;
+    let result2 = interpreter.interpret("command2").await?;
 
     // With FakeInterpreter, we expect the output to be the same as input
     assert_eq!(result1, "command1");
@@ -25,7 +25,7 @@ async fn test_interpreter_error_handling() -> Result<()> {
 
     // FakeInterpreter always returns Ok with the input string,
     // so we need to modify this test to match that behavior
-    let result = interpreter.interpret("bad_command".to_string()).await;
+    let result = interpreter.interpret("bad_command").await;
 
     // The test now verifies that FakeInterpreter returns success
     assert!(result.is_ok());
@@ -37,12 +37,15 @@ async fn test_interpreter_error_handling() -> Result<()> {
 
 // This is a simplified version of how main.rs processes commands
 // It allows us to test the command processing logic without the full readline interface
-async fn process_command(interpreter: &impl InterpreterProvider, command: String) -> Result<String> {
+async fn process_command(
+    interpreter: &impl InterpreterProvider,
+    command: String,
+) -> Result<String> {
     if command == "quit" {
         return Ok("quit".to_string());
     }
 
-    interpreter.interpret(command).await
+    interpreter.interpret(&command).await
 }
 
 #[tokio::test]
