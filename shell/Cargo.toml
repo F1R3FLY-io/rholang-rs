@@ -22,7 +22,12 @@ tokio = { workspace = true }
 rustyline-async = { workspace = true }
 clap = { workspace = true }
 bracket-parser = { workspace = true }
+rholang-fake = { path = "../rholang-fake" }
 
+
+[[example]]
+name = "process_examples"
+path = "examples/process_examples.rs"
 
 [dev-dependencies]
 rstest = { workspace = true }

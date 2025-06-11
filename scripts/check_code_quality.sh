@@ -58,7 +58,14 @@ if command -v cargo-tarpaulin &> /dev/null; then
     # Run test coverage without requiring 100%
     echo "Running test coverage check..."
     coverage_output=$(cargo tarpaulin --out Stdout)
-    coverage_percentage=$(echo "$coverage_output" | grep -o '[0-9]\+\.[0-9]\+%' | head -1)
+    coverage_percentage=$(echo "$coverage_output" | grep -o '[0-9]\+\.[0-9]\+% coverage' | head -1 | sed 's/ coverage//')
+    if [ -z "$coverage_percentage" ]; then
+        # Try alternative pattern if the first one doesn't match
+        coverage_percentage=$(echo "$coverage_output" | grep -o '[0-9]\+\.[0-9]\+%' | head -1)
+    fi
+    if [ -z "$coverage_percentage" ]; then
+        coverage_percentage="0.00%"
+    fi
     echo "✅ Test coverage check completed: $coverage_percentage"
 else
     echo "ℹ️ cargo-tarpaulin not found, skipping test coverage check"
