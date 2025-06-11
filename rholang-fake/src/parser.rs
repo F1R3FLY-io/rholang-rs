@@ -1,5 +1,4 @@
 use crate::errors::{InterpretationResult, InterpreterError};
-use anyhow::anyhow;
 use anyhow::Result;
 
 /// A simple parser for Rholang code
