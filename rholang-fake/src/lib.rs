@@ -3,7 +3,11 @@ use std::collections::HashMap;
 use std::time::Duration;
 use tokio::time::sleep;
 
+pub mod errors;
 pub mod parser;
+
+// Re-export error types for convenience
+pub use errors::{ErrorKind, InterpretationResult, InterpreterError, SourcePosition};
 
 /// A simple fake interpreter for Rholang language
 /// This is not a real Rholang interpreter, but it uses the RholangParser
@@ -27,10 +31,14 @@ impl FakeRholangInterpreter {
     /// Interpret a string of Rholang code synchronously
     /// This implementation uses the RholangParser to validate the code
     /// and returns a meaningful result based on the type of Rholang construct
-    pub fn interpret(&mut self, code: &str) -> Result<String> {
+    pub fn interpret(&mut self, code: &str) -> InterpretationResult {
         // Check if the code is valid Rholang
         if !self.parser.is_valid(code) {
-            return Err(anyhow!("Invalid Rholang code"));
+            return InterpretationResult::Error(InterpreterError::parsing_error(
+                "Invalid Rholang code",
+                None,
+                Some(code.to_string()),
+            ));
         }
 
         // Trim the code to remove leading/trailing whitespace
@@ -52,13 +60,26 @@ impl FakeRholangInterpreter {
         }
     }
 
+    /// Interpret a string of Rholang code synchronously (legacy method)
+    /// This is kept for backward compatibility
+    pub fn interpret_legacy(&mut self, code: &str) -> Result<String> {
+        match self.interpret(code) {
+            InterpretationResult::Success(result) => Ok(result),
+            InterpretationResult::Error(err) => Err(anyhow!("{}", err)),
+        }
+    }
+
     /// Interpret a string of Rholang code asynchronously
     /// This implementation uses the RholangParser to validate the code
     /// and returns a meaningful result based on the type of Rholang construct
-    pub async fn interpret_async(&mut self, code: &str) -> Result<String> {
+    pub async fn interpret_async(&mut self, code: &str) -> InterpretationResult {
         // Check if the code is valid Rholang
         if !self.parser.is_valid(code) {
-            return Err(anyhow!("Invalid Rholang code"));
+            return InterpretationResult::Error(InterpreterError::parsing_error(
+                "Invalid Rholang code",
+                None,
+                Some(code.to_string()),
+            ));
         }
 
         // Trim the code to remove leading/trailing whitespace
@@ -84,13 +105,22 @@ impl FakeRholangInterpreter {
         }
     }
 
+    /// Interpret a string of Rholang code asynchronously (legacy method)
+    /// This is kept for backward compatibility
+    pub async fn interpret_async_legacy(&mut self, code: &str) -> Result<String> {
+        match self.interpret_async(code).await {
+            InterpretationResult::Success(result) => Ok(result),
+            InterpretationResult::Error(err) => Err(anyhow!("{}", err)),
+        }
+    }
+
     /// Check if the code is valid Rholang
     pub fn is_valid(&mut self, code: &str) -> bool {
         self.parser.is_valid(code)
     }
 
     /// Handle print statements like @"stdout"!("Hello, world!")
-    fn handle_print(&mut self, code: &str) -> Result<String> {
+    fn handle_print(&mut self, code: &str) -> InterpretationResult {
         // Extract the message from the print statement
         if let Some(start_idx) = code.find("@\"stdout\"!(") {
             let content_start = start_idx + "@\"stdout\"!(".len();
@@ -106,7 +136,7 @@ impl FakeRholangInterpreter {
                     message
                 };
 
-                return Ok(format!("Output: {}", message));
+                return InterpretationResult::Success(format!("Output: {}", message));
             }
         }
 
@@ -115,7 +145,7 @@ impl FakeRholangInterpreter {
     }
 
     /// Handle new declarations like new x in { ... }
-    fn handle_new_declaration(&mut self, code: &str) -> Result<String> {
+    fn handle_new_declaration(&mut self, code: &str) -> InterpretationResult {
         // Extract the name from the new declaration
         if let Some(start_idx) = code.find("new ") {
             let name_start = start_idx + "new ".len();
@@ -128,7 +158,7 @@ impl FakeRholangInterpreter {
                 self.variables
                     .insert(name.to_string(), "channel".to_string());
 
-                return Ok(format!("Created new name: {}", name));
+                return InterpretationResult::Success(format!("Created new name: {}", name));
             }
         }
 
@@ -137,7 +167,7 @@ impl FakeRholangInterpreter {
     }
 
     /// Handle for comprehensions like for (x <- y) { ... }
-    fn handle_for_comprehension(&mut self, code: &str) -> Result<String> {
+    fn handle_for_comprehension(&mut self, code: &str) -> InterpretationResult {
         // Extract the pattern and channel from the for comprehension
         if let Some(start_idx) = code.find("for (") {
             let pattern_start = start_idx + "for (".len();
@@ -150,7 +180,7 @@ impl FakeRholangInterpreter {
                     let var_name = pattern[..arrow_idx].trim();
                     let channel = pattern[arrow_idx + 2..].trim();
 
-                    return Ok(format!(
+                    return InterpretationResult::Success(format!(
                         "Listening for messages on {} as {}",
                         channel, var_name
                     ));
@@ -169,19 +199,19 @@ impl FakeRholangInterpreter {
     }
 
     /// Handle arithmetic expressions like 1 + 2 * 3
-    fn handle_arithmetic(&mut self, code: &str) -> Result<String> {
+    fn handle_arithmetic(&mut self, code: &str) -> InterpretationResult {
         // This is a very simplified evaluator for arithmetic expressions
         // In a real interpreter, we would use a proper parser and evaluator
 
         // For this fake interpreter, we'll just return a fake result
         if code.contains('+') {
-            Ok(format!("Addition expression: {}", code))
+            InterpretationResult::Success(format!("Addition expression: {}", code))
         } else if code.contains('-') {
-            Ok(format!("Subtraction expression: {}", code))
+            InterpretationResult::Success(format!("Subtraction expression: {}", code))
         } else if code.contains('*') {
-            Ok(format!("Multiplication expression: {}", code))
+            InterpretationResult::Success(format!("Multiplication expression: {}", code))
         } else if code.contains('/') {
-            Ok(format!("Division expression: {}", code))
+            InterpretationResult::Success(format!("Division expression: {}", code))
         } else {
             // Fallback to generic parse tree
             self.parser.get_tree_string(code)
@@ -204,8 +234,15 @@ mod tests {
         assert!(interpreter.is_valid("6 / 2"));
 
         // The result should contain the arithmetic expression
-        let result = interpreter.interpret("1 + 2")?;
-        assert!(result.contains("Addition expression: 1 + 2"));
+        let result = interpreter.interpret("1 + 2");
+        match result {
+            InterpretationResult::Success(output) => {
+                assert!(output.contains("Addition expression: 1 + 2"));
+            }
+            InterpretationResult::Error(err) => {
+                panic!("Expected success, got error: {}", err);
+            }
+        }
 
         Ok(())
     }
@@ -218,8 +255,15 @@ mod tests {
         assert!(interpreter.is_valid(input));
 
         // The result should contain the output message
-        let result = interpreter.interpret(input)?;
-        assert!(result.contains("Output: Hello, world!"));
+        let result = interpreter.interpret(input);
+        match result {
+            InterpretationResult::Success(output) => {
+                assert!(output.contains("Output: Hello, world!"));
+            }
+            InterpretationResult::Error(err) => {
+                panic!("Expected success, got error: {}", err);
+            }
+        }
 
         Ok(())
     }
@@ -232,8 +276,15 @@ mod tests {
         assert!(interpreter.is_valid(input));
 
         // The result should contain the listening message
-        let result = interpreter.interpret(input)?;
-        assert!(result.contains("Listening for messages on channel as msg"));
+        let result = interpreter.interpret(input);
+        match result {
+            InterpretationResult::Success(output) => {
+                assert!(output.contains("Listening for messages on channel as msg"));
+            }
+            InterpretationResult::Error(err) => {
+                panic!("Expected success, got error: {}", err);
+            }
+        }
 
         Ok(())
     }
@@ -246,8 +297,15 @@ mod tests {
         assert!(interpreter.is_valid(input));
 
         // The result should contain the created name
-        let result = interpreter.interpret(input)?;
-        assert!(result.contains("Created new name: channel"));
+        let result = interpreter.interpret(input);
+        match result {
+            InterpretationResult::Success(output) => {
+                assert!(output.contains("Created new name: channel"));
+            }
+            InterpretationResult::Error(err) => {
+                panic!("Expected success, got error: {}", err);
+            }
+        }
 
         Ok(())
     }
@@ -261,7 +319,8 @@ mod tests {
         assert!(!interpreter.is_valid(input));
 
         // Interpret should return an error for invalid code
-        assert!(interpreter.interpret(input).is_err());
+        let result = interpreter.interpret(input);
+        assert!(result.is_error());
 
         Ok(())
     }

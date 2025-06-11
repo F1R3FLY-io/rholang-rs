@@ -1,4 +1,5 @@
 use anyhow::Result;
+use rholang_fake::InterpretationResult;
 use rstest::rstest;
 
 use shell::providers::{FakeInterpreterProvider, InterpreterProvider};
@@ -8,10 +9,17 @@ async fn test_fake_interpreter_with_arithmetic() -> Result<()> {
     let interpreter = FakeInterpreterProvider;
 
     let input = "1 + 2 * 3";
-    let result = interpreter.interpret(input).await?;
+    let result = interpreter.interpret(input).await;
 
     // The fake interpreter just returns the input
-    assert_eq!(result, input);
+    match result {
+        InterpretationResult::Success(output) => {
+            assert_eq!(output, input);
+        }
+        InterpretationResult::Error(err) => {
+            panic!("Expected success, got error: {}", err);
+        }
+    }
     Ok(())
 }
 
@@ -25,8 +33,15 @@ async fn test_fake_interpreter_with_various_arithmetic(
     #[case] expected: &str,
 ) -> Result<()> {
     let interpreter = FakeInterpreterProvider;
-    let result = interpreter.interpret(input).await?;
+    let result = interpreter.interpret(input).await;
 
-    assert_eq!(result, expected);
+    match result {
+        InterpretationResult::Success(output) => {
+            assert_eq!(output, expected);
+        }
+        InterpretationResult::Error(err) => {
+            panic!("Expected success, got error: {}", err);
+        }
+    }
     Ok(())
 }

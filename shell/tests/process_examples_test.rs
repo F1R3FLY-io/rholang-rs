@@ -1,4 +1,5 @@
 use anyhow::Result;
+use rholang_fake::InterpretationResult;
 use shell::providers::{InterpreterProvider, RholangFakeInterpreterProvider};
 use std::env;
 use std::fs;
@@ -81,11 +82,11 @@ async fn test_process_examples() -> Result<()> {
 
         // Process the content using the interpreter
         match interpreter.interpret(&content).await {
-            Ok(_result) => {
+            InterpretationResult::Success(_result) => {
                 println!("Successfully interpreted file: {}", file.display());
                 success_count += 1;
             }
-            Err(e) => {
+            InterpretationResult::Error(e) => {
                 println!("Failed to interpret file {}: {}", file.display(), e);
                 error_count += 1;
             }
@@ -143,13 +144,20 @@ async fn test_process_hello_world() -> Result<()> {
     let content = read_file(&file_path)?;
 
     // Process the content using the interpreter
-    let result = interpreter.interpret(&content).await?;
+    let result = interpreter.interpret(&content).await;
 
-    // Check that the result is not empty
-    assert!(!result.is_empty(), "Result is empty");
+    match result {
+        InterpretationResult::Success(output) => {
+            // Check that the result is not empty
+            assert!(!output.is_empty(), "Result is empty");
 
-    // Print the result for debugging
-    println!("Result: {}", result);
+            // Print the result for debugging
+            println!("Result: {}", output);
+        }
+        InterpretationResult::Error(err) => {
+            panic!("Failed to interpret hello world example: {}", err);
+        }
+    }
 
     Ok(())
 }

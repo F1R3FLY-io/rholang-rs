@@ -1,4 +1,5 @@
 use anyhow::Result;
+use rholang_fake::InterpretationResult;
 use rstest::rstest;
 
 use shell::providers::{FakeInterpreterProvider, InterpreterProvider};
@@ -21,10 +22,17 @@ async fn test_multiline_buffer_handling() -> Result<()> {
     let combined = format!("{line1}\n{line2}\n{line3}");
 
     // Interpret the combined command
-    let result = interpreter.interpret(&combined).await?;
+    let result = interpreter.interpret(&combined).await;
 
-    // Verify the result matches what we'd expect from FakeInterpreter
-    assert_eq!(result, combined);
+    match result {
+        InterpretationResult::Success(output) => {
+            // Verify the result matches what we'd expect from FakeInterpreter
+            assert_eq!(output, combined);
+        }
+        InterpretationResult::Error(err) => {
+            panic!("Expected success, got error: {}", err);
+        }
+    }
 
     Ok(())
 }
@@ -44,10 +52,17 @@ async fn test_multiline_commands_joined_correctly(
     let command = input_lines.join("\n");
 
     // Interpret the command
-    let result = interpreter.interpret(&command).await?;
+    let result = interpreter.interpret(&command).await;
 
-    // Verify the result
-    assert_eq!(result, expected);
+    match result {
+        InterpretationResult::Success(output) => {
+            // Verify the result
+            assert_eq!(output, expected);
+        }
+        InterpretationResult::Error(err) => {
+            panic!("Expected success, got error: {}", err);
+        }
+    }
 
     Ok(())
 }

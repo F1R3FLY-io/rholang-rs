@@ -1,4 +1,5 @@
 use anyhow::Result;
+use rholang_fake::InterpretationResult;
 use rstest::rstest;
 
 use shell::providers::{FakeInterpreterProvider, InterpreterProvider};
@@ -8,9 +9,16 @@ async fn test_fake_interpreter_returns_input() -> Result<()> {
     let interpreter = FakeInterpreterProvider;
 
     let input = "println(\"Hello, World!\");".to_string();
-    let result = interpreter.interpret(&input).await?;
+    let result = interpreter.interpret(&input).await;
 
-    assert_eq!(result, input);
+    match result {
+        InterpretationResult::Success(output) => {
+            assert_eq!(output, input);
+        }
+        InterpretationResult::Error(err) => {
+            panic!("Expected success, got error: {}", err);
+        }
+    }
     Ok(())
 }
 
@@ -26,8 +34,15 @@ async fn test_fake_interpreter_with_various_inputs(
     #[case] expected: String,
 ) -> Result<()> {
     let interpreter = FakeInterpreterProvider;
-    let result = interpreter.interpret(&input).await?;
+    let result = interpreter.interpret(&input).await;
 
-    assert_eq!(result, expected);
+    match result {
+        InterpretationResult::Success(output) => {
+            assert_eq!(output, expected);
+        }
+        InterpretationResult::Error(err) => {
+            panic!("Expected success, got error: {}", err);
+        }
+    }
     Ok(())
 }

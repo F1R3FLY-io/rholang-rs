@@ -4,6 +4,7 @@ use anyhow::Result;
 use bracket_parser::{BracketParser, BracketState};
 use clap::Parser;
 use providers::InterpreterProvider;
+use rholang_fake::InterpretationResult;
 use rustyline_async::{Readline, ReadlineEvent};
 use std::io::Write;
 
@@ -275,8 +276,8 @@ pub async fn run_shell<I: InterpreterProvider>(
                         writeln!(stdout, "Executing code: {command}")?;
                         let result = interpreter.interpret(&command).await;
                         match result {
-                            Ok(output) => writeln!(stdout, "Output: {output}")?,
-                            Err(e) => writeln!(stdout, "Error interpreting line: {e}")?,
+                            InterpretationResult::Success(output) => writeln!(stdout, "Output: {output}")?,
+                            InterpretationResult::Error(e) => writeln!(stdout, "Error interpreting line: {e}")?,
                         }
                     }
                 }

@@ -1,6 +1,7 @@
 use anyhow::Result;
 
 // Correctly import from the shell crate
+use rholang_fake::InterpretationResult;
 use shell::providers::{FakeInterpreterProvider, InterpreterProvider};
 
 #[tokio::test]
@@ -9,12 +10,27 @@ async fn test_interpreter_receives_commands() -> Result<()> {
     let interpreter = FakeInterpreterProvider;
 
     // Call our interpreter
-    let result1 = interpreter.interpret("command1").await?;
-    let result2 = interpreter.interpret("command2").await?;
+    let result1 = interpreter.interpret("command1").await;
+    let result2 = interpreter.interpret("command2").await;
 
     // With FakeInterpreter, we expect the output to be the same as input
-    assert_eq!(result1, "command1");
-    assert_eq!(result2, "command2");
+    match result1 {
+        InterpretationResult::Success(output) => {
+            assert_eq!(output, "command1");
+        }
+        InterpretationResult::Error(err) => {
+            panic!("Expected success, got error: {}", err);
+        }
+    }
+
+    match result2 {
+        InterpretationResult::Success(output) => {
+            assert_eq!(output, "command2");
+        }
+        InterpretationResult::Error(err) => {
+            panic!("Expected success, got error: {}", err);
+        }
+    }
 
     Ok(())
 }
@@ -23,14 +39,19 @@ async fn test_interpreter_receives_commands() -> Result<()> {
 async fn test_interpreter_error_handling() -> Result<()> {
     let interpreter = FakeInterpreterProvider;
 
-    // FakeInterpreter always returns Ok with the input string,
+    // FakeInterpreter always returns Success with the input string,
     // so we need to modify this test to match that behavior
     let result = interpreter.interpret("bad_command").await;
 
     // The test now verifies that FakeInterpreter returns success
-    assert!(result.is_ok());
-    let output = result.unwrap();
-    assert_eq!(output, "bad_command");
+    match result {
+        InterpretationResult::Success(output) => {
+            assert_eq!(output, "bad_command");
+        }
+        InterpretationResult::Error(err) => {
+            panic!("Expected success, got error: {}", err);
+        }
+    }
 
     Ok(())
 }
@@ -45,7 +66,10 @@ async fn process_command(
         return Ok("quit".to_string());
     }
 
-    interpreter.interpret(&command).await
+    match interpreter.interpret(&command).await {
+        InterpretationResult::Success(output) => Ok(output),
+        InterpretationResult::Error(err) => Err(anyhow::anyhow!("{}", err)),
+    }
 }
 
 #[tokio::test]

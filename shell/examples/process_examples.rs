@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use rholang_fake::InterpretationResult;
 use shell::providers::{InterpreterProvider, RholangFakeInterpreterProvider};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -39,11 +40,11 @@ async fn process_file(interpreter: &RholangFakeInterpreterProvider, path: &Path)
 
     // Process the content using the interpreter
     match interpreter.interpret(&content).await {
-        Ok(result) => {
+        InterpretationResult::Success(result) => {
             println!("Result: {}", result);
             Ok(())
         }
-        Err(e) => {
+        InterpretationResult::Error(e) => {
             println!("Error: {}", e);
             Err(anyhow!(
                 "Failed to interpret file {}: {}",

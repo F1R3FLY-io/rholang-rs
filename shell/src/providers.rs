@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use rholang_fake::FakeRholangInterpreter;
+use rholang_fake::{FakeRholangInterpreter, InterpretationResult, InterpreterError};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -13,7 +13,7 @@ use tokio::time::timeout;
 #[async_trait]
 pub trait InterpreterProvider {
     /// Interpret a string of code and return the result
-    async fn interpret(&self, code: &str) -> Result<String>;
+    async fn interpret(&self, code: &str) -> InterpretationResult;
 
     /// List all running processes
     /// Returns a vector of tuples containing the process ID and the code being executed
@@ -34,9 +34,9 @@ pub struct FakeInterpreterProvider;
 
 #[async_trait]
 impl InterpreterProvider for FakeInterpreterProvider {
-    async fn interpret(&self, code: &str) -> Result<String> {
+    async fn interpret(&self, code: &str) -> InterpretationResult {
         // Fake implementation: just returns the input code
-        Ok(code.to_string())
+        InterpretationResult::Success(code.to_string())
     }
 
     /// List all running processes
@@ -94,13 +94,25 @@ impl RholangFakeInterpreterProvider {
 /// Implementation of the InterpreterProvider trait for the fake Rholang interpreter
 #[async_trait]
 impl InterpreterProvider for RholangFakeInterpreterProvider {
-    async fn interpret(&self, code: &str) -> Result<String> {
+    async fn interpret(&self, code: &str) -> InterpretationResult {
         // Create a new interpreter for each call to avoid mutability issues
-        let mut interpreter = FakeRholangInterpreter::new()?;
+        let mut interpreter = match FakeRholangInterpreter::new() {
+            Ok(interpreter) => interpreter,
+            Err(e) => {
+                return InterpretationResult::Error(InterpreterError::other_error(format!(
+                    "Failed to create interpreter: {}",
+                    e
+                )))
+            }
+        };
 
         // Use the interpreter to parse and validate the code
         if !interpreter.is_valid(code) {
-            return Err(anyhow!("Invalid Rholang code"));
+            return InterpretationResult::Error(InterpreterError::parsing_error(
+                "Invalid Rholang code",
+                None,
+                Some(code.to_string()),
+            ));
         }
 
         // Clone the code for the process info and for the task
@@ -116,9 +128,15 @@ impl InterpreterProvider for RholangFakeInterpreterProvider {
 
         // Get the next process ID
         let pid = {
-            let mut next_pid = next_pid
-                .lock()
-                .map_err(|e| anyhow!("Failed to lock next_pid: {}", e))?;
+            let mut next_pid = match next_pid.lock() {
+                Ok(guard) => guard,
+                Err(e) => {
+                    return InterpretationResult::Error(InterpreterError::other_error(format!(
+                        "Failed to lock next_pid: {}",
+                        e
+                    )))
+                }
+            };
             let pid = *next_pid;
             *next_pid += 1;
             pid
@@ -126,9 +144,15 @@ impl InterpreterProvider for RholangFakeInterpreterProvider {
 
         // Store the process info
         {
-            let mut processes = processes
-                .lock()
-                .map_err(|e| anyhow!("Failed to lock processes: {}", e))?;
+            let mut processes = match processes.lock() {
+                Ok(guard) => guard,
+                Err(e) => {
+                    return InterpretationResult::Error(InterpreterError::other_error(format!(
+                        "Failed to lock processes: {}",
+                        e
+                    )))
+                }
+            };
             processes.insert(
                 pid,
                 ProcessInfo {
@@ -154,25 +178,37 @@ impl InterpreterProvider for RholangFakeInterpreterProvider {
                 result = timeout_future => {
                     match result {
                         Ok(result) => result,
-                        Err(_) => Err(anyhow!("Interpreter timed out after 30 seconds")),
+                        Err(_) => InterpretationResult::Error(InterpreterError::timeout_error("Interpreter timed out after 30 seconds")),
                     }
                 }
                 _ = cancel_future => {
-                    Err(anyhow!("Interpreter was cancelled"))
+                    InterpretationResult::Error(InterpreterError::cancellation_error("Interpreter was cancelled"))
                 }
             }
         });
 
         // Wait for the task to complete
-        let result = handle.await.map_err(|e| anyhow!("Task error: {}", e))??;
+        let result = match handle.await {
+            Ok(result) => result,
+            Err(e) => InterpretationResult::Error(InterpreterError::other_error(format!(
+                "Task error: {}",
+                e
+            ))),
+        };
 
         // Remove the process from the map
-        let mut processes = processes
-            .lock()
-            .map_err(|e| anyhow!("Failed to lock processes: {}", e))?;
+        let mut processes = match self.processes.lock() {
+            Ok(guard) => guard,
+            Err(e) => {
+                return InterpretationResult::Error(InterpreterError::other_error(format!(
+                    "Failed to lock processes: {}",
+                    e
+                )))
+            }
+        };
         processes.remove(&pid);
 
-        Ok(result)
+        result
     }
 
     /// List all running processes
