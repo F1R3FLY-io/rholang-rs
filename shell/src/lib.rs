@@ -22,20 +22,41 @@ pub fn help_message() -> String {
         + "\n  .list - List all edited lines"
         + "\n  .delete or .del - Remove the last edited line"
         + "\n  .reset or Ctrl+C - Interrupt current input (in multiline mode: clear buffer)"
+        + "\n  .ps - List all running processes"
+        + "\n  .kill <index> - Kill a running process by index"
         + "\n  .quit - Exit the shell"
 }
 
 /// Process a special command (starting with '.')
 /// Returns true if the command was processed, false otherwise
-pub fn process_special_command<W: Write>(
+pub fn process_special_command<W: Write, I: InterpreterProvider>(
     command: &str,
     buffer: &mut Vec<String>,
     multiline: &mut bool,
     stdout: &mut W,
     update_prompt: impl FnOnce(&str) -> Result<()>,
+    interpreter: &I,
 ) -> Result<bool> {
     if !command.starts_with('.') {
         return Ok(false);
+    }
+
+    // Check for .kill command with an index
+    if command.starts_with(".kill ") {
+        let parts: Vec<&str> = command.splitn(2, ' ').collect();
+        if parts.len() == 2 {
+            if let Ok(pid) = parts[1].trim().parse::<usize>() {
+                match interpreter.kill_process(pid) {
+                    Ok(true) => writeln!(stdout, "Process {} killed successfully", pid)?,
+                    Ok(false) => writeln!(stdout, "Process {} not found", pid)?,
+                    Err(e) => writeln!(stdout, "Error killing process {}: {}", pid, e)?,
+                }
+                return Ok(false);
+            } else {
+                writeln!(stdout, "Invalid process ID: {}", parts[1])?;
+                return Ok(false);
+            }
+        }
     }
 
     match command {
@@ -80,6 +101,19 @@ pub fn process_special_command<W: Write>(
         ".buffer" => {
             writeln!(stdout, "Current buffer: {:?}", buffer)?;
         }
+        ".ps" => match interpreter.list_processes() {
+            Ok(processes) => {
+                if processes.is_empty() {
+                    writeln!(stdout, "No running processes")?;
+                } else {
+                    writeln!(stdout, "Running processes:")?;
+                    for (pid, code) in processes {
+                        writeln!(stdout, "  {}: {}", pid, code)?;
+                    }
+                }
+            }
+            Err(e) => writeln!(stdout, "Error listing processes: {}", e)?,
+        },
         _ => {
             writeln!(stdout, "Unknown command: {command}")?;
         }
@@ -152,16 +186,27 @@ pub fn process_single_line_input(
 }
 
 /// Handle an interrupt event (Ctrl+C)
-pub fn handle_interrupt<W: Write>(
+pub fn handle_interrupt<W: Write, I: InterpreterProvider>(
     buffer: &mut Vec<String>,
     multiline: bool,
     stdout: &mut W,
     update_prompt: impl FnOnce(&str) -> Result<()>,
+    interpreter: &I,
 ) -> Result<()> {
     // Clear buffer in multiline mode
     if multiline {
         buffer.clear();
         update_prompt(">>> ")?;
+    }
+
+    // Kill all running processes
+    match interpreter.kill_all_processes() {
+        Ok(count) => {
+            if count > 0 {
+                writeln!(stdout, "Killed {} running processes", count)?;
+            }
+        }
+        Err(e) => writeln!(stdout, "Error killing processes: {}", e)?,
     }
 
     writeln!(stdout, "Input interrupted with Ctrl+C")?;
@@ -196,6 +241,7 @@ pub async fn run_shell<I: InterpreterProvider>(
                         &mut multiline,
                         &mut stdout,
                         |prompt| Ok(rl.update_prompt(prompt)?),
+                        &interpreter,
                     )?;
 
                     if should_exit {
@@ -243,6 +289,7 @@ pub async fn run_shell<I: InterpreterProvider>(
                         multiline,
                         &mut stdout,
                         |prompt| Ok(rl.update_prompt(prompt)?),
+                        &interpreter,
                     )?;
                     continue;
                 }

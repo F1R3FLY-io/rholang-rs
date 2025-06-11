@@ -3,13 +3,20 @@ use std::io::Cursor;
 
 use shell::{
     handle_interrupt, process_multiline_input, process_single_line_input, process_special_command,
+    providers::FakeInterpreterProvider,
 };
+
+// Helper function to create a fake interpreter provider
+fn create_fake_interpreter() -> FakeInterpreterProvider {
+    FakeInterpreterProvider
+}
 
 #[tokio::test]
 async fn test_process_special_command_help() -> Result<()> {
     let mut buffer = Vec::new();
     let mut multiline = true;
     let mut stdout = Cursor::new(Vec::new());
+    let interpreter = create_fake_interpreter();
 
     let should_exit = process_special_command(
         ".help",
@@ -17,6 +24,7 @@ async fn test_process_special_command_help() -> Result<()> {
         &mut multiline,
         &mut stdout,
         |_| Ok(()),
+        &interpreter,
     )?;
 
     assert!(!should_exit, "Help command should not exit");
@@ -38,6 +46,7 @@ async fn test_process_special_command_mode() -> Result<()> {
     let mut buffer = Vec::new();
     let mut multiline = true;
     let mut stdout = Cursor::new(Vec::new());
+    let interpreter = create_fake_interpreter();
 
     let should_exit = process_special_command(
         ".mode",
@@ -45,6 +54,7 @@ async fn test_process_special_command_mode() -> Result<()> {
         &mut multiline,
         &mut stdout,
         |_| Ok(()),
+        &interpreter,
     )?;
 
     assert!(!should_exit, "Mode command should not exit");
@@ -67,6 +77,7 @@ async fn test_process_special_command_mode_to_multiline() -> Result<()> {
     let mut buffer = Vec::new();
     let mut multiline = false; // Start in single line mode
     let mut stdout = Cursor::new(Vec::new());
+    let interpreter = create_fake_interpreter();
 
     let should_exit = process_special_command(
         ".mode",
@@ -74,6 +85,7 @@ async fn test_process_special_command_mode_to_multiline() -> Result<()> {
         &mut multiline,
         &mut stdout,
         |_| Ok(()),
+        &interpreter,
     )?;
 
     assert!(!should_exit, "Mode command should not exit");
@@ -96,6 +108,7 @@ async fn test_process_special_command_quit() -> Result<()> {
     let mut buffer = Vec::new();
     let mut multiline = true;
     let mut stdout = Cursor::new(Vec::new());
+    let interpreter = create_fake_interpreter();
 
     let should_exit = process_special_command(
         ".quit",
@@ -103,6 +116,7 @@ async fn test_process_special_command_quit() -> Result<()> {
         &mut multiline,
         &mut stdout,
         |_| Ok(()),
+        &interpreter,
     )?;
 
     assert!(should_exit, "Quit command should exit");
@@ -124,6 +138,7 @@ async fn test_process_special_command_list() -> Result<()> {
     let mut buffer = vec!["line1".to_string(), "line2".to_string()];
     let mut multiline = true;
     let mut stdout = Cursor::new(Vec::new());
+    let interpreter = create_fake_interpreter();
 
     let should_exit = process_special_command(
         ".list",
@@ -131,6 +146,7 @@ async fn test_process_special_command_list() -> Result<()> {
         &mut multiline,
         &mut stdout,
         |_| Ok(()),
+        &interpreter,
     )?;
 
     assert!(!should_exit, "List command should not exit");
@@ -143,8 +159,8 @@ async fn test_process_special_command_list() -> Result<()> {
         output.contains("Edited lines:"),
         "List header not displayed"
     );
-    assert!(output.contains("line1"), "First line not displayed");
-    assert!(output.contains("line2"), "Second line not displayed");
+    assert!(output.contains("line1"), "First line not in list output");
+    assert!(output.contains("line2"), "Second line not in list output");
 
     Ok(())
 }
@@ -154,11 +170,16 @@ async fn test_process_special_command_delete() -> Result<()> {
     let mut buffer = vec!["line1".to_string(), "line2".to_string()];
     let mut multiline = true;
     let mut stdout = Cursor::new(Vec::new());
+    let interpreter = create_fake_interpreter();
 
-    let should_exit =
-        process_special_command(".delete", &mut buffer, &mut multiline, &mut stdout, |_| {
-            Ok(())
-        })?;
+    let should_exit = process_special_command(
+        ".delete",
+        &mut buffer,
+        &mut multiline,
+        &mut stdout,
+        |_| Ok(()),
+        &interpreter,
+    )?;
 
     assert!(!should_exit, "Delete command should not exit");
     assert_eq!(buffer.len(), 1, "Buffer should have one item left");
@@ -181,11 +202,16 @@ async fn test_process_special_command_delete_empty() -> Result<()> {
     let mut buffer = Vec::new();
     let mut multiline = true;
     let mut stdout = Cursor::new(Vec::new());
+    let interpreter = create_fake_interpreter();
 
-    let should_exit =
-        process_special_command(".delete", &mut buffer, &mut multiline, &mut stdout, |_| {
-            Ok(())
-        })?;
+    let should_exit = process_special_command(
+        ".delete",
+        &mut buffer,
+        &mut multiline,
+        &mut stdout,
+        |_| Ok(()),
+        &interpreter,
+    )?;
 
     assert!(!should_exit, "Delete command should not exit");
 
@@ -206,11 +232,16 @@ async fn test_process_special_command_reset() -> Result<()> {
     let mut buffer = vec!["line1".to_string(), "line2".to_string()];
     let mut multiline = true;
     let mut stdout = Cursor::new(Vec::new());
+    let interpreter = create_fake_interpreter();
 
-    let should_exit =
-        process_special_command(".reset", &mut buffer, &mut multiline, &mut stdout, |_| {
-            Ok(())
-        })?;
+    let should_exit = process_special_command(
+        ".reset",
+        &mut buffer,
+        &mut multiline,
+        &mut stdout,
+        |_| Ok(()),
+        &interpreter,
+    )?;
 
     assert!(!should_exit, "Reset command should not exit");
     assert!(buffer.is_empty(), "Buffer should be empty after reset");
@@ -232,11 +263,16 @@ async fn test_process_special_command_buffer() -> Result<()> {
     let mut buffer = vec!["line1".to_string(), "line2".to_string()];
     let mut multiline = true;
     let mut stdout = Cursor::new(Vec::new());
+    let interpreter = create_fake_interpreter();
 
-    let should_exit =
-        process_special_command(".buffer", &mut buffer, &mut multiline, &mut stdout, |_| {
-            Ok(())
-        })?;
+    let should_exit = process_special_command(
+        ".buffer",
+        &mut buffer,
+        &mut multiline,
+        &mut stdout,
+        |_| Ok(()),
+        &interpreter,
+    )?;
 
     assert!(!should_exit, "Buffer command should not exit");
 
@@ -259,11 +295,16 @@ async fn test_process_special_command_unknown() -> Result<()> {
     let mut buffer = Vec::new();
     let mut multiline = true;
     let mut stdout = Cursor::new(Vec::new());
+    let interpreter = create_fake_interpreter();
 
-    let should_exit =
-        process_special_command(".unknown", &mut buffer, &mut multiline, &mut stdout, |_| {
-            Ok(())
-        })?;
+    let should_exit = process_special_command(
+        ".unknown",
+        &mut buffer,
+        &mut multiline,
+        &mut stdout,
+        |_| Ok(()),
+        &interpreter,
+    )?;
 
     assert!(!should_exit, "Unknown command should not exit");
 
@@ -284,6 +325,7 @@ async fn test_process_special_command_not_special() -> Result<()> {
     let mut buffer = Vec::new();
     let mut multiline = true;
     let mut stdout = Cursor::new(Vec::new());
+    let interpreter = create_fake_interpreter();
 
     let should_exit = process_special_command(
         "not_special",
@@ -291,11 +333,13 @@ async fn test_process_special_command_not_special() -> Result<()> {
         &mut multiline,
         &mut stdout,
         |_| Ok(()),
+        &interpreter,
     )?;
 
     assert!(!should_exit, "Non-special command should not exit");
-    assert!(
-        stdout.get_ref().is_empty(),
+    assert_eq!(
+        stdout.get_ref().len(),
+        0,
         "No output should be produced for non-special commands"
     );
 
@@ -308,10 +352,7 @@ async fn test_process_multiline_input_empty_buffer_empty_line() -> Result<()> {
 
     let command = process_multiline_input("".to_string(), &mut buffer, |_| Ok(()))?;
 
-    assert!(
-        command.is_none(),
-        "Empty line with empty buffer should not produce a command"
-    );
+    assert!(command.is_none(), "Empty line should not produce a command");
     assert!(buffer.is_empty(), "Buffer should remain empty");
 
     Ok(())
@@ -321,54 +362,45 @@ async fn test_process_multiline_input_empty_buffer_empty_line() -> Result<()> {
 async fn test_process_multiline_input_empty_buffer_with_line() -> Result<()> {
     let mut buffer = Vec::new();
 
-    let command = process_multiline_input("let x = 10;".to_string(), &mut buffer, |_| Ok(()))?;
+    let command = process_multiline_input("line1".to_string(), &mut buffer, |_| Ok(()))?;
 
     assert!(command.is_none(), "First line should not produce a command");
     assert_eq!(buffer.len(), 1, "Buffer should have one item");
-    assert_eq!(
-        buffer[0], "let x = 10;",
-        "Buffer should contain the input line"
-    );
+    assert_eq!(buffer[0], "line1", "Buffer should contain the input line");
 
     Ok(())
 }
 
 #[tokio::test]
 async fn test_process_multiline_input_add_line() -> Result<()> {
-    let mut buffer = vec!["let x = 10;".to_string()];
+    let mut buffer = vec!["line1".to_string()];
 
-    let command = process_multiline_input("let y = 20;".to_string(), &mut buffer, |_| Ok(()))?;
+    let command = process_multiline_input("line2".to_string(), &mut buffer, |_| Ok(()))?;
 
     assert!(
         command.is_none(),
         "Adding a line should not produce a command"
     );
     assert_eq!(buffer.len(), 2, "Buffer should have two items");
-    assert_eq!(buffer[0], "let x = 10;", "First line should be preserved");
-    assert_eq!(buffer[1], "let y = 20;", "Second line should be added");
+    assert_eq!(buffer[0], "line1", "First line should be preserved");
+    assert_eq!(buffer[1], "line2", "Second line should be added");
 
     Ok(())
 }
 
 #[tokio::test]
 async fn test_process_multiline_input_execute() -> Result<()> {
-    let mut buffer = vec!["let x = 10;".to_string(), "let y = 20;".to_string()];
+    let mut buffer = vec!["line1".to_string(), "line2".to_string()];
 
     let command = process_multiline_input("".to_string(), &mut buffer, |_| Ok(()))?;
 
-    assert!(
-        command.is_some(),
-        "Empty line with non-empty buffer should produce a command"
-    );
+    assert!(command.is_some(), "Empty line should produce a command");
     assert_eq!(
         command.unwrap(),
-        "let x = 10;\nlet y = 20;",
-        "Command should be all lines joined"
+        "line1\nline2",
+        "Command should be all lines joined with newlines"
     );
-    assert!(
-        buffer.is_empty(),
-        "Buffer should be cleared after execution"
-    );
+    assert!(buffer.is_empty(), "Buffer should be cleared");
 
     Ok(())
 }
@@ -443,8 +475,15 @@ async fn test_handle_interrupt_multiline() -> Result<()> {
     let mut buffer = vec!["line1".to_string(), "line2".to_string()];
     let multiline = true;
     let mut stdout = Cursor::new(Vec::new());
+    let interpreter = create_fake_interpreter();
 
-    handle_interrupt(&mut buffer, multiline, &mut stdout, |_| Ok(()))?;
+    handle_interrupt(
+        &mut buffer,
+        multiline,
+        &mut stdout,
+        |_| Ok(()),
+        &interpreter,
+    )?;
 
     assert!(
         buffer.is_empty(),
@@ -468,8 +507,15 @@ async fn test_handle_interrupt_single_line() -> Result<()> {
     let mut buffer = vec!["line1".to_string(), "line2".to_string()];
     let multiline = false;
     let mut stdout = Cursor::new(Vec::new());
+    let interpreter = create_fake_interpreter();
 
-    handle_interrupt(&mut buffer, multiline, &mut stdout, |_| Ok(()))?;
+    handle_interrupt(
+        &mut buffer,
+        multiline,
+        &mut stdout,
+        |_| Ok(()),
+        &interpreter,
+    )?;
 
     assert_eq!(
         buffer.len(),

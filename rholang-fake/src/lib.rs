@@ -1,5 +1,7 @@
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
+use std::time::Duration;
+use tokio::time::sleep;
 
 pub mod parser;
 
@@ -22,7 +24,7 @@ impl FakeRholangInterpreter {
         })
     }
 
-    /// Interpret a string of Rholang code
+    /// Interpret a string of Rholang code synchronously
     /// This implementation uses the RholangParser to validate the code
     /// and returns a meaningful result based on the type of Rholang construct
     pub fn interpret(&mut self, code: &str) -> Result<String> {
@@ -33,6 +35,38 @@ impl FakeRholangInterpreter {
 
         // Trim the code to remove leading/trailing whitespace
         let code = code.trim();
+
+        // Handle different Rholang constructs
+        // Check for the more specific constructs first
+        if code.starts_with("new ") && code.contains(" in ") {
+            self.handle_new_declaration(code)
+        } else if code.starts_with("for (") && code.contains("<-") {
+            self.handle_for_comprehension(code)
+        } else if code.contains("@\"stdout\"!(") {
+            self.handle_print(code)
+        } else if self.is_arithmetic_expression(code) {
+            self.handle_arithmetic(code)
+        } else {
+            // If no specific handler, return a generic parse tree
+            self.parser.get_tree_string(code)
+        }
+    }
+
+    /// Interpret a string of Rholang code asynchronously
+    /// This implementation uses the RholangParser to validate the code
+    /// and returns a meaningful result based on the type of Rholang construct
+    pub async fn interpret_async(&mut self, code: &str) -> Result<String> {
+        // Check if the code is valid Rholang
+        if !self.parser.is_valid(code) {
+            return Err(anyhow!("Invalid Rholang code"));
+        }
+
+        // Trim the code to remove leading/trailing whitespace
+        let code = code.trim();
+
+        // Simulate a delay to represent processing time
+        // This makes the interpreter run asynchronously
+        sleep(Duration::from_millis(100)).await;
 
         // Handle different Rholang constructs
         // Check for the more specific constructs first
