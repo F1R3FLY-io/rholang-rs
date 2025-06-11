@@ -60,15 +60,6 @@ impl FakeRholangInterpreter {
         }
     }
 
-    /// Interpret a string of Rholang code synchronously (legacy method)
-    /// This is kept for backward compatibility
-    pub fn interpret_legacy(&mut self, code: &str) -> Result<String> {
-        match self.interpret(code) {
-            InterpretationResult::Success(result) => Ok(result),
-            InterpretationResult::Error(err) => Err(anyhow!("{}", err)),
-        }
-    }
-
     /// Interpret a string of Rholang code asynchronously
     /// This implementation uses the RholangParser to validate the code
     /// and returns a meaningful result based on the type of Rholang construct
@@ -102,15 +93,6 @@ impl FakeRholangInterpreter {
         } else {
             // If no specific handler, return a generic parse tree
             self.parser.get_tree_string(code)
-        }
-    }
-
-    /// Interpret a string of Rholang code asynchronously (legacy method)
-    /// This is kept for backward compatibility
-    pub async fn interpret_async_legacy(&mut self, code: &str) -> Result<String> {
-        match self.interpret_async(code).await {
-            InterpretationResult::Success(result) => Ok(result),
-            InterpretationResult::Error(err) => Err(anyhow!("{}", err)),
         }
     }
 

@@ -53,15 +53,6 @@ impl RholangParser {
             ))
         }
     }
-
-    /// Get a string representation of the parse tree (legacy method)
-    /// This is kept for backward compatibility
-    pub fn get_tree_string_legacy(&mut self, code: &str) -> Result<String> {
-        match self.get_tree_string(code) {
-            InterpretationResult::Success(result) => Ok(result),
-            InterpretationResult::Error(err) => Err(anyhow!("{}", err)),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -86,7 +77,7 @@ mod tests {
         let mut parser = RholangParser::new()?;
         let code = "new channel in { @\"stdout\"!(\"Hello, world!\") }";
 
-        // Test the new InterpretationResult-based method
+        // Test the InterpretationResult-based method
         let result = parser.get_tree_string(code);
         match result {
             InterpretationResult::Success(tree_string) => {
@@ -96,10 +87,6 @@ mod tests {
                 panic!("Expected success, got error: {}", err);
             }
         }
-
-        // Also test the legacy method for backward compatibility
-        let tree_string = parser.get_tree_string_legacy(code)?;
-        assert!(tree_string.starts_with("Parse tree:"));
 
         Ok(())
     }
