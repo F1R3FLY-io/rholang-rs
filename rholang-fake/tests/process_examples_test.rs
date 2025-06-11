@@ -35,6 +35,8 @@ fn read_file(path: &Path) -> Result<String> {
 async fn test_process_examples() -> Result<()> {
     // Create the interpreter
     let mut interpreter = FakeRholangInterpreter::new()?;
+    // Set delay to 0 for tests
+    interpreter.set_delay(0);
 
     // Find all Rholang files in the examples directory
     let current_dir = env::current_dir()?;
@@ -108,6 +110,8 @@ async fn test_process_examples() -> Result<()> {
 async fn test_process_hello_world() -> Result<()> {
     // Create the interpreter
     let mut interpreter = FakeRholangInterpreter::new()?;
+    // Set delay to 0 for tests
+    interpreter.set_delay(0);
 
     // Path to the hello world example
     let current_dir = env::current_dir()?;

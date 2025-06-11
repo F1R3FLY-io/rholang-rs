@@ -74,11 +74,14 @@ struct ProcessInfo {
 
 /// Provider for the fake Rholang interpreter
 /// This implements the InterpreterProvider trait
+#[derive(Clone)]
 pub struct RholangFakeInterpreterProvider {
     /// Map of process ID to process information
     processes: Arc<Mutex<HashMap<usize, ProcessInfo>>>,
     /// Next process ID to assign
     next_pid: Arc<Mutex<usize>>,
+    /// Delay for async interpretation (in milliseconds)
+    delay_ms: Arc<Mutex<u64>>,
 }
 
 impl RholangFakeInterpreterProvider {
@@ -87,7 +90,18 @@ impl RholangFakeInterpreterProvider {
         Ok(RholangFakeInterpreterProvider {
             processes: Arc::new(Mutex::new(HashMap::new())),
             next_pid: Arc::new(Mutex::new(1)),
+            delay_ms: Arc::new(Mutex::new(2000)), // Default delay: 2 seconds
         })
+    }
+
+    /// Set the delay for async interpretation
+    pub fn set_delay(&self, delay_ms: u64) -> Result<()> {
+        let mut delay = self
+            .delay_ms
+            .lock()
+            .map_err(|e| anyhow!("Failed to lock delay_ms: {}", e))?;
+        *delay = delay_ms;
+        Ok(())
     }
 }
 
@@ -105,6 +119,18 @@ impl InterpreterProvider for RholangFakeInterpreterProvider {
                 )))
             }
         };
+
+        // Set the delay for the interpreter
+        let delay = match self.delay_ms.lock() {
+            Ok(guard) => *guard,
+            Err(e) => {
+                return InterpretationResult::Error(InterpreterError::other_error(format!(
+                    "Failed to lock delay_ms: {}",
+                    e
+                )))
+            }
+        };
+        interpreter.set_delay(delay);
 
         // Use the interpreter to parse and validate the code
         if !interpreter.is_valid(code) {

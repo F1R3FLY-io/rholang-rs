@@ -16,16 +16,25 @@ pub struct FakeRholangInterpreter {
     parser: parser::RholangParser,
     // Store variables for the interpreter
     variables: HashMap<String, String>,
+    // Delay for async interpretation (in milliseconds)
+    delay_ms: u64,
 }
 
 impl FakeRholangInterpreter {
     /// Create a new instance of the fake Rholang interpreter
+    /// Default delay for async interpretation is 2 seconds
     pub fn new() -> Result<Self> {
         let parser = parser::RholangParser::new()?;
         Ok(FakeRholangInterpreter {
             parser,
             variables: HashMap::new(),
+            delay_ms: 2000, // Default delay: 2 seconds
         })
+    }
+
+    /// Set the delay for async interpretation
+    pub fn set_delay(&mut self, delay_ms: u64) {
+        self.delay_ms = delay_ms;
     }
 
     /// Interpret a string of Rholang code synchronously
@@ -78,7 +87,7 @@ impl FakeRholangInterpreter {
 
         // Simulate a delay to represent processing time
         // This makes the interpreter run asynchronously
-        sleep(Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(self.delay_ms)).await;
 
         // Handle different Rholang constructs
         // Check for the more specific constructs first
