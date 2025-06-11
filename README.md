@@ -29,6 +29,28 @@ This Rust implementation aims to provide:
 - Rust (latest stable version)
 - Cargo package manager
 
+### Rust Setup
+
+This project currently uses Rust Edition 2021 for maximum compatibility. To prepare for future 2024 edition migration:
+
+```bash
+# Update to the latest stable Rust version
+rustup update stable
+
+# Set stable as default (if not already)
+rustup default stable
+
+# Verify your Rust version
+rustc --version
+cargo --version
+
+# For future 2024 edition support, you may need nightly:
+# rustup install nightly
+# rustup default nightly
+```
+
+**Note**: Edition 2024 requires Cargo 1.85+ with the feature stabilized. Currently using Edition 2021 and resolver v2 for stable compatibility.
+
 ### Building the Project
 
 ```bash
@@ -36,21 +58,27 @@ This Rust implementation aims to provide:
 git clone <repository-url>
 cd rholang-rs
 
-# Build the project
+# Build the entire workspace
 cargo build
 
 # Build for release (optimized)
 cargo build --release
+
+# Build specific workspace member
+cargo build -p shell
 ```
 
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run all tests in workspace
 cargo test
 
 # Run tests with verbose output
 cargo test -- --nocapture
+
+# Run tests for specific workspace member
+cargo test -p shell
 
 # Run specific test module
 cargo test <module_name>
@@ -74,21 +102,28 @@ cargo clippy
 # Run Clippy with all features and strict mode
 cargo clippy --all-features --all-targets -- -D warnings
 
-# Check for security vulnerabilities
+# Fix code style issues automatically
+cargo fix --bin "rhosh"
+
+# Check for security vulnerabilities (requires cargo-audit)
+cargo install cargo-audit
 cargo audit
 ```
 
 ### Running the Interpreter
 
 ```bash
-# Run the interpreter
-cargo run
+# Run the Rholang shell (rhosh)
+cargo run -p shell
 
-# Run with specific Rholang file
-cargo run -- <file.rho>
+# Run with specific arguments
+cargo run -p shell -- --help
 
-# Run in REPL mode
-cargo run -- --repl
+# Run the interpreter binary directly after building
+./target/debug/rhosh
+
+# Run the release version
+./target/release/rhosh
 ```
 
 ## Development
@@ -97,13 +132,18 @@ cargo run -- --repl
 
 ```
 rholang-rs/
-├── src/
-│   ├── parser/          # Rholang syntax parser
-│   ├── interpreter/     # Core interpreter logic
-│   ├── runtime/         # Runtime environment
-│   └── repl/           # Interactive REPL
-├── tests/              # Integration tests
-└── examples/           # Example Rholang programs
+├── Cargo.toml           # Workspace configuration
+├── shell/               # Rholang interpreter shell (rhosh)
+│   ├── Cargo.toml       # Shell package configuration
+│   ├── src/
+│   │   ├── main.rs      # Shell entry point
+│   │   ├── lib.rs       # Library modules
+│   │   ├── interpreter.rs    # Core interpreter logic
+│   │   ├── rh_interpreter.rs # Rholang-specific interpreter
+│   │   └── main_sync.rs # Synchronous main alternative
+│   └── tests/           # Shell integration tests
+├── README.md
+└── CLAUDE.md           # Project instructions for Claude
 ```
 
 ### Code Style Guidelines
@@ -127,6 +167,9 @@ cargo test --lib
 
 # Run integration tests only
 cargo test --test '*'
+
+# Run tests for shell package
+cargo test -p shell
 
 # Run benchmarks
 cargo bench
