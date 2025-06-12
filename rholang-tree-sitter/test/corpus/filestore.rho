@@ -1,0 +1,173 @@
+==============================================
+Example filestore.rho
+==============================================
+
+new AddData, GetData, store, stdout(`rho:io:stdout`) in {
+   contract AddData(@key, @data, ack) = {
+     for (@map <- store) {
+       store!(map.set(key, data)) | ack!(Nil)
+     }
+   } |
+   contract GetData(@key, ret) = {
+     for (@map <- store) {
+       ret!(map.get(key))
+     }
+   } |
+   store!({}) |
+   new uriAddData, uriGetData, register(`rho:registry:insertArbitrary`) in {
+     register!(bundle+{*AddData}, *uriAddData) |
+     register!(bundle+{*GetData}, *uriGetData) |
+     for (@uri1 <- uriAddData; @uri2 <- uriGetData) {
+       stdout!({"AddData URI": uri1, "GetData URI": uri2})
+     }
+   }
+ }
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var))
+      (name_decl
+        (var))
+      (name_decl
+        (var))
+      (name_decl
+        (var)
+        uri: (uri_literal)))
+    proc: (block
+      (par
+        (par
+          (par
+            (contract
+              name: (var)
+              formals: (names
+                (quote
+                  (var))
+                (quote
+                  (var))
+                (var))
+              proc: (block
+                (input
+                  receipts: (receipts
+                    (receipt
+                      (linear_bind
+                        names: (names
+                          (quote
+                            (var)))
+                        input: (simple_source
+                          (var)))))
+                  proc: (block
+                    (par
+                      (send
+                        channel: (var)
+                        send_type: (send_single)
+                        inputs: (inputs
+                          (method
+                            receiver: (var)
+                            name: (var)
+                            args: (args
+                              (var)
+                              (var)))))
+                      (send
+                        channel: (var)
+                        send_type: (send_single)
+                        inputs: (inputs
+                          (nil))))))))
+            (contract
+              name: (var)
+              formals: (names
+                (quote
+                  (var))
+                (var))
+              proc: (block
+                (input
+                  receipts: (receipts
+                    (receipt
+                      (linear_bind
+                        names: (names
+                          (quote
+                            (var)))
+                        input: (simple_source
+                          (var)))))
+                  proc: (block
+                    (send
+                      channel: (var)
+                      send_type: (send_single)
+                      inputs: (inputs
+                        (method
+                          receiver: (var)
+                          name: (var)
+                          args: (args
+                            (var))))))))))
+          (send
+            channel: (var)
+            send_type: (send_single)
+            inputs: (inputs
+              (collection
+                (map)))))
+        (new
+          decls: (name_decls
+            (name_decl
+              (var))
+            (name_decl
+              (var))
+            (name_decl
+              (var)
+              uri: (uri_literal)))
+          proc: (block
+            (par
+              (par
+                (send
+                  channel: (var)
+                  send_type: (send_single)
+                  inputs: (inputs
+                    (bundle
+                      bundle_type: (bundle_write)
+                      proc: (block
+                        (eval
+                          (var))))
+                    (eval
+                      (var))))
+                (send
+                  channel: (var)
+                  send_type: (send_single)
+                  inputs: (inputs
+                    (bundle
+                      bundle_type: (bundle_write)
+                      proc: (block
+                        (eval
+                          (var))))
+                    (eval
+                      (var)))))
+              (input
+                receipts: (receipts
+                  (receipt
+                    (linear_bind
+                      names: (names
+                        (quote
+                          (var)))
+                      input: (simple_source
+                        (var))))
+                  (receipt
+                    (linear_bind
+                      names: (names
+                        (quote
+                          (var)))
+                      input: (simple_source
+                        (var)))))
+                proc: (block
+                  (send
+                    channel: (var)
+                    send_type: (send_single)
+                    inputs: (inputs
+                      (collection
+                        (map
+                          (key_value_pair
+                            key: (string_literal)
+                            value: (var))
+                          (key_value_pair
+                            key: (string_literal)
+                            value: (var)))))))))))))))

@@ -1,0 +1,329 @@
+==============================================
+Set methods
+==============================================
+
+// all methods modifying the underlying collection return new Set
+new stdout(`rho:io:stdout`) in {
+
+  // prints true
+  stdout!(Set(1,2,3).contains(1)) |
+
+  // prints false
+  stdout!(Set(1,2,3).contains(5)) |
+
+  // prints [1,2,3,4]
+  stdout!(Set(1,2,3).add(4).toList()) |
+
+  // prints Set(1,2,3) because duplicates are not allowed
+  stdout!(Set(1,2,3).add(1)) |
+
+  // prints Set(1,2)
+  stdout!(Set(1,2,3).delete(3)) |
+
+  // prints Set(1,2,3)
+  stdout!(Set(1,2,3).delete(4)) |
+
+  // prints Set(1, 2, 3, 4, 5, 6)
+  stdout!(Set(1,2,3).union(Set(4,5,6))) |
+
+  // prints Set(1, 2, 3)
+  stdout!(Set(1,2,3).union(Set(1))) |
+
+  // prints Set(2, 3)
+  stdout!(Set(1,2,3).diff(Set(1))) |
+
+  // prints Set(1,2,3)
+  stdout!(Set(1,2,3).diff(Set(4))) |
+
+  // prints false
+  new x in {
+    stdout!(Set(x!(7)).contains(x!(10)))
+  } |
+
+  // prints @{Set(@{_some_unforgeable_name}!(7), for( @{x0} <- @{_same_unforgeable_name} ) { @{"stdout"}!(x0) })}
+  new x in {
+    stdout!(Set(x!(7)).add(for (@X <- x) { stdout!(X) }))
+  } |
+
+  // prints true
+  new x in { x!(10) | for(X <- x) { stdout!(Set(X!(7)).add(*X).contains(10)) }} |
+
+  // prints 3
+  stdout!(Set(1,2,3).size())
+}
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var)
+        uri: (uri_literal)))
+    proc: (block
+      (par
+        (par
+          (par
+            (par
+              (par
+                (par
+                  (par
+                    (par
+                      (par
+                        (par
+                          (par
+                            (par
+                              (par
+                                (send
+                                  channel: (var)
+                                  send_type: (send_single)
+                                  inputs: (inputs
+                                    (method
+                                      receiver: (collection
+                                        (set
+                                          (long_literal)
+                                          (long_literal)
+                                          (long_literal)))
+                                      name: (var)
+                                      args: (args
+                                        (long_literal)))))
+                                (send
+                                  channel: (var)
+                                  send_type: (send_single)
+                                  inputs: (inputs
+                                    (method
+                                      receiver: (collection
+                                        (set
+                                          (long_literal)
+                                          (long_literal)
+                                          (long_literal)))
+                                      name: (var)
+                                      args: (args
+                                        (long_literal))))))
+                              (send
+                                channel: (var)
+                                send_type: (send_single)
+                                inputs: (inputs
+                                  (method
+                                    receiver: (method
+                                      receiver: (collection
+                                        (set
+                                          (long_literal)
+                                          (long_literal)
+                                          (long_literal)))
+                                      name: (var)
+                                      args: (args
+                                        (long_literal)))
+                                    name: (var)
+                                    args: (args)))))
+                            (send
+                              channel: (var)
+                              send_type: (send_single)
+                              inputs: (inputs
+                                (method
+                                  receiver: (collection
+                                    (set
+                                      (long_literal)
+                                      (long_literal)
+                                      (long_literal)))
+                                  name: (var)
+                                  args: (args
+                                    (long_literal))))))
+                          (send
+                            channel: (var)
+                            send_type: (send_single)
+                            inputs: (inputs
+                              (method
+                                receiver: (collection
+                                  (set
+                                    (long_literal)
+                                    (long_literal)
+                                    (long_literal)))
+                                name: (var)
+                                args: (args
+                                  (long_literal))))))
+                        (send
+                          channel: (var)
+                          send_type: (send_single)
+                          inputs: (inputs
+                            (method
+                              receiver: (collection
+                                (set
+                                  (long_literal)
+                                  (long_literal)
+                                  (long_literal)))
+                              name: (var)
+                              args: (args
+                                (long_literal))))))
+                      (send
+                        channel: (var)
+                        send_type: (send_single)
+                        inputs: (inputs
+                          (method
+                            receiver: (collection
+                              (set
+                                (long_literal)
+                                (long_literal)
+                                (long_literal)))
+                            name: (var)
+                            args: (args
+                              (collection
+                                (set
+                                  (long_literal)
+                                  (long_literal)
+                                  (long_literal))))))))
+                    (send
+                      channel: (var)
+                      send_type: (send_single)
+                      inputs: (inputs
+                        (method
+                          receiver: (collection
+                            (set
+                              (long_literal)
+                              (long_literal)
+                              (long_literal)))
+                          name: (var)
+                          args: (args
+                            (collection
+                              (set
+                                (long_literal))))))))
+                  (send
+                    channel: (var)
+                    send_type: (send_single)
+                    inputs: (inputs
+                      (method
+                        receiver: (collection
+                          (set
+                            (long_literal)
+                            (long_literal)
+                            (long_literal)))
+                        name: (var)
+                        args: (args
+                          (collection
+                            (set
+                              (long_literal))))))))
+                (send
+                  channel: (var)
+                  send_type: (send_single)
+                  inputs: (inputs
+                    (method
+                      receiver: (collection
+                        (set
+                          (long_literal)
+                          (long_literal)
+                          (long_literal)))
+                      name: (var)
+                      args: (args
+                        (collection
+                          (set
+                            (long_literal))))))))
+              (new
+                decls: (name_decls
+                  (name_decl
+                    (var)))
+                proc: (block
+                  (send
+                    channel: (var)
+                    send_type: (send_single)
+                    inputs: (inputs
+                      (method
+                        receiver: (collection
+                          (set
+                            (send
+                              channel: (var)
+                              send_type: (send_single)
+                              inputs: (inputs
+                                (long_literal)))))
+                        name: (var)
+                        args: (args
+                          (send
+                            channel: (var)
+                            send_type: (send_single)
+                            inputs: (inputs
+                              (long_literal))))))))))
+            (new
+              decls: (name_decls
+                (name_decl
+                  (var)))
+              proc: (block
+                (send
+                  channel: (var)
+                  send_type: (send_single)
+                  inputs: (inputs
+                    (method
+                      receiver: (collection
+                        (set
+                          (send
+                            channel: (var)
+                            send_type: (send_single)
+                            inputs: (inputs
+                              (long_literal)))))
+                      name: (var)
+                      args: (args
+                        (input
+                          receipts: (receipts
+                            (receipt
+                              (linear_bind
+                                names: (names
+                                  (quote
+                                    (var)))
+                                input: (simple_source
+                                  (var)))))
+                          proc: (block
+                            (send
+                              channel: (var)
+                              send_type: (send_single)
+                              inputs: (inputs
+                                (var))))))))))))
+          (new
+            decls: (name_decls
+              (name_decl
+                (var)))
+            proc: (block
+              (par
+                (send
+                  channel: (var)
+                  send_type: (send_single)
+                  inputs: (inputs
+                    (long_literal)))
+                (input
+                  receipts: (receipts
+                    (receipt
+                      (linear_bind
+                        names: (names
+                          (var))
+                        input: (simple_source
+                          (var)))))
+                  proc: (block
+                    (send
+                      channel: (var)
+                      send_type: (send_single)
+                      inputs: (inputs
+                        (method
+                          receiver: (method
+                            receiver: (collection
+                              (set
+                                (send
+                                  channel: (var)
+                                  send_type: (send_single)
+                                  inputs: (inputs
+                                    (long_literal)))))
+                            name: (var)
+                            args: (args
+                              (eval
+                                (var))))
+                          name: (var)
+                          args: (args
+                            (long_literal)))))))))))
+        (send
+          channel: (var)
+          send_type: (send_single)
+          inputs: (inputs
+            (method
+              receiver: (collection
+                (set
+                  (long_literal)
+                  (long_literal)
+                  (long_literal)))
+              name: (var)
+              args: (args))))))))

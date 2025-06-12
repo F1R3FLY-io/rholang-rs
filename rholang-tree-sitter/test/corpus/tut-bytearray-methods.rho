@@ -1,0 +1,68 @@
+==============================================
+Method chains
+==============================================
+
+new x, y, stdout(`rho:io:stdout`) in {
+
+  stdout!({
+    "nth for byte array": "deadbeef".hexToBytes().nth(3),
+    "expected": 239 // 0xef
+  })
+  |
+  stdout!({
+    "length for byte array": "deadbeef".hexToBytes().length(),
+    "expected": 4
+  })
+}
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var))
+      (name_decl
+        (var))
+      (name_decl
+        (var)
+        uri: (uri_literal)))
+    proc: (block
+      (par
+        (send
+          channel: (var)
+          send_type: (send_single)
+          inputs: (inputs
+            (collection
+              (map
+                (key_value_pair
+                  key: (string_literal)
+                  value: (method
+                    receiver: (method
+                      receiver: (string_literal)
+                      name: (var)
+                      args: (args))
+                    name: (var)
+                    args: (args
+                      (long_literal))))
+                (key_value_pair
+                  key: (string_literal)
+                  value: (long_literal))))))
+        (send
+          channel: (var)
+          send_type: (send_single)
+          inputs: (inputs
+            (collection
+              (map
+                (key_value_pair
+                  key: (string_literal)
+                  value: (method
+                    receiver: (method
+                      receiver: (string_literal)
+                      name: (var)
+                      args: (args))
+                    name: (var)
+                    args: (args)))
+                (key_value_pair
+                  key: (string_literal)
+                  value: (long_literal))))))))))

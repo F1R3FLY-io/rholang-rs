@@ -1,0 +1,76 @@
+==============================================
+String methods
+==============================================
+
+new stdout(`rho:io:stdout`) in {
+
+  // prints 11
+  stdout!("Hello World".length()) |
+
+  // prints llo Wo
+  stdout!("Hello World".slice(2, 8)) |
+
+  // prints Hello World
+  stdout!("Hello " ++ "World") |
+
+  // prints a40be5 as a byte array, not a string
+  stdout!("A40BE5".hexToBytes()) |
+
+  // evaluates to something, but not something useful
+  stdout!("Hello World".hexToBytes())
+}
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var)
+        uri: (uri_literal)))
+    proc: (block
+      (par
+        (par
+          (par
+            (par
+              (send
+                channel: (var)
+                send_type: (send_single)
+                inputs: (inputs
+                  (method
+                    receiver: (string_literal)
+                    name: (var)
+                    args: (args))))
+              (send
+                channel: (var)
+                send_type: (send_single)
+                inputs: (inputs
+                  (method
+                    receiver: (string_literal)
+                    name: (var)
+                    args: (args
+                      (long_literal)
+                      (long_literal))))))
+            (send
+              channel: (var)
+              send_type: (send_single)
+              inputs: (inputs
+                (concat
+                  (string_literal)
+                  (string_literal)))))
+          (send
+            channel: (var)
+            send_type: (send_single)
+            inputs: (inputs
+              (method
+                receiver: (string_literal)
+                name: (var)
+                args: (args)))))
+        (send
+          channel: (var)
+          send_type: (send_single)
+          inputs: (inputs
+            (method
+              receiver: (string_literal)
+              name: (var)
+              args: (args))))))))

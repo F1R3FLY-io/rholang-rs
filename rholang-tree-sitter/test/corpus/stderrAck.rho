@@ -1,0 +1,47 @@
+==============================================
+Stderr with ack
+==============================================
+
+new ack, stderr(`rho:io:stderr`), stderrAck(`rho:io:stderrAck`) in {
+  stderrAck!("hello, world!", *ack) |
+  for (_ <- ack) {
+    stderr!("received")
+  }
+}
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var))
+      (name_decl
+        (var)
+        uri: (uri_literal))
+      (name_decl
+        (var)
+        uri: (uri_literal)))
+    proc: (block
+      (par
+        (send
+          channel: (var)
+          send_type: (send_single)
+          inputs: (inputs
+            (string_literal)
+            (eval
+              (var))))
+        (input
+          receipts: (receipts
+            (receipt
+              (linear_bind
+                names: (names
+                  (wildcard))
+                input: (simple_source
+                  (var)))))
+          proc: (block
+            (send
+              channel: (var)
+              send_type: (send_single)
+              inputs: (inputs
+                (string_literal)))))))))

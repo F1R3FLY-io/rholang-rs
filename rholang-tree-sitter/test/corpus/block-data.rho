@@ -1,0 +1,77 @@
+==============================================
+Example block-data.rho
+==============================================
+
+new blockData(`rho:block:data`), stdout(`rho:io:stdout`), retCh in {
+  blockData!(*retCh) |
+  for(@blockNumber, @timestamp, @sender <- retCh) {
+      stdout!({"block number": blockNumber}) |
+      stdout!({"block time": timestamp})|
+      stdout!({"block sender": sender})
+  }
+}
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var)
+        uri: (uri_literal))
+      (name_decl
+        (var)
+        uri: (uri_literal))
+      (name_decl
+        (var)))
+    proc: (block
+      (par
+        (send
+          channel: (var)
+          send_type: (send_single)
+          inputs: (inputs
+            (eval
+              (var))))
+        (input
+          receipts: (receipts
+            (receipt
+              (linear_bind
+                names: (names
+                  (quote
+                    (var))
+                  (quote
+                    (var))
+                  (quote
+                    (var)))
+                input: (simple_source
+                  (var)))))
+          proc: (block
+            (par
+              (par
+                (send
+                  channel: (var)
+                  send_type: (send_single)
+                  inputs: (inputs
+                    (collection
+                      (map
+                        (key_value_pair
+                          key: (string_literal)
+                          value: (var))))))
+                (send
+                  channel: (var)
+                  send_type: (send_single)
+                  inputs: (inputs
+                    (collection
+                      (map
+                        (key_value_pair
+                          key: (string_literal)
+                          value: (var)))))))
+              (send
+                channel: (var)
+                send_type: (send_single)
+                inputs: (inputs
+                  (collection
+                    (map
+                      (key_value_pair
+                        key: (string_literal)
+                        value: (var)))))))))))))

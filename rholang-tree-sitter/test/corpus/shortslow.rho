@@ -1,0 +1,49 @@
+==============================================
+Example shortslow.rho
+==============================================
+
+new loop in {
+  contract loop(@n) = {
+    match n {
+      0 => Nil
+      _ => loop!(n-1)
+    }
+  } |
+  loop!(32768)
+}
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var)))
+    proc: (block
+      (par
+        (contract
+          name: (var)
+          formals: (names
+            (quote
+              (var)))
+          proc: (block
+            (match
+              expression: (var)
+              cases: (cases
+                (case
+                  pattern: (long_literal)
+                  proc: (nil))
+                (case
+                  pattern: (wildcard)
+                  proc: (send
+                    channel: (var)
+                    send_type: (send_single)
+                    inputs: (inputs
+                      (sub
+                        (var)
+                        (long_literal)))))))))
+        (send
+          channel: (var)
+          send_type: (send_single)
+          inputs: (inputs
+            (long_literal)))))))

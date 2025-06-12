@@ -1,0 +1,61 @@
+==============================================
+Contract definition in new
+==============================================
+
+// Test the contract
+new ret in {
+  // Define a contract named `loopback`
+  contract loopback(@input, return) = {
+    return!(input)
+  }
+  |
+  loopback!("Hello, world!", *ret) |
+  for(@msg <- ret) {
+    stdout!(msg)
+  }
+}
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var)))
+    proc: (block
+      (par
+        (par
+          (contract
+            name: (var)
+            formals: (names
+              (quote
+                (var))
+              (var))
+            proc: (block
+              (send
+                channel: (var)
+                send_type: (send_single)
+                inputs: (inputs
+                  (var)))))
+          (send
+            channel: (var)
+            send_type: (send_single)
+            inputs: (inputs
+              (string_literal)
+              (eval
+                (var)))))
+        (input
+          receipts: (receipts
+            (receipt
+              (linear_bind
+                names: (names
+                  (quote
+                    (var)))
+                input: (simple_source
+                  (var)))))
+          proc: (block
+            (send
+              channel: (var)
+              send_type: (send_single)
+              inputs: (inputs
+                (var)))))))))

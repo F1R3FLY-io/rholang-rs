@@ -1,0 +1,22 @@
+==============================================
+Stderr
+==============================================
+
+new stderr(`rho:io:stderr`) in {
+  stderr!("hello, world!")
+}
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var)
+        uri: (uri_literal)))
+    proc: (block
+      (send
+        channel: (var)
+        send_type: (send_single)
+        inputs: (inputs
+          (string_literal))))))

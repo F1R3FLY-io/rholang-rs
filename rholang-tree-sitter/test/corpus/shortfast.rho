@@ -1,0 +1,19 @@
+==============================================
+simple new
+==============================================
+
+new x in { x!(0) }
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var)))
+    proc: (block
+      (send
+        channel: (var)
+        send_type: (send_single)
+        inputs: (inputs
+          (long_literal))))))

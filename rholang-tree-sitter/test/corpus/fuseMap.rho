@@ -1,0 +1,140 @@
+==============================================
+Example fuseMap.rho
+==============================================
+
+new map, stdout(`rho:io:stdout`) in {
+   // Create a map
+   map!({}) |
+
+   // Insert a key-value pair into the map
+   for(@m <- map) {
+     map!(m.set("key1", "value1")) |
+     stdout!("Inserted 'key1' with 'value1' into the map.")
+   } |
+
+   // Retrieve the value associated with a key from the map
+   for(m <- map) {
+     new lookupResponse in {
+       m!("get", "key1", *lookupResponse) |
+       for(@value <- lookupResponse) {
+         stdout!(value)
+       }
+     }
+   } |
+
+   // Remove a key-value pair from the map
+   for(@m <- map) {
+     map!(m.delete("key1")) |
+     stdout!("Removed 'key1' from the map.")
+   }
+ }
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var))
+      (name_decl
+        (var)
+        uri: (uri_literal)))
+    proc: (block
+      (par
+        (par
+          (par
+            (send
+              channel: (var)
+              send_type: (send_single)
+              inputs: (inputs
+                (collection
+                  (map))))
+            (input
+              receipts: (receipts
+                (receipt
+                  (linear_bind
+                    names: (names
+                      (quote
+                        (var)))
+                    input: (simple_source
+                      (var)))))
+              proc: (block
+                (par
+                  (send
+                    channel: (var)
+                    send_type: (send_single)
+                    inputs: (inputs
+                      (method
+                        receiver: (var)
+                        name: (var)
+                        args: (args
+                          (string_literal)
+                          (string_literal)))))
+                  (send
+                    channel: (var)
+                    send_type: (send_single)
+                    inputs: (inputs
+                      (string_literal)))))))
+          (input
+            receipts: (receipts
+              (receipt
+                (linear_bind
+                  names: (names
+                    (var))
+                  input: (simple_source
+                    (var)))))
+            proc: (block
+              (new
+                decls: (name_decls
+                  (name_decl
+                    (var)))
+                proc: (block
+                  (par
+                    (send
+                      channel: (var)
+                      send_type: (send_single)
+                      inputs: (inputs
+                        (string_literal)
+                        (string_literal)
+                        (eval
+                          (var))))
+                    (input
+                      receipts: (receipts
+                        (receipt
+                          (linear_bind
+                            names: (names
+                              (quote
+                                (var)))
+                            input: (simple_source
+                              (var)))))
+                      proc: (block
+                        (send
+                          channel: (var)
+                          send_type: (send_single)
+                          inputs: (inputs
+                            (var)))))))))))
+        (input
+          receipts: (receipts
+            (receipt
+              (linear_bind
+                names: (names
+                  (quote
+                    (var)))
+                input: (simple_source
+                  (var)))))
+          proc: (block
+            (par
+              (send
+                channel: (var)
+                send_type: (send_single)
+                inputs: (inputs
+                  (method
+                    receiver: (var)
+                    name: (var)
+                    args: (args
+                      (string_literal)))))
+              (send
+                channel: (var)
+                send_type: (send_single)
+                inputs: (inputs
+                  (string_literal))))))))))

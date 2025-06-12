@@ -1,0 +1,150 @@
+==============================================
+Example tut-prime.rho
+==============================================
+
+new loop, primeCheck, stdoutAck(`rho:io:stdoutAck`) in {
+  contract loop(@x) = {
+    match x {
+      [] => Nil
+      [head ...tail] => {
+        new ret in {
+          for (_ <- ret) {
+            loop!(tail)
+          } | primeCheck!(head, *ret)
+        }
+      }
+    }
+  } |
+  contract primeCheck(@x, ret) = {
+    match x {
+      Nil => stdoutAck!("Nil", *ret)
+      ~{~Nil | ~Nil} => stdoutAck!("Prime", *ret)
+      _ => stdoutAck!("Composite", *ret)
+    }
+  } |
+  loop!([Nil, 7, 7 | 8, 9 | Nil, 9 | 10, Nil, 9])
+}
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var))
+      (name_decl
+        (var))
+      (name_decl
+        (var)
+        uri: (uri_literal)))
+    proc: (block
+      (par
+        (par
+          (contract
+            name: (var)
+            formals: (names
+              (quote
+                (var)))
+            proc: (block
+              (match
+                expression: (var)
+                cases: (cases
+                  (case
+                    pattern: (collection
+                      (list))
+                    proc: (nil))
+                  (case
+                    pattern: (collection
+                      (list
+                        (var)
+                        remainder: (var)))
+                    proc: (block
+                      (new
+                        decls: (name_decls
+                          (name_decl
+                            (var)))
+                        proc: (block
+                          (par
+                            (input
+                              receipts: (receipts
+                                (receipt
+                                  (linear_bind
+                                    names: (names
+                                      (wildcard))
+                                    input: (simple_source
+                                      (var)))))
+                              proc: (block
+                                (send
+                                  channel: (var)
+                                  send_type: (send_single)
+                                  inputs: (inputs
+                                    (var)))))
+                            (send
+                              channel: (var)
+                              send_type: (send_single)
+                              inputs: (inputs
+                                (var)
+                                (eval
+                                  (var)))))))))))))
+          (contract
+            name: (var)
+            formals: (names
+              (quote
+                (var))
+              (var))
+            proc: (block
+              (match
+                expression: (var)
+                cases: (cases
+                  (case
+                    pattern: (nil)
+                    proc: (send
+                      channel: (var)
+                      send_type: (send_single)
+                      inputs: (inputs
+                        (string_literal)
+                        (eval
+                          (var)))))
+                  (case
+                    pattern: (negation
+                      (block
+                        (par
+                          (negation
+                            (nil))
+                          (negation
+                            (nil)))))
+                    proc: (send
+                      channel: (var)
+                      send_type: (send_single)
+                      inputs: (inputs
+                        (string_literal)
+                        (eval
+                          (var)))))
+                  (case
+                    pattern: (wildcard)
+                    proc: (send
+                      channel: (var)
+                      send_type: (send_single)
+                      inputs: (inputs
+                        (string_literal)
+                        (eval
+                          (var))))))))))
+        (send
+          channel: (var)
+          send_type: (send_single)
+          inputs: (inputs
+            (collection
+              (list
+                (nil)
+                (long_literal)
+                (par
+                  (long_literal)
+                  (long_literal))
+                (par
+                  (long_literal)
+                  (nil))
+                (par
+                  (long_literal)
+                  (long_literal))
+                (nil)
+                (long_literal)))))))))

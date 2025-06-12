@@ -1,0 +1,120 @@
+==============================================
+Example dupe.rho
+==============================================
+
+new dupe in {
+  contract dupe(@depth) = {
+    if (depth <= 0) {
+      Nil
+    } else {
+      dupe!(depth - 1) | dupe!(depth - 1) | dupe!(depth - 1) | dupe!(depth - 1) | dupe!(depth - 1) | dupe!(depth - 1) | dupe!(depth - 1) | dupe!(depth - 1) | dupe!(depth - 1) | dupe!(depth - 1)
+    }
+  } | dupe!(2)
+}
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var)))
+    proc: (block
+      (par
+        (contract
+          name: (var)
+          formals: (names
+            (quote
+              (var)))
+          proc: (block
+            (ifElse
+              condition: (lte
+                (var)
+                (long_literal))
+              consequence: (block
+                (nil))
+              alternative: (block
+                (par
+                  (par
+                    (par
+                      (par
+                        (par
+                          (par
+                            (par
+                              (par
+                                (par
+                                  (send
+                                    channel: (var)
+                                    send_type: (send_single)
+                                    inputs: (inputs
+                                      (sub
+                                        (var)
+                                        (long_literal))))
+                                  (send
+                                    channel: (var)
+                                    send_type: (send_single)
+                                    inputs: (inputs
+                                      (sub
+                                        (var)
+                                        (long_literal)))))
+                                (send
+                                  channel: (var)
+                                  send_type: (send_single)
+                                  inputs: (inputs
+                                    (sub
+                                      (var)
+                                      (long_literal)))))
+                              (send
+                                channel: (var)
+                                send_type: (send_single)
+                                inputs: (inputs
+                                  (sub
+                                    (var)
+                                    (long_literal)))))
+                            (send
+                              channel: (var)
+                              send_type: (send_single)
+                              inputs: (inputs
+                                (sub
+                                  (var)
+                                  (long_literal)))))
+                          (send
+                            channel: (var)
+                            send_type: (send_single)
+                            inputs: (inputs
+                              (sub
+                                (var)
+                                (long_literal)))))
+                        (send
+                          channel: (var)
+                          send_type: (send_single)
+                          inputs: (inputs
+                            (sub
+                              (var)
+                              (long_literal)))))
+                      (send
+                        channel: (var)
+                        send_type: (send_single)
+                        inputs: (inputs
+                          (sub
+                            (var)
+                            (long_literal)))))
+                    (send
+                      channel: (var)
+                      send_type: (send_single)
+                      inputs: (inputs
+                        (sub
+                          (var)
+                          (long_literal)))))
+                  (send
+                    channel: (var)
+                    send_type: (send_single)
+                    inputs: (inputs
+                      (sub
+                        (var)
+                        (long_literal)))))))))
+        (send
+          channel: (var)
+          send_type: (send_single)
+          inputs: (inputs
+            (long_literal)))))))

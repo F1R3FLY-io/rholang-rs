@@ -1,0 +1,169 @@
+==============================================
+Example fileinteract.rho
+==============================================
+
+new AddData(`rho:registry:lookup`), GetData(`rho:registry:lookup`), ack, ret in {
+   AddData!("uri1", *addData) |
+   GetData!("uri2", *getData) |
+   for (@add <- addData; @get <- getData) {
+     contract callAddData(@key, @data) = {
+       add!(key, data, ack)
+     } |
+     contract callGetData(@key, result) = {
+       get!(key, result)
+     } |
+     new key, data in {
+       key!("myKey") | data!("myData".hexToBytes()) |
+       callAddData!(*key, *data) |
+       for (_ <- ack) {
+         callGetData!(*key, ret) |
+         for (@data <- ret) {
+           stdout!(data)
+         }
+       }
+     }
+   }
+ }
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var)
+        uri: (uri_literal))
+      (name_decl
+        (var)
+        uri: (uri_literal))
+      (name_decl
+        (var))
+      (name_decl
+        (var)))
+    proc: (block
+      (par
+        (par
+          (send
+            channel: (var)
+            send_type: (send_single)
+            inputs: (inputs
+              (string_literal)
+              (eval
+                (var))))
+          (send
+            channel: (var)
+            send_type: (send_single)
+            inputs: (inputs
+              (string_literal)
+              (eval
+                (var)))))
+        (input
+          receipts: (receipts
+            (receipt
+              (linear_bind
+                names: (names
+                  (quote
+                    (var)))
+                input: (simple_source
+                  (var))))
+            (receipt
+              (linear_bind
+                names: (names
+                  (quote
+                    (var)))
+                input: (simple_source
+                  (var)))))
+          proc: (block
+            (par
+              (par
+                (contract
+                  name: (var)
+                  formals: (names
+                    (quote
+                      (var))
+                    (quote
+                      (var)))
+                  proc: (block
+                    (send
+                      channel: (var)
+                      send_type: (send_single)
+                      inputs: (inputs
+                        (var)
+                        (var)
+                        (var)))))
+                (contract
+                  name: (var)
+                  formals: (names
+                    (quote
+                      (var))
+                    (var))
+                  proc: (block
+                    (send
+                      channel: (var)
+                      send_type: (send_single)
+                      inputs: (inputs
+                        (var)
+                        (var))))))
+              (new
+                decls: (name_decls
+                  (name_decl
+                    (var))
+                  (name_decl
+                    (var)))
+                proc: (block
+                  (par
+                    (par
+                      (par
+                        (send
+                          channel: (var)
+                          send_type: (send_single)
+                          inputs: (inputs
+                            (string_literal)))
+                        (send
+                          channel: (var)
+                          send_type: (send_single)
+                          inputs: (inputs
+                            (method
+                              receiver: (string_literal)
+                              name: (var)
+                              args: (args)))))
+                      (send
+                        channel: (var)
+                        send_type: (send_single)
+                        inputs: (inputs
+                          (eval
+                            (var))
+                          (eval
+                            (var)))))
+                    (input
+                      receipts: (receipts
+                        (receipt
+                          (linear_bind
+                            names: (names
+                              (wildcard))
+                            input: (simple_source
+                              (var)))))
+                      proc: (block
+                        (par
+                          (send
+                            channel: (var)
+                            send_type: (send_single)
+                            inputs: (inputs
+                              (eval
+                                (var))
+                              (var)))
+                          (input
+                            receipts: (receipts
+                              (receipt
+                                (linear_bind
+                                  names: (names
+                                    (quote
+                                      (var)))
+                                  input: (simple_source
+                                    (var)))))
+                            proc: (block
+                              (send
+                                channel: (var)
+                                send_type: (send_single)
+                                inputs: (inputs
+                                  (var))))))))))))))))))

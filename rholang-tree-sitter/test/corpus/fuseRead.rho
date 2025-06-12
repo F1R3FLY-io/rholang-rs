@@ -1,0 +1,88 @@
+==============================================
+Example fuseRead.rho
+==============================================
+
+new fuseRead,
+     fr(`rho:registry:fuseRead`),
+     stdout(`rho:io:stdout`),
+     stdoutAck(`rho:io:stdoutAck`), ack in {
+         contract fuseRead(@uri, result) = {
+             stdout!("REGISTRY_SIMPLE_LOOKUP_TEST: looking up X in the registry using identifier") |
+             new lookupResponse in {
+                 rl!(uri, *lookupResponse) |
+                 for(@val <- lookupResponse) {
+                     stdout!("REGISTRY_SIMPLE_LOOKUP_TEST: got X from the registry using identifier") |
+                     stdoutAck!(val, *result)
+                 }
+             }
+         }
+     }
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var))
+      (name_decl
+        (var)
+        uri: (uri_literal))
+      (name_decl
+        (var)
+        uri: (uri_literal))
+      (name_decl
+        (var)
+        uri: (uri_literal))
+      (name_decl
+        (var)))
+    proc: (block
+      (contract
+        name: (var)
+        formals: (names
+          (quote
+            (var))
+          (var))
+        proc: (block
+          (par
+            (send
+              channel: (var)
+              send_type: (send_single)
+              inputs: (inputs
+                (string_literal)))
+            (new
+              decls: (name_decls
+                (name_decl
+                  (var)))
+              proc: (block
+                (par
+                  (send
+                    channel: (var)
+                    send_type: (send_single)
+                    inputs: (inputs
+                      (var)
+                      (eval
+                        (var))))
+                  (input
+                    receipts: (receipts
+                      (receipt
+                        (linear_bind
+                          names: (names
+                            (quote
+                              (var)))
+                          input: (simple_source
+                            (var)))))
+                    proc: (block
+                      (par
+                        (send
+                          channel: (var)
+                          send_type: (send_single)
+                          inputs: (inputs
+                            (string_literal)))
+                        (send
+                          channel: (var)
+                          send_type: (send_single)
+                          inputs: (inputs
+                            (var)
+                            (eval
+                              (var))))))))))))))))

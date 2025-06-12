@@ -1,0 +1,89 @@
+==============================================
+Test simple types and connectives
+==============================================
+
+new orExample, stdout(`rho:io:stdout`) in {
+  contract orExample(@record) = {
+    match record {
+     {{"name" : {name /\ String},  "age": {age /\ {Int \/ String}}}} => stdout!(["Hello, ", name, " aged ", age])
+    }
+  } |
+  orExample!({"name" : "Joe", "age": 40}) |
+  orExample!({"name": "Bob", "age": "41"})
+}
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var))
+      (name_decl
+        (var)
+        uri: (uri_literal)))
+    proc: (block
+      (par
+        (par
+          (contract
+            name: (var)
+            formals: (names
+              (quote
+                (var)))
+            proc: (block
+              (match
+                expression: (var)
+                cases: (cases
+                  (case
+                    pattern: (block
+                      (collection
+                        (map
+                          (key_value_pair
+                            key: (string_literal)
+                            value: (block
+                              (conjunction
+                                (var)
+                                (simple_type))))
+                          (key_value_pair
+                            key: (string_literal)
+                            value: (block
+                              (conjunction
+                                (var)
+                                (block
+                                  (disjunction
+                                    (simple_type)
+                                    (simple_type)))))))))
+                    proc: (send
+                      channel: (var)
+                      send_type: (send_single)
+                      inputs: (inputs
+                        (collection
+                          (list
+                            (string_literal)
+                            (var)
+                            (string_literal)
+                            (var))))))))))
+          (send
+            channel: (var)
+            send_type: (send_single)
+            inputs: (inputs
+              (collection
+                (map
+                  (key_value_pair
+                    key: (string_literal)
+                    value: (string_literal))
+                  (key_value_pair
+                    key: (string_literal)
+                    value: (long_literal)))))))
+        (send
+          channel: (var)
+          send_type: (send_single)
+          inputs: (inputs
+            (collection
+              (map
+                (key_value_pair
+                  key: (string_literal)
+                  value: (string_literal))
+                (key_value_pair
+                  key: (string_literal)
+                  value: (string_literal))))))))))

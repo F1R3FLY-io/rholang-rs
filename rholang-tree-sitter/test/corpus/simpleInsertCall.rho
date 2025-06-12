@@ -1,0 +1,30 @@
+==============================================
+Simple call
+==============================================
+
+new return, simpleInsertTest(`rho:rchain:mySimpleInsertTest`), stdout(`rho:io:stdout`) in { stdout!(simpleInsertTest!(*return)) }
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var))
+      (name_decl
+        (var)
+        uri: (uri_literal))
+      (name_decl
+        (var)
+        uri: (uri_literal)))
+    proc: (block
+      (send
+        channel: (var)
+        send_type: (send_single)
+        inputs: (inputs
+          (send
+            channel: (var)
+            send_type: (send_single)
+            inputs: (inputs
+              (eval
+                (var)))))))))

@@ -1,0 +1,118 @@
+==============================================
+Test connectives
+==============================================
+
+new helloNameAge, getOlder, stdout(`rho:io:stdout`) in {
+  contract helloNameAge(@{@"name"!(name) | @"age"!(age) | _}) = {
+    stdout!(["Hello, ", name, " aged ", age])
+  } |
+  contract getOlder(@{rest /\ {@"name"!(_) | _} | @"age"!(age) }, ret) = {
+    ret!(@"age"!(age + 1) | rest)
+  } |
+  getOlder!(@"name"!("Joe") | @"age"!(39), *helloNameAge)
+}
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var))
+      (name_decl
+        (var))
+      (name_decl
+        (var)
+        uri: (uri_literal)))
+    proc: (block
+      (par
+        (par
+          (contract
+            name: (var)
+            formals: (names
+              (quote
+                (block
+                  (par
+                    (par
+                      (send
+                        channel: (quote
+                          (string_literal))
+                        send_type: (send_single)
+                        inputs: (inputs
+                          (var)))
+                      (send
+                        channel: (quote
+                          (string_literal))
+                        send_type: (send_single)
+                        inputs: (inputs
+                          (var))))
+                    (wildcard)))))
+            proc: (block
+              (send
+                channel: (var)
+                send_type: (send_single)
+                inputs: (inputs
+                  (collection
+                    (list
+                      (string_literal)
+                      (var)
+                      (string_literal)
+                      (var)))))))
+          (contract
+            name: (var)
+            formals: (names
+              (quote
+                (block
+                  (par
+                    (conjunction
+                      (var)
+                      (block
+                        (par
+                          (send
+                            channel: (quote
+                              (string_literal))
+                            send_type: (send_single)
+                            inputs: (inputs
+                              (wildcard)))
+                          (wildcard))))
+                    (send
+                      channel: (quote
+                        (string_literal))
+                      send_type: (send_single)
+                      inputs: (inputs
+                        (var))))))
+              (var))
+            proc: (block
+              (send
+                channel: (var)
+                send_type: (send_single)
+                inputs: (inputs
+                  (par
+                    (send
+                      channel: (quote
+                        (string_literal))
+                      send_type: (send_single)
+                      inputs: (inputs
+                        (add
+                          (var)
+                          (long_literal))))
+                    (var)))))))
+        (send
+          channel: (var)
+          send_type: (send_single)
+          inputs: (inputs
+            (par
+              (send
+                channel: (quote
+                  (string_literal))
+                send_type: (send_single)
+                inputs: (inputs
+                  (string_literal)))
+              (send
+                channel: (quote
+                  (string_literal))
+                send_type: (send_single)
+                inputs: (inputs
+                  (long_literal))))
+            (eval
+              (var))))))))

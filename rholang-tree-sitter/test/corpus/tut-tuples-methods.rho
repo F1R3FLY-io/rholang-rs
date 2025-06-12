@@ -1,0 +1,49 @@
+==============================================
+Tuple methods
+==============================================
+
+// tuples only support random access
+new stdout(`rho:io:stdout`) in {
+
+  // prints 2 because tuples are 0-indexed
+  stdout!((1,2,3).nth(1))
+
+  // prints [1,2,3]
+  | stdout!((1,2,3).toList())
+}
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var)
+        uri: (uri_literal)))
+    proc: (block
+      (par
+        (send
+          channel: (var)
+          send_type: (send_single)
+          inputs: (inputs
+            (method
+              receiver: (collection
+                (tuple
+                  (long_literal)
+                  (long_literal)
+                  (long_literal)))
+              name: (var)
+              args: (args
+                (long_literal)))))
+        (send
+          channel: (var)
+          send_type: (send_single)
+          inputs: (inputs
+            (method
+              receiver: (collection
+                (tuple
+                  (long_literal)
+                  (long_literal)
+                  (long_literal)))
+              name: (var)
+              args: (args))))))))

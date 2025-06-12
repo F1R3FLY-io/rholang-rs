@@ -1,0 +1,101 @@
+==============================================
+Example tut-hello-again.rho
+==============================================
+
+new helloAgain, stdout(`rho:io:stdout`), stdoutAck(`rho:io:stdoutAck`) in {
+  contract helloAgain(_) = {
+    new chan in {
+      chan!("Hello again, world!") |
+      for (@text <- chan) {
+        new ack in {
+          stdoutAck!(text, *ack) |
+          for (_ <- ack) {
+            stdout!("\n")
+          }
+        }
+      }
+    }
+  } |
+  helloAgain!(Nil) |
+  helloAgain!(Nil)
+}
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var))
+      (name_decl
+        (var)
+        uri: (uri_literal))
+      (name_decl
+        (var)
+        uri: (uri_literal)))
+    proc: (block
+      (par
+        (par
+          (contract
+            name: (var)
+            formals: (names
+              (wildcard))
+            proc: (block
+              (new
+                decls: (name_decls
+                  (name_decl
+                    (var)))
+                proc: (block
+                  (par
+                    (send
+                      channel: (var)
+                      send_type: (send_single)
+                      inputs: (inputs
+                        (string_literal)))
+                    (input
+                      receipts: (receipts
+                        (receipt
+                          (linear_bind
+                            names: (names
+                              (quote
+                                (var)))
+                            input: (simple_source
+                              (var)))))
+                      proc: (block
+                        (new
+                          decls: (name_decls
+                            (name_decl
+                              (var)))
+                          proc: (block
+                            (par
+                              (send
+                                channel: (var)
+                                send_type: (send_single)
+                                inputs: (inputs
+                                  (var)
+                                  (eval
+                                    (var))))
+                              (input
+                                receipts: (receipts
+                                  (receipt
+                                    (linear_bind
+                                      names: (names
+                                        (wildcard))
+                                      input: (simple_source
+                                        (var)))))
+                                proc: (block
+                                  (send
+                                    channel: (var)
+                                    send_type: (send_single)
+                                    inputs: (inputs
+                                      (string_literal)))))))))))))))
+          (send
+            channel: (var)
+            send_type: (send_single)
+            inputs: (inputs
+              (nil))))
+        (send
+          channel: (var)
+          send_type: (send_single)
+          inputs: (inputs
+            (nil)))))))
