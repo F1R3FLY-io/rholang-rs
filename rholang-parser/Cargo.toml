@@ -1,0 +1,12 @@
+[package]
+name = "rholang-parser"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+tree-sitter = { workspace = true }
+rholang-tree-sitter = { path = "../rholang-tree-sitter" }
+
+[dev-dependencies]
+rstest = { workspace = true }

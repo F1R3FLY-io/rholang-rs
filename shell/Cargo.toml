@@ -1,0 +1,34 @@
+[package]
+name = "shell"
+version = "0.1.0"
+edition = "2021"
+
+# Add lib configuration to expose crate modules to tests
+[lib]
+name = "shell"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rhosh"
+path = "src/main.rs"
+
+[features]
+with-file-history = []
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+rustyline-async = { workspace = true }
+clap = { workspace = true }
+bracket-parser = { workspace = true }
+rholang-parser = { path = "../rholang-parser" }
+
+
+[[example]]
+name = "process_examples"
+path = "examples/process_examples.rs"
+
+[dev-dependencies]
+rstest = { workspace = true }
+async-std = { workspace = true }

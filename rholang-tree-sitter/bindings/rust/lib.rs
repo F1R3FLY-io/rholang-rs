@@ -7,7 +7,7 @@
 //! let code = r#"
 //! "#;
 //! let mut parser = tree_sitter::Parser::new();
-//! let language = tree_sitter_rholang::LANGUAGE;
+//! let language = rholang_tree_sitter::LANGUAGE;
 //! parser
 //!     .set_language(&language.into())
 //!     .expect("Error loading Rholang parser");
@@ -44,8 +44,9 @@ mod tests {
     #[test]
     fn test_can_load_grammar() {
         let mut parser = tree_sitter::Parser::new();
+        let language = super::LANGUAGE.into();
         parser
-            .set_language(&super::LANGUAGE.into())
+            .set_language(&language)
             .expect("Error loading Rholang parser");
     }
 }
