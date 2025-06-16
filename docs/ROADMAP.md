@@ -28,16 +28,16 @@ Build a high-performance, production-ready Rholang interpreter in Rust for the F
 ### 🎯 Parser and AST (v0.2.0)
 **Priority: High | Timeline: 4-6 weeks**
 
-- [ ] **Lexer Implementation**
-  - [ ] Token definitions for Rholang syntax
-  - [ ] String literals, numbers, identifiers
-  - [ ] Keywords and operators
-  - [ ] Comment handling
+- [x] **Lexer Implementation**
+  - [x] Token definitions for Rholang syntax
+  - [x] String literals, numbers, identifiers
+  - [x] Keywords and operators
+  - [x] Comment handling
 
-- [ ] **Parser Implementation**
-  - [ ] Grammar definition for Rholang subset
-  - [ ] AST node structures
-  - [ ] Expression parsing (arithmetic, logical)
+- [-] **Parser Implementation**
+  - [x] Grammar definition for Rholang subset
+  - [x] AST node structures
+  - [x] Expression parsing (arithmetic, logical)
   - [ ] Pattern matching syntax
   - [ ] Error recovery and reporting
 
