@@ -1,26 +1,57 @@
 [workspace]
 resolver = "3"
 members = [
+    "shell",
     "rholang-tree-sitter",
     "rholang-parser",
     "rholang-jni-bridge"
 ]
 
 [workspace.dependencies]
+# Used by: shell, rholang-parser, rholang-jni-bridge
 anyhow = "1.0.98"
-async-std = { version = "1.13.1", features = ["attributes"] }
+
+# Used by: shell
 async-trait = "0.1.88"
-bracket-parser = "0.1.0"
-clap = { version = "4.5.40", features = ["derive"] }
-rstest = "0.25.0"
-rustyline = "*"
-rustyline-async = "0.4.6"
-serde = { version = "1.0.188", features = ["derive"] }
-serde_json = "1.0.107"
-smallvec = { version = "1.15.1", features = ["union", "const_generics", "const_new"] }
+
+# Used by: shell
 tokio = { version = "1.45.1", features = ["rt", "rt-multi-thread", "full"] }
+
+# Used by: shell
+rustyline-async = "0.4.6"
+
+# Used by: shell, rholang-parser
+rstest = "0.25.0"
+
+# Used by: shell
+clap = { version = "4.5.40", features = ["derive"] }
+
+# Used by: shell
+async-std = { version = "1.13.1", features = ["attributes"] }
+
+# Used by: shell
+bracket-parser = "0.1.0"
+
+# Used by: rholang-tree-sitter
+cc = "1.2.26"
+
+# Used by: rholang-parser, rholang-tree-sitter
 tree-sitter = "0.25.6"
+
+# Used by: rholang-tree-sitter
 tree-sitter-language = "0.1.5"
+
+# Used by: rholang-parser, rholang-jni-bridge
+serde = { version = "1.0.188", features = ["derive"] }
+
+# Used by: rholang-parser, rholang-jni-bridge
+serde_json = "1.0.107"
+
+# Used by: rholang-jni-bridge
+jni = "0.21.1"
+
+rustyline = "*"
+smallvec = { version = "1.15.1", features = ["union", "const_generics", "const_new"] }
 
 [profile.dev]
 debug = true
