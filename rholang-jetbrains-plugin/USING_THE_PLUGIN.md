@@ -67,6 +67,36 @@ The current version of the plugin provides basic functionality. Future versions 
 - Refactoring support
 - Integration with the Rholang compiler
 
+## JNI (Java Native Interface) Integration
+
+The Rholang plugin uses JNI to integrate with the Rholang parser written in Rust. This allows the plugin to provide advanced features like syntax validation and parsing.
+
+### How JNI Works in the Plugin
+
+1. The plugin includes a native library (`librholang_parser`) that is built from the Rust code in the `rholang-parser` crate.
+2. When the plugin is loaded, it extracts this native library to a temporary directory and loads it using JNI.
+3. The Java code in `RholangParserJNI.java` provides methods that call into the native library:
+   - `isValid(String code)`: Checks if the given code is valid Rholang
+   - `parse(String code)`: Parses the given code and returns a parse tree
+
+### Building the Native Library
+
+If you're developing the plugin, you'll need to build the native library before building the plugin:
+
+1. Make sure you have Rust and Cargo installed
+2. Run `make build-rholang-parser` to build the native library
+3. Then run `make build-plugin` to build the plugin with the native library included
+
+Alternatively, you can run `make build-plugin` directly, which will build the native library first.
+
+### Troubleshooting JNI Issues
+
+If you encounter issues with the JNI integration:
+
+1. Check that the native library was built successfully
+2. Look for JNI-related error messages in the IDE log (Help > Show Log in Explorer/Finder)
+3. Make sure you're using a compatible Java version (Java 17 is recommended)
+
 ## Feedback
 
 If you have any feedback or suggestions for improving the plugin, please open an issue on the GitHub repository.
