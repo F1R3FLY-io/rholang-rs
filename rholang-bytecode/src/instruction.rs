@@ -217,7 +217,12 @@ impl fmt::Display for Instruction {
             Instruction::Par => write!(f, "PAR"),
             Instruction::Send { arity } => write!(f, "SEND {}", arity),
             Instruction::Receive { arity, persistent } => {
-                write!(f, "RECEIVE {} {}", arity, if *persistent { "PERSISTENT" } else { "ONCE" })
+                write!(
+                    f,
+                    "RECEIVE {} {}",
+                    arity,
+                    if *persistent { "PERSISTENT" } else { "ONCE" }
+                )
             }
             Instruction::New { count } => write!(f, "NEW {}", count),
 
