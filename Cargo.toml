@@ -1,10 +1,8 @@
 [workspace]
 resolver = "3"
 members = [
-    "shell",
     "rholang-tree-sitter",
     "rholang-parser",
-    "rholang-jni-bridge",
     "rholang-tree-sitter-proc-macro"
 ]
 
@@ -32,9 +30,6 @@ async-std = { version = "1.13.1", features = ["attributes"] }
 
 # Used by: shell
 bracket-parser = "0.1.0"
-
-# Used by: rholang-tree-sitter
-cc = "1.2.26"
 
 # Used by: rholang-parser, rholang-tree-sitter
 tree-sitter = "0.25.6"
