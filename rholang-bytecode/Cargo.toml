@@ -1,0 +1,21 @@
+[package]
+name = "rholang-bytecode"
+version = "0.1.0"
+edition = "2021"
+description = "Bytecode representation and utilities for Rholang"
+
+[lib]
+name = "rholang_bytecode"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+rstest = { workspace = true }
+
+[[example]]
+name = "core_types_example"
+path = "examples/core_types_example.rs"
