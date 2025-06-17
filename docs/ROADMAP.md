@@ -22,7 +22,7 @@ Build a high-performance, production-ready Rholang interpreter in Rust for the F
 - [x] Documentation structure and developer guidelines
   - *Implementation: docs/ directory and README.md*
 
-#### 📦 JSON Support (v0.1.1) 
+#### 📦 JSON Support (v0.1.1)
 - [x] Core Rholang data types with JSON serialization
 - [x] File import/export functionality
 - [x] Type-safe serialization with metadata support
