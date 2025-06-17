@@ -9,6 +9,13 @@ name = "rholang_parser"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+anyhow = { workspace = true }
+tree-sitter = { workspace = true }
 rholang-tree-sitter = { path = "../rholang-tree-sitter" }
+serde = { workspace = true }
+serde_json = { workspace = true }
 smallvec = { workspace = true }
 typed-arena = "2.0.2"
+
+[dev-dependencies]
+rstest = { workspace = true }

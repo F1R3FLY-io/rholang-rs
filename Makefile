@@ -85,14 +85,19 @@ clean:
 
 # Build the JetBrains plugin
 .PHONY: build-plugin
-build-plugin: build-rholang-parser
+build-plugin: build-rholang-jni-bridge
 	cd rholang-jetbrains-plugin && ./download-gradle-wrapper.sh
 	cd rholang-jetbrains-plugin && ./gradlew buildPlugin
 
-# Build the rholang-parser library with j4rs support (required for the JetBrains plugin)
+# Build the rholang-parser library (required for the JetBrains plugin)
 .PHONY: build-rholang-parser
 build-rholang-parser:
 	cargo build --release -p rholang-parser
+
+# Build the rholang-jni-bridge library with JNI support (required for the JetBrains plugin)
+.PHONY: build-rholang-jni-bridge
+build-rholang-jni-bridge: build-rholang-parser
+	cargo build --release -p rholang-jni-bridge
 
 # Install development dependencies
 .PHONY: setup
@@ -122,7 +127,8 @@ help:
 	@echo "  coverage        Run source-only test coverage (excluding tests)"
 	@echo "  coverage-html   Generate source-only HTML coverage report (excluding tests)"
 	@echo "  clean           Clean the project (including rholang-jetbrains-plugin)"
-	@echo "  build-plugin    Build the JetBrains plugin (includes building rholang-parser)"
-	@echo "  build-rholang-parser Build the rholang-parser library with j4rs support (required for the JetBrains plugin)"
+	@echo "  build-plugin    Build the JetBrains plugin (includes building rholang-jni-bridge)"
+	@echo "  build-rholang-parser Build the rholang-parser library (required for the JetBrains plugin)"
+	@echo "  build-rholang-jni-bridge Build the rholang-jni-bridge library with JNI support (required for the JetBrains plugin)"
 	@echo "  setup           Install development dependencies"
 	@echo "  help            Show this help message"
