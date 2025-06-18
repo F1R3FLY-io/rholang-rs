@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     parser.set_language(&language)?;
 
     // Read input from stdin or use a default example
-    let code = if atty::is(atty::Stream::Stdin) {
+    let code = if is_terminal::is_terminal(std::io::stdin()) {
         // No stdin input, use a default example
         r#"
         new stdout(`rho:io:stdout`) in {

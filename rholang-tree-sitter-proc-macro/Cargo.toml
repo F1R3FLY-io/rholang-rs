@@ -11,12 +11,12 @@ readme = "README.md"
 
 [dependencies]
 rholang-tree-sitter = { path = "../rholang-tree-sitter" }
-quote = "1.0.36"
-syn = "2.0.58"
-tree-sitter = "0.25.6"
+quote = { workspace = true }
+syn = { workspace = true }
+tree-sitter = { workspace = true }
 
 [dev-dependencies]
-atty = "0.2.14"
+is-terminal = { workspace = true }
 
 [features]
 proc_macros = []
