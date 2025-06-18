@@ -87,6 +87,29 @@ cargo test <module_name>
 cargo test --all-features
 ```
 
+### Development Container
+
+For a consistent development environment, this project provides a Docker-based development container with all necessary tools pre-installed.
+
+```bash
+# Start an interactive shell in the container
+make container-shell
+
+# Build the project in the container
+make container-build
+
+# Run tests in the container
+make container-test
+
+# Check code quality in the container
+make container-check
+
+# Fix code quality issues in the container
+make container-fix
+```
+
+For detailed instructions on using the development container, see [DOCKER.md](DOCKER.md).
+
 ### Static Analysis and Code Quality
 
 ```bash
