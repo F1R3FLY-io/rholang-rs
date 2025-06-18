@@ -7,7 +7,9 @@ set -e
 # - clippy: for linting
 # - cargo check: for compilation errors
 # - cargo audit: for security vulnerabilities (if installed)
+# - run_all_tests.sh: to run all tests in the workspace
 # - cargo-tarpaulin: for test coverage
+# - run_all_examples.sh: to run all examples in the workspace
 # - checkstyle: for Java code style checking
 # - pmd: for Java code analysis
 # - jacoco: for Java test coverage
@@ -62,6 +64,24 @@ else
     echo "   Install with: cargo install cargo-audit"
 fi
 
+# Run all tests using the run_all_tests.sh script
+echo "Running all tests..."
+echo "FAILURES value before running tests: $(cat "$FAILURES_ABS_PATH")"
+
+if [ -f "scripts/run_all_tests.sh" ]; then
+    if ./scripts/run_all_tests.sh; then
+        echo "✅ All tests passed"
+    else
+        echo "❌ Some tests failed"
+        echo "1" > "$FAILURES_ABS_PATH"
+        echo "DEBUG: run_all_tests.sh failed"
+    fi
+else
+    echo "ℹ️ scripts/run_all_tests.sh not found, skipping tests check"
+fi
+
+echo "FAILURES value after running tests: $(cat "$FAILURES_ABS_PATH")"
+
 # Run cargo-tarpaulin for test coverage if available
 if command -v cargo-tarpaulin &> /dev/null; then
     # Run test coverage without requiring 100%
@@ -82,43 +102,23 @@ else
     echo "   Install with: cargo install cargo-tarpaulin"
 fi
 
-# Check rholang-tree-sitter-proc-macro examples
-if [ -d "rholang-tree-sitter-proc-macro" ]; then
-    echo "Checking rholang-tree-sitter-proc-macro examples..."
-    echo "FAILURES value before proc-macro checks: $(cat "$FAILURES_ABS_PATH")"
+# Run all examples using the run_all_examples.sh script
+echo "Running all examples..."
+echo "FAILURES value before running examples: $(cat "$FAILURES_ABS_PATH")"
 
-    # Change to the proc-macro directory
-    cd rholang-tree-sitter-proc-macro
-
-    # Run examples
-    echo "Running parse_rholang example..."
-    if cargo run --example parse_rholang --features proc_macros; then
-        echo "✅ parse_rholang example passed"
+if [ -f "scripts/run_all_examples.sh" ]; then
+    if ./scripts/run_all_examples.sh; then
+        echo "✅ All examples passed"
     else
-        echo "❌ parse_rholang example failed"
+        echo "❌ Some examples failed"
         echo "1" > "$FAILURES_ABS_PATH"
-        echo "DEBUG: parse_rholang example failed"
-        echo "FAILURES value after parse_rholang: $(cat "$FAILURES_ABS_PATH")"
+        echo "DEBUG: run_all_examples.sh failed"
     fi
-    echo "FAILURES value after parse_rholang example: $(cat "$FAILURES_ABS_PATH")"
-
-    echo "Running advanced_usage example..."
-    if cargo run --example advanced_usage --features proc_macros; then
-        echo "✅ advanced_usage example passed"
-    else
-        echo "❌ advanced_usage example failed"
-        echo "1" > "$FAILURES_ABS_PATH"
-        echo "DEBUG: advanced_usage example failed"
-        echo "FAILURES value after advanced_usage: $(cat "$FAILURES_ABS_PATH")"
-    fi
-    echo "FAILURES value after advanced_usage example: $(cat "$FAILURES_ABS_PATH")"
-
-    # Change back to the project root
-    cd ..
-    echo "FAILURES value after proc-macro checks: $(cat "$FAILURES_ABS_PATH")"
 else
-    echo "ℹ️ rholang-tree-sitter-proc-macro directory not found, skipping proc-macro checks"
+    echo "ℹ️ scripts/run_all_examples.sh not found, skipping examples check"
 fi
+
+echo "FAILURES value after running examples: $(cat "$FAILURES_ABS_PATH")"
 
 # Check JetBrains plugin code quality
 if [ -d "rholang-jetbrains-plugin" ]; then

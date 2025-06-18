@@ -38,12 +38,13 @@ macro-examples:
 
 # Run all examples in all crates
 .PHONY: examples
-examples: run-examples macro-examples
+examples:
+	./scripts/run_all_examples.sh
 
 # Run all tests
 .PHONY: test
 test:
-	cargo test
+	./scripts/run_all_tests.sh
 
 # Run tests with ignored tests
 .PHONY: test-all
