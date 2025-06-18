@@ -32,8 +32,9 @@ run-examples:
 # Run the rholang-tree-sitter-proc-macro examples
 .PHONY: macro-examples
 macro-examples:
-	cd rholang-tree-sitter-proc-macro && cargo run --example parse_rholang --features proc_macros
-	cd rholang-tree-sitter-proc-macro && cargo run --example advanced_usage --features proc_macros
+	cargo run --example parse_rholang --features proc_macros
+	cargo run --example advanced_usage --features proc_macros
+	cargo run --example match_node_example --features proc_macros
 
 # Run all examples in all crates
 .PHONY: examples

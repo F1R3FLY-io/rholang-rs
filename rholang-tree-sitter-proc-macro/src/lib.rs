@@ -1,7 +1,10 @@
 use proc_macro::TokenStream;
 
 use quote::{quote, quote_spanned};
-use syn::{parse_macro_input, LitStr};
+use syn::{
+    parse::Parse, parse::ParseStream, parse_macro_input, punctuated::Punctuated, Expr, LitStr,
+    Result, Token,
+};
 use tree_sitter::Language;
 
 /// # Rholang-tree-sitter-proc-macro
@@ -333,4 +336,127 @@ pub fn field(token_stream: TokenStream) -> TokenStream {
         )
     }
     .into()
+}
+
+/// A structure to represent a pattern-handler pair in the match_node macro
+struct MatchNodeArm {
+    pattern: LitStr,
+    handler: Expr,
+}
+
+impl Parse for MatchNodeArm {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let pattern = input.parse()?;
+        input.parse::<Token![=>]>()?;
+        let handler = input.parse()?;
+        Ok(MatchNodeArm { pattern, handler })
+    }
+}
+
+/// A structure to represent the input to the match_node macro
+struct MatchNodeInput {
+    node_expr: Expr,
+    arms: Punctuated<MatchNodeArm, Token![,]>,
+}
+
+impl Parse for MatchNodeInput {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let node_expr = input.parse()?;
+        input.parse::<Token![,]>()?;
+        let arms = Punctuated::parse_terminated(input)?;
+        Ok(MatchNodeInput { node_expr, arms })
+    }
+}
+
+/// Matches a node's kind string against a series of patterns.
+///
+/// This macro is useful for pattern matching on node kinds using string literals.
+/// It generates code that compares the node's kind string with each pattern and
+/// executes the corresponding handler if there's a match.
+///
+/// # Arguments
+///
+/// * `node_expr` - An expression that evaluates to a tree-sitter Node.
+/// * `pattern => handler` - A series of pattern-handler pairs, where each pattern is a string literal
+///   and each handler is an expression to be executed if the node's kind matches the pattern.
+///
+/// # Returns
+///
+/// The result of the handler expression for the first matching pattern, or the result of the
+/// default handler if no pattern matches.
+///
+/// # Examples
+///
+/// Basic usage:
+///
+/// ```
+/// use rholang_tree_sitter_proc_macro::match_node;
+/// use tree_sitter::Node;
+///
+/// fn process_node(node: &Node) {
+///     match_node!(node,
+///         "par" => println!("Found a parallel composition"),
+///         "new" => println!("Found a new declaration"),
+///         "send" => println!("Found a send operation"),
+///         _ => println!("Found something else: {}", node.kind())
+///     );
+/// }
+/// ```
+///
+/// Using with variables:
+///
+/// ```
+/// use rholang_tree_sitter_proc_macro::match_node;
+/// use tree_sitter::Node;
+///
+/// fn get_node_description(node: &Node) -> String {
+///     match_node!(node,
+///         "par" => "parallel composition".to_string(),
+///         "new" => "new declaration".to_string(),
+///         "send" => "send operation".to_string(),
+///         _ => format!("other node type: {}", node.kind())
+///     )
+/// }
+/// ```
+#[proc_macro]
+pub fn match_node(token_stream: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(token_stream as MatchNodeInput);
+
+    let node_expr = &input.node_expr;
+    let mut match_arms = Vec::new();
+    let mut has_default_arm = false;
+
+    for arm in input.arms.iter() {
+        let pattern = &arm.pattern;
+        let handler = &arm.handler;
+
+        if pattern.value() == "_" {
+            has_default_arm = true;
+            match_arms.push(quote! {
+                _ => #handler
+            });
+        } else {
+            match_arms.push(quote! {
+                kind if kind == #pattern => #handler
+            });
+        }
+    }
+
+    if !has_default_arm {
+        match_arms.push(quote! {
+            _ => panic!("Unhandled node kind: {}", kind)
+        });
+    }
+
+    let expanded = quote! {
+        {
+            let node = #node_expr;
+            let kind = node.kind();
+            match kind {
+                #(#match_arms),*
+            }
+        }
+    };
+
+    expanded.into()
 }
