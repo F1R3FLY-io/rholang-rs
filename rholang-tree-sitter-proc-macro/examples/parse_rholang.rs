@@ -1,7 +1,8 @@
+use anyhow::Result;
 use std::io::{self, Read};
 use tree_sitter::Parser;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<()> {
     // Initialize the parser
     let mut parser = Parser::new();
 

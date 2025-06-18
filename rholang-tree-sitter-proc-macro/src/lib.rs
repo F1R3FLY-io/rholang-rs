@@ -26,7 +26,7 @@ use tree_sitter::Language;
 /// These macros are particularly useful when working with tree-sitter parse trees in pattern
 /// matching contexts or when traversing the tree to find specific nodes or fields.
 ///
-/// ```
+/// ```no_run
 /// use rholang_tree_sitter_proc_macro::{kind, kw, field};
 /// use tree_sitter::TreeCursor;
 ///
@@ -89,7 +89,7 @@ use tree_sitter::Language;
 ///
 /// Basic usage:
 ///
-/// ```
+/// ```no_run
 /// use rholang_tree_sitter_proc_macro::kind;
 ///
 /// let new_id = kind!("new");
@@ -97,7 +97,7 @@ use tree_sitter::Language;
 ///
 /// Using in a match statement:
 ///
-/// ```
+/// ```no_run
 /// use rholang_tree_sitter_proc_macro::kind;
 /// use tree_sitter::Node;
 ///
@@ -113,7 +113,7 @@ use tree_sitter::Language;
 ///
 /// Using with variables:
 ///
-/// ```
+/// ```no_run
 /// use rholang_tree_sitter_proc_macro::kind;
 ///
 /// // These are evaluated at compile time
@@ -175,7 +175,7 @@ pub fn kind(token_stream: TokenStream) -> TokenStream {
 ///
 /// Basic usage:
 ///
-/// ```
+/// ```no_run
 /// use rholang_tree_sitter_proc_macro::kw;
 ///
 /// let for_keyword_id = kw!("for");
@@ -183,7 +183,7 @@ pub fn kind(token_stream: TokenStream) -> TokenStream {
 ///
 /// Using in a match statement:
 ///
-/// ```
+/// ```no_run
 /// use rholang_tree_sitter_proc_macro::kw;
 /// use tree_sitter::Node;
 ///
@@ -199,7 +199,7 @@ pub fn kind(token_stream: TokenStream) -> TokenStream {
 ///
 /// Using with variables:
 ///
-/// ```
+/// ```no_run
 /// use rholang_tree_sitter_proc_macro::kw;
 ///
 /// // These are evaluated at compile time
@@ -262,7 +262,7 @@ pub fn kw(token_stream: TokenStream) -> TokenStream {
 ///
 /// Basic usage:
 ///
-/// ```
+/// ```no_run
 /// use rholang_tree_sitter_proc_macro::field;
 ///
 /// let decls_field_id = field!("decls");
@@ -270,7 +270,7 @@ pub fn kw(token_stream: TokenStream) -> TokenStream {
 ///
 /// Using to navigate a parse tree:
 ///
-/// ```
+/// ```no_run
 /// use rholang_tree_sitter_proc_macro::{field, kind};
 /// use tree_sitter::Node;
 ///
@@ -293,7 +293,7 @@ pub fn kw(token_stream: TokenStream) -> TokenStream {
 ///
 /// Using with variables:
 ///
-/// ```
+/// ```no_run
 /// use rholang_tree_sitter_proc_macro::field;
 /// use std::num::NonZeroU16;
 ///
@@ -389,7 +389,7 @@ impl Parse for MatchNodeInput {
 ///
 /// Basic usage:
 ///
-/// ```
+/// ```no_run
 /// use rholang_tree_sitter_proc_macro::match_node;
 /// use tree_sitter::Node;
 ///
@@ -398,14 +398,14 @@ impl Parse for MatchNodeInput {
 ///         "par" => println!("Found a parallel composition"),
 ///         "new" => println!("Found a new declaration"),
 ///         "send" => println!("Found a send operation"),
-///         _ => println!("Found something else: {}", node.kind())
+///         "_" => println!("Found something else: {}", node.kind())
 ///     );
 /// }
 /// ```
 ///
 /// Using with variables:
 ///
-/// ```
+/// ```no_run
 /// use rholang_tree_sitter_proc_macro::match_node;
 /// use tree_sitter::Node;
 ///
@@ -414,7 +414,7 @@ impl Parse for MatchNodeInput {
 ///         "par" => "parallel composition".to_string(),
 ///         "new" => "new declaration".to_string(),
 ///         "send" => "send operation".to_string(),
-///         _ => format!("other node type: {}", node.kind())
+///         "_" => format!("other node type: {}", node.kind())
 ///     )
 /// }
 /// ```

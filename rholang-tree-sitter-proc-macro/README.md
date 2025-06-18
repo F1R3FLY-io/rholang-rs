@@ -20,7 +20,7 @@ use tree_sitter::TreeCursor;
 
 fn process_node(cursor: &TreeCursor, code: &str) {
     let node = cursor.node();
-    
+
     // Match on node kind
     match node.kind_id() {
         kind!("process") => {
@@ -68,6 +68,30 @@ cargo run --example parse_rholang --features proc_macros
 # Run the advanced_usage example
 cargo run --example advanced_usage --features proc_macros
 ```
+
+## Known Issues
+
+### Doctest Memory Allocation
+
+When running doctests for this crate, you might encounter memory allocation errors:
+
+```
+error: could not exec the linker `cc`
+  |
+  = note: Cannot allocate memory (os error 12)
+```
+
+This is due to the memory-intensive nature of compiling the tree-sitter grammar and running the doctests. If you encounter this issue, you can try the following workarounds:
+
+1. Increase the available memory for the compilation process
+2. Run the doctests with a smaller number of threads:
+   ```bash
+   RUST_TEST_THREADS=1 cargo test -p rholang-tree-sitter-proc-macro --doc
+   ```
+3. Skip the doctests and rely on the examples instead:
+   ```bash
+   cargo test -p rholang-tree-sitter-proc-macro --examples
+   ```
 
 ## License
 
