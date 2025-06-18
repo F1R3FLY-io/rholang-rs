@@ -1,0 +1,35 @@
+[package]
+name = "rholang-tree-sitter-proc-macro"
+version = "0.1.0"
+edition = "2021"
+description = "Proc macros for compile-time access to rholang-tree-sitter node kinds, keywords, and fields"
+license = "MIT"
+repository = "https://github.com/f1r3fly/rholang"
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rholang-tree-sitter = { path = "../rholang-tree-sitter" }
+quote = "1.0.36"
+syn = "2.0.58"
+tree-sitter = "0.25.6"
+
+[dev-dependencies]
+atty = "0.2.14"
+
+[features]
+proc_macros = []
+
+[lib]
+proc-macro = true
+
+[[example]]
+name = "parse_rholang"
+path = "examples/parse_rholang.rs"
+required-features = ["proc_macros"]
+
+[[example]]
+name = "advanced_usage"
+path = "examples/advanced_usage.rs"
+required-features = ["proc_macros"]

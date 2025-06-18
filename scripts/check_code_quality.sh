@@ -37,20 +37,26 @@ run_check() {
 
 # Create a temporary file to track failures
 FAILURES=$(mktemp)
-echo "0" > "$FAILURES"
+FAILURES_ABS_PATH=$(realpath "$FAILURES")
+echo "0" > "$FAILURES_ABS_PATH"
+echo "Initial FAILURES value: $(cat "$FAILURES_ABS_PATH")"
 
 # Run rustfmt to check formatting
-run_check "cargo fmt --all -- --check" "code formatting check" || echo "1" > "$FAILURES"
+run_check "cargo fmt --all -- --check" "code formatting check" || { echo "1" > "$FAILURES_ABS_PATH"; echo "DEBUG: rustfmt failed"; }
+echo "FAILURES value after rustfmt: $(cat "$FAILURES_ABS_PATH")"
 
 # Run clippy for linting
-run_check "cargo clippy --all-targets --all-features -- -D warnings" "code linting" || echo "1" > "$FAILURES"
+run_check "cargo clippy --all-targets --all-features -- -D warnings" "code linting" || { echo "1" > "$FAILURES_ABS_PATH"; echo "DEBUG: clippy failed"; }
+echo "FAILURES value after clippy: $(cat "$FAILURES_ABS_PATH")"
 
 # Run cargo check to ensure code compiles
-run_check "cargo check --all" "compilation check" || echo "1" > "$FAILURES"
+run_check "cargo check --all" "compilation check" || { echo "1" > "$FAILURES_ABS_PATH"; echo "DEBUG: cargo check failed"; }
+echo "FAILURES value after cargo check: $(cat "$FAILURES_ABS_PATH")"
 
 # Run cargo audit if available
 if command -v cargo-audit &> /dev/null; then
-    run_check "cargo audit" "security audit" || echo "1" > "$FAILURES"
+    run_check "cargo audit" "security audit" || { echo "1" > "$FAILURES_ABS_PATH"; echo "DEBUG: cargo audit failed"; }
+    echo "FAILURES value after cargo audit: $(cat "$FAILURES_ABS_PATH")"
 else
     echo "ℹ️ cargo-audit not found, skipping security audit"
     echo "   Install with: cargo install cargo-audit"
@@ -70,9 +76,48 @@ if command -v cargo-tarpaulin &> /dev/null; then
         coverage_percentage="0.00%"
     fi
     echo "✅ Test coverage check completed: $coverage_percentage"
+    echo "FAILURES value after test coverage: $(cat "$FAILURES_ABS_PATH")"
 else
     echo "ℹ️ cargo-tarpaulin not found, skipping test coverage check"
     echo "   Install with: cargo install cargo-tarpaulin"
+fi
+
+# Check rholang-tree-sitter-proc-macro examples
+if [ -d "rholang-tree-sitter-proc-macro" ]; then
+    echo "Checking rholang-tree-sitter-proc-macro examples..."
+    echo "FAILURES value before proc-macro checks: $(cat "$FAILURES_ABS_PATH")"
+
+    # Change to the proc-macro directory
+    cd rholang-tree-sitter-proc-macro
+
+    # Run examples
+    echo "Running parse_rholang example..."
+    if cargo run --example parse_rholang --features proc_macros; then
+        echo "✅ parse_rholang example passed"
+    else
+        echo "❌ parse_rholang example failed"
+        echo "1" > "$FAILURES_ABS_PATH"
+        echo "DEBUG: parse_rholang example failed"
+        echo "FAILURES value after parse_rholang: $(cat "$FAILURES_ABS_PATH")"
+    fi
+    echo "FAILURES value after parse_rholang example: $(cat "$FAILURES_ABS_PATH")"
+
+    echo "Running advanced_usage example..."
+    if cargo run --example advanced_usage --features proc_macros; then
+        echo "✅ advanced_usage example passed"
+    else
+        echo "❌ advanced_usage example failed"
+        echo "1" > "$FAILURES_ABS_PATH"
+        echo "DEBUG: advanced_usage example failed"
+        echo "FAILURES value after advanced_usage: $(cat "$FAILURES_ABS_PATH")"
+    fi
+    echo "FAILURES value after advanced_usage example: $(cat "$FAILURES_ABS_PATH")"
+
+    # Change back to the project root
+    cd ..
+    echo "FAILURES value after proc-macro checks: $(cat "$FAILURES_ABS_PATH")"
+else
+    echo "ℹ️ rholang-tree-sitter-proc-macro directory not found, skipping proc-macro checks"
 fi
 
 # Check JetBrains plugin code quality
@@ -88,7 +133,8 @@ if [ -d "rholang-jetbrains-plugin" ]; then
         echo "✅ Checkstyle passed"
     else
         echo "❌ Checkstyle failed"
-        echo "1" > "$FAILURES"
+        echo "1" > "$FAILURES_ABS_PATH"
+        echo "DEBUG: Checkstyle failed"
     fi
 
     # Run PMD
@@ -97,7 +143,8 @@ if [ -d "rholang-jetbrains-plugin" ]; then
         echo "✅ PMD passed"
     else
         echo "❌ PMD failed"
-        echo "1" > "$FAILURES"
+        echo "1" > "$FAILURES_ABS_PATH"
+        echo "DEBUG: PMD failed"
     fi
 
     # Run tests with JaCoCo coverage
@@ -107,7 +154,8 @@ if [ -d "rholang-jetbrains-plugin" ]; then
         echo "JaCoCo coverage report is available at: rholang-jetbrains-plugin/build/reports/jacoco/test/html/index.html"
     else
         echo "❌ Tests failed"
-        echo "1" > "$FAILURES"
+        echo "1" > "$FAILURES_ABS_PATH"
+        echo "DEBUG: JaCoCo tests failed"
     fi
 
     # Build the plugin
@@ -116,7 +164,8 @@ if [ -d "rholang-jetbrains-plugin" ]; then
         echo "✅ Plugin build successful"
     else
         echo "❌ Plugin build failed"
-        echo "1" > "$FAILURES"
+        echo "1" > "$FAILURES_ABS_PATH"
+        echo "DEBUG: Plugin build failed"
     fi
 
     # Change back to the project root
@@ -126,12 +175,13 @@ else
 fi
 
 # Check if any failures occurred
-if [ "$(cat "$FAILURES")" == "1" ]; then
+echo "Final FAILURES value: $(cat "$FAILURES_ABS_PATH")"
+if [ "$(cat "$FAILURES_ABS_PATH")" == "1" ]; then
     echo "❌ Code quality checks failed"
-    rm "$FAILURES"
+    rm "$FAILURES_ABS_PATH"
     exit 1
 else
     echo "✅ All code quality checks passed"
-    rm "$FAILURES"
+    rm "$FAILURES_ABS_PATH"
     exit 0
 fi
