@@ -44,6 +44,11 @@ test-all:
 test-shell:
 	cargo test -p shell
 
+# Run the rholang-bytecode examples
+.PHONY: bytecode-examples
+macro-examples:
+	 cargo run --example core_types_example -p rholang-bytecode
+
 # Check code quality
 .PHONY: check
 check:
