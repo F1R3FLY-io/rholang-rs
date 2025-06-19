@@ -1,6 +1,6 @@
 use clap::Parser;
 
-use shell::{providers::RholangParserInterpreterProvider, run_shell, Args};
+use rholang_shell::{providers::RholangParserInterpreterProvider, run_shell, Args};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
