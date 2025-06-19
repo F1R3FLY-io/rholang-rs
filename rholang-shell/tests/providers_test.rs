@@ -1,5 +1,5 @@
 use anyhow::Result;
-use shell::providers::{
+use rholang_shell::providers::{
     FakeInterpreterProvider, InterpretationResult, InterpreterProvider,
     RholangParserInterpreterProvider,
 };

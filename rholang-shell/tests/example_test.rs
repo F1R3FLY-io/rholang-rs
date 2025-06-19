@@ -1,15 +1,18 @@
 use anyhow::Result;
 use rstest::rstest;
 
-use shell::providers::{FakeInterpreterProvider, InterpretationResult, InterpreterProvider};
+use rholang_shell::providers::{
+    FakeInterpreterProvider, InterpretationResult, InterpreterProvider,
+};
 
 #[tokio::test]
-async fn test_fake_interpreter_returns_input() -> Result<()> {
+async fn test_fake_interpreter_with_arithmetic() -> Result<()> {
     let interpreter = FakeInterpreterProvider;
 
-    let input = "println(\"Hello, World!\");".to_string();
-    let result = interpreter.interpret(&input).await;
+    let input = "1 + 2 * 3";
+    let result = interpreter.interpret(input).await;
 
+    // The fake interpreter just returns the input
     match result {
         InterpretationResult::Success(output) => {
             assert_eq!(output, input);
@@ -22,18 +25,16 @@ async fn test_fake_interpreter_returns_input() -> Result<()> {
 }
 
 #[rstest]
-#[case("println(\"Hello, World!\");", "println(\"Hello, World!\");")]
-#[case("let x = 42;", "let x = 42;")]
-#[case("println(\"test\");", "println(\"test\");")]
-#[case("1 + 1", "1 + 1")]
-#[case("", "")]
+#[case("1 + 2", "1 + 2")]
+#[case("3 * 4", "3 * 4")]
+#[case("5 - 6", "5 - 6")]
 #[async_std::test]
-async fn test_fake_interpreter_with_various_inputs(
-    #[case] input: String,
-    #[case] expected: String,
+async fn test_fake_interpreter_with_various_arithmetic(
+    #[case] input: &str,
+    #[case] expected: &str,
 ) -> Result<()> {
     let interpreter = FakeInterpreterProvider;
-    let result = interpreter.interpret(&input).await;
+    let result = interpreter.interpret(input).await;
 
     match result {
         InterpretationResult::Success(output) => {

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::io::Cursor;
 
-use shell::{
+use rholang_shell::{
     handle_interrupt, process_multiline_input, process_single_line_input, process_special_command,
     providers::FakeInterpreterProvider,
 };
