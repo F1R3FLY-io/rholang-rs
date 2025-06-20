@@ -29,10 +29,22 @@ run-with-history:
 run-examples:
 	cargo run --example process_examples
 
+# Run the rholang-tree-sitter-proc-macro examples
+.PHONY: macro-examples
+macro-examples:
+	cargo run --example parse_rholang --features proc_macros
+	cargo run --example advanced_usage --features proc_macros
+	cargo run --example match_node_example --features proc_macros
+
+# Run all examples in all crates
+.PHONY: examples
+examples:
+	./scripts/run_all_examples.sh
+
 # Run all tests
 .PHONY: test
 test:
-	cargo test
+	./scripts/run_all_tests.sh
 
 # Run tests with ignored tests
 .PHONY: test-all
@@ -119,6 +131,8 @@ help:
 	@echo "  run             Run the shell binary"
 	@echo "  run-with-history Run the shell binary with file history feature"
 	@echo "  run-examples     Run the examples processor"
+	@echo "  macro-examples    Run the rholang-tree-sitter-proc-macro examples"
+	@echo "  examples         Run all examples in all crates"
 	@echo "  test            Run all tests"
 	@echo "  test-all        Run all tests including ignored tests"
 	@echo "  test-shell      Run tests for the shell crate"

@@ -214,10 +214,7 @@ pub fn handle_interrupt<W: Write, I: InterpreterProvider>(
 }
 
 /// Run the shell with the provided interpreter provider
-pub async fn run_shell<I: InterpreterProvider>(
-    args: Args,
-    interpreter: I,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run_shell<I: InterpreterProvider>(args: Args, interpreter: I) -> Result<()> {
     writeln!(std::io::stdout(), "{}", help_message())?;
 
     let prompt = ">>> ".to_string();
