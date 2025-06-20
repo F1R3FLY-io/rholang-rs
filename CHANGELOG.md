@@ -5,9 +5,21 @@ All notable changes to the Rholang-RS project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.2] - 2025-07-01
 ### Added
-- Planned features for future releases as outlined in the ROADMAP.md
+- New `match_node` macro with examples for rholang-tree-sitter-proc-macro
+- Scripts to run all examples and tests across workspace crates
+- Integration of test and example scripts into quality check script and Makefile
+- Examples, scripts, and procedural macros for rholang-tree-sitter-proc-macro
+
+### Changed
+- Changed field return type to u16
+- Consolidated dependencies in workspace configuration
+- Replaced `atty` with `is-terminal` in examples
+- Refactored code for improved maintainability
+
+### Fixed
+- Use in tests hardcoded IDs values related with current grammar state ("nasz klient nasz pan!" - means: "as you wish" in PL)
 
 ## [0.1.1] - 2025-06-19
 ### Added
