@@ -1,5 +1,4 @@
 use proc_macro::TokenStream;
-
 use quote::{quote, quote_spanned};
 use syn::{
     parse::Parse, parse::ParseStream, parse_macro_input, punctuated::Punctuated, Expr, LitStr,
@@ -38,14 +37,14 @@ use tree_sitter::Language;
 ///         kind!("new") => {
 ///             // Process a new declaration
 ///             let decls_field = field!("decls");
-///             if let Some(decls) = node.child_by_field_id(decls_field.get()) {
+///             if let Some(decls) = node.child_by_field_id(decls_field) {
 ///                 // Process declarations
 ///             }
 ///         },
 ///         kind!("send") => {
 ///             // Process a send operation
 ///             let proc_field = field!("proc");
-///             if let Some(proc) = node.child_by_field_id(proc_field.get()) {
+///             if let Some(proc) = node.child_by_field_id(proc_field) {
 ///                 // Process proc
 ///             }
 ///         },
@@ -250,7 +249,7 @@ pub fn kw(token_stream: TokenStream) -> TokenStream {
 ///
 /// # Returns
 ///
-/// The field ID as a `std::num::NonZeroU16`. This is the type expected by
+/// The field ID as a `std::num::u16`. This is the type expected by
 /// tree-sitter's `child_by_field_id` method.
 ///
 /// # Errors
@@ -282,7 +281,7 @@ pub fn kw(token_stream: TokenStream) -> TokenStream {
 ///
 ///     // Get the decls field
 ///     let decls_field = field!("decls");
-///     let decls = new_node.child_by_field_id(decls_field.get())?;
+///     let decls = new_node.child_by_field_id(decls_field)?;
 ///
 ///     // Extract the declarations text
 ///     decls.utf8_text(source_code.as_bytes())
@@ -295,12 +294,11 @@ pub fn kw(token_stream: TokenStream) -> TokenStream {
 ///
 /// ```no_run
 /// use rholang_tree_sitter_proc_macro::field;
-/// use std::num::NonZeroU16;
 ///
 /// // These are evaluated at compile time
-/// const DECLS_FIELD: NonZeroU16 = field!("decls");
-/// const PROC_FIELD: NonZeroU16 = field!("proc");
-/// const BUNDLE_TYPE_FIELD: NonZeroU16 = field!("bundle_type");
+/// const DECLS_FIELD: u16 = field!("decls");
+/// const PROC_FIELD: u16 = field!("proc");
+/// const BUNDLE_TYPE_FIELD: u16 = field!("bundle_type");
 ///
 /// // Later in your code
 /// fn extract_field_by_name<'a>(node: &'a tree_sitter::Node<'a>, field_name: &str) -> Option<tree_sitter::Node<'a>> {
@@ -311,7 +309,7 @@ pub fn kw(token_stream: TokenStream) -> TokenStream {
 ///         _ => return None,
 ///     };
 ///
-///     node.child_by_field_id(field_id.get())
+///     node.child_by_field_id(field_id)
 /// }
 /// ```
 #[proc_macro]
@@ -324,10 +322,10 @@ pub fn field(token_stream: TokenStream) -> TokenStream {
     let language: Language = rholang_tree_sitter::LANGUAGE.into();
     let found_id = language.field_id_for_name(&requested_field);
 
-    if let Some(found_id) = found_id {
-        let id_number: u16 = found_id.get();
+    if let Some(field_id) = found_id {
+        let id_number: u16 = field_id.get();
         quote! {
-            std::num::NonZeroU16::new(#id_number).unwrap()
+            #id_number
         }
     } else {
         quote_spanned!(

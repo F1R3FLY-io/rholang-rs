@@ -77,7 +77,7 @@ fn main() -> Result<()> {
 
                 // Get the decls field
                 let decls_field = field!("decls");
-                if let Some(decls) = node.child_by_field_id(decls_field.get()) {
+                if let Some(decls) = node.child_by_field_id(decls_field) {
                     println!(
                         "  with declarations: {}",
                         decls
@@ -88,7 +88,7 @@ fn main() -> Result<()> {
 
                 // Get the proc field
                 let proc_field = field!("proc");
-                if let Some(proc) = node.child_by_field_id(proc_field.get()) {
+                if let Some(proc) = node.child_by_field_id(proc_field) {
                     println!(
                         "  with process: {}",
                         proc.utf8_text(code.as_bytes())
@@ -165,7 +165,7 @@ fn main() -> Result<()> {
             if node.kind_id() == bundle_id {
                 // Get the bundle_type field
                 let bundle_type_field = field!("bundle_type");
-                if let Some(bundle_type) = node.child_by_field_id(bundle_type_field.get()) {
+                if let Some(bundle_type) = node.child_by_field_id(bundle_type_field) {
                     let bundle_type_text = bundle_type
                         .utf8_text(code.as_bytes())
                         .unwrap_or("unknown")
@@ -176,7 +176,7 @@ fn main() -> Result<()> {
 
                     // Get the proc field
                     let proc_field = field!("proc");
-                    if let Some(proc) = node.child_by_field_id(proc_field.get()) {
+                    if let Some(proc) = node.child_by_field_id(proc_field) {
                         println!(
                             "  with process: {}",
                             proc.utf8_text(code.as_bytes())

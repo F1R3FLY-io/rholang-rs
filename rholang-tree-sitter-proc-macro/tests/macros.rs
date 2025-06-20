@@ -130,21 +130,18 @@ fn test_kw_macro() {
 fn test_field_macro() {
     // Test with valid fields
     let pattern_id = field!("pattern");
-    assert!(
-        pattern_id.get() > 0,
-        "Expected non-zero ID for 'pattern' field"
-    );
+    assert!(pattern_id > 0, "Expected non-zero ID for 'pattern' field");
 
     let proc_id = field!("proc");
-    assert!(proc_id.get() > 0, "Expected non-zero ID for 'proc' field");
+    assert!(proc_id > 0, "Expected non-zero ID for 'proc' field");
 
     let decls_id = field!("decls");
-    assert!(decls_id.get() > 0, "Expected non-zero ID for 'decls' field");
+    assert!(decls_id > 0, "Expected non-zero ID for 'decls' field");
 
     // Test more fields to ensure comprehensive coverage
     let bundle_type_id = field!("bundle_type");
     assert!(
-        bundle_type_id.get() > 0,
+        bundle_type_id > 0,
         "Expected non-zero ID for 'bundle_type' field"
     );
 
@@ -176,14 +173,14 @@ fn test_field_macro() {
     }
 
     // Test using the macro in a const context
-    const PATTERN_FIELD: std::num::NonZeroU16 = field!("pattern");
+    const PATTERN_FIELD: u16 = field!("pattern");
     assert_eq!(
         PATTERN_FIELD, pattern_id,
         "Macro should work the same in const and non-const contexts"
     );
 
     // Test using the field ID to extract a field from a node
-    fn extract_field(field_name: &str) -> std::num::NonZeroU16 {
+    fn extract_field(field_name: &str) -> u16 {
         match field_name {
             "pattern" => field!("pattern"),
             "proc" => field!("proc"),
@@ -218,8 +215,8 @@ fn test_field_macro() {
 fn test_macro_integration() {
     // Test using the macros together in a realistic scenario
     let new_id = kind!("new");
-    let decls_id = field!("decls").get();
-    let proc_id = field!("proc").get();
+    let decls_id = field!("decls");
+    let proc_id = field!("proc");
 
     // Verify that the IDs are valid
     assert!(new_id > 0, "Expected non-zero ID for new");

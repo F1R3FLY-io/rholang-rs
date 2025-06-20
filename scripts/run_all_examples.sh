@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 # Script to run all examples from all crates in the Rholang workspace
 #
@@ -19,57 +18,22 @@ set -e
 #   0 - All examples ran successfully
 #   1 - Some examples failed
 
+# Source common functions
+source "$(dirname "$0")/common.sh"
+
+# Detect if this script is being sourced
+detect_sourced
+
+# Check if we're in the project root
+check_project_root
+
 echo "Running examples for all crates in the workspace..."
 
-# Check if we're in the project root (where Cargo.toml exists)
-if [ ! -f "Cargo.toml" ]; then
-    echo "Error: This script must be run from the project root directory."
-    exit 1
-fi
-
 # Create a temporary file to track failures
-FAILURES=$(mktemp)
-FAILURES_ABS_PATH=$(realpath "$FAILURES")
-echo "0" > "$FAILURES_ABS_PATH"
+FAILURES_ABS_PATH=$(create_failure_tracker)
 
-# Function to run a command and report its status
-run_example() {
-    local cmd="$1"
-    local description="$2"
-
-    echo "Running $description..."
-    if eval "$cmd"; then
-        echo "✅ $description passed"
-        return 0
-    else
-        echo "❌ $description failed"
-        echo "1" > "$FAILURES_ABS_PATH"
-        return 1
-    fi
-}
-
-# Check if jq is installed
-if ! command -v jq &> /dev/null; then
-    echo "⚠️ jq is not installed. Using alternative method to get crates."
-    # Alternative method to get crates from Cargo.toml
-    CRATES=$(grep -A 100 "members" Cargo.toml | grep -v "members" | grep -v "\[" | grep -v "^$" | sed 's/^[ \t]*"\(.*\)",*/\1/' | sed 's/^[ \t]*"\(.*\)"$/\1/')
-else
-    # Get all crates in the workspace using jq
-    CRATES=$(cargo metadata --format-version=1 | jq -r '.workspace_members[] | split(" ")[0]')
-fi
-
-# Function to get the crate name from the full path
-get_crate_name() {
-    local full_path="$1"
-    # Extract just the crate name from the full path
-    if [[ "$full_path" == path+file* ]]; then
-        # For paths like "path+file:///Users/beret/f1r3fly/rholang/shell#0.1.0"
-        echo "$full_path" | sed 's|.*/\([^/]*\)#.*|\1|'
-    else
-        # For simple paths like "shell"
-        echo "$full_path"
-    fi
-}
+# Get all crates in the workspace
+CRATES=$(get_workspace_crates)
 
 # Track the total number of examples found and run
 TOTAL_EXAMPLES=0
@@ -88,11 +52,11 @@ for crate_path in $CRATES; do
 
         # Get list of examples
         EXAMPLES=$(find "$crate_name/examples" -name "*.rs" -exec basename {} .rs \;)
-        
+
         # Count examples
         example_count=$(echo "$EXAMPLES" | wc -w)
         TOTAL_EXAMPLES=$((TOTAL_EXAMPLES + example_count))
-        
+
         if [ -z "$EXAMPLES" ]; then
             echo "No example files found in $crate_name/examples"
             continue
@@ -103,14 +67,14 @@ for crate_path in $CRATES; do
         # Run each example
         for example in $EXAMPLES; do
             # Check if the example requires features
-            FEATURES=$(grep -l "required-features" "$crate_name/Cargo.toml" 2>/dev/null | xargs grep -A 10 "name = \"$example\"" 2>/dev/null | grep "required-features" | sed 's/.*required-features.*\[\(.*\)\].*/\1/' | tr -d ' "')
+            FEATURES=$(get_example_features "$crate_name" "$example")
 
             if [ -n "$FEATURES" ]; then
-                run_example "cargo run -p $crate_path --example $example --features $FEATURES" "example $example for $crate_name (with features: $FEATURES)"
+                run_command "cargo run -p $crate_path --example $example --features=\"$FEATURES\"" "example $example for $crate_name (with features: $FEATURES)" "$FAILURES_ABS_PATH"
             else
-                run_example "cargo run -p $crate_path --example $example" "example $example for $crate_name"
+                run_command "cargo run -p $crate_path --example $example" "example $example for $crate_name" "$FAILURES_ABS_PATH"
             fi
-            
+
             # Increment the count of run examples
             RUN_EXAMPLES=$((RUN_EXAMPLES + 1))
         done
@@ -132,9 +96,10 @@ if [ "$(cat "$FAILURES_ABS_PATH")" == "1" ]; then
 else
     if [ "$RUN_EXAMPLES" -eq 0 ]; then
         echo "⚠️ No examples were found or run"
+        rm "$FAILURES_ABS_PATH"
+        exit 0
     else
-        echo "✅ All examples ran successfully"
+        check_failures "$FAILURES_ABS_PATH" "All examples ran successfully" "Some examples failed"
+        exit $?
     fi
-    rm "$FAILURES_ABS_PATH"
-    exit 0
 fi

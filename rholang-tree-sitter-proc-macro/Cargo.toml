@@ -21,6 +21,7 @@ is-terminal = { workspace = true }
 
 [features]
 proc_macros = []
+default = ["proc_macros"]
 
 [lib]
 proc-macro = true
@@ -33,4 +34,9 @@ required-features = ["proc_macros"]
 [[example]]
 name = "advanced_usage"
 path = "examples/advanced_usage.rs"
+required-features = ["proc_macros"]
+
+[[example]]
+name = "match_node_example"
+path = "examples/match_node_example.rs"
 required-features = ["proc_macros"]

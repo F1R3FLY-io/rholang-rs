@@ -118,7 +118,7 @@ fn main() -> Result<()> {
             if node.kind_id() == bundle_id {
                 // Get the bundle_type field using field! macro
                 let bundle_type_field = field!("bundle_type");
-                if let Some(bundle_type) = node.child_by_field_id(bundle_type_field.get()) {
+                if let Some(bundle_type) = node.child_by_field_id(bundle_type_field) {
                     println!(
                         "Found bundle declaration with type: {}",
                         bundle_type
@@ -129,7 +129,7 @@ fn main() -> Result<()> {
 
                 // Get the proc field using field! macro
                 let proc_field = field!("proc");
-                if let Some(proc) = node.child_by_field_id(proc_field.get()) {
+                if let Some(proc) = node.child_by_field_id(proc_field) {
                     println!(
                         "Found bundle declaration with process: {}",
                         proc.utf8_text(code.as_bytes())
