@@ -105,6 +105,35 @@ setup:
 	cargo install cargo-tarpaulin
 	cargo install cargo-audit
 
+# Container targets
+.PHONY: container-build
+container-build:
+	./scripts/run-in-container.sh make build
+
+.PHONY: container-release
+container-release:
+	./scripts/run-in-container.sh make release
+
+.PHONY: container-run
+container-run:
+	./scripts/run-in-container.sh make run
+
+.PHONY: container-test
+container-test:
+	./scripts/run-in-container.sh make test
+
+.PHONY: container-check
+container-check:
+	./scripts/run-in-container.sh make check
+
+.PHONY: container-fix
+container-fix:
+	./scripts/run-in-container.sh make fix
+
+.PHONY: container-shell
+container-shell:
+	./scripts/run-in-container.sh
+
 # Help target
 .PHONY: help
 help:
@@ -132,3 +161,12 @@ help:
 	@echo "  build-rholang-jni-bridge Build the rholang-jni-bridge library with JNI support (required for the JetBrains plugin)"
 	@echo "  setup           Install development dependencies"
 	@echo "  help            Show this help message"
+	@echo ""
+	@echo "Container Targets:"
+	@echo "  container-build  Build the project in a container"
+	@echo "  container-release Build with optimizations in a container"
+	@echo "  container-run    Run the shell binary in a container"
+	@echo "  container-test   Run all tests in a container"
+	@echo "  container-check  Check code quality in a container"
+	@echo "  container-fix    Fix code quality issues in a container"
+	@echo "  container-shell  Start an interactive shell in the container"
