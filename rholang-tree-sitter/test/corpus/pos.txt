@@ -749,6 +749,18 @@ in {
 ---
 
 (source_file
+  (line_comment)
+  (line_comment)
+  (line_comment)
+  (line_comment)
+  (line_comment)
+  (line_comment)
+  (line_comment)
+  (line_comment)
+  (line_comment)
+  (line_comment)
+  (block_comment)
+  (block_comment)
   (new
     decls: (name_decls
       (name_decl
@@ -801,6 +813,7 @@ in {
       (name_decl
         (var)))
     proc: (block
+      (line_comment)
       (par
         (par
           (par
@@ -891,6 +904,7 @@ in {
                   (name_decl
                     (var)))
                 proc: (block
+                  (line_comment)
                   (par
                     (par
                       (par
@@ -938,6 +952,8 @@ in {
                                         (var)
                                         (eval
                                           (var))))
+                                    (line_comment)
+                                    (line_comment)
                                     (send
                                       channel: (quote
                                         (var))
@@ -963,6 +979,8 @@ in {
                                         (long_literal)
                                         (eval
                                           (var))))))))))
+                        (line_comment)
+                        (line_comment)
                         (contract
                           name: (var)
                           formals: (names
@@ -1214,6 +1232,7 @@ in {
                                                               (var)))))))
                                                   input: (var))))
                                             proc: (block
+                                              (line_comment)
                                               (par
                                                 (par
                                                   (new
@@ -1302,6 +1321,7 @@ in {
                                                                       input: (simple_source
                                                                         (var)))))
                                                                 proc: (block
+                                                                  (line_comment)
                                                                   (send
                                                                     channel: (quote
                                                                       (var))
@@ -1313,6 +1333,7 @@ in {
                                                                       (var)
                                                                       (eval
                                                                         (var))))))))))))
+                                                  (line_comment)
                                                   (send
                                                     channel: (var)
                                                     send_type: (send_single)
@@ -1393,6 +1414,7 @@ in {
                                                         (name_decl
                                                           (var)))
                                                       proc: (block
+                                                        (line_comment)
                                                         (par
                                                           (par
                                                             (par
@@ -1421,6 +1443,7 @@ in {
                                                                                                       inputs: (inputs
                                                                                                         (collection
                                                                                                           (map
+                                                                                                            (line_comment)
                                                                                                             (key_value_pair
                                                                                                               key: (string_literal)
                                                                                                               value: (collection
@@ -1455,17 +1478,24 @@ in {
                                                                                                                       name: (var)
                                                                                                                       args: (args))
                                                                                                                     value: (long_literal)))))
+                                                                                                            (line_comment)
                                                                                                             (key_value_pair
                                                                                                               key: (string_literal)
                                                                                                               value: (var))
+                                                                                                            (line_comment)
+                                                                                                            (line_comment)
+                                                                                                            (line_comment)
+                                                                                                            (line_comment)
                                                                                                             (key_value_pair
                                                                                                               key: (string_literal)
                                                                                                               value: (collection
                                                                                                                 (map)))
+                                                                                                            (line_comment)
                                                                                                             (key_value_pair
                                                                                                               key: (string_literal)
                                                                                                               value: (collection
                                                                                                                 (map)))
+                                                                                                            (line_comment)
                                                                                                             (key_value_pair
                                                                                                               key: (string_literal)
                                                                                                               value: (collection
@@ -1830,6 +1860,7 @@ in {
                                                                                                                 (var))
                                                                                                               (var))
                                                                                                             proc: (block
+                                                                                                              (line_comment)
                                                                                                               (ifElse
                                                                                                                 condition: (method
                                                                                                                   receiver: (var)
@@ -1962,6 +1993,7 @@ in {
                                                                                                                               (var)
                                                                                                                               (long_literal)))
                                                                                                                           (var)))))))))))))))))))
+                                                                                      (line_comment)
                                                                                       (contract
                                                                                         name: (var)
                                                                                         formals: (names
@@ -1987,6 +2019,7 @@ in {
                                                                                                     name: (var)
                                                                                                     args: (args
                                                                                                       (string_literal))))))))))
+                                                                                    (line_comment)
                                                                                     (contract
                                                                                       name: (var)
                                                                                       formals: (names
@@ -2012,6 +2045,7 @@ in {
                                                                                                   name: (var)
                                                                                                   args: (args
                                                                                                     (string_literal))))))))))
+                                                                                  (line_comment)
                                                                                   (contract
                                                                                     name: (var)
                                                                                     formals: (names
@@ -2062,6 +2096,7 @@ in {
                                                                                               name: (var)
                                                                                               args: (args
                                                                                                 (string_literal))))))))))
+                                                                              (line_comment)
                                                                               (contract
                                                                                 name: (var)
                                                                                 formals: (names
@@ -2090,6 +2125,7 @@ in {
                                                                                               (var)
                                                                                               (var)
                                                                                               (var))))))))))
+                                                                            (line_comment)
                                                                             (contract
                                                                               name: (var)
                                                                               formals: (names
@@ -2105,6 +2141,7 @@ in {
                                                                                       (tuple
                                                                                         (var)
                                                                                         (var))))))))
+                                                                          (line_comment)
                                                                           (contract
                                                                             name: (var)
                                                                             formals: (names
@@ -2117,6 +2154,7 @@ in {
                                                                                 send_type: (send_single)
                                                                                 inputs: (inputs
                                                                                   (long_literal))))))
+                                                                        (line_comment)
                                                                         (contract
                                                                           name: (var)
                                                                           formals: (names
@@ -2143,6 +2181,7 @@ in {
                                                                           (quote
                                                                             (var)))
                                                                         proc: (block
+                                                                          (line_comment)
                                                                           (send
                                                                             channel: (quote
                                                                               (var))
@@ -2153,6 +2192,7 @@ in {
                                                                               (var)
                                                                               (var)
                                                                               (var))))))
+                                                                    (line_comment)
                                                                     (contract
                                                                       name: (var)
                                                                       formals: (names
@@ -2258,6 +2298,7 @@ in {
                                                                                                   (bool_literal)
                                                                                                   (string_literal))))))
                                                                                         alternative: (block
+                                                                                          (line_comment)
                                                                                           (par
                                                                                             (send
                                                                                               channel: (var)
@@ -2280,6 +2321,7 @@ in {
                                                                                               proc: (block
                                                                                                 (match
                                                                                                   expression: (var)
+                                                                                                  (line_comment)
                                                                                                   cases: (cases
                                                                                                     (case
                                                                                                       pattern: (collection
@@ -2307,6 +2349,7 @@ in {
                                                                                                                     (var)
                                                                                                                     (var)))))
                                                                                                             (var)))))
+                                                                                                    (line_comment)
                                                                                                     (case
                                                                                                       pattern: (collection
                                                                                                         (tuple
@@ -2324,6 +2367,7 @@ in {
                                                                                                                 (concat
                                                                                                                   (string_literal)
                                                                                                                   (var)))))))))))))))))))))))))
+                                                                  (line_comment)
                                                                   (contract
                                                                     name: (var)
                                                                     formals: (names
@@ -2345,6 +2389,7 @@ in {
                                                                             (var)
                                                                             uri: (uri_literal)))
                                                                         proc: (block
+                                                                          (line_comment)
                                                                           (par
                                                                             (par
                                                                               (par
@@ -2407,6 +2452,7 @@ in {
                                                                                     args: (args
                                                                                       (var)))
                                                                                   consequence: (block
+                                                                                    (line_comment)
                                                                                     (send
                                                                                       channel: (var)
                                                                                       send_type: (send_single)
@@ -2448,6 +2494,9 @@ in {
                                                                                           (tuple
                                                                                             (bool_literal)
                                                                                             (string_literal)))))))))))))))
+                                                                (line_comment)
+                                                                (line_comment)
+                                                                (line_comment)
                                                                 (new
                                                                   decls: (name_decls
                                                                     (name_decl
@@ -2567,6 +2616,9 @@ in {
                                                                                               (tuple
                                                                                                 (bool_literal)
                                                                                                 (string_literal))))))))))))))
+                                                                      (line_comment)
+                                                                      (line_comment)
+                                                                      (line_comment)
                                                                       (contract
                                                                         name: (var)
                                                                         formals: (names
@@ -2649,6 +2701,7 @@ in {
                                                                                                               input: (simple_source
                                                                                                                 (var)))))
                                                                                                         proc: (block
+                                                                                                          (line_comment)
                                                                                                           (par
                                                                                                             (send
                                                                                                               channel: (quote
@@ -2727,6 +2780,8 @@ in {
                                                                   (name_decl
                                                                     (var)))
                                                                 proc: (block
+                                                                  (line_comment)
+                                                                  (line_comment)
                                                                   (par
                                                                     (contract
                                                                       name: (var)
@@ -2838,6 +2893,11 @@ in {
                                                                                                     (name_decl
                                                                                                       (var)))
                                                                                                   proc: (block
+                                                                                                    (line_comment)
+                                                                                                    (line_comment)
+                                                                                                    (line_comment)
+                                                                                                    (line_comment)
+                                                                                                    (line_comment)
                                                                                                     (par
                                                                                                       (send
                                                                                                         channel: (var)
@@ -2859,6 +2919,7 @@ in {
                                                                                                               input: (simple_source
                                                                                                                 (var)))))
                                                                                                         proc: (block
+                                                                                                          (line_comment)
                                                                                                           (par
                                                                                                             (send
                                                                                                               channel: (var)
@@ -2883,6 +2944,7 @@ in {
                                                                                                                     input: (simple_source
                                                                                                                       (var)))))
                                                                                                               proc: (block
+                                                                                                                (line_comment)
                                                                                                                 (new
                                                                                                                   decls: (name_decls
                                                                                                                     (name_decl
@@ -2900,6 +2962,7 @@ in {
                                                                                                                           (var)
                                                                                                                           (eval
                                                                                                                             (var))))
+                                                                                                                      (line_comment)
                                                                                                                       (input
                                                                                                                         receipts: (receipts
                                                                                                                           (receipt
@@ -2909,6 +2972,8 @@ in {
                                                                                                                               input: (simple_source
                                                                                                                                 (var)))))
                                                                                                                         proc: (block
+                                                                                                                          (line_comment)
+                                                                                                                          (line_comment)
                                                                                                                           (send
                                                                                                                             channel: (var)
                                                                                                                             send_type: (send_single)
@@ -2990,6 +3055,7 @@ in {
                                                                                             (tuple
                                                                                               (bool_literal)
                                                                                               (string_literal))))))))))))))
+                                                                    (line_comment)
                                                                     (contract
                                                                       name: (var)
                                                                       formals: (names
@@ -3060,6 +3126,7 @@ in {
                                                                                                       (long_literal))
                                                                                                     (long_literal))
                                                                                                   consequence: (block
+                                                                                                    (line_comment)
                                                                                                     (send
                                                                                                       channel: (var)
                                                                                                       send_type: (send_single)
@@ -3069,6 +3136,7 @@ in {
                                                                                                             (bool_literal)
                                                                                                             (nil))))))
                                                                                                   alternative: (block
+                                                                                                    (line_comment)
                                                                                                     (new
                                                                                                       decls: (name_decls
                                                                                                         (name_decl
@@ -3142,6 +3210,8 @@ in {
                                                                                                                                 input: (simple_source
                                                                                                                                   (var)))))
                                                                                                                           proc: (block
+                                                                                                                            (line_comment)
+                                                                                                                            (line_comment)
                                                                                                                             (par
                                                                                                                               (send
                                                                                                                                 channel: (var)
@@ -3161,6 +3231,8 @@ in {
                                                                                                                                       input: (simple_source
                                                                                                                                         (var)))))
                                                                                                                                 proc: (block
+                                                                                                                                  (line_comment)
+                                                                                                                                  (line_comment)
                                                                                                                                   (par
                                                                                                                                     (send
                                                                                                                                       channel: (var)
@@ -3179,6 +3251,9 @@ in {
                                                                                                                                             input: (simple_source
                                                                                                                                               (var)))))
                                                                                                                                       proc: (block
+                                                                                                                                        (line_comment)
+                                                                                                                                        (line_comment)
+                                                                                                                                        (line_comment)
                                                                                                                                         (par
                                                                                                                                           (send
                                                                                                                                             channel: (var)
@@ -3198,6 +3273,7 @@ in {
                                                                                                                                                   input: (simple_source
                                                                                                                                                     (var)))))
                                                                                                                                             proc: (block
+                                                                                                                                              (line_comment)
                                                                                                                                               (par
                                                                                                                                                 (send
                                                                                                                                                   channel: (var)
@@ -3237,6 +3313,7 @@ in {
                                                                                                                                                           (tuple
                                                                                                                                                             (bool_literal)
                                                                                                                                                             (nil)))))))))))))))))))))))
+                                                                                                                (line_comment)
                                                                                                                 (contract
                                                                                                                   name: (var)
                                                                                                                   formals: (names
@@ -3478,6 +3555,9 @@ in {
                                                                                                                                     name: (var)
                                                                                                                                     args: (args
                                                                                                                                       (var)))))))))))))))
+                                                                                                          (line_comment)
+                                                                                                          (line_comment)
+                                                                                                          (line_comment)
                                                                                                           (contract
                                                                                                             name: (var)
                                                                                                             formals: (names
@@ -3508,6 +3588,7 @@ in {
                                                                                                                   (name_decl
                                                                                                                     (var)))
                                                                                                                 proc: (block
+                                                                                                                  (line_comment)
                                                                                                                   (par
                                                                                                                     (par
                                                                                                                       (send
@@ -3564,6 +3645,7 @@ in {
                                                                                                                                             (var))))))
                                                                                                                                   (var))
                                                                                                                                 proc: (block
+                                                                                                                                  (line_comment)
                                                                                                                                   (send
                                                                                                                                     channel: (var)
                                                                                                                                     send_type: (send_single)
@@ -3654,6 +3736,7 @@ in {
                                                                                                                                                 name: (var)
                                                                                                                                                 args: (args
                                                                                                                                                   (var))))))))))))))))
+                                                                                                                    (line_comment)
                                                                                                                     (contract
                                                                                                                       name: (var)
                                                                                                                       formals: (names
@@ -3683,6 +3766,7 @@ in {
                                                                                             (tuple
                                                                                               (bool_literal)
                                                                                               (string_literal))))))))))))))))))
+                                                            (line_comment)
                                                             (contract
                                                               name: (var)
                                                               formals: (names
@@ -3778,6 +3862,7 @@ in {
                                                                                           (var)
                                                                                           (var)))))
                                                                                   (bool_literal)))))))))))))
+                                                          (line_comment)
                                                           (contract
                                                             name: (var)
                                                             formals: (names
@@ -3915,6 +4000,7 @@ in {
                                                                                   (tuple
                                                                                     (bool_literal)
                                                                                     (string_literal))))))))))))))))))))))
+                                          (line_comment)
                                           (contract
                                             name: (var)
                                             formals: (names
@@ -3995,6 +4081,7 @@ in {
                                                                   input: (simple_source
                                                                     (var)))))
                                                             proc: (block
+                                                              (line_comment)
                                                               (send
                                                                 channel: (quote
                                                                   (var))
@@ -4006,6 +4093,7 @@ in {
                                                                   (var)
                                                                   (eval
                                                                     (var))))))))))))))))))
+                                  (line_comment)
                                   (contract
                                     name: (var)
                                     formals: (names
@@ -4059,6 +4147,7 @@ in {
                                                         send_type: (send_single)
                                                         inputs: (inputs
                                                           (var))))))))))))))
+                                (line_comment)
                                 (contract
                                   name: (var)
                                   formals: (names
@@ -4074,6 +4163,7 @@ in {
                                       send_type: (send_single)
                                       inputs: (inputs
                                         (var))))))
+                              (line_comment)
                               (contract
                                 name: (var)
                                 formals: (names
@@ -4093,6 +4183,7 @@ in {
                                       (add
                                         (var)
                                         (var)))))))
+                            (line_comment)
                             (contract
                               name: (var)
                               formals: (names
@@ -4114,6 +4205,7 @@ in {
                                         (var)
                                         (eval
                                           (var)))))))))
+                          (line_comment)
                           (contract
                             name: (var)
                             formals: (names
@@ -4152,6 +4244,7 @@ in {
                                             input: (simple_source
                                               (var)))))
                                       proc: (block
+                                        (line_comment)
                                         (send
                                           channel: (var)
                                           send_type: (send_single)
@@ -4164,6 +4257,7 @@ in {
                                                   (long_literal)))
                                               name: (var)
                                               args: (args)))))))))))))))))
+              (line_comment)
               (send
                 channel: (var)
                 send_type: (send_single)

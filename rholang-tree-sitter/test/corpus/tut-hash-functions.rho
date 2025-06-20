@@ -51,6 +51,7 @@ new x, y, stdout(`rho:io:stdout`), keccak256Hash(`rho:crypto:keccak256Hash`) in 
                   send_type: (send_single)
                   inputs: (inputs
                     (long_literal))))))
+          (line_comment)
           (input
             receipts: (receipts
               (receipt
@@ -61,6 +62,8 @@ new x, y, stdout(`rho:io:stdout`), keccak256Hash(`rho:crypto:keccak256Hash`) in 
                   input: (simple_source
                     (var)))))
             proc: (block
+              (line_comment)
+              (line_comment)
               (send
                 channel: (var)
                 send_type: (send_single)
@@ -70,7 +73,8 @@ new x, y, stdout(`rho:io:stdout`), keccak256Hash(`rho:crypto:keccak256Hash`) in 
                     name: (var)
                     args: (args))
                   (eval
-                    (var)))))))
+                    (var))))
+              (line_comment))))
         (input
           receipts: (receipts
             (receipt
@@ -81,8 +85,11 @@ new x, y, stdout(`rho:io:stdout`), keccak256Hash(`rho:crypto:keccak256Hash`) in 
                 input: (simple_source
                   (var)))))
           proc: (block
+            (line_comment)
+            (line_comment)
             (send
               channel: (var)
               send_type: (send_single)
               inputs: (inputs
-                (var)))))))))
+                (var)))
+            (line_comment)))))))
