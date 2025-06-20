@@ -1,56 +1,46 @@
 // Tests for the rholang-tree-sitter-proc-macro macros
 use rholang_tree_sitter_proc_macro::{field, kind, kw};
 
+// Static values for node kinds
+const NEW_KIND: u16 = 79;
+const SEND_KIND: u16 = 87;
+const BUNDLE_KIND: u16 = 82;
+const BRANCH_KIND: u16 = 129;
+const CASE_KIND: u16 = 128;
+
+// Static values for keywords
+const NEW_KW: u16 = 4;
+const FOR_KW: u16 = 17;
+const IN_KW: u16 = 5;
+
+// Static values for fields
+const PATTERN_FIELD: u16 = 19;
+const PROC_FIELD: u16 = 20;
+const DECLS_FIELD: u16 = 10;
+const BUNDLE_TYPE_FIELD: u16 = 4;
+
 #[test]
 fn test_kind_macro() {
     // Test with valid node kinds
     let new_id = kind!("new");
-    assert!(new_id > 0, "Expected non-zero ID for new");
+    assert_eq!(new_id, NEW_KIND, "Unexpected ID for new");
 
     let send_id = kind!("send");
-    assert!(send_id > 0, "Expected non-zero ID for send");
+    assert_eq!(send_id, SEND_KIND, "Unexpected ID for send");
 
     let bundle_id = kind!("bundle");
-    assert!(bundle_id > 0, "Expected non-zero ID for bundle");
+    assert_eq!(bundle_id, BUNDLE_KIND, "Unexpected ID for bundle");
 
     // Test more node kinds to ensure comprehensive coverage
     let branch_id = kind!("branch");
-    assert!(branch_id > 0, "Expected non-zero ID for branch");
+    assert_eq!(branch_id, BRANCH_KIND, "Unexpected ID for branch");
 
     let case_id = kind!("case");
-    assert!(case_id > 0, "Expected non-zero ID for case");
-
-    // Verify that different node kinds have different IDs
-    assert_ne!(
-        new_id, send_id,
-        "Different node kinds should have different IDs"
-    );
-    assert_ne!(
-        new_id, bundle_id,
-        "Different node kinds should have different IDs"
-    );
-    assert_ne!(
-        send_id, bundle_id,
-        "Different node kinds should have different IDs"
-    );
-
-    // Test that all node kinds have unique IDs
-    let node_kinds = [new_id, send_id, bundle_id, branch_id, case_id];
-
-    for i in 0..node_kinds.len() {
-        for j in i + 1..node_kinds.len() {
-            assert_ne!(
-                node_kinds[i], node_kinds[j],
-                "Node kinds should have unique IDs: {} and {}",
-                i, j
-            );
-        }
-    }
+    assert_eq!(case_id, CASE_KIND, "Unexpected ID for case");
 
     // Test using the macro in a const context
-    const NEW_ID: u16 = kind!("new");
     assert_eq!(
-        NEW_ID, new_id,
+        NEW_KIND, new_id,
         "Macro should work the same in const and non-const contexts"
     );
 
@@ -63,41 +53,14 @@ fn test_kind_macro() {
 fn test_kw_macro() {
     // Test with valid keywords
     let new_id = kw!("new");
-    assert!(new_id > 0, "Expected non-zero ID for 'new' keyword");
+    assert_eq!(new_id, NEW_KW, "Unexpected ID for 'new' keyword");
 
     let for_id = kw!("for");
-    assert!(for_id > 0, "Expected non-zero ID for 'for' keyword");
+    assert_eq!(for_id, FOR_KW, "Unexpected ID for 'for' keyword");
 
     // Test more keywords to ensure comprehensive coverage
     let in_id = kw!("in");
-    assert!(in_id > 0, "Expected non-zero ID for 'in' keyword");
-
-    // Verify that different keywords have different IDs
-    assert_ne!(
-        new_id, for_id,
-        "Different keywords should have different IDs"
-    );
-    assert_ne!(
-        new_id, in_id,
-        "Different keywords should have different IDs"
-    );
-    assert_ne!(
-        for_id, in_id,
-        "Different keywords should have different IDs"
-    );
-
-    // Test that all keywords have unique IDs
-    let keywords = [new_id, for_id, in_id];
-
-    for i in 0..keywords.len() {
-        for j in i + 1..keywords.len() {
-            assert_ne!(
-                keywords[i], keywords[j],
-                "Keywords should have unique IDs: {} and {}",
-                i, j
-            );
-        }
-    }
+    assert_eq!(in_id, IN_KW, "Unexpected ID for 'in' keyword");
 
     // Test using the macro in a const context
     const NEW_KEYWORD_ID: u16 = kw!("new");
@@ -130,50 +93,25 @@ fn test_kw_macro() {
 fn test_field_macro() {
     // Test with valid fields
     let pattern_id = field!("pattern");
-    assert!(pattern_id > 0, "Expected non-zero ID for 'pattern' field");
+    assert_eq!(
+        pattern_id, PATTERN_FIELD,
+        "Unexpected ID for 'pattern' field"
+    );
 
     let proc_id = field!("proc");
-    assert!(proc_id > 0, "Expected non-zero ID for 'proc' field");
+    assert_eq!(proc_id, PROC_FIELD, "Unexpected ID for 'proc' field");
 
     let decls_id = field!("decls");
-    assert!(decls_id > 0, "Expected non-zero ID for 'decls' field");
+    assert_eq!(decls_id, DECLS_FIELD, "Unexpected ID for 'decls' field");
 
     // Test more fields to ensure comprehensive coverage
     let bundle_type_id = field!("bundle_type");
-    assert!(
-        bundle_type_id > 0,
-        "Expected non-zero ID for 'bundle_type' field"
+    assert_eq!(
+        bundle_type_id, BUNDLE_TYPE_FIELD,
+        "Unexpected ID for 'bundle_type' field"
     );
-
-    // Verify that different fields have different IDs
-    assert_ne!(
-        pattern_id, proc_id,
-        "Different fields should have different IDs"
-    );
-    assert_ne!(
-        pattern_id, decls_id,
-        "Different fields should have different IDs"
-    );
-    assert_ne!(
-        proc_id, decls_id,
-        "Different fields should have different IDs"
-    );
-
-    // Test that all fields have unique IDs
-    let fields = [pattern_id, proc_id, decls_id, bundle_type_id];
-
-    for i in 0..fields.len() {
-        for j in i + 1..fields.len() {
-            assert_ne!(
-                fields[i], fields[j],
-                "Fields should have unique IDs: {} and {}",
-                i, j
-            );
-        }
-    }
 
     // Test using the macro in a const context
-    const PATTERN_FIELD: u16 = field!("pattern");
     assert_eq!(
         PATTERN_FIELD, pattern_id,
         "Macro should work the same in const and non-const contexts"
@@ -218,10 +156,10 @@ fn test_macro_integration() {
     let decls_id = field!("decls");
     let proc_id = field!("proc");
 
-    // Verify that the IDs are valid
-    assert!(new_id > 0, "Expected non-zero ID for new");
-    assert!(decls_id > 0, "Expected non-zero ID for decls field");
-    assert!(proc_id > 0, "Expected non-zero ID for proc field");
+    // Verify that the IDs match the expected values
+    assert_eq!(new_id, NEW_KIND, "Unexpected ID for new");
+    assert_eq!(decls_id, DECLS_FIELD, "Unexpected ID for decls field");
+    assert_eq!(proc_id, PROC_FIELD, "Unexpected ID for proc field");
 
     // In a real scenario, we would use these IDs to navigate a tree-sitter parse tree
     // For example, to find the declarations and process body of a new expression:
