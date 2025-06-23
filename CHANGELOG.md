@@ -7,10 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.2] - 2025-07-01
 ### Added
-- New `match_node` macro with examples for rholang-tree-sitter-proc-macro
+- Docker-based development container setup with IntelliJ run configuration
+- Comprehensive procedural macros for tree-sitter integration:
+  - `kind!`: Returns the node kind ID for a given node kind name
+  - `kw!`: Returns the node kind ID for a given keyword
+  - `field!`: Returns the field ID for a given field name
+  - `match_node!`: Matches a node's kind string against patterns
 - Scripts to run all examples and tests across workspace crates
 - Integration of test and example scripts into quality check script and Makefile
-- Examples, scripts, and procedural macros for rholang-tree-sitter-proc-macro
+- Examples and documentation for rholang-tree-sitter-proc-macro
 
 ### Changed
 - Changed field return type to u16

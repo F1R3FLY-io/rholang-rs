@@ -30,6 +30,14 @@ Build a high-performance, production-ready Rholang interpreter in Rust for the F
 - [ ] Comprehensive unit tests
 - [ ] API documentation and examples
 
+#### 🛠️ Developer Tools (v0.1.2)
+- [x] Procedural macros for tree-sitter integration
+  - *Implementation: rholang-tree-sitter-proc-macro crate provides kind!, kw!, field!, and match_node! macros for compile-time validation and pattern matching*
+- [x] Docker-based development container setup
+  - *Implementation: Added Docker configuration for consistent development environment and IntelliJ run configuration*
+- [x] Scripts for running tests and examples across workspace crates
+  - *Implementation: Added run_all_tests.sh and run_all_examples.sh scripts, integrated into quality check script and Makefile*
+
 ## Phase 1: Core Language Implementation (Q1-Q2 2025)
 
 ### 🎯 Parser and AST (v0.2.0)
