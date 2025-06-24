@@ -9,8 +9,8 @@ Build a high-performance, production-ready Rholang interpreter in Rust for the F
 ### Completed Milestones
 
 #### 🏗️ Project Infrastructure (v0.1.0)
-- [x] Workspace setup with shell package structure
-  - *Implementation: Project root structure with Cargo.toml workspace configuration defining members: shell, rholang-tree-sitter, rholang-parser, rholang-jni-bridge*
+- [x] Workspace setup with rholang-shell package structure
+  - *Implementation: Project root structure with Cargo.toml workspace configuration defining members: rholang-shell, rholang-tree-sitter, rholang-parser, rholang-jni-bridge*
 - [x] Basic interpreter trait and fake implementation
   - *Implementation: shell/src/providers.rs defines InterpreterProvider trait and FakeInterpreterProvider, with RholangParserInterpreterProvider as a more advanced implementation*
 - [x] CLI shell (`rhosh`) with rustyline integration

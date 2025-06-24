@@ -2,14 +2,14 @@
 
 ## Project Context
 - This is a F1r3fly.io repository for the Rholang rust interpreter
-- Uses workspace structure with `shell/` package containing the main interpreter (`rhosh` binary)
+- Uses workspace structure with `rholang-shell/` package containing the main interpreter (`rhosh` binary)
 - Currently uses Rust Edition 2021 with resolver v2 for stable compatibility
 - If the user does not provide enough information with their prompts, ask the user to clarify before executing the task. This should be included in all tasks including writing unit tests, scaffolding the project, as well as implementation of individual modules. In general, follow a test driven development approach whereby unit tests are developed in parallel with the individual components, and features.
 
 ## Commands
-- Development: `cargo run -p shell` (runs rhosh interpreter)
-- Build: `cargo build` (workspace), `cargo build -p shell` (specific package)
-- Test: `cargo test` (all), `cargo test -p shell` (package-specific)
+- Development: `cargo run -p rholang-shell` (runs rhosh interpreter)
+- Build: `cargo build` (workspace), `cargo build -p rholang-shell` (specific package)
+- Test: `cargo test` (all), `cargo test -p rholang-shell` (package-specific)
 - Lint: `cargo clippy --all-features --all-targets -- -D warnings`
 - Format: `cargo fmt`
 - Fix: `cargo fix --bin "rhosh"`
@@ -71,11 +71,11 @@
 - If connected to a `mcp-shell-server` also known as just a "shell", run all shell commands through that mcp server. This approach will automatically restrict which commands can be run and properly configure the shell environment
 - Review `git history` to determine how code base evolved or history for particular files and functions
 - When adding new dependencies, add them to workspace dependencies in root Cargo.toml
-- Use package-specific commands when working on shell: `cargo test -p shell`, `cargo run -p shell`
+- Use package-specific commands when working on rholang-shell: `cargo test -p rholang-shell`, `cargo run -p rholang-shell`
 
 ## Project Specifics
 - DO NOT change language or narratives when synthesizing code. Ask if you think other changes are necessary
 - Observe the lint rules when writing code and fix all warnings
 - Make use of [https://browsertools.agentdesk.ai/](https://browsertools.agentdesk.ai/) if installed in MCP subsystem
-- Current workspace structure: root with `shell/` package containing the Rholang interpreter
-- Main binary: `rhosh` (Rholang shell) in `shell/src/main.rs`
+- Current workspace structure: root with `rholang-shell/` package containing the Rholang interpreter
+- Main binary: `rhosh` (Rholang shell) in `rholang-shell/src/main.rs`

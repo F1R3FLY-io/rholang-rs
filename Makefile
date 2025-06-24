@@ -14,15 +14,15 @@ build:
 release:
 	cargo build --release
 
-# Run the shell binary
+# Run the rholang-shell binary
 .PHONY: run
 run:
-	cargo run -p shell
+	cargo run -p rholang-shell
 
-# Run the shell binary with file history feature
+# Run the rholang-shell binary with file history feature
 .PHONY: run-with-history
 run-with-history:
-	cargo run -p shell --features with-file-history
+	cargo run -p rholang-shell --features with-file-history
 
 # Run the examples processor
 .PHONY: run-examples
@@ -52,9 +52,9 @@ test-all:
 	cargo test -- --include-ignored
 
 # Run tests for a specific crate
-.PHONY: test-shell
-test-shell:
-	cargo test -p shell
+.PHONY: test-rholang-shell
+test-rholang-shell:
+	cargo test -p rholang-shell
 
 # Check code quality
 .PHONY: check
@@ -157,14 +157,14 @@ help:
 	@echo "  all             Build the project (default)"
 	@echo "  build           Build the project"
 	@echo "  release         Build with optimizations"
-	@echo "  run             Run the shell binary"
-	@echo "  run-with-history Run the shell binary with file history feature"
+	@echo "  run             Run the rholang-shell binary"
+	@echo "  run-with-history Run the rholang-shell binary with file history feature"
 	@echo "  run-examples     Run the examples processor"
 	@echo "  macro-examples    Run the rholang-tree-sitter-proc-macro examples"
 	@echo "  examples         Run all examples in all crates"
 	@echo "  test            Run all tests"
 	@echo "  test-all        Run all tests including ignored tests"
-	@echo "  test-shell      Run tests for the shell crate"
+	@echo "  test-rholang-shell Run tests for the rholang-shell crate"
 	@echo "  check           Check code quality"
 	@echo "  fix             Fix code quality issues"
 	@echo "  coverage        Run source-only test coverage (excluding tests)"
@@ -179,7 +179,7 @@ help:
 	@echo "Container Targets:"
 	@echo "  container-build  Build the project in a container"
 	@echo "  container-release Build with optimizations in a container"
-	@echo "  container-run    Run the shell binary in a container"
+	@echo "  container-run    Run the rholang-shell binary in a container"
 	@echo "  container-test   Run all tests in a container"
 	@echo "  container-check  Check code quality in a container"
 	@echo "  container-fix    Fix code quality issues in a container"

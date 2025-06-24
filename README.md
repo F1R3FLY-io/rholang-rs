@@ -65,7 +65,7 @@ cargo build
 cargo build --release
 
 # Build specific workspace member
-cargo build -p shell
+cargo build -p rholang-shell
 ```
 
 ### Running Tests
@@ -78,7 +78,7 @@ cargo test
 cargo test -- --nocapture
 
 # Run tests for specific workspace member
-cargo test -p shell
+cargo test -p rholang-shell
 
 # Run specific test module
 cargo test <module_name>
@@ -137,10 +137,10 @@ cargo audit
 
 ```bash
 # Run the Rholang shell (rhosh)
-cargo run -p shell
+cargo run -p rholang-shell
 
 # Run with specific arguments
-cargo run -p shell -- --help
+cargo run -p rholang-shell -- --help
 
 # Run the interpreter binary directly after building
 ./target/debug/rhosh
@@ -156,15 +156,15 @@ cargo run -p shell -- --help
 ```
 rholang-rs/
 ├── Cargo.toml           # Workspace configuration
-├── shell/               # Rholang interpreter shell (rhosh)
-│   ├── Cargo.toml       # Shell package configuration
+├── rholang-shell/       # Rholang interpreter shell (rhosh)
+│   ├── Cargo.toml       # Rholang-shell package configuration
 │   ├── src/
-│   │   ├── main.rs      # Shell entry point
+│   │   ├── main.rs      # Rholang-shell entry point
 │   │   ├── lib.rs       # Library modules
 │   │   ├── interpreter.rs    # Core interpreter logic
 │   │   ├── rh_interpreter.rs # Rholang-specific interpreter
 │   │   └── main_sync.rs # Synchronous main alternative
-│   └── tests/           # Shell integration tests
+│   └── tests/           # Rholang-shell integration tests
 ├── README.md
 └── CLAUDE.md           # Project instructions for Claude
 ```
@@ -191,8 +191,8 @@ cargo test --lib
 # Run integration tests only
 cargo test --test '*'
 
-# Run tests for shell package
-cargo test -p shell
+# Run tests for rholang-shell package
+cargo test -p rholang-shell
 
 # Run benchmarks
 cargo bench

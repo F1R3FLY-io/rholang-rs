@@ -71,10 +71,10 @@ get_crate_name() {
     local full_path="$1"
     # Extract just the crate name from the full path
     if [[ "$full_path" == path+file* ]]; then
-        # For paths like "path+file:///Users/beret/f1r3fly/rholang/shell#0.1.0"
+        # For paths like "path+file:///Users/beret/f1r3fly/rholang/rholang-shell#0.1.0"
         echo "$full_path" | sed 's|.*/\([^/]*\)#.*|\1|'
     else
-        # For simple paths like "shell"
+        # For simple paths like "rholang-shell"
         echo "$full_path"
     fi
 }
@@ -83,7 +83,7 @@ get_crate_name() {
 get_example_features() {
     local crate_name="$1"
     local example="$2"
-    
+
     grep -l "required-features" "$crate_name/Cargo.toml" 2>/dev/null | xargs grep -A 10 "name = \"$example\"" 2>/dev/null | grep "required-features" | sed 's/.*required-features.*\[\(.*\)\].*/\1/' | tr -d ' "' | tr '\n' ' ' | xargs
 }
 
@@ -92,7 +92,7 @@ check_failures() {
     local failures_path="$1"
     local success_message="$2"
     local failure_message="$3"
-    
+
     if [ "$(cat "$failures_path")" == "1" ]; then
         echo "❌ $failure_message"
         rm "$failures_path"
