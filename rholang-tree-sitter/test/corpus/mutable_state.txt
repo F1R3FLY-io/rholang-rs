@@ -47,6 +47,7 @@ new MakeCell in {
       (name_decl
         (var)))
     proc: (block
+      (line_comment)
       (par
         (contract
           name: (var)
@@ -160,6 +161,7 @@ new MakeCell in {
                             input: (simple_source
                               (var)))))
                       proc: (block
+                        (line_comment)
                         (par
                           (send
                             channel: (var)
@@ -194,4 +196,5 @@ new MakeCell in {
                                         input: (simple_source
                                           (var)))))
                                   proc: (block
+                                    (line_comment)
                                     (nil)))))))))))))))))))

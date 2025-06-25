@@ -2,8 +2,8 @@ module.exports = grammar({
     name: 'rholang',
 
     extras: $ => [
-        $._line_comment,
-        $._block_comment,
+        $.line_comment,
+        $.block_comment,
         /\s/,
     ],
     word: $ => $.var,
@@ -302,8 +302,8 @@ module.exports = grammar({
 
         // comments
 
-        _line_comment: $ => token(seq('//', /[^\n]*/)),
-        _block_comment: $ => token(seq(
+        line_comment: $ => token(seq('//', /[^\n]*/)),
+        block_comment: $ => token(seq(
             '/*',
             /[^*]*\*+([^/*][^*]*\*+)*/,
             '/',
