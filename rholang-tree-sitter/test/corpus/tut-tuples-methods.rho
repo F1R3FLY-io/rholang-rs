@@ -15,12 +15,14 @@ new stdout(`rho:io:stdout`) in {
 ---
 
 (source_file
+  (line_comment)
   (new
     decls: (name_decls
       (name_decl
         (var)
         uri: (uri_literal)))
     proc: (block
+      (line_comment)
       (par
         (send
           channel: (var)
@@ -35,6 +37,7 @@ new stdout(`rho:io:stdout`) in {
               name: (var)
               args: (args
                 (long_literal)))))
+        (line_comment)
         (send
           channel: (var)
           send_type: (send_single)
