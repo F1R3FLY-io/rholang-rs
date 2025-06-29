@@ -1,19 +1,17 @@
+# Rholang Bytecode Design
+
 For a complete and accurate implementation of bytecode, here we will describe a tentative structure of converting each Rholang instruction from grammar into bytecode. This bytecode design follows a stack-based VM where each Rholang instruction is translated into a sequence of low-level operations.
 
-### Runtime Support Instructions
+### Runtime System Instructions
 ```
 CORE INSTRUCTIONS:
 ├── NOP                 // No operation
-├── HALT                // Stop execution
 ├── PUSH_INT n          // Push integer literal
 ├── PUSH_STR s          // Push string literal
 ├── PUSH_BOOL b         // Push boolean literal
 ├── POP                 // Pop top of stack
 ├── DUP                 // Duplicate top of stack
-├── SWAP                // Swap top two stack items
 ├── LOAD_VAR n          // Load variable by index
-├── STORE_VAR n         // Store to variable by index
-├── LOAD_LOCAL n        // Load local variable
 ├── STORE_LOCAL n       // Store to local variable
 ├── ALLOC_LOCAL         // Allocate new local slot
 ├── ALLOC_NAME          // Allocate fresh name
@@ -30,7 +28,27 @@ CORE INSTRUCTIONS:
 ├── BRANCH_TRUE L       // Conditional jump if true
 ├── BRANCH_FALSE L      // Conditional jump if false
 ├── JUMP L              // Unconditional jump
-└── CALL addr           // Call subroutine
+├── CALL addr           // Call subroutine
+├── CMP_EQ              // Equality comparison
+├── CMP_NEQ             // Inequality comparison
+├── CMP_LT              // Less than comparison
+├── CMP_LTE             // Less than or equal
+├── CMP_GT              // Greater than comparison
+├── CMP_GTE             // Greater than or equal
+├── CONCAT              // String/collection concatenation
+├── DIFF                // Collection difference
+├── INTERPOLATE         // String interpolation
+├── NOT                 // Logical NOT
+├── CONJ                // Process conjunction
+├── DISJ                // Process disjunction
+├── PROC_NEG            // Process negation
+├── MATCH_TEST          // Pattern match test
+├── COPY                // Copy value
+├── MOVE                // Move value
+├── REF                 // Create reference
+├── TUPLE_BEGIN         // Start tuple construction
+├── TUPLE_ADD           // Add element to tuple
+└── TUPLE_END           // Finish tuple construction
 ```
 
 ### Core Process Constructs
@@ -158,7 +176,7 @@ select { x <- chan1 => P1; y <- chan2 => P2 }  -> BYTECODE
 
 ### Expression Constructs
 **Arithmetic Operations** - The conversion of these operations will be almost the same, so I won't describe them all. But here are the types we have in general:
-Addition, Subtraction, Multiplication, Division(add `CHECK_ZERO`), Modulo(add `CHECK_ZERO`), Negation?
+Addition, Subtraction, Multiplication, Division, Modulo, Negation?
 ```
 P + Q  -> BYTECODE
 ├── PUSH_PROC P         // Push left operand
@@ -190,6 +208,159 @@ obj.method(args)  -> BYTECODE
 ├── EVAL                // Evaluate arguments
 ├── LOAD_METHOD method  // Load method name
 └── INVOKE              // Invoke method
+```
+
+### Comparison Expression Constructs
+**Equality Comparison**
+```
+P == Q  -> BYTECODE
+├── PUSH_PROC P         // Push left operand
+├── EVAL                // Evaluate P
+├── PUSH_PROC Q         // Push right operand
+├── EVAL                // Evaluate Q
+└── CMP_EQ              // Compare for equality, push boolean result
+```
+
+**Inequality Comparison**
+```
+P != Q  -> BYTECODE
+├── PUSH_PROC P         // Push left operand
+├── EVAL                // Evaluate P
+├── PUSH_PROC Q         // Push right operand
+├── EVAL                // Evaluate Q
+└── CMP_NEQ             // Compare for inequality, push boolean result
+```
+
+**All Other Comparisons (!=, <, <=, >, >=)**
+```
+P <op> Q  -> BYTECODE
+├── PUSH_PROC P         // Push left operand
+├── EVAL                // Evaluate P
+├── PUSH_PROC Q         // Push right operand
+├── EVAL                // Evaluate Q
+└── CMP_<OP>            // Perform comparison operation
+```
+
+### Logical/Pattern Constructs
+**Matches Expression**
+```
+P matches Q  -> BYTECODE
+├── PUSH_PROC P         // Push value to match
+├── EVAL                // Evaluate P
+├── PATTERN Q           // Load pattern Q
+├── MATCH_TEST          // Test if P matches Q
+└── PUSH_BOOL           // Push boolean result (true/false)
+```
+
+**Logical NOT**
+```
+not P  -> BYTECODE
+├── PUSH_PROC P         // Push operand
+├── EVAL_BOOL           // Evaluate to boolean
+└── NOT                 // Logical negation
+```
+
+**Logical OR**
+```
+P or Q  -> BYTECODE
+├── PUSH_PROC P         // Push left operand
+├── EVAL_BOOL           // Evaluate to boolean
+├── DUP                 // Duplicate result
+├── BRANCH_TRUE L1      // Short-circuit if true
+├── POP                 // Remove duplicate
+├── PUSH_PROC Q         // Push right operand
+├── EVAL_BOOL           // Evaluate to boolean
+└── L1: NOP             // Result is on stack
+```
+
+### Process Logic Constructs
+**Conjunction (Process AND)**
+```
+P /\ Q  -> BYTECODE
+├── PUSH_PROC P         // Push left process
+├── PUSH_PROC Q         // Push right process
+└── CONJ                // Process conjunction (both must succeed)
+```
+
+**Disjunction (Process OR)**
+```
+P \/ Q  -> BYTECODE
+├── PUSH_PROC P         // Push left process
+├── PUSH_PROC Q         // Push right process
+└── DISJ                // Process disjunction (either can succeed)
+```
+
+**Process Negation**
+```
+~P  -> BYTECODE
+├── PUSH_PROC P         // Push process
+└── PROC_NEG            // Process negation
+```
+
+### String/Collection Operations
+**String Concatenation**
+```
+P ++ Q  -> BYTECODE
+├── PUSH_PROC P         // Push left operand
+├── EVAL                // Evaluate P
+├── PUSH_PROC Q         // Push right operand
+├── EVAL                // Evaluate Q
+└── CONCAT              // Concatenate strings/collections
+```
+
+**Collection Difference**
+```
+P -- Q  -> BYTECODE
+├── PUSH_PROC P         // Push left operand
+├── EVAL                // Evaluate P
+├── PUSH_PROC Q         // Push right operand
+├── EVAL                // Evaluate Q
+└── DIFF                // Collection difference operation
+```
+
+**String Interpolation**
+```
+P %% Q  -> BYTECODE
+├── PUSH_PROC P         // Push format string
+├── EVAL                // Evaluate P
+├── PUSH_PROC Q         // Push value to interpolate  
+├── EVAL                // Evaluate Q
+└── INTERPOLATE         // Perform string interpolation
+```
+
+### Variable binding constructs
+**Let Binding (Linear)**
+```
+let x = P; y = Q in R  -> BYTECODE
+├── PUSH_PROC P         // Push value for x
+├── EVAL                // Evaluate P
+├── ALLOC_LOCAL         // Allocate slot for x
+├── STORE_LOCAL 0       // Store P result in x
+├── PUSH_PROC Q         // Push value for y
+├── EVAL                // Evaluate Q
+├── ALLOC_LOCAL         // Allocate slot for y
+├── STORE_LOCAL 1       // Store Q result in y
+├── PUSH_PROC R         // Push body process R
+└── EXEC                // Execute R with bindings
+```
+
+**Let Binding (Concurrent)**
+```
+let x = P & y = Q in R  -> BYTECODE
+├── FORK                // Create parallel context
+├── PUSH_PROC P         // Push value for x
+├── EVAL                // Evaluate P
+├── ALLOC_LOCAL         // Allocate slot for x
+├── STORE_LOCAL 0       // Store P result in x
+├── SPAWN               // Spawn x binding in parallel
+├── PUSH_PROC Q         // Push value for y
+├── EVAL                // Evaluate Q
+├── ALLOC_LOCAL         // Allocate slot for y
+├── STORE_LOCAL 1       // Store Q result in y
+├── SPAWN               // Spawn y binding in parallel
+├── JOIN_ALL            // Wait for all bindings
+├── PUSH_PROC R         // Push body process R
+└── EXEC                // Execute R with all bindings
 ```
 
 ### Data Constructs
@@ -226,6 +397,32 @@ obj.method(args)  -> BYTECODE
 └── MAP_END             // Finish map construction
 ```
 
+**Single Element Tuple**
+```
+(P,)  -> BYTECODE
+├── TUPLE_BEGIN         // Start tuple construction
+├── PUSH_PROC P         // Push element
+├── EVAL                // Evaluate element
+├── TUPLE_ADD           // Add to tuple
+└── TUPLE_END           // Finish single-element tuple
+```
+
+**Multi-Element Tuple**
+```
+(P, Q, R)  -> BYTECODE
+├── TUPLE_BEGIN         // Start tuple construction
+├── PUSH_PROC P         // Push first element
+├── EVAL                // Evaluate P
+├── TUPLE_ADD           // Add to tuple
+├── PUSH_PROC Q         // Push second element
+├── EVAL                // Evaluate Q
+├── TUPLE_ADD           // Add to tuple
+├── PUSH_PROC R         // Push third element
+├── EVAL                // Evaluate R
+├── TUPLE_ADD           // Add to tuple
+└── TUPLE_END           // Finish tuple construction
+```
+
 ### Advanced Constructs
 **Bundle Operations**
 ```
@@ -248,14 +445,17 @@ bundle+ { P }  -> BYTECODE
 ```
 
 **Variable Reference**
+*Requires clarification from Jeff
 ```
 =var  -> BYTECODE
-├── LOAD_VAR var        // Load variable value
-└── REF_COPY            // Create reference copy
+├── LOAD_VAR var        // Load variable
+├── COPY                // Create copy
+└── REF                 // Create reference to copy
 
 =*var  -> BYTECODE
-├── LOAD_VAR var        // Load variable value
-└── REF_MOVE            // Create reference with move semantics
+├── LOAD_VAR var        // Load variable
+├── MOVE                // Transfer ownership
+└── REF                 // Create reference with move
 ```
 
 ### Literal Constructs*
@@ -274,4 +474,23 @@ boolean_true (true) → BYTECODE
 boolean_false (false) → BYTECODE
 
 nil (Nil) → BYTECODE
+```
+
+For the sake of clarity, I translated all the Rholang constructs into bytecode.
+But in reality I think that bytecode instructions will be reduced due to the use of Desugaring. For example:
+```
+contract Name(x) = { P }
+```
+↓ DESUGAR TO ↓
+```
+for (x <= Name) { P }
+```
+↓ BYTECODE ↓
+```
+├── LOAD_VAR Name
+├── ALLOC_LOCAL
+├── RECEIVE_PERSISTENT
+├── STORE_LOCAL 0
+├── PUSH_PROC P
+└── EXEC
 ```
