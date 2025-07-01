@@ -1,18 +1,12 @@
 [package]
 name = "rholang-parser"
-version = "0.1.2"
-edition = "2021"
+description = "Parser for the Rholang language based on the tree-sitter grammar."
+version = "0.1.0"
+edition = "2024"
 
 [lib]
 name = "rholang_parser"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-anyhow = { workspace = true }
-tree-sitter = { workspace = true }
 rholang-tree-sitter = { path = "../rholang-tree-sitter" }
-serde = { workspace = true }
-serde_json = { workspace = true }
-
-[dev-dependencies]
-rstest = { workspace = true }
