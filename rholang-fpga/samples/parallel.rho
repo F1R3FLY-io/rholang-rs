@@ -1,0 +1,15 @@
+// Parallel Processes in Rholang
+// This program demonstrates concurrent execution and message passing
+
+new channel, stdout(`rho:io:stdout`) in {
+  // Sender process 1
+  channel!("Message 1") |
+  
+  // Sender process 2
+  channel!("Message 2") |
+  
+  // Receiver process
+  for (msg1 <- channel; msg2 <- channel) {
+    stdout!(["Received", msg1, "and", msg2])
+  }
+}
