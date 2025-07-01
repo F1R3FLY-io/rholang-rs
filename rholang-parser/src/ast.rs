@@ -213,8 +213,12 @@ pub enum BinaryExpOp {
 
 // for-comprehensions
 
-pub type Receipt<'a> = SmallVec<[Bind<'a>; 1]>;
 pub type Receipts<'a> = SmallVec<[Receipt<'a>; 1]>;
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Receipt<'a> {
+    pub binds: SmallVec<[Bind<'a>; 1]>,
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Bind<'ast> {
@@ -300,6 +304,8 @@ pub enum SimpleType {
 
 // collections
 
+pub type KeyValuePair<'ast> = (AnnProc<'ast>, AnnProc<'ast>);
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Collection<'ast> {
     List {
@@ -315,7 +321,7 @@ pub enum Collection<'ast> {
     },
 
     Map {
-        elements: Vec<(AnnProc<'ast>, AnnProc<'ast>)>,
+        elements: Vec<KeyValuePair<'ast>>,
         remainder: Option<Var<'ast>>,
     },
 }
