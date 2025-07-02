@@ -436,10 +436,21 @@ P | Q -> FSM
                         │                    │
                         └──────┐     ┌───────┘
                                ▼     ▼
-                           ┌─────────┐
-                           │TERMINATED│
-                           │         │
-                           └─────────┘
+                              ┌──────────┐
+                              │TERMINATED│
+                              │          │
+                              └──────────┘
+```
+
+**Bytecode Sequence:**
+```
+par (P | Q)  -> BYTECODE
+├── FORK                 // Create parallel execution context
+├── PUSH_PROC P          // Push left process to stack
+├── SPAWN                // Spawn left process in new thread
+├── PUSH_PROC Q          // Push right process to stack
+├── SPAWN                // Spawn right process in new thread
+└── JOIN_ALL             // Wait for all parallel processes
 ```
 
 **Name Creation (new)**
@@ -466,6 +477,17 @@ new x, y in P -> FSM
                            └─────────┘
 ```
 
+**Bytecode Sequence:**
+```
+new x, y in P -> BYTECODE
+├── ALLOC_NAME           // Allocate fresh name for x
+├── STORE_LOCAL 0        // Store in local slot 0
+├── ALLOC_NAME           // Allocate fresh name for y
+├── STORE_LOCAL 1        // Store in local slot 1
+├── PUSH_PROC P          // Push process P to stack
+└── EXEC                 // Execute P with new scope
+```
+
 **Asynchronous Send (send)**
 ```
 chan!(data) -> FSM
@@ -480,6 +502,15 @@ chan!(data) -> FSM
                     │EVALUATING│
                     │ data    │
                     └─────────┘
+```
+
+**Bytecode Sequence:**
+```
+chan!(data)  -> BYTECODE
+├── LOAD_VAR chan        // Load channel name
+├── PUSH_PROC data       // Push data process
+├── QUOTE                // Convert process to name (@data)
+└── SEND_ASYNC           // Send message asynchronously
 ```
 
 **Synchronous Send (send_sync)**
@@ -512,6 +543,17 @@ chan!?(data); P -> FSM
                                                            └─────────┘
 ```
 
+**Bytecode Sequence:**
+```
+chan!?(data); P  -> BYTECODE
+├── LOAD_VAR chan       // Load channel name
+├── PUSH_PROC data      // Push data process
+├── QUOTE               // Convert to name
+├── SEND_SYNC           // Send and wait for ack
+├── PUSH_PROC P         // Push continuation
+└── EXEC                // Execute continuation
+```
+
 **Input/Receive (for)**
 ```
 for(x <- chan) P -> FSM
@@ -540,6 +582,17 @@ for(x <- chan) P -> FSM
                                                             │TERMINATED│
                                                             │         │
                                                             └─────────┘
+```
+
+**Bytecode Sequence:**
+```
+for(x <- chan) P  -> BYTECODE
+├── LOAD_VAR chan       // Load channel name
+├── ALLOC_LOCAL         // Allocate slot for x
+├── RECEIVE             // Block until message available
+├── STORE_LOCAL 0       // Store received value in x
+├── PUSH_PROC P         // Push process P
+└── EXEC                // Execute P with bound x
 ```
 
 **Replicated Receive (contract)**
@@ -574,17 +627,28 @@ contract Name(x) = P -> FSM
                                                  └─────────┘
 ```
 
+**Bytecode Sequence:**
+```
+contract Name(x) = P  -> BYTECODE
+├── LOAD_VAR Name       // Load contract name
+├── ALLOC_LOCAL         // Allocate slot for parameter x
+├── CREATE_HANDLER      // Create persistent message handler
+├── PUSH_PROC P         // Push contract body
+├── BIND_HANDLER        // Bind handler to channel
+└── PERSIST             // Keep handler active
+```
+
 ### Control Flow Constructs
 
 **Conditional (if-else)**
 ```
 if (cond) P else Q -> FSM
-┌─────────┐         ┌─────────┐         ┌─────────┐
+┌─────────┐         ┌──────────┐         ┌──────────┐
 │ INITIAL │ EVALUATE│EVALUATING│ BRANCH  │BRANCHING │
-│         │────────>│ cond    │────────>│         │
-└─────────┘         └─────────┘         └─────────┘
-                                            │
-                                            │
+│         │────────>│ cond     │────────>│          │
+└─────────┘         └──────────┘         └──────────┘
+                                           │
+                                           │
                         ┌──────────────────┴──────────────────┐
                         │                                     │
                         ▼                                     ▼
@@ -603,10 +667,24 @@ if (cond) P else Q -> FSM
                         │                                     │
                         └──────────────┐       ┌─────────────┘
                                        ▼       ▼
-                                   ┌─────────┐
-                                   │TERMINATED│
-                                   │         │
-                                   └─────────┘
+                                     ┌──────────┐
+                                     │TERMINATED│
+                                     │          │
+                                     └──────────┘
+```
+
+**Bytecode Sequence:**
+```
+if (cond) P else Q  -> BYTECODE
+├── PUSH_PROC cond      // Push condition
+├── EVAL_BOOL           // Evaluate to boolean
+├── BRANCH_FALSE L1     // Jump to L1 if false
+├── PUSH_PROC P         // Push then-branch
+├── EXEC                // Execute P
+├── JUMP L2             // Skip else-branch
+├── L1: PUSH_PROC Q     // Label L1: Push else-branch
+├── EXEC                // Execute Q
+└── L2: NOP             // Label L2: Continue
 ```
 
 **Pattern Matching (match)**
@@ -647,6 +725,26 @@ match expr { pat1 => P1; pat2 => P2 } -> FSM
                                    │TERMINATED│
                                    │         │
                                    └─────────┘
+```
+
+**Bytecode Sequence:**
+```
+match expr { pat1 => P1; pat2 => P2 }  -> BYTECODE
+├── PUSH_PROC expr      // Push expression to match
+├── EVAL                // Evaluate expression
+├── MATCH_BEGIN         // Start pattern matching
+├── PATTERN pat1        // Try pattern 1
+├── BRANCH_NOMATCH L1   // Jump if no match
+├── PUSH_PROC P1        // Push body 1
+├── EXEC                // Execute P1
+├── JUMP L_END          // Jump to end
+├── L1: PATTERN pat2    // Label L1: Try pattern 2
+├── BRANCH_NOMATCH L2   // Jump if no match
+├── PUSH_PROC P2        // Push body 2
+├── EXEC                // Execute P2
+├── JUMP L_END          // Jump to end
+├── L2: MATCH_FAIL      // Label L2: No patterns matched
+└── L_END: NOP          // Label L_END: Continue
 ```
 
 **Select/Choice (select)**
@@ -690,6 +788,29 @@ select { x <- chan1 => P1; y <- chan2 => P2 } -> FSM
                                    └─────────┘
 ```
 
+**Bytecode Sequence:**
+```
+select { x <- chan1 => P1; y <- chan2 => P2 }  -> BYTECODE
+├── SELECT_BEGIN        // Start select operation
+├── LOAD_VAR chan1      // Load channel 1
+├── ADD_CHOICE 0        // Add to choice set with index 0
+├── LOAD_VAR chan2      // Load channel 2
+├── ADD_CHOICE 1        // Add to choice set with index 1
+├── SELECT_WAIT         // Wait for any channel to be ready
+├── BRANCH_CHOICE 0 L1  // If choice 0, jump to L1
+├── BRANCH_CHOICE 1 L2  // If choice 1, jump to L2
+├── L1: ALLOC_LOCAL     // Allocate for x
+├── STORE_LOCAL 0       // Store received value in x
+├── PUSH_PROC P1        // Push process P1
+├── EXEC                // Execute P1
+├── JUMP L_END          // Jump to end
+├── L2: ALLOC_LOCAL     // Allocate for y
+├── STORE_LOCAL 0       // Store received value in y
+├── PUSH_PROC P2        // Push process P2
+├── EXEC                // Execute P2
+└── L_END: NOP          // Continue
+```
+
 ### Expression Constructs
 
 **Arithmetic Operations**
@@ -708,6 +829,16 @@ P + Q -> FSM
                                                             └─────────┘
 ```
 
+**Bytecode Sequence:**
+```
+P + Q  -> BYTECODE
+├── PUSH_PROC P         // Push left operand
+├── EVAL                // Evaluate P
+├── PUSH_PROC Q         // Push right operand
+├── EVAL                // Evaluate Q
+└── ADD                 // Perform addition
+```
+
 **Logical Operations**
 ```
 P and Q -> FSM
@@ -722,6 +853,19 @@ P and Q -> FSM
                                         │TERMINATED│         │TERMINATED│
                                         │ false   │         │ Q result │
                                         └─────────┘         └─────────┘
+```
+
+**Bytecode Sequence:**
+```
+P and Q  -> BYTECODE
+├── PUSH_PROC P         // Push left operand
+├── EVAL_BOOL           // Evaluate to boolean
+├── DUP                 // Duplicate result
+├── BRANCH_FALSE L1     // Short-circuit if false
+├── POP                 // Remove duplicate
+├── PUSH_PROC Q         // Push right operand
+├── EVAL_BOOL           // Evaluate to boolean
+└── L1: NOP             // Result is on stack
 ```
 
 **Method Call**
@@ -740,6 +884,17 @@ obj.method(args) -> FSM
                                                             └─────────┘
 ```
 
+**Bytecode Sequence:**
+```
+obj.method(args)  -> BYTECODE
+├── PUSH_PROC obj       // Push receiver object
+├── EVAL                // Evaluate receiver
+├── PUSH_PROC args      // Push arguments
+├── EVAL                // Evaluate arguments
+├── LOAD_METHOD method  // Load method name
+└── INVOKE              // Invoke method
+```
+
 ### Data Constructs
 
 **List Construction**
@@ -756,6 +911,22 @@ obj.method(args) -> FSM
                                         │EVALUATING│         │TERMINATED│
                                         │ R       │         │         │
                                         └─────────┘         └─────────┘
+```
+
+**Bytecode Sequence:**
+```
+[P, Q, ...R]  -> BYTECODE
+├── LIST_BEGIN          // Start list construction
+├── PUSH_PROC P         // Push first element
+├── EVAL                // Evaluate P
+├── LIST_ADD            // Add to list
+├── PUSH_PROC Q         // Push second element
+├── EVAL                // Evaluate Q
+├── LIST_ADD            // Add to list
+├── PUSH_PROC R         // Push remainder
+├── EVAL                // Evaluate remainder
+├── LIST_SPREAD         // Spread remainder into list
+└── LIST_END            // Finish list construction
 ```
 ### Additional Rholang Constructs
 
@@ -779,6 +950,15 @@ bundle+ { P } -> FSM
                                         └─────────┘
 ```
 
+**Bytecode Sequence:**
+```
+bundle+ { P }  -> BYTECODE
+├── BUNDLE_BEGIN WRITE  // Start write bundle
+├── PUSH_PROC P         // Push bundled process
+├── EXEC                // Execute in bundle context
+└── BUNDLE_END          // End bundle
+```
+
 ```
 bundle- { P } -> FSM
 ┌─────────┐         ┌─────────┐         ┌─────────┐         ┌─────────┐
@@ -792,6 +972,15 @@ bundle- { P } -> FSM
                                         │ P:TERM  │
                                         │         │
                                         └─────────┘
+```
+
+**Bytecode Sequence:**
+```
+bundle- { P }  -> BYTECODE
+├── BUNDLE_BEGIN READ   // Start read bundle
+├── PUSH_PROC P         // Push bundled process
+├── EXEC                // Execute in bundle context
+└── BUNDLE_END          // End bundle
 ```
 
 ```
@@ -809,6 +998,15 @@ bundle0 { P } -> FSM
                                         └─────────┘
 ```
 
+**Bytecode Sequence:**
+```
+bundle0 { P }  -> BYTECODE
+├── BUNDLE_BEGIN EQUIV  // Start equivalence bundle
+├── PUSH_PROC P         // Push bundled process
+├── EXEC                // Execute in bundle context
+└── BUNDLE_END          // End bundle
+```
+
 ```
 bundle { P } -> FSM
 ┌─────────┐         ┌─────────┐         ┌─────────┐         ┌─────────┐
@@ -822,6 +1020,15 @@ bundle { P } -> FSM
                                         │ P:TERM  │
                                         │         │
                                         └─────────┘
+```
+
+**Bytecode Sequence:**
+```
+bundle { P }  -> BYTECODE
+├── BUNDLE_BEGIN RW     // Start read-write bundle
+├── PUSH_PROC P         // Push bundled process
+├── EXEC                // Execute in bundle context
+└── BUNDLE_END          // End bundle
 ```
 
 #### String Operations
@@ -842,6 +1049,16 @@ P %% Q -> FSM
                                                             └─────────┘
 ```
 
+**Bytecode Sequence:**
+```
+P %% Q  -> BYTECODE
+├── PUSH_PROC P         // Push format string
+├── EVAL                // Evaluate P
+├── PUSH_PROC Q         // Push value to interpolate  
+├── EVAL                // Evaluate Q
+└── INTERPOLATE         // Perform string interpolation
+```
+
 #### Variable Reference Operations
 
 **Variable Reference (=var)**
@@ -860,6 +1077,14 @@ P %% Q -> FSM
                                         └─────────┘
 ```
 
+**Bytecode Sequence:**
+```
+=var  -> BYTECODE
+├── LOAD_VAR var        // Load variable
+├── COPY                // Create copy
+└── REF                 // Create reference to copy
+```
+
 **Variable Reference with Move (=*var)**
 ```
 =*var -> FSM
@@ -874,6 +1099,14 @@ P %% Q -> FSM
                                         │TERMINATED│
                                         │         │
                                         └─────────┘
+```
+
+**Bytecode Sequence:**
+```
+=*var  -> BYTECODE
+├── LOAD_VAR var        // Load variable
+├── MOVE                // Transfer ownership
+└── REF                 // Create reference with move
 ```
 
 #### Process Logic Operations
@@ -894,6 +1127,14 @@ P /\ Q -> FSM
                                                             └─────────┘
 ```
 
+**Bytecode Sequence:**
+```
+P /\ Q  -> BYTECODE
+├── PUSH_PROC P         // Push left process
+├── PUSH_PROC Q         // Push right process
+└── CONJ                // Process conjunction (both must succeed)
+```
+
 **Process Disjunction (P \/ Q)**
 ```
 P \/ Q -> FSM
@@ -908,6 +1149,14 @@ P \/ Q -> FSM
                                                             │TERMINATED│
                                                             │         │
                                                             └─────────┘
+```
+
+**Bytecode Sequence:**
+```
+P \/ Q  -> BYTECODE
+├── PUSH_PROC P         // Push left process
+├── PUSH_PROC Q         // Push right process
+└── DISJ                // Process disjunction (either can succeed)
 ```
 
 **Process Negation (~P)**
@@ -926,6 +1175,13 @@ P \/ Q -> FSM
                                         └─────────┘
 ```
 
+**Bytecode Sequence:**
+```
+~P  -> BYTECODE
+├── PUSH_PROC P         // Push process
+└── PROC_NEG            // Process negation
+```
+
 #### Collection Operations
 
 **Set Construction**
@@ -942,6 +1198,22 @@ Set(P, Q, R) -> FSM
                                         │EVALUATING│         │TERMINATED│
                                         │ R       │         │         │
                                         └─────────┘         └─────────┘
+```
+
+**Bytecode Sequence:**
+```
+Set(P, Q, R)  -> BYTECODE
+├── SET_BEGIN           // Start set construction
+├── PUSH_PROC P         // Push first element
+├── EVAL                // Evaluate P
+├── SET_ADD             // Add to set
+├── PUSH_PROC Q         // Push second element
+├── EVAL                // Evaluate Q
+├── SET_ADD             // Add to set
+├── PUSH_PROC R         // Push third element
+├── EVAL                // Evaluate R
+├── SET_ADD             // Add to set
+└── SET_END             // Finish set construction
 ```
 
 **Map Construction**
@@ -972,6 +1244,23 @@ Set(P, Q, R) -> FSM
                                                             │TERMINATED│
                                                             │         │
                                                             └─────────┘
+```
+
+**Bytecode Sequence:**
+```
+{key1: val1, key2: val2}  -> BYTECODE
+├── MAP_BEGIN           // Start map construction
+├── PUSH_PROC key1      // Push first key
+├── EVAL                // Evaluate key1
+├── PUSH_PROC val1      // Push first value
+├── EVAL                // Evaluate val1
+├── MAP_PUT             // Add key-value pair
+├── PUSH_PROC key2      // Push second key
+├── EVAL                // Evaluate key2
+├── PUSH_PROC val2      // Push second value
+├── EVAL                // Evaluate val2
+├── MAP_PUT             // Add key-value pair
+└── MAP_END             // Finish map construction
 ```
 
 #### Enhanced Receipt Types
@@ -1008,6 +1297,18 @@ for(x <= chan) P -> FSM
                                                  └─────────┘
 ```
 
+**Bytecode Sequence:**
+```
+for(x <= chan) P  -> BYTECODE
+├── LOAD_VAR chan       // Load channel name
+├── ALLOC_LOCAL         // Allocate slot for x
+├── RECEIVE_PERSISTENT  // Block until message available (persistent)
+├── STORE_LOCAL 0       // Store received value in x
+├── PUSH_PROC P         // Push process P
+├── EXEC                // Execute P with bound x
+└── PERSIST             // Keep handler active
+```
+
 **Peek Bind (<<-)**
 ```
 for(x <<- chan) P -> FSM
@@ -1036,6 +1337,17 @@ for(x <<- chan) P -> FSM
                                                             │TERMINATED│
                                                             │         │
                                                             └─────────┘
+```
+
+**Bytecode Sequence:**
+```
+for(x <<- chan) P  -> BYTECODE
+├── LOAD_VAR chan       // Load channel name
+├── ALLOC_LOCAL         // Allocate slot for x
+├── RECEIVE_PEEK        // Block until message available (non-consuming)
+├── STORE_LOCAL 0       // Store received value in x
+├── PUSH_PROC P         // Push process P
+└── EXEC                // Execute P with bound x
 ```
 
 #### Enhanced Source Types
@@ -1068,6 +1380,17 @@ for(x <- chan?!) P -> FSM
                                                             │TERMINATED│
                                                             │         │
                                                             └─────────┘
+```
+
+**Bytecode Sequence:**
+```
+for(x <- chan?!) P  -> BYTECODE
+├── LOAD_VAR chan       // Load channel name
+├── ALLOC_LOCAL         // Allocate slot for x
+├── RECEIVE_SEND        // Receive and then send acknowledgment
+├── STORE_LOCAL 0       // Store received value in x
+├── PUSH_PROC P         // Push process P
+└── EXEC                // Execute P with bound x
 ```
 
 **Send-Receive Source (!?)**
@@ -1107,6 +1430,19 @@ for(x <- chan!?(data)) P -> FSM
                                                             └─────────┘
 ```
 
+**Bytecode Sequence:**
+```
+for(x <- chan!?(data)) P  -> BYTECODE
+├── LOAD_VAR chan       // Load channel name
+├── PUSH_PROC data      // Push data process
+├── QUOTE               // Convert to name
+├── SEND_RECEIVE        // Send data and wait for response
+├── ALLOC_LOCAL         // Allocate slot for x
+├── STORE_LOCAL 0       // Store received value in x
+├── PUSH_PROC P         // Push process P
+└── EXEC                // Execute P with bound x
+```
+
 #### Enhanced Send Types
 
 **Multiple Send (!!)**
@@ -1123,6 +1459,15 @@ chan!!(data) -> FSM
                                                             │TERMINATED│
                                                             │         │
                                                             └─────────┘
+```
+
+**Bytecode Sequence:**
+```
+chan!!(data)  -> BYTECODE
+├── LOAD_VAR chan        // Load channel name
+├── PUSH_PROC data       // Push data process
+├── QUOTE                // Convert process to name (@data)
+└── SEND_MULTIPLE        // Send message multiple times
 ```
 ## State Machine Execution Model
 
