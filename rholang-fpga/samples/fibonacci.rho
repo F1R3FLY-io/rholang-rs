@@ -1,0 +1,36 @@
+// Fibonacci Calculator in Rholang
+// This program calculates Fibonacci numbers using recursive processes
+
+new fib, stdout(`rho:io:stdout`) in {
+  // Define a contract for calculating Fibonacci numbers
+  contract fib(@n, ret) = {
+    // Base cases
+    if (n == 0) { 
+      ret!(0) 
+    } else {
+      if (n == 1) { 
+        ret!(1) 
+      } else {
+        // Recursive case: fib(n) = fib(n-1) + fib(n-2)
+        new a, b in {
+          // Calculate fib(n-1) and fib(n-2) in parallel
+          fib!(n - 1, *a) |
+          fib!(n - 2, *b) |
+          
+          // Wait for both results and add them
+          for (@x <- a; @y <- b) {
+            ret!(x + y)
+          }
+        }
+      }
+    }
+  } |
+  
+  // Calculate the 10th Fibonacci number
+  new result in {
+    fib!(10, *result) |
+    for (@value <- result) {
+      stdout!(["Fibonacci(10) =", value])
+    }
+  }
+}
