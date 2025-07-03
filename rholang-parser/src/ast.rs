@@ -109,6 +109,8 @@ pub enum Proc<'ast> {
         kind: VarRefKind,
         var: Id<'ast>,
     },
+
+    Bad, // bad process usually represents a parsing error
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -427,16 +429,3 @@ impl Display for NameDecl<'_> {
         Ok(())
     }
 }
-
-// useful constants
-
-pub const NIL: Proc = Proc::Nil;
-pub const GTRUE: Proc = Proc::BoolLiteral(true);
-pub const GFALSE: Proc = Proc::BoolLiteral(false);
-pub const WILD: Proc = Proc::ProcVar(Var::Wildcard);
-pub const NAME_WILD: Name = Name::ProcVar(Var::Wildcard);
-pub const TYPE_URI: Proc = Proc::SimpleType(SimpleType::Uri);
-pub const TYPE_STRING: Proc = Proc::SimpleType(SimpleType::String);
-pub const TYPE_INT: Proc = Proc::SimpleType(SimpleType::Int);
-pub const TYPE_BOOL: Proc = Proc::SimpleType(SimpleType::Bool);
-pub const TYPE_BYTEA: Proc = Proc::SimpleType(SimpleType::ByteArray);
