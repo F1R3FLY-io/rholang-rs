@@ -3,46 +3,61 @@ use typed_arena::Arena;
 
 use crate::ast::{
     AnnName, AnnProc, BinaryExpOp, Bind, BundleType, Case, Collection, Id, KeyValuePair,
-    LetBinding, NameDecl, Names, Proc, Receipt, SendType, SyncSendCont, UnaryExpOp, Var,
-    VarRefKind,
+    LetBinding, NameDecl, Names, Proc, Receipt, SendType, SimpleType, SyncSendCont, UnaryExpOp,
+    Var, VarRefKind,
 };
 
-pub struct ASTBuilder<'ast> {
+pub(super) struct ASTBuilder<'ast> {
     arena: Arena<Proc<'ast>>,
+    // useful quasi-constants
+    pub(super) NIL: Proc<'ast>,
+    pub(super) TRUE: Proc<'ast>,
+    pub(super) FALSE: Proc<'ast>,
+    pub(super) WILD: Proc<'ast>,
+    pub(super) BAD: Proc<'ast>,
 }
 
 impl<'ast> ASTBuilder<'ast> {
-    pub fn new() -> ASTBuilder<'ast> {
+    pub(super) fn new() -> ASTBuilder<'ast> {
         Self::with_capacity(64)
     }
 
-    pub fn with_capacity(capacity: usize) -> ASTBuilder<'ast> {
+    pub(super) fn with_capacity(capacity: usize) -> ASTBuilder<'ast> {
         ASTBuilder {
             arena: Arena::with_capacity(capacity),
+            NIL: Proc::Nil,
+            TRUE: Proc::BoolLiteral(true),
+            FALSE: Proc::BoolLiteral(false),
+            WILD: Proc::ProcVar(Var::Wildcard),
+            BAD: Proc::Bad,
         }
     }
 
-    pub fn alloc_string_literal(&'ast self, value: &'ast str) -> &'ast Proc<'ast> {
+    pub(super) fn alloc_string_literal(&'ast self, value: &'ast str) -> &'ast Proc<'ast> {
         self.arena
             .alloc(Proc::StringLiteral(value.trim_matches(|c| c == '"')))
     }
 
-    pub fn alloc_long_literal(&'ast self, value: i64) -> &'ast Proc<'ast> {
+    pub(super) fn alloc_long_literal(&'ast self, value: i64) -> &'ast Proc<'ast> {
         self.arena.alloc(Proc::LongLiteral(value))
     }
 
-    pub fn alloc_uri_literal(&'ast self, value: &'ast str) -> &'ast Proc<'ast> {
+    pub(super) fn alloc_uri_literal(&'ast self, value: &'ast str) -> &'ast Proc<'ast> {
         self.arena.alloc(Proc::UriLiteral(value.into()))
     }
 
-    pub fn alloc_list(&'ast self, procs: &[AnnProc<'ast>]) -> &'ast Proc<'ast> {
+    pub(super) fn alloc_simple_type(&'ast self, value: SimpleType) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::SimpleType(value))
+    }
+
+    pub(super) fn alloc_list(&'ast self, procs: &[AnnProc<'ast>]) -> &'ast Proc<'ast> {
         self.arena.alloc(Proc::Collection(Collection::List {
             elements: procs.to_vec(),
             remainder: None,
         }))
     }
 
-    pub fn alloc_list_with_remainder(
+    pub(super) fn alloc_list_with_remainder(
         &'ast self,
         procs: &[AnnProc<'ast>],
         remainder: Var<'ast>,
@@ -53,14 +68,14 @@ impl<'ast> ASTBuilder<'ast> {
         }))
     }
 
-    pub fn alloc_set(&'ast self, procs: &[AnnProc<'ast>]) -> &'ast Proc<'ast> {
+    pub(super) fn alloc_set(&'ast self, procs: &[AnnProc<'ast>]) -> &'ast Proc<'ast> {
         self.arena.alloc(Proc::Collection(Collection::Set {
             elements: procs.to_vec(),
             remainder: None,
         }))
     }
 
-    pub fn alloc_set_with_remainder(
+    pub(super) fn alloc_set_with_remainder(
         &'ast self,
         procs: &[AnnProc<'ast>],
         remainder: Var<'ast>,
@@ -71,7 +86,7 @@ impl<'ast> ASTBuilder<'ast> {
         }))
     }
 
-    pub fn alloc_tuple(&'ast self, procs: &[AnnProc<'ast>]) -> &'ast Proc<'ast> {
+    pub(super) fn alloc_tuple(&'ast self, procs: &[AnnProc<'ast>]) -> &'ast Proc<'ast> {
         self.arena
             .alloc(Proc::Collection(Collection::Tuple(procs.to_vec())))
     }
@@ -80,14 +95,14 @@ impl<'ast> ASTBuilder<'ast> {
         slice.chunks_exact(2).map(|kv| (kv[0], kv[1])).collect()
     }
 
-    pub fn alloc_map(&'ast self, pairs: &[AnnProc<'ast>]) -> &'ast Proc<'ast> {
+    pub(super) fn alloc_map(&'ast self, pairs: &[AnnProc<'ast>]) -> &'ast Proc<'ast> {
         self.arena.alloc(Proc::Collection(Collection::Map {
             elements: Self::to_key_value(pairs),
             remainder: None,
         }))
     }
 
-    pub fn alloc_map_with_remainder(
+    pub(super) fn alloc_map_with_remainder(
         &'ast self,
         pairs: &[AnnProc<'ast>],
         remainder: Var<'ast>,
@@ -98,15 +113,19 @@ impl<'ast> ASTBuilder<'ast> {
         }))
     }
 
-    pub fn alloc_var(&'ast self, id: Id<'ast>) -> &'ast Proc<'ast> {
+    pub(super) fn alloc_var(&'ast self, id: Id<'ast>) -> &'ast Proc<'ast> {
         self.arena.alloc(Proc::ProcVar(Var::Id(id)))
     }
 
-    pub fn alloc_par(&'ast self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &'ast Proc<'ast> {
+    pub(super) fn alloc_par(
+        &'ast self,
+        left: AnnProc<'ast>,
+        right: AnnProc<'ast>,
+    ) -> &'ast Proc<'ast> {
         self.arena.alloc(Proc::Par { left, right })
     }
 
-    pub fn alloc_if_then(
+    pub(super) fn alloc_if_then(
         &'ast self,
         condition: AnnProc<'ast>,
         if_true: AnnProc<'ast>,
@@ -118,7 +137,7 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub fn alloc_if_then_else(
+    pub(super) fn alloc_if_then_else(
         &'ast self,
         condition: AnnProc<'ast>,
         if_true: AnnProc<'ast>,
@@ -131,7 +150,7 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub fn alloc_send(
+    pub(super) fn alloc_send(
         &'ast self,
         send_type: SendType,
         channel: AnnName<'ast>,
@@ -144,7 +163,7 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub fn alloc_for<'x, Rs>(&'ast self, rs: Rs, proc: AnnProc<'ast>) -> &'ast Proc<'ast>
+    pub(super) fn alloc_for<'x, Rs>(&'ast self, rs: Rs, proc: AnnProc<'ast>) -> &'ast Proc<'ast>
     where
         Rs: IntoIterator<Item = &'x [Bind<'ast>]>,
         'ast: 'x,
@@ -156,7 +175,7 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::ForComprehension { receipts, proc })
     }
 
-    pub fn alloc_match(
+    pub(super) fn alloc_match(
         &'ast self,
         expression: AnnProc<'ast>,
         cases: &[AnnProc<'ast>],
@@ -173,7 +192,7 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub fn alloc_bundle(
+    pub(super) fn alloc_bundle(
         &'ast self,
         bundle_type: BundleType,
         proc: AnnProc<'ast>,
@@ -181,7 +200,7 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::Bundle { bundle_type, proc })
     }
 
-    pub fn alloc_let<Ls>(
+    pub(super) fn alloc_let<Ls>(
         &'ast self,
         bindings: Ls,
         body: AnnProc<'ast>,
@@ -197,7 +216,7 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub fn alloc_new(
+    pub(super) fn alloc_new(
         &'ast self,
         proc: AnnProc<'ast>,
         decls: Vec<NameDecl<'ast>>,
@@ -205,7 +224,7 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::New { decls, proc })
     }
 
-    pub fn alloc_contract(
+    pub(super) fn alloc_contract(
         &'ast self,
         name: AnnName<'ast>,
         formals: Names<'ast>,
@@ -218,7 +237,7 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub fn alloc_send_sync(
+    pub(super) fn alloc_send_sync(
         &'ast self,
         channel: AnnName<'ast>,
         messages: &[AnnProc<'ast>],
@@ -230,7 +249,7 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub fn alloc_send_sync_with_cont(
+    pub(super) fn alloc_send_sync_with_cont(
         &'ast self,
         channel: AnnName<'ast>,
         messages: &[AnnProc<'ast>],
@@ -243,15 +262,15 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub fn alloc_eval(&'ast self, name: AnnName<'ast>) -> &'ast Proc<'ast> {
+    pub(super) fn alloc_eval(&'ast self, name: AnnName<'ast>) -> &'ast Proc<'ast> {
         self.arena.alloc(Proc::Eval { name })
     }
 
-    pub fn alloc_quote(&'ast self, proc: AnnProc<'ast>) -> &'ast Proc<'ast> {
+    pub(super) fn alloc_quote(&'ast self, proc: AnnProc<'ast>) -> &'ast Proc<'ast> {
         self.arena.alloc(Proc::Quote { proc })
     }
 
-    pub fn alloc_method(
+    pub(super) fn alloc_method(
         &'ast self,
         name: Id<'ast>,
         receiver: AnnProc<'ast>,
@@ -264,7 +283,7 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub fn alloc_binary_exp(
+    pub(super) fn alloc_binary_exp(
         &'ast self,
         op: BinaryExpOp,
         left: AnnProc<'ast>,
@@ -273,11 +292,15 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::BinaryExp { op, left, right })
     }
 
-    pub fn alloc_unary_exp(&'ast self, op: UnaryExpOp, arg: &'ast Proc<'ast>) -> &'ast Proc<'ast> {
+    pub(super) fn alloc_unary_exp(
+        &'ast self,
+        op: UnaryExpOp,
+        arg: &'ast Proc<'ast>,
+    ) -> &'ast Proc<'ast> {
         self.arena.alloc(Proc::UnaryExp { op, arg })
     }
 
-    pub fn alloc_var_ref(&'ast self, kind: VarRefKind, var: Id<'ast>) -> &'ast Proc<'ast> {
+    pub(super) fn alloc_var_ref(&'ast self, kind: VarRefKind, var: Id<'ast>) -> &'ast Proc<'ast> {
         self.arena.alloc(Proc::VarRef { kind, var })
     }
 }
