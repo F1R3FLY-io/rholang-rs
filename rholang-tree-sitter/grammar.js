@@ -267,7 +267,7 @@ module.exports = grammar({
         bool_literal: $ => choice('true', 'false'),
         long_literal: $ => token(/-?\d+/),
         string_literal: $ => token(/"([^"\\]|(\\[0nrt\\"])|(\\[0-9]+))*"/),
-        uri_literal: $ => token(/`[^`]*`/),
+        uri_literal: $ => token(/`[^`]+`/),
 
         nil: $ => 'Nil',
 
