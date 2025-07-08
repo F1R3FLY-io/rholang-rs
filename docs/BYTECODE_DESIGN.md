@@ -22,13 +22,10 @@ CORE INSTRUCTIONS:
 ├── SEND_ASYNC          // Asynchronous send
 ├── SEND_SYNC           // Synchronous send
 ├── RECEIVE             // Receive from channel
-├── FORK                // Create parallel context
 ├── SPAWN               // Spawn process in new thread
-├── JOIN_ALL            // Wait for all parallel processes
 ├── BRANCH_TRUE L       // Conditional jump if true
 ├── BRANCH_FALSE L      // Conditional jump if false
 ├── JUMP L              // Unconditional jump
-├── CALL addr           // Call subroutine
 ├── CMP_EQ              // Equality comparison
 ├── CMP_NEQ             // Inequality comparison
 ├── CMP_LT              // Less than comparison
@@ -46,9 +43,6 @@ CORE INSTRUCTIONS:
 ├── COPY                // Copy value
 ├── MOVE                // Move value
 ├── REF                 // Create reference
-├── TUPLE_BEGIN         // Start tuple construction
-├── TUPLE_ADD           // Add element to tuple
-└── TUPLE_END           // Finish tuple construction
 ```
 
 ### Core Process Constructs
@@ -373,17 +367,14 @@ let x = P & y = Q in R  -> BYTECODE
 **List Construction**
 ```
 [P, Q, ...R]  -> BYTECODE
-├── LIST_BEGIN          // Start list construction
+├── PUSH_INT 3          // Push list size
 ├── PUSH_PROC P         // Push first element
 ├── EVAL                // Evaluate P
-├── LIST_ADD            // Add to list
 ├── PUSH_PROC Q         // Push second element
 ├── EVAL                // Evaluate Q
-├── LIST_ADD            // Add to list
-├── PUSH_PROC R         // Push remainder
-├── EVAL                // Evaluate remainder
-├── LIST_SPREAD         // Spread remainder into list
-└── LIST_END            // Finish list construction
+├── PUSH_PROC R         // Push third element
+├── EVAL                // Evaluate R
+└── CREATE_LIST         // Create list from size + elements on stack
 ```
 
 **Map Construction**
@@ -406,27 +397,21 @@ let x = P & y = Q in R  -> BYTECODE
 **Single Element Tuple**
 ```
 (P,)  -> BYTECODE
-├── TUPLE_BEGIN         // Start tuple construction
 ├── PUSH_PROC P         // Push element
 ├── EVAL                // Evaluate element
-├── TUPLE_ADD           // Add to tuple
-└── TUPLE_END           // Finish single-element tuple
+└── CREATE_TUPLE 1      // Create tuple with 1 element
 ```
 
 **Multi-Element Tuple**
 ```
 (P, Q, R)  -> BYTECODE
-├── TUPLE_BEGIN         // Start tuple construction
 ├── PUSH_PROC P         // Push first element
 ├── EVAL                // Evaluate P
-├── TUPLE_ADD           // Add to tuple
 ├── PUSH_PROC Q         // Push second element
 ├── EVAL                // Evaluate Q
-├── TUPLE_ADD           // Add to tuple
 ├── PUSH_PROC R         // Push third element
 ├── EVAL                // Evaluate R
-├── TUPLE_ADD           // Add to tuple
-└── TUPLE_END           // Finish tuple construction
+└── CREATE_TUPLE 3      // Create tuple with 3 elements
 ```
 
 ### Advanced Constructs
@@ -442,12 +427,17 @@ bundle+ { P }  -> BYTECODE
 **Quote/Unquote**
 ```
 @P  -> BYTECODE
-├── PUSH_PROC P         // Push process P
-└── QUOTE               // Convert process to name
+└── QUOTE P             // Convert known process P directly to name
 
 *name  -> BYTECODE
-├── LOAD_VAR name       // Load name
-└── UNQUOTE             // Convert name to process
+└── UNQUOTE name        // Convert known name directly to process
+```
+
+**Dynamic Quote with free variables**
+```
+@x  -> BYTECODE (where x is free variable)
+├── LOAD_VAR x          // Load the variable x
+└── QUOTE               // Convert the loaded process to name
 ```
 
 **Variable Reference**
