@@ -55,12 +55,8 @@ CORE INSTRUCTIONS:
 **Parallel Composition (par)**
 ```
 par (P | Q)  -> BYTECODE
-├── FORK                 // Create parallel execution context
-├── PUSH_PROC P          // Push left process to stack
-├── SPAWN                // Spawn left process in new thread
-├── PUSH_PROC Q          // Push right process to stack
-├── SPAWN                // Spawn right process in new thread
-└── JOIN_ALL             // Wait for all parallel processes
+├── EVAL_PROCESS P       // Evaluate P in current context
+└── EVAL_PROCESS Q       // Evaluate Q in current context
 ```
 
 **Name Creation (new)**
@@ -96,24 +92,32 @@ chan!?(data); P  -> BYTECODE
 
 **Input/Receive (for)**
 ```
+// Simple receive without pattern matching
 for(x <- chan) P  -> BYTECODE
 ├── LOAD_VAR chan       // Load channel name
 ├── ALLOC_LOCAL         // Allocate slot for x
-├── RECEIVE             // Block until message available
+├── RECEIVE_SIMPLE      // Simple receive without pattern matching
 ├── STORE_LOCAL 0       // Store received value in x
 ├── PUSH_PROC P         // Push process P
 └── EXEC                // Execute P with bound x
+
+// Pattern matching receive
+for(pattern <- chan) P  -> BYTECODE
+├── LOAD_VAR chan
+├── COMPILE_PATTERN pattern
+├── RECEIVE_PATTERN         // Receive with pattern matching
+├── EXTRACT_BINDINGS        // Extract all bound variables
+├── PUSH_PROC P
+└── EXEC
 ```
 
 **Replicated Receive (contract)**
 ```
 contract Name(x) = P  -> BYTECODE
-├── LOAD_VAR Name       // Load contract name
-├── ALLOC_LOCAL         // Allocate slot for parameter x
-├── CREATE_HANDLER      // Create persistent message handler
-├── PUSH_PROC P         // Push contract body
-├── BIND_HANDLER        // Bind handler to channel
-└── PERSIST             // Keep handler active
+├── LOAD_VAR Name           // Load contract name
+├── COMPILE_PATTERN x       // Compile parameter pattern  
+├── PUSH_PROC P             // Push contract body
+├── RECEIVE_PATTERN true    // Same as for(), but with persist=true flag
 ```
 
 ### Control Flow Constructs
@@ -136,43 +140,48 @@ if (cond) P else Q  -> BYTECODE
 match expr { pat1 => P1; pat2 => P2 }  -> BYTECODE
 ├── PUSH_PROC expr      // Push expression to match
 ├── EVAL                // Evaluate expression
-├── MATCH_BEGIN         // Start pattern matching
 ├── PATTERN pat1        // Try pattern 1
-├── BRANCH_NOMATCH L1   // Jump if no match
+├── MATCH_TEST          // Test match (leaves boolean on stack)
+├── BRANCH_FALSE L1     // Jump if no match
+├── EXTRACT_BINDINGS    // Extract bound variables
 ├── PUSH_PROC P1        // Push body 1
 ├── EXEC                // Execute P1
 ├── JUMP L_END          // Jump to end
-├── L1: PATTERN pat2    // Label L1: Try pattern 2
-├── BRANCH_NOMATCH L2   // Jump if no match
+├── L1: PATTERN pat2    // Try pattern 2
+├── MATCH_TEST          // Test match
+├── BRANCH_FALSE L2     // Jump if no match
+├── EXTRACT_BINDINGS    // Extract bound variables
 ├── PUSH_PROC P2        // Push body 2
 ├── EXEC                // Execute P2
-├── JUMP L_END          // Jump to end
-├── L2: MATCH_FAIL      // Label L2: No patterns matched
-└── L_END: NOP          // Label L_END: Continue
+└── L_END: NOP          // Continue
 ```
 
 **Select/Choice (select)**
 ```
 select { x <- chan1 => P1; y <- chan2 => P2 }  -> BYTECODE
-├── SELECT_BEGIN        // Start select operation
+├── SELECT_BEGIN        // Start atomic select operation
 ├── LOAD_VAR chan1      // Load channel 1
-├── ADD_CHOICE 0        // Add to choice set with index 0
-├── LOAD_VAR chan2      // Load channel 2
-├── ADD_CHOICE 1        // Add to choice set with index 1
-├── SELECT_WAIT         // Wait for any channel to be ready
-├── BRANCH_CHOICE 0 L1  // If choice 0, jump to L1
-├── BRANCH_CHOICE 1 L2  // If choice 1, jump to L2
+├── PREPARE_CHOICE 0    // Prepare choice 0 (but don't commit yet)
+├── LOAD_VAR chan2      // Load channel 2  
+├── PREPARE_CHOICE 1    // Prepare choice 1 (but don't commit yet)
+├── ATOMIC_SELECT       // Atomically wait for ANY channel to be ready
+├── CANCEL_OTHERS       // Cancel all non-selected choices
+├── BRANCH_CHOICE 0 L1  // If choice 0 was selected, jump to L1
+├── BRANCH_CHOICE 1 L2  // If choice 1 was selected, jump to L2
 ├── L1: ALLOC_LOCAL     // Allocate for x
+├── RECEIVE_SELECTED    // Receive from the selected channel
 ├── STORE_LOCAL 0       // Store received value in x
 ├── PUSH_PROC P1        // Push process P1
 ├── EXEC                // Execute P1
 ├── JUMP L_END          // Jump to end
 ├── L2: ALLOC_LOCAL     // Allocate for y
+├── RECEIVE_SELECTED    // Receive from the selected channel
 ├── STORE_LOCAL 0       // Store received value in y
 ├── PUSH_PROC P2        // Push process P2
 ├── EXEC                // Execute P2
 └── L_END: NOP          // Continue
 ```
+* The RSpace would need to support this atomic selection mechanism, probably using something like compare-and-swap operations or locks to ensure atomicity
 
 ### Expression Constructs
 **Arithmetic Operations** - The conversion of these operations will be almost the same, so I won't describe them all. But here are the types we have in general:
@@ -248,8 +257,7 @@ P matches Q  -> BYTECODE
 ├── PUSH_PROC P         // Push value to match
 ├── EVAL                // Evaluate P
 ├── PATTERN Q           // Load pattern Q
-├── MATCH_TEST          // Test if P matches Q
-└── PUSH_BOOL           // Push boolean result (true/false)
+└── MATCH_TEST          // Test if P matches Q (leaves boolean on stack)
 ```
 
 **Logical NOT**
@@ -332,35 +340,33 @@ P %% Q  -> BYTECODE
 **Let Binding (Linear)**
 ```
 let x = P; y = Q in R  -> BYTECODE
+├── PUSH_CONTEXT LOCAL  // Push local evaluation context
 ├── PUSH_PROC P         // Push value for x
-├── EVAL                // Evaluate P
+├── EVAL_WITH_CONTEXT   // Evaluate P with provided context
 ├── ALLOC_LOCAL         // Allocate slot for x
 ├── STORE_LOCAL 0       // Store P result in x
 ├── PUSH_PROC Q         // Push value for y
-├── EVAL                // Evaluate Q
+├── EVAL_WITH_CONTEXT   // Evaluate Q with provided context
 ├── ALLOC_LOCAL         // Allocate slot for y
 ├── STORE_LOCAL 1       // Store Q result in y
 ├── PUSH_PROC R         // Push body process R
-└── EXEC                // Execute R with bindings
+├── EVAL_WITH_CONTEXT   // Evaluate R with local bindings
+└── POP_CONTEXT         // Restore previous context
 ```
 
 **Let Binding (Concurrent)**
 ```
 let x = P & y = Q in R  -> BYTECODE
-├── FORK                // Create parallel context
-├── PUSH_PROC P         // Push value for x
-├── EVAL                // Evaluate P
-├── ALLOC_LOCAL         // Allocate slot for x
-├── STORE_LOCAL 0       // Store P result in x
-├── SPAWN               // Spawn x binding in parallel
-├── PUSH_PROC Q         // Push value for y
-├── EVAL                // Evaluate Q
-├── ALLOC_LOCAL         // Allocate slot for y
-├── STORE_LOCAL 1       // Store Q result in y
-├── SPAWN               // Spawn y binding in parallel
-├── JOIN_ALL            // Wait for all bindings
-├── PUSH_PROC R         // Push body process R
-└── EXEC                // Execute R with all bindings
+├── CREATE_CONCURRENT_LOCAL_CONTEXT   // Create context for concurrent local eval
+├── PUSH_PROC P                       // Push process P
+├── PUSH_CONTINUATION x               // Push continuation for x binding
+├── SPAWN_IN_LOCAL_CONTEXT            // Spawn P evaluation in local context
+├── PUSH_PROC Q                       // Push process Q
+├── PUSH_CONTINUATION y               // Push continuation for y binding  
+├── SPAWN_IN_LOCAL_CONTEXT            // Spawn Q evaluation in local context
+├── WAIT_LOCAL_CONTEXT                // Wait for all local evaluations
+├── PUSH_PROC R                       // Push body process R
+└── EXEC_WITH_LOCAL_BINDINGS          // Execute R with accumulated bindings
 ```
 
 ### Data Constructs
