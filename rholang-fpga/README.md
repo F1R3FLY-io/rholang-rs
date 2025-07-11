@@ -365,10 +365,6 @@ The implementation is optimized for the Cyclone V FPGA on the DE10-Nano board:
    - Make sure the build was successful: `docker-compose run --rm build`
    - Check that the RBF file exists: `ls -l output_files/rholang_fsm.rbf`
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
 ## Acknowledgments
 
 - The MiSTer FPGA project for providing the platform
