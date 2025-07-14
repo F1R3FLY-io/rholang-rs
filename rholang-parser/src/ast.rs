@@ -86,7 +86,7 @@ pub enum Proc<'ast> {
         name: AnnName<'ast>,
     },
     Quote {
-        proc: AnnProc<'ast>,
+        proc: &'ast Proc<'ast>,
     },
     Method {
         receiver: AnnProc<'ast>,
@@ -121,16 +121,36 @@ pub struct AnnProc<'ast> {
 
 // process variables and names
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Id<'ast> {
     pub name: &'ast str,
     pub pos: SourcePos,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+impl PartialEq for Id<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+impl Eq for Id<'_> {}
+
+impl Ord for Id<'_> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.name.cmp(other.name)
+    }
+}
+
+impl PartialOrd for Id<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum Var<'ast> {
-    Id(Id<'ast>),
     Wildcard,
+    Id(Id<'ast>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -362,10 +382,30 @@ pub enum LetBinding<'ast> {
 
 // new name declaration
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct NameDecl<'ast> {
     pub id: Id<'ast>,
     pub uri: Option<Uri<'ast>>,
+}
+
+impl PartialEq for NameDecl<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for NameDecl<'_> {}
+
+impl Ord for NameDecl<'_> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.id.cmp(&other.id)
+    }
+}
+
+impl PartialOrd for NameDecl<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 // synchronous send continuations

@@ -266,7 +266,7 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::Eval { name })
     }
 
-    pub(super) fn alloc_quote(&'ast self, proc: AnnProc<'ast>) -> &'ast Proc<'ast> {
+    pub(super) fn alloc_quote(&'ast self, proc: &'ast Proc<'ast>) -> &'ast Proc<'ast> {
         self.arena.alloc(Proc::Quote { proc })
     }
 
