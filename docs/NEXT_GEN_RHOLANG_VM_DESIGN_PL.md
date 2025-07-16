@@ -8,6 +8,8 @@ Główną wizją jest stworzenie architektury VM, w której właściwości matem
 
 Dzięki głębokiej integracji z RSpace (warstwą pamięci opartą na przestrzeni krotek), ten projekt VM umożliwia naturalne reprezentowanie procesów współbieżnych jako niezależnych jednostek, które komunikują się wyłącznie poprzez przekazywanie wiadomości. Takie podejście nie tylko upraszcza model wykonania, ale także zapewnia jasną ścieżkę do rozproszonego wykonania na wielu węzłach w sieci.
 
+Ten dokument projektowy opiera się na specyfikacjach kodu bajtowego przedstawionych w naszej dokumentacji technicznej, szczególnie na architekturze kodu bajtowego opartej na ścieżkach, która idealnie pasuje do matematycznych podstaw rachunku Rho. Projekt kodu bajtowego dostarcza szczegółów implementacyjnych niskiego poziomu, które umożliwiają tę architekturę VM, z konkretnymi instrukcjami do obsługi kompozycji równoległej, tworzenia nazw, komunikacji i innych podstawowych konstrukcji Rholang.
+
 ## Podstawowe Wymagania Architektoniczne
 
 ### 1. Funktorialność Cytowania
@@ -76,138 +78,174 @@ To podejście do abstrakcji wątku zapewnia naturalny sposób implementacji funk
 
 Proces kompilacji przekształca kod źródłowy Rholang w multizbiór niezależnych sekwencji kodu bajtowego, zachowując strukturę współbieżności oryginalnego programu.
 
-1. **Parsowanie**: Kod źródłowy Rholang jest parsowany do Abstrakcyjnego Drzewa Składniowego (AST) przy użyciu parsera wygenerowanego z gramatyki Rholang.
+1. **Analiza Leksykalna i Parsowanie**: Kod źródłowy Rholang jest tokenizowany i parsowany przy użyciu parsera Tree-Sitter, który produkuje konkretne drzewo składniowe (CST).
 
-2. **Analiza AST**: AST jest analizowane w celu identyfikacji kompozycji równoległych, deklaracji nazw i innych konstrukcji Rholang.
+2. **Konstrukcja AST**: CST jest konwertowane do Abstrakcyjnego Drzewa Składniowego (AST) przy użyciu ASTBuilder. AST reprezentuje strukturę programu z węzłami dla różnych konstrukcji Rholang:
+   - Literały (Nil, Bool, Long, String, Uri)
+   - Kolekcje (List, Tuple, Set, Map)
+   - Konstrukcje procesów (Par, IfThenElse, Send, ForComprehension, Match, itp.)
+   - Wyrażenia (Eval, Quote, Method, UnaryExp, BinaryExp)
 
-3. **Generowanie Kodu Bajtowego**: Dla każdego procesu w kompozycji równoległej, kompilator generuje oddzielną sekwencję kodu bajtowego. To tutaj implementowana jest funktorialność współbieżności:
+3. **Generowanie Kodu Bajtowego Opartego na Ścieżkach**: AST jest przekształcane w kod bajtowy przy użyciu podejścia opartego na ścieżkach. Każdemu procesowi przypisywana jest ścieżka wykonania, a kompozycje równoległe rozgałęziają się na wiele ścieżek:
 
    ```
    compile(P1 | P2 | ... | Pn) = {| compile(P1), compile(P2), ..., compile(Pn) |}
    ```
 
+   Podejście oparte na ścieżkach jawnie reprezentuje konteksty wykonania i ich relacje, umożliwiając:
+   - Izolowane wykonanie procesów
+   - Właściwe zakresowanie i wiązanie zmiennych
+   - Efektywną komunikację między procesami
+   - Jasną reprezentację współbieżności
+
 4. **Optymalizacja**: Każda sekwencja kodu bajtowego jest optymalizowana niezależnie, bez wpływu na semantykę innych sekwencji.
 
 5. **Linkowanie**: Odniesienia między procesami (np. poprzez współdzielone kanały) są rozwiązywane i odpowiednio linkowane.
 
-Kluczową innowacją w tym procesie kompilacji jest bezpośrednie mapowanie kompozycji równoległej na niezależne sekwencje kodu bajtowego. To zachowuje strukturę współbieżności oryginalnego programu i umożliwia prawdziwie równoległe wykonanie.
+Kluczową innowacją w tym procesie kompilacji jest reprezentacja oparta na ścieżkach dla procesów współbieżnych. To zachowuje strukturę współbieżności oryginalnego programu i umożliwia prawdziwie równoległe wykonanie przy zachowaniu właściwej izolacji i kanałów komunikacyjnych.
 
-### Wykonanie Maszyny Stanów
+### Wykonanie Maszyny Stanów Opartej na Ścieżkach
 
-Każda sekwencja kodu bajtowego [| Pi |] jest wykonywana przez dedykowaną maszynę stanów z własnym kontekstem wykonania. Maszyna stanów utrzymuje:
+Każda sekwencja kodu bajtowego [| Pi |] jest wykonywana przez dedykowaną maszynę stanów w ramach własnej ścieżki wykonania. Maszyna stanów oparta na ścieżkach utrzymuje:
 
 1. **Wskaźnik Instrukcji**: Wskazuje na aktualnie wykonywaną instrukcję.
 2. **Stos Operandów**: Przechowuje wartości pośrednie podczas obliczeń.
-3. **Zmienne Lokalne**: Przechowuje zmienne zadeklarowane w procesie.
-4. **Referencje Kanałów**: Utrzymuje referencje do kanałów używanych przez proces.
-5. **Prywatny Kanał**: Unikalny kanał przypisany do tej maszyny stanów dla operacji prymitywnych.
+3. **Kontekst Ścieżki**: Zawiera środowisko wykonania specyficzne dla tej ścieżki.
+4. **Zmienne Lokalne**: Przechowuje zmienne zadeklarowane w procesie, powiązane ze ścieżką.
+5. **Referencje Kanałów**: Utrzymuje referencje do kanałów używanych przez proces.
+6. **Prywatny Kanał**: Unikalny kanał przypisany do tej ścieżki dla operacji prymitywnych.
+7. **Relacje Ścieżek**: Referencje do ścieżek nadrzędnych, podrzędnych i równorzędnych.
 
-Wykonanie maszyny stanów następuje w prostym cyklu:
+Wykonanie maszyny stanów opartej na ścieżkach następuje w tym cyklu:
 
 1. Pobierz następną instrukcję z sekwencji kodu bajtowego.
 2. Zdekoduj instrukcję, aby określić operację.
 3. Wykonaj operację, która może:
    - Modyfikować stos operandów
-   - Aktualizować zmienne lokalne
-   - Wysyłać lub odbierać wiadomości na kanałach
+   - Aktualizować zmienne lokalne w kontekście ścieżki
+   - Rozgałęziać nowe ścieżki dla wykonania współbieżnego
+   - Łączyć się z innymi ścieżkami w punktach synchronizacji
+   - Wysyłać lub odbierać wiadomości na kanałach między ścieżkami
    - Żądać operacji prymitywnych poprzez prywatny kanał
-4. Zaktualizuj wskaźnik instrukcji.
+4. Zaktualizuj wskaźnik instrukcji i stan ścieżki.
 5. Powtarzaj, aż sekwencja kodu bajtowego zostanie wyczerpana lub zablokowana na operacji odbioru.
 
-Ten izolowany model wykonania upraszcza implementację VM i umożliwia prostą paralelizację. Każda maszyna stanów może być planowana niezależnie, a wiele maszyn stanów może wykonywać się współbieżnie bez złożonych mechanizmów synchronizacji.
+Ten model wykonania oparty na ścieżkach zapewnia kilka zalet:
 
-### Interferencja RSpace i "Channel Trick"
+- **Jawna Współbieżność**: Ścieżki bezpośrednio reprezentują współbieżne konteksty wykonania.
+- **Wyraźna Izolacja**: Każda ścieżka ma swój własny izolowany stan.
+- **Ustrukturyzowana Komunikacja**: Ścieżki komunikują się poprzez dobrze zdefiniowane kanały.
+- **Organizacja Hierarchiczna**: Ścieżki tworzą strukturę drzewiastą, która odzwierciedla współbieżność programu.
+- **Efektywna Synchronizacja**: Ścieżki mogą synchronizować się na barierach bez złożonych mechanizmów blokowania.
 
-"Channel Trick" jest kluczową innowacją, która osadza wszystkie obliczenia, w tym operacje prymitywne, w modelu komunikacji RSpace. Oto szczegółowy opis, jak maszyna stanów wykonuje operację prymitywną, taką jak `x = 5 + 3`:
+Podejście oparte na ścieżkach idealnie pasuje do struktury AST, czyniąc proces kompilacji bardziej przejrzystym i zachowując właściwości semantyczne programu źródłowego.
+
+### Integracja z RSpace Oparta na Ścieżkach i "Channel Trick"
+
+"Channel Trick" jest wzmocniony w architekturze opartej na ścieżkach, aby osadzić wszystkie obliczenia, w tym operacje prymitywne, w modelu komunikacji RSpace. Oto szczegółowy opis, jak maszyna stanów oparta na ścieżkach wykonuje operację prymitywną, taką jak `x = 5 + 3`:
 
 1. **Dekodowanie Instrukcji**: Maszyna stanów napotyka instrukcję ADD w swojej sekwencji kodu bajtowego.
 
-2. **Przygotowanie Operandów**: Operandy (5 i 3) są już na stosie operandów, zostały tam umieszczone przez poprzednie instrukcje.
+2. **Przygotowanie Operandów**: Operandy (5 i 3) są ewaluowane w bieżącym kontekście ścieżki i umieszczane na stosie operandów.
 
-3. **Komunikacja przez Prywatny Kanał**:
+3. **Komunikacja Świadoma Ścieżek**:
    - Maszyna stanów tworzy wiadomość zawierającą:
      - Kod operacji (ADD)
      - Operandy (5 i 3)
+     - Identyfikator kontekstu ścieżki
      - Kanał kontynuacji dla wyniku
    - Ta wiadomość jest wysyłana na prywatnym kanale maszyny stanów do procesora prymitywów.
 
-4. **Przetwarzanie Prymitywne**:
-   - Procesor prymitywów odbiera wiadomość z prywatnego kanału.
-   - Wykonuje żądaną operację (5 + 3 = 8).
-   - Wysyła wynik (8) na kanale kontynuacji.
+4. **Przetwarzanie Prymitywne Świadome Ścieżek**:
+   - Procesor prymitywów odbiera wiadomość i identyfikuje kontekst ścieżki.
+   - Wykonuje żądaną operację (5 + 3 = 8) w kontekście określonej ścieżki.
+   - Wysyła wynik (8) na kanale kontynuacji, oznaczony identyfikatorem ścieżki.
 
-5. **Odbiór Wyniku**:
+5. **Odbiór Wyniku Świadomy Ścieżek**:
    - Maszyna stanów odbiera wynik (8) z kanału kontynuacji.
+   - Weryfikuje kontekst ścieżki i aktualizuje stan ścieżki.
    - Umieszcza wynik na stosie operandów.
    - Kontynuuje wykonanie z następną instrukcją.
 
-To podejście ma kilka zalet:
+To podejście oparte na ścieżkach wzmacnia "Channel Trick" kilkoma zaletami:
 
-- **Jednolitość**: Wszystkie operacje, czy to prymitywne czy wysokopoziomowe, używają tego samego mechanizmu komunikacji.
-- **Rozszerzalność**: Nowe operacje prymitywne mogą być dodawane przez rejestrowanie nowych procedur obsługi w procesorze prymitywów.
-- **Dystrybucja**: Operacje prymitywne mogą być wykonywane na różnych maszynach fizycznych niż żądająca maszyna stanów.
-- **Izolacja Błędów**: Awarie w operacjach prymitywnych nie wpływają na stan innych procesów.
+- **Świadomość Kontekstu Ścieżki**: Operacje są wykonywane w kontekście określonych ścieżek, zachowując izolację.
+- **Komunikacja Hierarchiczna**: Wiadomości mogą być kierowane przez hierarchię ścieżek, odzwierciedlając strukturę programu.
+- **Efektywna Synchronizacja Ścieżek**: Wiele ścieżek może synchronizować się na barierach przy użyciu prymitywów RSpace.
+- **Zarządzanie Zasobami Oparte na Ścieżkach**: Zasoby mogą być alokowane i zwalniane na podstawie cykli życia ścieżek.
+- **Migracja Ścieżek**: Całe ścieżki mogą być migrowane między węzłami dla równoważenia obciążenia lub tolerancji błędów.
 
-Co najważniejsze, to podejście sprawia, że kolekcja maszyn stanów jest natywnie reprezentowalna w RSpace. Każda maszyna stanów jest identyfikowana przez swój prywatny kanał, a cała interakcja z maszyną stanów odbywa się poprzez przekazywanie wiadomości na tym kanale. To umożliwia czystą integrację z warstwą pamięci RSpace i zapewnia naturalną ścieżkę do rozproszonego wykonania.
+Architektura oparta na ścieżkach czyni integrację z RSpace jeszcze bardziej naturalną. Każda ścieżka jest identyfikowana przez swój kontekst w RSpace, a cała interakcja ze ścieżką odbywa się poprzez przekazywanie wiadomości na kanałach powiązanych z tym kontekstem. To umożliwia czystą integrację z warstwą pamięci RSpace i zapewnia potężny model dla wykonania rozproszonego.
 
-## Wywoływanie i Zarządzanie Wątkami
+## Zarządzanie Wątkami Oparte na Ścieżkach
 
-Pytanie "Gdzie są wywoływane wątki?" ma jasną odpowiedź w tej architekturze: wątki są wywoływane na poziomie indywidualnych maszyn stanów, każda identyfikowana przez swój prywatny kanał w RSpace.
+Pytanie "Gdzie są wywoływane wątki?" ma jasną odpowiedź w tej architekturze opartej na ścieżkach: wątki są wywoływane na poziomie ścieżek wykonania, każda identyfikowana przez swój kontekst ścieżki w RSpace.
 
-### Tożsamość i Cykl Życia Wątku
+### Tożsamość i Cykl Życia Ścieżki
 
-W tej architekturze wątek nie jest tradycyjnym wątkiem OS ani nawet zielonym wątkiem w konwencjonalnym sensie. Zamiast tego, wątek jest kontekstem wykonania powiązanym z określoną maszyną stanów, identyfikowaną przez jej prywatny kanał w RSpace.
+W tej architekturze wątek nie jest tradycyjnym wątkiem OS ani nawet zielonym wątkiem w konwencjonalnym sensie. Zamiast tego, wątek jest kontekstem wykonania powiązanym z określoną ścieżką, identyfikowaną przez jej kontekst ścieżki w RSpace.
 
-Cykl życia wątku przebiega przez następujące etapy:
+Cykl życia wątku opartego na ścieżce przebiega przez następujące etapy:
 
-1. **Tworzenie**: Gdy nowy proces jest uruchamiany (albo z początkowego programu, albo poprzez kompozycję równoległą), tworzona jest nowa maszyna stanów z własnym prywatnym kanałem.
+1. **Tworzenie Ścieżki**: Gdy nowy proces jest uruchamiany (albo z początkowego programu, albo poprzez kompozycję równoległą), tworzona jest nowa ścieżka z własnym kontekstem.
 
-2. **Planowanie**: Planista wybiera maszyny stanów do wykonania na podstawie dostępności zasobów i polityk planowania. Prywatny kanał służy jako uchwyt dla decyzji planowania.
+2. **Rozgałęzianie Ścieżki**: Kompozycje równoległe rozgałęziają bieżącą ścieżkę na wiele ścieżek potomnych, z których każda wykonuje oddzielny proces.
 
-3. **Wykonanie**: Wybrana maszyna stanów wykonuje swoją sekwencję kodu bajtowego, aż zakończy lub zablokuje się na operacji odbioru.
+3. **Planowanie Ścieżki**: Planista wybiera ścieżki do wykonania na podstawie dostępności zasobów i polityk planowania. Kontekst ścieżki służy jako uchwyt dla decyzji planowania.
 
-4. **Blokowanie**: Jeśli maszyna stanów blokuje się na operacji odbioru, jej stan jest zachowywany, a ona sama jest usuwana z aktywnej kolejki planowania, dopóki nie nadejdzie pasująca wiadomość.
+4. **Wykonanie Ścieżki**: Wybrana ścieżka wykonuje swoją sekwencję kodu bajtowego, aż zakończy, zablokuje się na operacji odbioru lub osiągnie punkt synchronizacji.
 
-5. **Wznowienie**: Gdy nadchodzi wiadomość, która pasuje do zablokowanego odbioru, odpowiednia maszyna stanów jest wznawiana i dodawana z powrotem do kolejki planowania.
+5. **Blokowanie Ścieżki**: Jeśli ścieżka blokuje się na operacji odbioru, jej stan jest zachowywany, a ona sama jest usuwana z aktywnej kolejki planowania, dopóki nie nadejdzie pasująca wiadomość.
 
-6. **Zakończenie**: Gdy maszyna stanów kończy swoją sekwencję kodu bajtowego, jej zasoby są zwalniane, a jej prywatny kanał może być zbierany przez odśmiecacz, jeśli nie jest już referencjonowany.
+6. **Synchronizacja Ścieżek**: Ścieżki mogą synchronizować się na barierach, czekając na inne ścieżki, aby osiągnęły określone punkty przed kontynuacją.
 
-### Alokacja i Planowanie Wątków
+7. **Wznowienie Ścieżki**: Gdy nadchodzi wiadomość, która pasuje do zablokowanego odbioru lub warunek synchronizacji jest spełniony, odpowiednia ścieżka jest wznawiana i dodawana z powrotem do kolejki planowania.
 
-Alokacja zasobów wykonawczych (czas CPU, pamięć itp.) do wątków jest zarządzana przez system planowania, który mapuje fizyczne zasoby na maszyny stanów na podstawie ich prywatnych kanałów.
+8. **Łączenie Ścieżek**: Ścieżki potomne mogą być łączone z powrotem do ich ścieżki nadrzędnej, łącząc ich wyniki.
 
-Planista utrzymuje kilka struktur danych:
+9. **Zakończenie Ścieżki**: Gdy ścieżka kończy swoją sekwencję kodu bajtowego, jej zasoby są zwalniane, a jej kontekst może być zbierany przez odśmiecacz, jeśli nie jest już referencjonowany.
 
-1. **Aktywna Kolejka**: Zawiera prywatne kanały maszyn stanów gotowych do wykonania.
-2. **Mapa Zablokowanych**: Mapuje kanały na maszyny stanów zablokowane na odbiorach.
-3. **Mapa Zasobów**: Śledzi wykorzystanie zasobów przez każdą maszynę stanów.
+### Alokacja i Planowanie Oparte na Ścieżkach
 
-Gdy wiadomość jest wysyłana na kanale, planista sprawdza, czy jakiekolwiek maszyny stanów są zablokowane na tym kanale. Jeśli tak, przenosi je z mapy zablokowanych do aktywnej kolejki.
+Alokacja zasobów wykonawczych (czas CPU, pamięć itp.) do wątków jest zarządzana przez system planowania świadomy ścieżek, który mapuje fizyczne zasoby na ścieżki wykonania na podstawie ich kontekstów.
 
-Planista następnie wybiera maszyny stanów z aktywnej kolejki na podstawie polityk planowania (np. round-robin, opartych na priorytetach) i przypisuje je do dostępnych zasobów wykonawczych (np. rdzeni CPU).
+Planista oparty na ścieżkach utrzymuje kilka struktur danych:
 
-To podejście do zarządzania wątkami ma kilka zalet:
+1. **Aktywna Kolejka Ścieżek**: Zawiera konteksty ścieżek gotowych do wykonania.
+2. **Mapa Zablokowanych Ścieżek**: Mapuje kanały na ścieżki zablokowane na odbiorach.
+3. **Mapa Synchronizacji Ścieżek**: Śledzi ścieżki oczekujące na barierach synchronizacji.
+4. **Mapa Hierarchii Ścieżek**: Utrzymuje relacje rodzic-dziecko między ścieżkami.
+5. **Mapa Zasobów**: Śledzi wykorzystanie zasobów przez każdą ścieżkę.
 
-- **Skalowalność**: Liczba maszyn stanów może znacznie przekraczać liczbę fizycznych rdzeni CPU, umożliwiając efektywne wykorzystanie zasobów.
-- **Sprawiedliwość**: Planista może implementować różne polityki sprawiedliwości, aby zapewnić, że wszystkie procesy mają szansę na wykonanie.
-- **Kontrola Zasobów**: Planista może ograniczać zasoby przydzielane każdej maszynie stanów, zapobiegając wyczerpaniu zasobów.
-- **Równoważenie Obciążenia**: W środowisku rozproszonym, maszyny stanów mogą być migrowane między fizycznymi węzłami w celu równoważenia obciążenia.
+Gdy wiadomość jest wysyłana na kanale, planista kieruje ją przez odpowiednie ścieżki i sprawdza, czy jakiekolwiek ścieżki są zablokowane na tym kanale. Jeśli tak, przenosi je z mapy zablokowanych do aktywnej kolejki.
 
-### Wykonanie Rozproszone
+Planista wybiera ścieżki z aktywnej kolejki na podstawie polityk planowania (np. round-robin, opartych na priorytetach, świadomych hierarchii ścieżek) i przypisuje je do dostępnych zasobów wykonawczych (np. rdzeni CPU).
 
-Model wątków opisany powyżej naturalnie rozszerza się na wykonanie rozproszone na wielu maszynach fizycznych. Ponieważ każda maszyna stanów jest identyfikowana przez swój prywatny kanał, a cała interakcja odbywa się poprzez przekazywanie wiadomości, fizyczna lokalizacja maszyny stanów jest przezroczysta dla innych procesów.
+To podejście do zarządzania wątkami oparte na ścieżkach oferuje kilka zalet:
+
+- **Planowanie Hierarchiczne**: Planista może wykorzystać hierarchię ścieżek do podejmowania inteligentnych decyzji planowania, priorytetyzując ścieżki na podstawie ich pozycji w hierarchii.
+- **Ustrukturyzowana Współbieżność**: Hierarchia ścieżek zapewnia ustrukturyzowany widok współbieżności, ułatwiając rozumowanie o niej i zarządzanie nią.
+- **Efektywna Synchronizacja**: Ścieżki mogą synchronizować się na barierach bez złożonych mechanizmów blokowania.
+- **Precyzyjna Kontrola Zasobów**: Zasoby mogą być alokowane i kontrolowane na poziomie ścieżki, umożliwiając precyzyjne zarządzanie zasobami.
+- **Równoważenie Obciążenia Oparte na Ścieżkach**: W środowisku rozproszonym, całe ścieżki lub poddrzewa ścieżek mogą być migrowane między węzłami fizycznymi w celu równoważenia obciążenia.
+
+### Wykonanie Rozproszone Oparte na Ścieżkach
+
+Model wątków oparty na ścieżkach naturalnie rozszerza się na wykonanie rozproszone na wielu maszynach fizycznych. Ponieważ każda ścieżka jest identyfikowana przez swój kontekst w RSpace, a cała interakcja odbywa się poprzez przekazywanie wiadomości, fizyczna lokalizacja ścieżki jest przezroczysta dla innych ścieżek.
 
 W środowisku rozproszonym:
 
-1. **Routing Kanałów**: Wiadomości wysyłane na kanałach są kierowane do odpowiedniego węzła fizycznego na podstawie lokalizacji odbierającej maszyny stanów.
+1. **Routing Kanałów Świadomy Ścieżek**: Wiadomości wysyłane na kanałach są kierowane do odpowiedniego węzła fizycznego na podstawie lokalizacji odbierającej ścieżki.
 
-2. **Migracja Maszyn Stanów**: Maszyny stanów mogą być migrowane między węzłami w celu równoważenia obciążenia lub tolerancji błędów.
+2. **Migracja Ścieżek**: Całe ścieżki lub poddrzewa ścieżek mogą być migrowane między węzłami w celu równoważenia obciążenia lub tolerancji błędów.
 
-3. **Rozproszone Planowanie**: Rozproszony planista koordynuje alokację zasobów na wielu węzłach.
+3. **Rozproszone Planowanie Oparte na Ścieżkach**: Rozproszony planista koordynuje alokację zasobów do ścieżek na wielu węzłach, biorąc pod uwagę hierarchię ścieżek.
 
-4. **Tolerancja Błędów**: Jeśli węzeł ulegnie awarii, maszyny stanów działające na tym węźle mogą być odzyskane z trwałej pamięci i wznowione na innych węzłach.
+4. **Tolerancja Błędów na Poziomie Ścieżek**: Jeśli węzeł ulegnie awarii, ścieżki działające na tym węźle mogą być odzyskane z trwałej pamięci i wznowione na innych węzłach, zachowując ich relacje hierarchiczne.
 
-Ten rozproszony model wykonania idealnie pasuje do warstwy pamięci RSpace, która już zapewnia mechanizmy do rozproszonego przechowywania i pobierania krotek. Reprezentując maszyny stanów jako jednostki w RSpace, VM może wykorzystać te mechanizmy do rozproszonego wykonania.
+5. **Optymalizacja Lokalności Ścieżek**: Powiązane ścieżki mogą być współlokalizowane na tym samym węźle fizycznym, aby zminimalizować narzut komunikacyjny.
+
+Ten model wykonania rozproszonego oparty na ścieżkach idealnie pasuje do warstwy pamięci RSpace. Reprezentując ścieżki jako jednostki w RSpace, VM może wykorzystać rozproszoną naturę RSpace dla efektywnego wykonania na wielu węzłach. Hierarchia ścieżek zapewnia naturalną strukturę dla dystrybucji obliczeń przy zachowaniu właściwości semantycznych programu.
 
 ## Podsumowanie
 

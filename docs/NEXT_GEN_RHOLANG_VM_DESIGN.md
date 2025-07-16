@@ -8,6 +8,8 @@ The core vision is to create a VM architecture where the mathematical properties
 
 By deeply integrating with RSpace (the tuplespace-based storage layer), this VM design enables a natural representation of concurrent processes as independent entities that communicate solely through message passing. This approach not only simplifies the execution model but also provides a clear path to distributed execution across multiple nodes in a network.
 
+This design document builds upon the bytecode specifications outlined in our technical documentation, particularly the path-based bytecode architecture that aligns perfectly with the mathematical foundations of the Rho-calculus. The bytecode design provides the low-level implementation details that make this VM architecture possible, with specific instructions for handling parallel composition, name creation, communication, and other core Rholang constructs.
+
 ## Core Architectural Requirements
 
 ### 1. Functoriality of Quoting
