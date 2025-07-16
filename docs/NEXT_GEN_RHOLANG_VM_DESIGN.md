@@ -76,372 +76,188 @@ This approach to thread abstraction provides a natural way to implement features
 
 The compilation pipeline transforms Rholang source code into a multiset of independent bytecode sequences, preserving the concurrency structure of the original program.
 
-1. **Parsing**: The Rholang source code is parsed into an Abstract Syntax Tree (AST) using a parser generated from the Rholang grammar.
+1. **Lexical Analysis and Parsing**: The Rholang source code is tokenized and parsed using the Tree-Sitter parser, which produces a concrete syntax tree (CST).
 
-2. **AST Analysis**: The AST is analyzed to identify parallel compositions, name declarations, and other Rholang constructs.
+2. **AST Construction**: The CST is converted to an Abstract Syntax Tree (AST) using the ASTBuilder. The AST represents the program structure with nodes for different Rholang constructs:
+   - Literals (Nil, Bool, Long, String, Uri)
+   - Collections (List, Tuple, Set, Map)
+   - Process constructs (Par, IfThenElse, Send, ForComprehension, Match, etc.)
+   - Expressions (Eval, Quote, Method, UnaryExp, BinaryExp)
 
-3. **Bytecode Generation**: For each process in a parallel composition, the compiler generates a separate bytecode sequence. This is where the functoriality of concurrency is implemented:
-   
+3. **Path-Based Bytecode Generation**: The AST is transformed into bytecode using a path-based approach. Each process is assigned an execution path, and parallel compositions fork into multiple paths:
+
    ```
    compile(P1 | P2 | ... | Pn) = {| compile(P1), compile(P2), ..., compile(Pn) |}
    ```
+
+   The path-based approach explicitly represents execution contexts and their relationships, enabling:
+   - Isolated execution of processes
+   - Proper variable scoping and binding
+   - Efficient communication between processes
+   - Clear representation of concurrency
 
 4. **Optimization**: Each bytecode sequence is optimized independently, without affecting the semantics of other sequences.
 
 5. **Linking**: References between processes (e.g., through shared channels) are resolved and linked appropriately.
 
-The key innovation in this compilation pipeline is the direct mapping of parallel composition to independent bytecode sequences. This preserves the concurrency structure of the original program and enables truly parallel execution.
+The key innovation in this compilation pipeline is the path-based representation of concurrent processes. This preserves the concurrency structure of the original program and enables truly parallel execution while maintaining proper isolation and communication channels.
 
-### State Machine Execution
+### Path-Based State Machine Execution
 
-Each bytecode sequence [| Pi |] is executed by a dedicated state machine with its own execution context. The state machine maintains:
+Each bytecode sequence [| Pi |] is executed by a dedicated state machine within its own execution path. The path-based state machine maintains:
 
 1. **Instruction Pointer**: Points to the current instruction being executed.
 2. **Operand Stack**: Holds intermediate values during computation.
-3. **Local Variables**: Stores variables declared within the process.
-4. **Channel References**: Maintains references to channels used by the process.
-5. **Private Channel**: A unique channel assigned to this state machine for primitive operations.
+3. **Path Context**: Contains the execution environment specific to this path.
+4. **Local Variables**: Stores variables declared within the process, bound to the path.
+5. **Channel References**: Maintains references to channels used by the process.
+6. **Private Channel**: A unique channel assigned to this path for primitive operations.
+7. **Path Relationships**: References to parent, child, and sibling paths.
 
-The execution of a state machine follows a simple cycle:
+The execution of a path-based state machine follows this cycle:
 
 1. Fetch the next instruction from the bytecode sequence.
 2. Decode the instruction to determine the operation.
 3. Execute the operation, which may:
    - Modify the operand stack
-   - Update local variables
-   - Send or receive messages on channels
+   - Update local variables in the path context
+   - Fork new paths for concurrent execution
+   - Join with other paths at synchronization points
+   - Send or receive messages on channels across paths
    - Request primitive operations via the private channel
-4. Update the instruction pointer.
+4. Update the instruction pointer and path state.
 5. Repeat until the bytecode sequence is exhausted or blocked on a receive operation.
 
-This isolated execution model simplifies the implementation of the VM and enables straightforward parallelization. Each state machine can be scheduled independently, and multiple state machines can execute concurrently without complex synchronization mechanisms.
+This path-based execution model provides several advantages:
 
-### RSpace Interference and the "Channel Trick"
+- **Explicit Concurrency**: Paths directly represent concurrent execution contexts.
+- **Clear Isolation**: Each path has its own isolated state.
+- **Structured Communication**: Paths communicate through well-defined channels.
+- **Hierarchical Organization**: Paths form a tree structure that reflects the program's concurrency.
+- **Efficient Synchronization**: Paths can synchronize at barriers without complex locking.
 
-The "Channel Trick" is a key innovation that embeds all computation, including primitive operations, into the RSpace communication model. Here's a detailed walkthrough of how a state machine executes a primitive operation, such as `x = 5 + 3`:
+The path-based approach aligns perfectly with the AST structure, making the compilation process more straightforward and maintaining the semantic properties of the source program.
+
+### Path-Based RSpace Integration and the "Channel Trick"
+
+The "Channel Trick" is enhanced in the path-based architecture to embed all computation, including primitive operations, into the RSpace communication model. Here's a detailed walkthrough of how a path-based state machine executes a primitive operation, such as `x = 5 + 3`:
 
 1. **Instruction Decoding**: The state machine encounters an ADD instruction in its bytecode sequence.
 
-2. **Operand Preparation**: The operands (5 and 3) are already on the operand stack, having been pushed there by previous instructions.
+2. **Operand Preparation**: The operands (5 and 3) are evaluated in the current path context and placed on the operand stack.
 
-3. **Private Channel Communication**:
+3. **Path-Aware Channel Communication**:
    - The state machine creates a message containing:
      - The operation code (ADD)
      - The operands (5 and 3)
+     - The path context identifier
      - A continuation channel for the result
    - This message is sent on the state machine's private channel to the primitive processor.
 
-4. **Primitive Processing**:
-   - The primitive processor receives the message from the private channel.
-   - It performs the requested operation (5 + 3 = 8).
-   - It sends the result (8) on the continuation channel.
+4. **Path-Aware Primitive Processing**:
+   - The primitive processor receives the message and identifies the path context.
+   - It performs the requested operation (5 + 3 = 8) in the context of the specified path.
+   - It sends the result (8) on the continuation channel, tagged with the path identifier.
 
-5. **Result Reception**:
+5. **Path-Aware Result Reception**:
    - The state machine receives the result (8) from the continuation channel.
+   - It verifies the path context and updates the path's state.
    - It pushes the result onto the operand stack.
    - It continues execution with the next instruction.
 
-This approach has several advantages:
+This path-based approach enhances the "Channel Trick" with several advantages:
 
-- **Uniformity**: All operations, whether primitive or high-level, use the same communication mechanism.
-- **Extensibility**: New primitive operations can be added by registering new handlers with the primitive processor.
-- **Distribution**: Primitive operations can be executed on different physical machines from the requesting state machine.
-- **Fault Isolation**: Failures in primitive operations don't affect the state of other processes.
+- **Path Context Awareness**: Operations are executed in the context of specific paths, maintaining isolation.
+- **Hierarchical Communication**: Messages can be routed through the path hierarchy, reflecting the program structure.
+- **Efficient Path Synchronization**: Multiple paths can synchronize at barriers using RSpace primitives.
+- **Path-Based Resource Management**: Resources can be allocated and released based on path lifecycles.
+- **Path Migration**: Entire paths can be migrated between nodes for load balancing or fault tolerance.
 
-Most importantly, this approach makes the collection of state machines natively representable within RSpace. Each state machine is identified by its private channel, and all interaction with the state machine happens through message passing on that channel. This enables a clean integration with the RSpace storage layer and provides a natural path to distributed execution.
+The path-based architecture makes the integration with RSpace even more natural. Each path is identified by its context in RSpace, and all interaction with the path happens through message passing on channels associated with that context. This enables a clean integration with the RSpace storage layer and provides a powerful model for distributed execution.
 
-## Thread Invocation and Management
+## Path-Based Thread Management
 
-The question "Where are the threads invoked?" has a clear answer in this architecture: threads are invoked at the level of individual state machines, each identified by its private channel in RSpace.
+The question "Where are the threads invoked?" has a clear answer in this path-based architecture: threads are invoked at the level of execution paths, each identified by its path context in RSpace.
 
-### Thread Identity and Lifecycle
+### Path Identity and Lifecycle
 
-In this architecture, a thread is not a traditional OS thread or even a green thread in the conventional sense. Instead, a thread is an execution context associated with a specific state machine, identified by its private channel in RSpace.
+In this architecture, a thread is not a traditional OS thread or even a green thread in the conventional sense. Instead, a thread is an execution context associated with a specific path, identified by its path context in RSpace.
 
-The lifecycle of a thread follows these stages:
+The lifecycle of a path-based thread follows these stages:
 
-1. **Creation**: When a new process is spawned (either from the initial program or through a parallel composition), a new state machine is created with its own private channel.
+1. **Path Creation**: When a new process is spawned (either from the initial program or through a parallel composition), a new path is allocated with its own context.
 
-2. **Scheduling**: The scheduler selects state machines to execute based on resource availability and scheduling policies. The private channel serves as the handle for scheduling decisions.
+2. **Path Forking**: Parallel compositions fork the current path into multiple child paths, each executing a separate process.
 
-3. **Execution**: The selected state machine executes its bytecode sequence until it completes or blocks on a receive operation.
+3. **Path Scheduling**: The scheduler selects paths to execute based on resource availability and scheduling policies. The path context serves as the handle for scheduling decisions.
 
-4. **Blocking**: If a state machine blocks on a receive operation, its state is preserved, and it's removed from the active scheduling queue until a matching message arrives.
+4. **Path Execution**: The selected path executes its bytecode sequence until it completes, blocks on a receive operation, or reaches a synchronization point.
 
-5. **Resumption**: When a message arrives that matches a blocked receive, the corresponding state machine is resumed and added back to the scheduling queue.
+5. **Path Blocking**: If a path blocks on a receive operation, its state is preserved, and it's removed from the active scheduling queue until a matching message arrives.
 
-6. **Termination**: When a state machine completes its bytecode sequence, its resources are released, and its private channel may be garbage collected if no longer referenced.
+6. **Path Synchronization**: Paths can synchronize at barriers, waiting for other paths to reach specific points before continuing.
 
-### Thread Allocation and Scheduling
+7. **Path Resumption**: When a message arrives that matches a blocked receive or a synchronization condition is met, the corresponding path is resumed and added back to the scheduling queue.
 
-The allocation of execution resources (CPU time, memory, etc.) to threads is managed through a scheduling system that maps physical resources to state machines based on their private channels.
+8. **Path Joining**: Child paths can be joined back into their parent path, combining their results.
 
-The scheduler maintains several data structures:
+9. **Path Termination**: When a path completes its bytecode sequence, its resources are released, and its context may be garbage collected if no longer referenced.
 
-1. **Active Queue**: Contains private channels of state machines ready for execution.
-2. **Blocked Map**: Maps channels to state machines blocked on receives.
-3. **Resource Map**: Tracks resource usage by each state machine.
+### Path-Based Allocation and Scheduling
 
-When a message is sent on a channel, the scheduler checks if any state machines are blocked on that channel. If so, it moves them from the blocked map to the active queue.
+The allocation of execution resources (CPU time, memory, etc.) to threads is managed through a path-aware scheduling system that maps physical resources to execution paths based on their contexts.
 
-The scheduler then selects state machines from the active queue based on scheduling policies (e.g., round-robin, priority-based) and assigns them to available execution resources (e.g., CPU cores).
+The path-based scheduler maintains several data structures:
 
-This approach to thread management has several advantages:
+1. **Active Path Queue**: Contains path contexts ready for execution.
+2. **Blocked Path Map**: Maps channels to paths blocked on receives.
+3. **Path Synchronization Map**: Tracks paths waiting at synchronization barriers.
+4. **Path Hierarchy Map**: Maintains the parent-child relationships between paths.
+5. **Resource Map**: Tracks resource usage by each path.
 
-- **Scalability**: The number of state machines can far exceed the number of physical CPU cores, allowing for efficient utilization of resources.
-- **Fairness**: The scheduler can implement various fairness policies to ensure that all processes get a chance to execute.
-- **Resource Control**: The scheduler can limit the resources allocated to each state machine, preventing resource exhaustion.
-- **Load Balancing**: In a distributed setting, state machines can be migrated between physical nodes to balance load.
+When a message is sent on a channel, the scheduler routes it through the relevant paths and checks if any paths are blocked on that channel. If so, it moves them from the blocked map to the active queue.
 
-### Distributed Execution
+The scheduler selects paths from the active queue based on scheduling policies (e.g., round-robin, priority-based, path-hierarchy-aware) and assigns them to available execution resources (e.g., CPU cores).
 
-The thread model described above naturally extends to distributed execution across multiple physical machines. Since each state machine is identified by its private channel, and all interaction happens through message passing, the physical location of a state machine is transparent to other processes.
+This path-based approach to thread management offers several advantages:
+
+- **Hierarchical Scheduling**: The scheduler can use the path hierarchy to make intelligent scheduling decisions, prioritizing paths based on their position in the hierarchy.
+- **Structured Concurrency**: The path hierarchy provides a structured view of concurrency, making it easier to reason about and manage.
+- **Efficient Synchronization**: Paths can synchronize at barriers without complex locking mechanisms.
+- **Fine-Grained Resource Control**: Resources can be allocated and controlled at the path level, allowing for precise resource management.
+- **Path-Based Load Balancing**: In a distributed setting, entire paths or subtrees of paths can be migrated between physical nodes to balance load.
+
+### Path-Based Distributed Execution
+
+The path-based thread model naturally extends to distributed execution across multiple physical machines. Since each path is identified by its context in RSpace, and all interaction happens through message passing, the physical location of a path is transparent to other paths.
 
 In a distributed setting:
 
-1. **Channel Routing**: Messages sent on channels are routed to the appropriate physical node based on the location of the receiving state machine.
+1. **Path-Aware Channel Routing**: Messages sent on channels are routed to the appropriate physical node based on the location of the receiving path.
 
-2. **State Machine Migration**: State machines can be migrated between nodes for load balancing or fault tolerance.
+2. **Path Migration**: Entire paths or subtrees of paths can be migrated between nodes for load balancing or fault tolerance.
 
-3. **Distributed Scheduling**: A distributed scheduler coordinates the allocation of resources across multiple nodes.
+3. **Path-Based Distributed Scheduling**: A distributed scheduler coordinates the allocation of resources to paths across multiple nodes, taking into account the path hierarchy.
 
-4. **Fault Tolerance**: If a node fails, the state machines running on that node can be recovered from persistent storage and resumed on other nodes.
+4. **Path-Level Fault Tolerance**: If a node fails, the paths running on that node can be recovered from persistent storage and resumed on other nodes, maintaining their hierarchical relationships.
 
-This distributed execution model aligns perfectly with the RSpace storage layer, which already provides mechanisms for distributed storage and retrieval of tuples. By representing state machines as entities in RSpace, the VM can leverage these mechanisms for distributed execution.
+5. **Path Locality Optimization**: Related paths can be co-located on the same physical node to minimize communication overhead.
+
+This path-based distributed execution model aligns perfectly with the RSpace storage layer. By representing paths as entities in RSpace, the VM can leverage the distributed nature of RSpace for efficient execution across multiple nodes. The path hierarchy provides a natural structure for distributing computation while maintaining the semantic properties of the program.
 
 ## Conclusion
 
 The next-generation Rholang VM design presented in this document represents a significant advancement in the execution of concurrent, distributed programs. By adhering to the six core principles - functoriality of quoting, functoriality of concurrency, state as a multiset, isolated execution, deep RSpace integration, and thread abstraction - this design creates a VM that truly embodies the mathematical foundations of the Rho-calculus.
 
-The key innovations in this design include:
+The key innovations in this path-based design include:
 
-1. The direct representation of parallel composition as independent bytecode sequences.
-2. The execution of each process in its own isolated state machine.
-3. The use of private channels to embed all computation into the RSpace communication model.
-4. The identification of threads with private channels in RSpace.
+1. The direct representation of parallel composition as independent paths in a hierarchical structure.
+2. The execution of each process in its own isolated path context.
+3. The use of path-aware channels to embed all computation into the RSpace communication model.
+4. The identification of threads with path contexts in RSpace.
+5. The hierarchical organization of paths that reflects the program's concurrency structure.
+6. The efficient synchronization mechanisms based on path relationships.
 
-These innovations enable a VM that is not only mathematically consistent but also highly scalable, fault-tolerant, and naturally distributed. By building on the solid foundation of the Rho-calculus and integrating deeply with RSpace, this VM design provides a powerful platform for the next generation of concurrent, distributed applications.
+These innovations enable a VM that is not only mathematically consistent but also highly scalable, fault-tolerant, and naturally distributed. The path-based architecture aligns perfectly with the AST structure of Rholang programs, making the compilation process more straightforward and maintaining the semantic properties of the source language.
 
-# Projekt Wirtualnej Maszyny Rholang Nowej Generacji
-
-## Wprowadzenie i Wizja
-
-Wirtualna Maszyna Rholang (VM) nowej generacji stanowi fundamentalną zmianę w sposobie wykonywania procesów współbieżnych w środowisku rozproszonym. W przeciwieństwie do tradycyjnych maszyn wirtualnych, które zarządzają współbieżnością poprzez współdzieloną pamięć i blokady, ten nowy projekt VM przyjmuje prawdziwą naturę modelu współbieżności Rholang, traktując każdy proces jako niezależną jednostkę wykonawczą z własną izolowaną maszyną stanów.
-
-Główną wizją jest stworzenie architektury VM, w której właściwości matematyczne rachunku Rho są zachowane w całym procesie kompilacji i wykonania. Zapewnia to, że semantyka programów Rholang pozostaje spójna od kodu źródłowego do wykonania, zachowując to, co nazywamy "funktorialnością" - właściwość, że kompilacja zachowuje strukturę języka źródłowego.
-
-Dzięki głębokiej integracji z RSpace (warstwą pamięci opartą na przestrzeni krotek), ten projekt VM umożliwia naturalne reprezentowanie procesów współbieżnych jako niezależnych jednostek, które komunikują się wyłącznie poprzez przekazywanie wiadomości. Takie podejście nie tylko upraszcza model wykonania, ale także zapewnia jasną ścieżkę do rozproszonego wykonania na wielu węzłach w sieci.
-
-## Podstawowe Wymagania Architektoniczne
-
-### 1. Funktorialność Cytowania
-
-Kompilacja cytowanego procesu (@P) musi być równoważna operacji QUOTE na już skompilowanym kodzie bajtowym procesu P. Wyraża to formuła:
-
-```
-[| @P |] = QUOTE [| P |]
-```
-
-Ta zasada zapewnia, że operacja cytowania w Rholang zachowuje swoje znaczenie semantyczne w procesie kompilacji. Cytowanie jest fundamentalną operacją w rachunku Rho, która przekształca proces w nazwę, umożliwiając traktowanie procesów jako wartości pierwszej klasy, które mogą być przekazywane w wiadomościach.
-
-Techniczne znaczenie tego wymagania jest głębokie: gwarantuje, że VM może poprawnie obsługiwać procesy wyższego rzędu (procesy, które manipulują innymi procesami). Jest to kluczowe dla implementacji zaawansowanych wzorców, takich jak kod mobilny, gdzie procesy mogą być przesyłane między różnymi częściami systemu rozproszonego i wykonywane zdalnie.
-
-### 2. Funktorialność Współbieżności
-
-Kompilacja równoległej kompozycji procesów (P1 | … | Pn) musi skutkować multizbiorem ({|...|}) zawierającym indywidualne skompilowane kody bajtowe każdego procesu. Wyraża to formuła:
-
-```
-[| P1 | … | Pn |] = {| [| P1 |], …, [| Pn |] |}
-```
-
-Ta zasada zapewnia, że operator kompozycji równoległej (|) w Rholang bezpośrednio przekłada się na niezależne sekwencje kodu bajtowego w skompilowanym wyniku. Reprezentacja multizbioru oddaje komutatywną naturę kompozycji równoległej - kolejność procesów nie ma znaczenia, liczy się tylko ich współbieżne wykonanie.
-
-To wymaganie jest niezbędne dla zachowania prawdziwej semantyki współbieżności Rholang. Reprezentując procesy równoległe jako niezależne sekwencje kodu bajtowego, VM może wykonywać je naprawdę współbieżnie bez sztucznej sekwencjonalizacji, która wprowadzałaby niedeterminizm nieobecny w programie źródłowym.
-
-### 3. Stan jako Multizbiór
-
-Kompletny, chwilowy stan VM jest zdefiniowany jako multizbiór indywidualnych sekwencji kodu bajtowego:
-
-```
-{| [| P1 |], …, [| Pn |] |}
-```
-
-Ta zasada ustanawia, że stan VM nie jest monolitycznym bytem, ale kolekcją niezależnych stanów procesów. Każdy proces w systemie wnosi swój własny stan do ogólnego stanu VM, bez bezpośredniej interakcji ze stanami innych procesów.
-
-To podejście do reprezentacji stanu jest kluczowe dla skalowalności i izolacji błędów. Ponieważ procesy nie współdzielą stanu bezpośrednio, awarie w jednym procesie nie uszkadzają stanu innych. Dodatkowo, ten model naturalnie wspiera dystrybucję, ponieważ różne procesy mogą być wykonywane na różnych maszynach fizycznych bez wymagania złożonych mechanizmów synchronizacji stanu.
-
-### 4. Izolowane Wykonanie
-
-Każda indywidualna sekwencja kodu bajtowego [| Pi |] z multizbioru musi być wykonywana w swojej własnej, oddzielnej, dedykowanej maszynie stanów. Ta maszyna stanów reprezentuje pojedynczy logiczny wątek.
-
-Ta zasada wymusza ścisłą izolację między procesami, zapewniając, że każdy proces wykonuje się niezależnie z własnym kontekstem wykonania, stosem i zmiennymi lokalnymi. Ta izolacja jest fundamentalna dla modelu rachunku Rho, gdzie procesy wchodzą w interakcje tylko poprzez jawne kanały komunikacyjne.
-
-Techniczne znaczenie izolowanego wykonania wykracza poza poprawność do wydajności i skalowalności. Wykonując procesy w izolowanych maszynach stanów, VM może łatwo dystrybuować wykonanie na wiele rdzeni, a nawet wiele maszyn. To podejście upraszcza również rozumowanie o zachowaniu procesu, ponieważ wykonanie każdego procesu zależy tylko od jego własnego stanu i wiadomości, które otrzymuje.
-
-### 5. Głęboka Integracja z RSpace poprzez "Channel Trick"
-
-Aby obsłużyć operacje, które nie są natywnymi komunikacjami Rholang (np. arytmetyka), każda maszyna stanów [| Pi |] musi mieć przypisany prywatny kanał. Ten kanał jest używany do komunikacji z "procesorem prymitywów". To osadza każdą operację, w tym operacje prymitywne, w modelu komunikacji RSpace.
-
-Ta zasada zapewnia, że wszystkie obliczenia w VM, nawet operacje prymitywne jak arytmetyka, są wyrażane poprzez ten sam mechanizm komunikacji używany do interakcji procesów. Przypisując każdej maszynie stanów prywatny kanał, VM może kierować żądania operacji prymitywnych do wyspecjalizowanych procesorów bez łamania paradygmatu przekazywania wiadomości.
-
-"Channel Trick" jest potężną techniką unifikacji, która upraszcza architekturę VM, redukując wszystkie obliczenia do przekazywania wiadomości. To podejście czyni VM bardziej rozszerzalną, ponieważ nowe operacje prymitywne mogą być dodawane przez proste rejestrowanie nowych procedur obsługi dla określonych wzorców wiadomości, bez modyfikowania głównego silnika wykonawczego.
-
-### 6. Abstrakcja Wątku
-
-"Świadkiem" dla wątku (czy to zielony wątek, czy fizyczny) jest prywatny kanał przypisany do maszyny stanów. Zarządzanie wątkami staje się procesem mapowania zasobów wykonawczych na tych reprezentantów kanałów w RSpace.
-
-Ta zasada ustanawia jasną tożsamość dla każdego wątku wykonawczego w systemie. Używając prywatnego kanału jako tożsamości wątku, VM może śledzić, planować i zarządzać wątkami, używając tych samych mechanizmów, których używa dla innych operacji RSpace.
-
-To podejście do abstrakcji wątku zapewnia naturalny sposób implementacji funkcji takich jak priorytetyzacja wątków, równoważenie obciążenia i alokacja zasobów. Upraszcza również implementację zaawansowanych wzorców współbieżności, takich jak rachunek join, gdzie wiele wątków synchronizuje się na współdzielonych kanałach.
-
-## Model Implementacji i Wykonania
-
-### Proces Kompilacji
-
-Proces kompilacji przekształca kod źródłowy Rholang w multizbiór niezależnych sekwencji kodu bajtowego, zachowując strukturę współbieżności oryginalnego programu.
-
-1. **Parsowanie**: Kod źródłowy Rholang jest parsowany do Abstrakcyjnego Drzewa Składniowego (AST) przy użyciu parsera wygenerowanego z gramatyki Rholang.
-
-2. **Analiza AST**: AST jest analizowane w celu identyfikacji kompozycji równoległych, deklaracji nazw i innych konstrukcji Rholang.
-
-3. **Generowanie Kodu Bajtowego**: Dla każdego procesu w kompozycji równoległej, kompilator generuje oddzielną sekwencję kodu bajtowego. To tutaj implementowana jest funktorialność współbieżności:
-   
-   ```
-   compile(P1 | P2 | ... | Pn) = {| compile(P1), compile(P2), ..., compile(Pn) |}
-   ```
-
-4. **Optymalizacja**: Każda sekwencja kodu bajtowego jest optymalizowana niezależnie, bez wpływu na semantykę innych sekwencji.
-
-5. **Linkowanie**: Odniesienia między procesami (np. poprzez współdzielone kanały) są rozwiązywane i odpowiednio linkowane.
-
-Kluczową innowacją w tym procesie kompilacji jest bezpośrednie mapowanie kompozycji równoległej na niezależne sekwencje kodu bajtowego. To zachowuje strukturę współbieżności oryginalnego programu i umożliwia prawdziwie równoległe wykonanie.
-
-### Wykonanie Maszyny Stanów
-
-Każda sekwencja kodu bajtowego [| Pi |] jest wykonywana przez dedykowaną maszynę stanów z własnym kontekstem wykonania. Maszyna stanów utrzymuje:
-
-1. **Wskaźnik Instrukcji**: Wskazuje na aktualnie wykonywaną instrukcję.
-2. **Stos Operandów**: Przechowuje wartości pośrednie podczas obliczeń.
-3. **Zmienne Lokalne**: Przechowuje zmienne zadeklarowane w procesie.
-4. **Referencje Kanałów**: Utrzymuje referencje do kanałów używanych przez proces.
-5. **Prywatny Kanał**: Unikalny kanał przypisany do tej maszyny stanów dla operacji prymitywnych.
-
-Wykonanie maszyny stanów następuje w prostym cyklu:
-
-1. Pobierz następną instrukcję z sekwencji kodu bajtowego.
-2. Zdekoduj instrukcję, aby określić operację.
-3. Wykonaj operację, która może:
-   - Modyfikować stos operandów
-   - Aktualizować zmienne lokalne
-   - Wysyłać lub odbierać wiadomości na kanałach
-   - Żądać operacji prymitywnych poprzez prywatny kanał
-4. Zaktualizuj wskaźnik instrukcji.
-5. Powtarzaj, aż sekwencja kodu bajtowego zostanie wyczerpana lub zablokowana na operacji odbioru.
-
-Ten izolowany model wykonania upraszcza implementację VM i umożliwia prostą paralelizację. Każda maszyna stanów może być planowana niezależnie, a wiele maszyn stanów może wykonywać się współbieżnie bez złożonych mechanizmów synchronizacji.
-
-### Interferencja RSpace i "Channel Trick"
-
-"Channel Trick" jest kluczową innowacją, która osadza wszystkie obliczenia, w tym operacje prymitywne, w modelu komunikacji RSpace. Oto szczegółowy opis, jak maszyna stanów wykonuje operację prymitywną, taką jak `x = 5 + 3`:
-
-1. **Dekodowanie Instrukcji**: Maszyna stanów napotyka instrukcję ADD w swojej sekwencji kodu bajtowego.
-
-2. **Przygotowanie Operandów**: Operandy (5 i 3) są już na stosie operandów, zostały tam umieszczone przez poprzednie instrukcje.
-
-3. **Komunikacja przez Prywatny Kanał**:
-   - Maszyna stanów tworzy wiadomość zawierającą:
-     - Kod operacji (ADD)
-     - Operandy (5 i 3)
-     - Kanał kontynuacji dla wyniku
-   - Ta wiadomość jest wysyłana na prywatnym kanale maszyny stanów do procesora prymitywów.
-
-4. **Przetwarzanie Prymitywne**:
-   - Procesor prymitywów odbiera wiadomość z prywatnego kanału.
-   - Wykonuje żądaną operację (5 + 3 = 8).
-   - Wysyła wynik (8) na kanale kontynuacji.
-
-5. **Odbiór Wyniku**:
-   - Maszyna stanów odbiera wynik (8) z kanału kontynuacji.
-   - Umieszcza wynik na stosie operandów.
-   - Kontynuuje wykonanie z następną instrukcją.
-
-To podejście ma kilka zalet:
-
-- **Jednolitość**: Wszystkie operacje, czy to prymitywne czy wysokopoziomowe, używają tego samego mechanizmu komunikacji.
-- **Rozszerzalność**: Nowe operacje prymitywne mogą być dodawane przez rejestrowanie nowych procedur obsługi w procesorze prymitywów.
-- **Dystrybucja**: Operacje prymitywne mogą być wykonywane na różnych maszynach fizycznych niż żądająca maszyna stanów.
-- **Izolacja Błędów**: Awarie w operacjach prymitywnych nie wpływają na stan innych procesów.
-
-Co najważniejsze, to podejście sprawia, że kolekcja maszyn stanów jest natywnie reprezentowalna w RSpace. Każda maszyna stanów jest identyfikowana przez swój prywatny kanał, a cała interakcja z maszyną stanów odbywa się poprzez przekazywanie wiadomości na tym kanale. To umożliwia czystą integrację z warstwą pamięci RSpace i zapewnia naturalną ścieżkę do rozproszonego wykonania.
-
-## Wywoływanie i Zarządzanie Wątkami
-
-Pytanie "Gdzie są wywoływane wątki?" ma jasną odpowiedź w tej architekturze: wątki są wywoływane na poziomie indywidualnych maszyn stanów, każda identyfikowana przez swój prywatny kanał w RSpace.
-
-### Tożsamość i Cykl Życia Wątku
-
-W tej architekturze wątek nie jest tradycyjnym wątkiem OS ani nawet zielonym wątkiem w konwencjonalnym sensie. Zamiast tego, wątek jest kontekstem wykonania powiązanym z określoną maszyną stanów, identyfikowaną przez jej prywatny kanał w RSpace.
-
-Cykl życia wątku przebiega przez następujące etapy:
-
-1. **Tworzenie**: Gdy nowy proces jest uruchamiany (albo z początkowego programu, albo poprzez kompozycję równoległą), tworzona jest nowa maszyna stanów z własnym prywatnym kanałem.
-
-2. **Planowanie**: Planista wybiera maszyny stanów do wykonania na podstawie dostępności zasobów i polityk planowania. Prywatny kanał służy jako uchwyt dla decyzji planowania.
-
-3. **Wykonanie**: Wybrana maszyna stanów wykonuje swoją sekwencję kodu bajtowego, aż zakończy lub zablokuje się na operacji odbioru.
-
-4. **Blokowanie**: Jeśli maszyna stanów blokuje się na operacji odbioru, jej stan jest zachowywany, a ona sama jest usuwana z aktywnej kolejki planowania, dopóki nie nadejdzie pasująca wiadomość.
-
-5. **Wznowienie**: Gdy nadchodzi wiadomość, która pasuje do zablokowanego odbioru, odpowiednia maszyna stanów jest wznawiana i dodawana z powrotem do kolejki planowania.
-
-6. **Zakończenie**: Gdy maszyna stanów kończy swoją sekwencję kodu bajtowego, jej zasoby są zwalniane, a jej prywatny kanał może być zbierany przez odśmiecacz, jeśli nie jest już referencjonowany.
-
-### Alokacja i Planowanie Wątków
-
-Alokacja zasobów wykonawczych (czas CPU, pamięć itp.) do wątków jest zarządzana przez system planowania, który mapuje fizyczne zasoby na maszyny stanów na podstawie ich prywatnych kanałów.
-
-Planista utrzymuje kilka struktur danych:
-
-1. **Aktywna Kolejka**: Zawiera prywatne kanały maszyn stanów gotowych do wykonania.
-2. **Mapa Zablokowanych**: Mapuje kanały na maszyny stanów zablokowane na odbiorach.
-3. **Mapa Zasobów**: Śledzi wykorzystanie zasobów przez każdą maszynę stanów.
-
-Gdy wiadomość jest wysyłana na kanale, planista sprawdza, czy jakiekolwiek maszyny stanów są zablokowane na tym kanale. Jeśli tak, przenosi je z mapy zablokowanych do aktywnej kolejki.
-
-Planista następnie wybiera maszyny stanów z aktywnej kolejki na podstawie polityk planowania (np. round-robin, opartych na priorytetach) i przypisuje je do dostępnych zasobów wykonawczych (np. rdzeni CPU).
-
-To podejście do zarządzania wątkami ma kilka zalet:
-
-- **Skalowalność**: Liczba maszyn stanów może znacznie przekraczać liczbę fizycznych rdzeni CPU, umożliwiając efektywne wykorzystanie zasobów.
-- **Sprawiedliwość**: Planista może implementować różne polityki sprawiedliwości, aby zapewnić, że wszystkie procesy mają szansę na wykonanie.
-- **Kontrola Zasobów**: Planista może ograniczać zasoby przydzielane każdej maszynie stanów, zapobiegając wyczerpaniu zasobów.
-- **Równoważenie Obciążenia**: W środowisku rozproszonym, maszyny stanów mogą być migrowane między fizycznymi węzłami w celu równoważenia obciążenia.
-
-### Wykonanie Rozproszone
-
-Model wątków opisany powyżej naturalnie rozszerza się na wykonanie rozproszone na wielu maszynach fizycznych. Ponieważ każda maszyna stanów jest identyfikowana przez swój prywatny kanał, a cała interakcja odbywa się poprzez przekazywanie wiadomości, fizyczna lokalizacja maszyny stanów jest przezroczysta dla innych procesów.
-
-W środowisku rozproszonym:
-
-1. **Routing Kanałów**: Wiadomości wysyłane na kanałach są kierowane do odpowiedniego węzła fizycznego na podstawie lokalizacji odbierającej maszyny stanów.
-
-2. **Migracja Maszyn Stanów**: Maszyny stanów mogą być migrowane między węzłami w celu równoważenia obciążenia lub tolerancji błędów.
-
-3. **Rozproszone Planowanie**: Rozproszony planista koordynuje alokację zasobów na wielu węzłach.
-
-4. **Tolerancja Błędów**: Jeśli węzeł ulegnie awarii, maszyny stanów działające na tym węźle mogą być odzyskane z trwałej pamięci i wznowione na innych węzłach.
-
-Ten rozproszony model wykonania idealnie pasuje do warstwy pamięci RSpace, która już zapewnia mechanizmy do rozproszonego przechowywania i pobierania krotek. Reprezentując maszyny stanów jako jednostki w RSpace, VM może wykorzystać te mechanizmy do rozproszonego wykonania.
-
-## Podsumowanie
-
-Projekt VM Rholang nowej generacji przedstawiony w tym dokumencie reprezentuje znaczący postęp w wykonywaniu programów współbieżnych, rozproszonych. Przestrzegając sześciu podstawowych zasad - funktorialności cytowania, funktorialności współbieżności, stanu jako multizbioru, izolowanego wykonania, głębokiej integracji z RSpace i abstrakcji wątku - ten projekt tworzy VM, która prawdziwie ucieleśnia matematyczne podstawy rachunku Rho.
-
-Kluczowe innowacje w tym projekcie obejmują:
-
-1. Bezpośrednią reprezentację kompozycji równoległej jako niezależnych sekwencji kodu bajtowego.
-2. Wykonanie każdego procesu w jego własnej izolowanej maszynie stanów.
-3. Wykorzystanie prywatnych kanałów do osadzenia wszystkich obliczeń w modelu komunikacji RSpace.
-4. Identyfikację wątków z prywatnymi kanałami w RSpace.
-
-Te innowacje umożliwiają VM, która jest nie tylko matematycznie spójna, ale także wysoce skalowalna, odporna na błędy i naturalnie rozproszona. Budując na solidnych podstawach rachunku Rho i integrując się głęboko z RSpace, ten projekt VM zapewnia potężną platformę dla następnej generacji współbieżnych, rozproszonych aplikacji.
+By building on the solid foundation of the Rho-calculus, integrating deeply with RSpace, and leveraging the path-based execution model, this VM design provides a powerful platform for the next generation of concurrent, distributed applications.
