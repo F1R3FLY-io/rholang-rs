@@ -1,30 +1,58 @@
 # Rholang Bytecode Design
 
-For a complete and accurate implementation of bytecode, here we will describe a tentative structure of converting each Rholang instruction from grammar into bytecode. This bytecode design follows a stack-based VM where each Rholang instruction is translated into a sequence of low-level operations.
+For a complete and accurate implementation of bytecode, here we will describe a tentative structure of converting each Rholang instruction from grammar into bytecode.
 
-### Runtime System Instructions
+## Architecture Overview
+- **Mini-Stack VM**: Handles computational operations, control flow, local variables
+- **RSpace Types**:
+    - `RSPACE_MEM_SEQ`: In-memory sequential (hashmap)
+    - `RSPACE_MEM_CONC`: In-memory concurrent (concurrent hashmap)
+    - `RSPACE_STORE_SEQ`: On-store sequential (LMDB wrapper)
+    - `RSPACE_STORE_CONC`: On-store concurrent (LMDB wrapper)
+- **Integration**: VM communicates with appropriate RSpace through typed instructions
+
+### RSpace Type Selection Guidelines
+**`RSPACE_MEM_SEQ`**:
+- Simple, single-threaded operations
+- Temporary data that doesn't need persistence
+- Testing and development
+- Local variable bindings
+
+**`RSPACE_MEM_CONC`**:
+- Concurrent operations within a single process
+- Temporary data with multiple threads
+- High-performance concurrent operations
+- Real-time processing
+
+**`RSPACE_STORE_SEQ`**:
+- Persistent data that needs to survive process restarts
+- Single-threaded persistent operations
+- Configuration data
+- Simple persistent contracts
+
+**`RSPACE_STORE_CONC`**:
+- Persistent data with concurrent access
+- Multi-process communication
+- Production blockchain operations
+- Distributed systems
+
+### Core VM Instructions
 ```
-CORE INSTRUCTIONS:
+COMPUTATIONAL INSTRUCTIONS:
 ├── NOP                 // No operation
 ├── PUSH_INT n          // Push integer literal
 ├── PUSH_STR s          // Push string literal
 ├── PUSH_BOOL b         // Push boolean literal
+├── PUSH_PROC proc      // Push process to stack
 ├── POP                 // Pop top of stack
 ├── DUP                 // Duplicate top of stack
 ├── LOAD_VAR n          // Load variable by index
+├── LOAD_LOCAL n        // Load local variable by index
 ├── STORE_LOCAL n       // Store to local variable
 ├── ALLOC_LOCAL         // Allocate new local slot
-├── ALLOC_NAME          // Allocate fresh name
-├── EVAL                // Evaluate process on stack
-├── EXEC                // Execute process on stack
-├── QUOTE               // Process to name conversion
-├── UNQUOTE             // Name to process conversion
-├── SEND_ASYNC          // Asynchronous send
-├── SEND_SYNC           // Synchronous send
-├── RECEIVE             // Receive from channel
-├── SPAWN               // Spawn process in new thread
 ├── BRANCH_TRUE L       // Conditional jump if true
 ├── BRANCH_FALSE L      // Conditional jump if false
+├── BRANCH_SUCCESS L    // Branch if operation succeeded
 ├── JUMP L              // Unconditional jump
 ├── CMP_EQ              // Equality comparison
 ├── CMP_NEQ             // Inequality comparison
@@ -32,17 +60,69 @@ CORE INSTRUCTIONS:
 ├── CMP_LTE             // Less than or equal
 ├── CMP_GT              // Greater than comparison
 ├── CMP_GTE             // Greater than or equal
+├── ADD                 // Arithmetic addition
+├── SUB                 // Arithmetic subtraction
+├── MUL                 // Arithmetic multiplication
+├── DIV                 // Arithmetic division
+├── MOD                 // Arithmetic modulo
+├── NEG                 // Arithmetic negation
+├── NOT                 // Logical NOT
 ├── CONCAT              // String/collection concatenation
 ├── DIFF                // Collection difference
 ├── INTERPOLATE         // String interpolation
-├── NOT                 // Logical NOT
-├── CONJ                // Process conjunction
-├── DISJ                // Process disjunction
+├── CREATE_LIST n       // Create list from n stack elements
+├── CREATE_TUPLE n      // Create tuple from n stack elements
+├── INVOKE_METHOD       // Method invocation
+
+EVALUATION INSTRUCTIONS:
+├── EVAL                // Evaluate process on stack
+├── EVAL_BOOL           // Evaluate to boolean
+├── EVAL_TO_RSPACE      // Evaluate and prepare for RSpace
+├── EVAL_WITH_LOCALS    // Evaluate with local bindings
+├── EVAL_IN_BUNDLE      // Evaluate in bundle context
+├── EXEC                // Execute process on stack
+
+PATTERN MATCHING INSTRUCTIONS:
+├── PATTERN pat         // Load pattern
+├── MATCH_TEST          // Test pattern match (leaves boolean on stack)
+├── EXTRACT_BINDINGS    // Extract bound variables from pattern match
+
+DATA STRUCTURE INSTRUCTIONS:
+├── MAP_BEGIN           // Start map construction
+├── MAP_PUT             // Add key-value pair to map
+├── MAP_END             // Finish map construction
+
+PROCESS CONTROL INSTRUCTIONS:
+├── SPAWN_ASYNC         // Spawn process asynchronously
 ├── PROC_NEG            // Process negation
-├── MATCH_TEST          // Pattern match test
+
+REFERENCE INSTRUCTIONS:
 ├── COPY                // Copy value
 ├── MOVE                // Move value
 ├── REF                 // Create reference
+├── LOAD_METHOD name    // Load method name for invocation
+```
+
+### RSpace Instructions (Type-Specific)
+```
+RSPACE INSTRUCTIONS:
+├── RSPACE_PUT <type>          // Put data into
+├── RSPACE_GET <type>          // Get data from specified RSpace (blocking)
+├── RSPACE_GET_NONBLOCK <type> // Get data from specified RSpace (non-blocking)
+├── RSPACE_CONSUME <type>      // Consume data from specified RSpace
+├── RSPACE_PRODUCE <type>      // Produce data to specified RSpace
+├── RSPACE_PEEK <type>         // Peek at data without consuming
+├── RSPACE_MATCH <type>        // Pattern match against specified RSpace data
+├── RSPACE_SELECT <type>       // Atomic select operation across channels
+├── NAME_CREATE <type>         // Create fresh name in specified RSpace
+├── NAME_QUOTE <type>          // Quote process to name in specified RSpace
+├── NAME_UNQUOTE <type>        // Unquote name to process in specified RSpace
+├── PATTERN_COMPILE <type>     // Compile pattern for specified RSpace matching
+├── PATTERN_BIND <type>        // Bind pattern variables from specified RSpace match
+├── CONTINUATION_STORE <type>  // Store continuation in specified RSpace
+├── CONTINUATION_RESUME <type> // Resume stored continuation from specified RSpace
+├── RSPACE_BUNDLE_BEGIN <type> // Start bundle in specified RSpace
+├── RSPACE_BUNDLE_END <type>   // End bundle in specified RSpace
 ```
 
 ### Core Process Constructs
@@ -55,63 +135,104 @@ par (P | Q)  -> BYTECODE
 
 **Name Creation (new)**
 ```
-new x, y in P -> BYTECODE
-├── ALLOC_NAME           // Allocate fresh name for x
-├── STORE_LOCAL 0        // Store in local slot 0
-├── ALLOC_NAME           // Allocate fresh name for y
-├── STORE_LOCAL 1        // Store in local slot 1
-├── PUSH_PROC P          // Push process P to stack
-└── EXEC                 // Execute P with new scope
+new x, y in P -> BYTECODE (memory-based)
+├── NAME_CREATE RSPACE_MEM_CONC     // Create fresh name in memory RSpace
+├── STORE_LOCAL 0                   // Store x in local slot
+├── NAME_CREATE RSPACE_MEM_CONC     // Create fresh name for y
+├── STORE_LOCAL 1                   // Store y in local slot
+├── PUSH_PROC P                     // Push process P
+└── EVAL_WITH_LOCALS                // Evaluate with local bindings
+
+new x, y in P -> BYTECODE (persistent)
+├── NAME_CREATE RSPACE_STORE_CONC   // Create fresh name in persistent RSpace
+├── STORE_LOCAL 0                   // Store x in local slot
+├── NAME_CREATE RSPACE_STORE_CONC   // Create fresh name for y
+├── STORE_LOCAL 1                   // Store y in local slot
+├── PUSH_PROC P                     // Push process P
+└── EVAL_WITH_LOCALS                // Evaluate with local bindings
 ```
 
-**Asynchronous Send (send)**
+**Asynchronous Send (channel!) - Memory-based**
 ```
 chan!(data)  -> BYTECODE
-├── LOAD_VAR chan        // Load channel name
-├── PUSH_PROC data       // Push data process
-├── QUOTE                // Convert process to name (@data)
-└── SEND_ASYNC           // Send message asynchronously
+├── PUSH_PROC data              // Push data to stack
+├── EVAL_TO_RSPACE              // Evaluate and prepare for RSpace
+├── PUSH_PROC chan              // Push channel name
+├── EVAL_TO_RSPACE              // Evaluate channel
+└── RSPACE_PUT RSPACE_MEM_CONC  // Put data into concurrent memory RSpace
+```
+
+**Asynchronous Send (channel!) - Persistent**
+```
+chan!(data)  -> BYTECODE
+├── PUSH_PROC data                // Push data to stack
+├── EVAL_TO_RSPACE                // Evaluate and prepare for RSpace
+├── PUSH_PROC chan                // Push channel name
+├── EVAL_TO_RSPACE                // Evaluate channel
+└── RSPACE_PUT RSPACE_STORE_CONC  // Put data into persistent concurrent RSpace
 ```
 
 **Synchronous Send (send_sync)**
 ```
-chan!?(data); P  -> BYTECODE
-├── LOAD_VAR chan       // Load channel name
-├── PUSH_PROC data      // Push data process
-├── QUOTE               // Convert to name
-├── SEND_SYNC           // Send and wait for ack
-├── PUSH_PROC P         // Push continuation
-└── EXEC                // Execute continuation
+chan!?(data); P  -> BYTECODE (memory-based)
+├── LOAD_VAR chan                       // Load channel name
+├── PUSH_PROC data                      // Push data process
+├── EVAL_TO_RSPACE                      // Evaluate and prepare for RSpace
+├── NAME_QUOTE RSPACE_MEM_CONC          // Convert to name through memory RSpace
+├── CONTINUATION_STORE RSPACE_MEM_CONC P // Store continuation in memory RSpace
+├── RSPACE_PUT_SYNC RSPACE_MEM_CONC     // Send and wait for ack
+└── CONTINUATION_RESUME RSPACE_MEM_CONC // Resume when ack received
+
+chan!?(data); P  -> BYTECODE (persistent)
+├── LOAD_VAR chan                         // Load channel name
+├── PUSH_PROC data                        // Push data process
+├── EVAL_TO_RSPACE                        // Evaluate and prepare for RSpace
+├── NAME_QUOTE RSPACE_STORE_CONC          // Convert to name through persistent RSpace
+├── CONTINUATION_STORE RSPACE_STORE_CONC P // Store continuation in persistent RSpace
+├── RSPACE_PUT_SYNC RSPACE_STORE_CONC     // Send and wait for ack
+└── CONTINUATION_RESUME RSPACE_STORE_CONC // Resume when ack received
 ```
 
 **Input/Receive (for)**
 ```
-// Simple receive without pattern matching
+// Simple receive without pattern matching (memory-based)
 for(x <- chan) P  -> BYTECODE
-├── LOAD_VAR chan       // Load channel name
-├── ALLOC_LOCAL         // Allocate slot for x
-├── RECEIVE_SIMPLE      // Simple receive without pattern matching
-├── STORE_LOCAL 0       // Store received value in x
-├── PUSH_PROC P         // Push process P
-└── EXEC                // Execute P with bound x
+├── LOAD_VAR chan                       // Load channel name
+├── ALLOC_LOCAL                         // Allocate slot for x
+├── PATTERN_COMPILE RSPACE_MEM_CONC x   // Compile simple variable pattern
+├── CONTINUATION_STORE RSPACE_MEM_CONC P // Store continuation in memory RSpace
+├── RSPACE_CONSUME RSPACE_MEM_CONC      // Consume from memory RSpace
+├── PATTERN_BIND RSPACE_MEM_CONC        // Bind received value to x
+└── CONTINUATION_RESUME RSPACE_MEM_CONC // Resume with bound x
 
-// Pattern matching receive
+// Pattern matching receive (memory-based)
 for(pattern <- chan) P  -> BYTECODE
-├── LOAD_VAR chan
-├── COMPILE_PATTERN pattern
-├── RECEIVE_PATTERN         // Receive with pattern matching
-├── EXTRACT_BINDINGS        // Extract all bound variables
-├── PUSH_PROC P
-└── EXEC
+├── LOAD_VAR chan                         // Load channel name
+├── PATTERN_COMPILE RSPACE_MEM_CONC pattern // Compile pattern for memory RSpace
+├── CONTINUATION_STORE RSPACE_MEM_CONC P  // Store continuation in memory RSpace
+├── RSPACE_CONSUME RSPACE_MEM_CONC        // Consume from memory RSpace with pattern matching
+├── PATTERN_BIND RSPACE_MEM_CONC          // Extract all bound variables
+└── CONTINUATION_RESUME RSPACE_MEM_CONC   // Resume with bindings
+
+// Persistent versions
+for(x <- chan) P  -> BYTECODE (persistent)
+├── LOAD_VAR chan                         // Load channel name
+├── ALLOC_LOCAL                           // Allocate slot for x
+├── PATTERN_COMPILE RSPACE_STORE_CONC x   // Compile simple variable pattern
+├── CONTINUATION_STORE RSPACE_STORE_CONC P // Store continuation in persistent RSpace
+├── RSPACE_CONSUME RSPACE_STORE_CONC      // Consume from persistent RSpace
+├── PATTERN_BIND RSPACE_STORE_CONC        // Bind received value to x
+└── CONTINUATION_RESUME RSPACE_STORE_CONC // Resume with bound x
 ```
 
 **Replicated Receive (contract)**
 ```
 contract Name(x) = P  -> BYTECODE
-├── LOAD_VAR Name           // Load contract name
-├── COMPILE_PATTERN x       // Compile parameter pattern  
-├── PUSH_PROC P             // Push contract body
-├── RECEIVE_PATTERN true    // Same as for(), but with persist=true flag
+├── PUSH_PROC Name                      // Push contract name
+├── EVAL_TO_RSPACE                      // Evaluate name
+├── PATTERN_COMPILE RSPACE_STORE_CONC x // Compile pattern for persistent RSpace
+├── CONTINUATION_STORE RSPACE_STORE_CONC P // Store contract body persistently
+└── RSPACE_CONSUME_PERSISTENT RSPACE_STORE_CONC // Set up persistent consumer
 ```
 
 ### Control Flow Constructs
@@ -153,27 +274,20 @@ match expr { pat1 => P1; pat2 => P2 }  -> BYTECODE
 **Select/Choice (select)**
 ```
 select { x <- chan1 => P1; y <- chan2 => P2 }  -> BYTECODE
-├── SELECT_BEGIN        // Start atomic select operation
-├── LOAD_VAR chan1      // Load channel 1
-├── PREPARE_CHOICE 0    // Prepare choice 0 (but don't commit yet)
-├── LOAD_VAR chan2      // Load channel 2  
-├── PREPARE_CHOICE 1    // Prepare choice 1 (but don't commit yet)
-├── ATOMIC_SELECT       // Atomically wait for ANY channel to be ready
-├── CANCEL_OTHERS       // Cancel all non-selected choices
-├── BRANCH_CHOICE 0 L1  // If choice 0 was selected, jump to L1
-├── BRANCH_CHOICE 1 L2  // If choice 1 was selected, jump to L2
-├── L1: ALLOC_LOCAL     // Allocate for x
-├── RECEIVE_SELECTED    // Receive from the selected channel
-├── STORE_LOCAL 0       // Store received value in x
-├── PUSH_PROC P1        // Push process P1
-├── EXEC                // Execute P1
-├── JUMP L_END          // Jump to end
-├── L2: ALLOC_LOCAL     // Allocate for y
-├── RECEIVE_SELECTED    // Receive from the selected channel
-├── STORE_LOCAL 0       // Store received value in y
-├── PUSH_PROC P2        // Push process P2
-├── EXEC                // Execute P2
-└── L_END: NOP          // Continue
+├── RSPACE_SELECT_BEGIN RSPACE_MEM_CONC // Begin atomic select in memory RSpace
+├── PUSH_PROC chan1                     // Push first channel
+├── EVAL_TO_RSPACE                      // Evaluate channel 1
+├── PATTERN_COMPILE RSPACE_MEM_CONC x   // Compile pattern for memory RSpace
+├── CONTINUATION_STORE RSPACE_MEM_CONC P1 // Store continuation in memory RSpace
+├── RSPACE_SELECT_ADD RSPACE_MEM_CONC   // Add to select set
+├── PUSH_PROC chan2                     // Push second channel
+├── EVAL_TO_RSPACE                      // Evaluate channel 2
+├── PATTERN_COMPILE RSPACE_MEM_CONC y   // Compile pattern for memory RSpace
+├── CONTINUATION_STORE RSPACE_MEM_CONC P2 // Store continuation in memory RSpace
+├── RSPACE_SELECT_ADD RSPACE_MEM_CONC   // Add to select set
+├── RSPACE_SELECT_WAIT RSPACE_MEM_CONC  // Wait for any channel
+├── PATTERN_BIND RSPACE_MEM_CONC        // Bind variables from selected channel
+└── CONTINUATION_RESUME RSPACE_MEM_CONC // Resume selected continuation
 ```
 * The RSpace would need to support this atomic selection mechanism, probably using something like compare-and-swap operations or locks to ensure atomicity
 
@@ -205,12 +319,12 @@ P and Q  -> BYTECODE
 **Method Call**
 ```
 obj.method(args)  -> BYTECODE
-├── PUSH_PROC obj       // Push receiver object
-├── EVAL                // Evaluate receiver
-├── PUSH_PROC args      // Push arguments
-├── EVAL                // Evaluate arguments
-├── LOAD_METHOD method  // Load method name
-└── INVOKE              // Invoke method
+├── PUSH_PROC obj                       // Push receiver object
+├── EVAL_TO_RSPACE                      // Evaluate receiver
+├── PUSH_PROC args                      // Push arguments
+├── EVAL_TO_RSPACE                      // Evaluate arguments
+├── LOAD_METHOD method                  // Load method name
+└── INVOKE_METHOD RSPACE_MEM_CONC       // Invoke method with RSpace context
 ```
 
 ### Comparison Expression Constructs
@@ -334,33 +448,47 @@ P %% Q  -> BYTECODE
 **Let Binding (Linear)**
 ```
 let x = P; y = Q in R  -> BYTECODE
-├── PUSH_CONTEXT LOCAL  // Push local evaluation context
 ├── PUSH_PROC P         // Push value for x
-├── EVAL_WITH_CONTEXT   // Evaluate P with provided context
+├── EVAL                // Evaluate P (stack-based)
 ├── ALLOC_LOCAL         // Allocate slot for x
 ├── STORE_LOCAL 0       // Store P result in x
 ├── PUSH_PROC Q         // Push value for y
-├── EVAL_WITH_CONTEXT   // Evaluate Q with provided context
+├── EVAL                // Evaluate Q (stack-based)
 ├── ALLOC_LOCAL         // Allocate slot for y
 ├── STORE_LOCAL 1       // Store Q result in y
 ├── PUSH_PROC R         // Push body process R
-├── EVAL_WITH_CONTEXT   // Evaluate R with local bindings
-└── POP_CONTEXT         // Restore previous context
+└── EVAL_WITH_LOCALS    // Evaluate R with local bindings
 ```
 
 **Let Binding (Concurrent)**
 ```
-let x = P & y = Q in R  -> BYTECODE
-├── CREATE_CONCURRENT_LOCAL_CONTEXT   // Create context for concurrent local eval
-├── PUSH_PROC P                       // Push process P
-├── PUSH_CONTINUATION x               // Push continuation for x binding
-├── SPAWN_IN_LOCAL_CONTEXT            // Spawn P evaluation in local context
-├── PUSH_PROC Q                       // Push process Q
-├── PUSH_CONTINUATION y               // Push continuation for y binding  
-├── SPAWN_IN_LOCAL_CONTEXT            // Spawn Q evaluation in local context
-├── WAIT_LOCAL_CONTEXT                // Wait for all local evaluations
-├── PUSH_PROC R                       // Push body process R
-└── EXEC_WITH_LOCAL_BINDINGS          // Execute R with accumulated bindings
+let x = P & y = Q in R  -> BYTECODE (memory-based)
+├── NAME_CREATE RSPACE_MEM_CONC                 // Create coordination channel
+├── STORE_LOCAL 0                               // Store coordination channel
+├── PUSH_PROC P                                 // Push process P
+├── CONTINUATION_STORE RSPACE_MEM_CONC x_binding // Store x binding continuation
+├── SPAWN_ASYNC RSPACE_MEM_CONC                 // Spawn P evaluation in memory RSpace
+├── PUSH_PROC Q                                 // Push process Q
+├── CONTINUATION_STORE RSPACE_MEM_CONC y_binding // Store y binding continuation
+├── SPAWN_ASYNC RSPACE_MEM_CONC                 // Spawn Q evaluation in memory RSpace
+├── RSPACE_CONSUME RSPACE_MEM_CONC              // Wait for both bindings
+├── RSPACE_CONSUME RSPACE_MEM_CONC              // Wait for both bindings
+├── PUSH_PROC R                                 // Push body process R
+└── EVAL_WITH_LOCALS                            // Execute R with accumulated bindings
+
+let x = P & y = Q in R  -> BYTECODE (persistent)
+├── NAME_CREATE RSPACE_STORE_CONC                 // Create coordination channel
+├── STORE_LOCAL 0                                 // Store coordination channel
+├── PUSH_PROC P                                   // Push process P
+├── CONTINUATION_STORE RSPACE_STORE_CONC x_binding // Store x binding continuation
+├── SPAWN_ASYNC RSPACE_STORE_CONC                 // Spawn P evaluation in persistent RSpace
+├── PUSH_PROC Q                                   // Push process Q
+├── CONTINUATION_STORE RSPACE_STORE_CONC y_binding // Store y binding continuation
+├── SPAWN_ASYNC RSPACE_STORE_CONC                 // Spawn Q evaluation in persistent RSpace
+├── RSPACE_CONSUME RSPACE_STORE_CONC              // Wait for both bindings
+├── RSPACE_CONSUME RSPACE_STORE_CONC              // Wait for both bindings
+├── PUSH_PROC R                                   // Push body process R
+└── EVAL_WITH_LOCALS                              // Execute R with accumulated bindings
 ```
 
 ### Data Constructs
@@ -417,18 +545,32 @@ let x = P & y = Q in R  -> BYTECODE
 ### Advanced Constructs
 **Bundle Operations**
 ```
-bundle+ { P }  -> BYTECODE
-├── BUNDLE_BEGIN WRITE  // Start write bundle
-├── PUSH_PROC P         // Push bundled process
-├── EXEC                // Execute in bundle context
-└── BUNDLE_END          // End bundle
+bundle+ { P }  -> BYTECODE (memory-based)
+├── RSPACE_BUNDLE_BEGIN RSPACE_MEM_CONC WRITE // Start write bundle in memory RSpace
+├── PUSH_PROC P                             // Push bundled process
+├── EVAL_IN_BUNDLE                          // Evaluate in bundle context
+└── RSPACE_BUNDLE_END RSPACE_MEM_CONC       // End bundle (atomic commit)
+
+bundle+ { P }  -> BYTECODE (persistent)
+├── RSPACE_BUNDLE_BEGIN RSPACE_STORE_CONC WRITE // Start write bundle in persistent RSpace
+├── PUSH_PROC P                               // Push bundled process
+├── EVAL_IN_BUNDLE                            // Evaluate in bundle context
+└── RSPACE_BUNDLE_END RSPACE_STORE_CONC       // End bundle (atomic commit)
 ```
 
 **Quote/Unquote**
 ```
-@P  -> BYTECODE
-└── QUOTE P             // Convert known process P directly to name
+@P  -> BYTECODE (temporary quote)
+├── PUSH_PROC P                     // Push process P
+├── EVAL_TO_RSPACE                  // Evaluate process
+└── NAME_QUOTE RSPACE_MEM_CONC      // Quote through memory RSpace
 
+@P  -> BYTECODE (persistent quote)
+├── PUSH_PROC P                     // Push process P
+├── EVAL_TO_RSPACE                  // Evaluate process
+└── NAME_QUOTE RSPACE_STORE_CONC    // Quote through persistent RSpace
+```
+```
 *name  -> BYTECODE
 └── UNQUOTE name        // Convert known name directly to process
 ```
@@ -436,22 +578,22 @@ bundle+ { P }  -> BYTECODE
 **Dynamic Quote with free variables**
 ```
 @x  -> BYTECODE (where x is free variable)
-├── LOAD_VAR x          // Load the variable x
-└── QUOTE               // Convert the loaded process to name
+├── LOAD_VAR x                          // Load the variable x
+└── NAME_QUOTE RSPACE_MEM_CONC          // Quote through memory RSpace
 ```
 
 **Variable Reference**
 *Requires clarification from Jeff
 ```
 =var  -> BYTECODE
-├── LOAD_VAR var        // Load variable
-├── COPY                // Create copy
-└── REF                 // Create reference to copy
+├── LOAD_VAR var                        // Load variable
+├── COPY                                // Create copy
+└── REF RSPACE_MEM_CONC                 // Create reference through memory RSpace
 
 =*var  -> BYTECODE
-├── LOAD_VAR var        // Load variable
-├── MOVE                // Transfer ownership
-└── REF                 // Create reference with move
+├── LOAD_VAR var                        // Load variable
+├── MOVE                                // Transfer ownership
+└── REF RSPACE_MEM_CONC                 // Create reference with move through memory RSpace
 ```
 
 ### Literal Constructs*
