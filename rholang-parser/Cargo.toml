@@ -9,6 +9,12 @@ name = "rholang_parser"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+bitvec = { workspace = true }
+nonempty-collections = "1.0.0"
 rholang-tree-sitter = { path = "../rholang-tree-sitter" }
+rholang-tree-sitter-proc-macro = { path = "../rholang-tree-sitter-proc-macro/" }
 smallvec = { workspace = true }
+tree-sitter = { workspace = true }
 typed-arena = "2.0.2"
+validated = { workspace = true }
+

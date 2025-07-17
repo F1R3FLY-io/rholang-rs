@@ -13,6 +13,9 @@ anyhow = "1.0.98"
 # Used by: shell
 async-trait = "0.1.88"
 
+# General purpose, used mostly by rholang-parser
+bitvec = "1.0.1"
+
 # Used by: shell
 tokio = { version = "1.45.1", features = ["rt", "rt-multi-thread", "full"] }
 
@@ -39,6 +42,9 @@ tree-sitter = "0.25.6"
 
 # Used by: rholang-tree-sitter
 tree-sitter-language = "0.1.5"
+
+# Used by: rholang-parser
+validated = "1.0.0"
 
 # Used by: rholang-parser, rholang-jni-bridge
 serde = { version = "1.0.188", features = ["derive"] }

@@ -3,7 +3,7 @@ use std::{
     ops::Deref,
 };
 
-use smallvec::SmallVec;
+use smallvec::{SmallVec, ToSmallVec};
 
 use crate::{SourcePos, SourceSpan};
 
@@ -153,16 +153,58 @@ pub enum Var<'ast> {
     Id(Id<'ast>),
 }
 
+impl<'a> TryFrom<&Proc<'a>> for Var<'a> {
+    type Error = String;
+
+    fn try_from(value: &Proc<'a>) -> Result<Self, Self::Error> {
+        match value {
+            Proc::ProcVar(var) => Ok(*var),
+            other => Err(format!("attempt to convert {{ {other:?} }} to a var")),
+        }
+    }
+}
+
+impl<'a> TryFrom<AnnProc<'a>> for Var<'a> {
+    type Error = String;
+
+    fn try_from(value: AnnProc<'a>) -> Result<Self, Self::Error> {
+        value.proc.try_into()
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Name<'ast> {
     ProcVar(Var<'ast>),
     Quote(&'ast Proc<'ast>),
 }
 
+impl<'a> TryFrom<&Proc<'a>> for Name<'a> {
+    type Error = String;
+
+    fn try_from(value: &Proc<'a>) -> Result<Self, Self::Error> {
+        match value {
+            Proc::ProcVar(var) => Ok(Name::ProcVar(*var)),
+            Proc::Quote { proc } => Ok(Name::Quote(*proc)),
+            other => Err(format!("{other:?} is not a name")),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct AnnName<'ast> {
     pub name: Name<'ast>,
     pub span: SourceSpan,
+}
+
+impl<'a> TryFrom<AnnProc<'a>> for AnnName<'a> {
+    type Error = String;
+
+    fn try_from(value: AnnProc<'a>) -> Result<Self, Self::Error> {
+        value.proc.try_into().map(|name| AnnName {
+            name,
+            span: value.span,
+        })
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -198,6 +240,45 @@ impl Clone for Names<'_> {
         self.names.copy_from_slice(init);
         self.names.extend_from_slice(tail);
         self.remainder.clone_from(&source.remainder);
+    }
+}
+
+impl<'a> Names<'a> {
+    pub(super) fn from_slice(
+        slice: &[AnnProc<'a>],
+        with_remainder: bool,
+    ) -> Result<Names<'a>, String> {
+        fn to_names<'b>(procs: &[AnnProc<'b>]) -> Result<SmallVec<[AnnName<'b>; 1]>, String> {
+            procs.iter().map(|p| (*p).try_into()).collect()
+        }
+        //this method is optimized for small input (<= 2 names) because it collects directly into SmallVec's inline buffer
+        //Consider allocating to an intermediate Vec if output is deemed to be large
+        if with_remainder {
+            match slice.split_last() {
+                None => Err("attempt to build 'x, y ...@z' out of zero names".to_string()),
+                Some((_, init)) if init.is_empty() => {
+                    Err("attempt to build 'x, y ...@z' out of one name".to_string())
+                }
+                Some((last, init)) => {
+                    let names = to_names(init)?;
+                    let remainder = (*last).try_into()?;
+                    Ok(Names {
+                        names,
+                        remainder: Some(remainder),
+                    })
+                }
+            }
+        } else {
+            if slice.is_empty() {
+                Err("attempt to build empty names".to_string())
+            } else {
+                let names = to_names(slice)?;
+                Ok(Names {
+                    names,
+                    remainder: None,
+                })
+            }
+        }
     }
 }
 

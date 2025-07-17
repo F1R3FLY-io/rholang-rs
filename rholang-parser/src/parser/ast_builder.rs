@@ -15,6 +15,9 @@ pub(super) struct ASTBuilder<'ast> {
     pub(super) FALSE: Proc<'ast>,
     pub(super) WILD: Proc<'ast>,
     pub(super) BAD: Proc<'ast>,
+    EMPTY_LIST: Proc<'ast>,
+    ZERO: Proc<'ast>,
+    ONE: Proc<'ast>,
 }
 
 impl<'ast> ASTBuilder<'ast> {
@@ -29,6 +32,12 @@ impl<'ast> ASTBuilder<'ast> {
             TRUE: Proc::BoolLiteral(true),
             FALSE: Proc::BoolLiteral(false),
             WILD: Proc::ProcVar(Var::Wildcard),
+            EMPTY_LIST: Proc::Collection(Collection::List {
+                elements: Vec::new(),
+                remainder: None,
+            }),
+            ZERO: Proc::LongLiteral(0),
+            ONE: Proc::LongLiteral(1),
             BAD: Proc::Bad,
         }
     }
@@ -39,7 +48,11 @@ impl<'ast> ASTBuilder<'ast> {
     }
 
     pub(super) fn alloc_long_literal(&'ast self, value: i64) -> &'ast Proc<'ast> {
-        self.arena.alloc(Proc::LongLiteral(value))
+        match value {
+            0 => &self.ZERO,
+            1 => &self.ONE,
+            other => self.arena.alloc(Proc::LongLiteral(other)),
+        }
     }
 
     pub(super) fn alloc_uri_literal(&'ast self, value: &'ast str) -> &'ast Proc<'ast> {
@@ -51,6 +64,9 @@ impl<'ast> ASTBuilder<'ast> {
     }
 
     pub(super) fn alloc_list(&'ast self, procs: &[AnnProc<'ast>]) -> &'ast Proc<'ast> {
+        if procs.is_empty() {
+            return &self.EMPTY_LIST;
+        }
         self.arena.alloc(Proc::Collection(Collection::List {
             elements: procs.to_vec(),
             remainder: None,
@@ -163,16 +179,24 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub(super) fn alloc_for<'x, Rs>(&'ast self, rs: Rs, proc: AnnProc<'ast>) -> &'ast Proc<'ast>
+    pub(super) fn alloc_for<Rs, Bs>(
+        &'ast self,
+        receipts: Rs,
+        proc: AnnProc<'ast>,
+    ) -> &'ast Proc<'ast>
     where
-        Rs: IntoIterator<Item = &'x [Bind<'ast>]>,
-        'ast: 'x,
+        Rs: IntoIterator<Item = Bs>,
+        Bs: IntoIterator<Item = Bind<'ast>>,
     {
-        let receipts = rs
-            .into_iter()
-            .map(|bs| Receipt { binds: bs.into() })
-            .collect();
-        self.arena.alloc(Proc::ForComprehension { receipts, proc })
+        self.arena.alloc(Proc::ForComprehension {
+            receipts: receipts
+                .into_iter()
+                .map(|bs| Receipt {
+                    binds: bs.into_iter().collect(),
+                })
+                .collect(),
+            proc,
+        })
     }
 
     pub(super) fn alloc_match(
