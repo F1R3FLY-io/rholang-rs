@@ -30,11 +30,11 @@ pub(super) fn parse_to_tree(source: &str) -> tree_sitter::Tree {
         .expect("Failed to produce syntax tree")
 }
 
-pub(super) fn node_to_ast<'ast, 'tree>(
-    start_node: &tree_sitter::Node<'tree>,
+pub(super) fn node_to_ast<'ast>(
+    start_node: &tree_sitter::Node,
     ast_builder: &'ast ASTBuilder<'ast>,
     source: &'ast str,
-) -> Validated<&'ast Proc<'ast>, AnnParsingError> {
+) -> Validated<AnnProc<'ast>, AnnParsingError> {
     let mut errors = Vec::new();
     let mut proc_stack = ProcStack::new();
     let mut cont_stack = Vec::with_capacity(16);
@@ -564,7 +564,7 @@ pub(super) fn node_to_ast<'ast, 'tree>(
                         return Validated::Fail(some_errors);
                     }
                     let last = proc_stack.to_proc();
-                    return Validated::Good(last.proc);
+                    return Validated::Good(last);
                 }
                 Step::Continue(n) => {
                     node = n;
@@ -575,7 +575,7 @@ pub(super) fn node_to_ast<'ast, 'tree>(
     }
 }
 
-fn parse_decls<'a>(from: &tree_sitter::Node<'_>, source: &'a str) -> Vec<NameDecl<'a>> {
+fn parse_decls<'a>(from: &tree_sitter::Node, source: &'a str) -> Vec<NameDecl<'a>> {
     let mut result = Vec::with_capacity(from.named_child_count());
 
     for decl_node in from.named_children(&mut from.walk()) {
@@ -594,11 +594,11 @@ fn parse_decls<'a>(from: &tree_sitter::Node<'_>, source: &'a str) -> Vec<NameDec
     result
 }
 
-fn apply_cont<'a, 'b>(
-    cont_stack: &mut Vec<K<'a, 'b>>,
-    proc_stack: &mut ProcStack<'b>,
-    ast_builder: &'b ASTBuilder<'b>,
-) -> Step<'a> {
+fn apply_cont<'tree, 'ast>(
+    cont_stack: &mut Vec<K<'tree, 'ast>>,
+    proc_stack: &mut ProcStack<'ast>,
+    ast_builder: &'ast ASTBuilder<'ast>,
+) -> Step<'tree> {
     fn move_cursor_to_named(cursor: &mut tree_sitter::TreeCursor) -> bool {
         let mut has_more = if cursor.depth() == 0 {
             cursor.goto_first_child()
