@@ -35,7 +35,7 @@ async-std = { version = "1.13.1", features = ["attributes"] }
 bracket-parser = "0.1.0"
 
 # Used by: rholang-parser
-smallvec = { version = "1.15.1", features = ["union", "const_generics", "const_new"] }
+smallvec = { version = "1.15.1", features = ["union", "const_generics", "const_new", "may_dangle"] }
 
 # Used by: rholang-parser, rholang-tree-sitter
 tree-sitter = "0.25.6"
