@@ -3,8 +3,8 @@ use typed_arena::Arena;
 
 use crate::ast::{
     AnnName, AnnProc, BinaryExpOp, Bind, BundleType, Case, Collection, Id, KeyValuePair,
-    LetBinding, NameDecl, Names, Proc, Receipt, SendType, SimpleType, SyncSendCont, UnaryExpOp,
-    Var, VarRefKind,
+    LetBinding, NameDecl, Names, Proc, SendType, SimpleType, SyncSendCont, UnaryExpOp, Var,
+    VarRefKind,
 };
 
 pub(super) struct ASTBuilder<'ast> {
@@ -183,9 +183,7 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::ForComprehension {
             receipts: receipts
                 .into_iter()
-                .map(|bs| Receipt {
-                    binds: bs.into_iter().collect(),
-                })
+                .map(|bs| bs.into_iter().collect())
                 .collect(),
             proc,
         })

@@ -9,6 +9,7 @@ pub enum ParsingError {
     MalformedLetDecl { lhs_arity: usize, rhs_arity: usize },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnnParsingError {
     pub error: ParsingError,
     pub span: SourceSpan,
