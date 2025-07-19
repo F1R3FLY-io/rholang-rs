@@ -1,0 +1,68 @@
+---
+source: rholang-parser/tests/golden.rs
+expression: result
+---
+Fail(
+    [
+        AnnParsingError {
+            error: Unexpected(
+                '\'',
+            ),
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 7,
+                    col: 17,
+                },
+                end: SourcePos {
+                    line: 7,
+                    col: 18,
+                },
+            },
+        },
+        AnnParsingError {
+            error: Unexpected(
+                '\'',
+            ),
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 7,
+                    col: 25,
+                },
+                end: SourcePos {
+                    line: 7,
+                    col: 26,
+                },
+            },
+        },
+        AnnParsingError {
+            error: Unexpected(
+                '\'',
+            ),
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 14,
+                    col: 18,
+                },
+                end: SourcePos {
+                    line: 14,
+                    col: 19,
+                },
+            },
+        },
+        AnnParsingError {
+            error: Unexpected(
+                '\'',
+            ),
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 23,
+                    col: 20,
+                },
+                end: SourcePos {
+                    line: 23,
+                    col: 21,
+                },
+            },
+        },
+    ],
+)

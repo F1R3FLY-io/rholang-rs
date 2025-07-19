@@ -1,0 +1,21 @@
+---
+source: rholang-parser/tests/golden.rs
+expression: result
+---
+Fail(
+    [
+        AnnParsingError {
+            error: SyntaxError,
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 12,
+                    col: 11,
+                },
+                end: SourcePos {
+                    line: 12,
+                    col: 20,
+                },
+            },
+        },
+    ],
+)

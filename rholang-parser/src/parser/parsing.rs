@@ -37,26 +37,20 @@ pub(super) fn node_to_ast<'ast>(
 ) -> Validated<AnnProc<'ast>, AnnParsingError> {
     let mut errors = Vec::new();
     let mut proc_stack = ProcStack::new();
-    let mut cont_stack = Vec::with_capacity(16);
+    let mut cont_stack = Vec::with_capacity(32);
     let mut node = *start_node;
 
     'parse: loop {
-        let span = node.range().into();
         let mut bad = false;
 
         if node.is_error() {
-            errors.push(AnnParsingError {
-                error: ParsingError::SyntaxError,
-                span,
-            });
+            errors.push(AnnParsingError::from_error(&node, source.as_bytes()));
             bad = true;
         } else if node.is_missing() {
-            errors.push(AnnParsingError {
-                error: ParsingError::MissingToken(node.kind()),
-                span,
-            });
+            errors.push(AnnParsingError::from_mising(&node));
             bad = true;
         } else {
+            let span = node.range().into();
             match node.kind_id() {
                 kind!("block") => {
                     node = get_first_child(&node);
@@ -554,7 +548,7 @@ pub(super) fn node_to_ast<'ast>(
         }
 
         if bad {
-            proc_stack.push(&ast_builder.BAD, span);
+            proc_stack.push(&ast_builder.BAD, node.range().into());
         }
         loop {
             let step = apply_cont(&mut cont_stack, &mut proc_stack, ast_builder);
@@ -1265,10 +1259,9 @@ fn get_field<'a>(of: &tree_sitter::Node<'a>, id: u16) -> tree_sitter::Node<'a> {
 #[inline]
 fn get_node_value<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
     let source_bytes = source.as_bytes();
-    let range = node.range();
     unsafe {
         // string slices are expected to contain valid utf8
-        str::from_utf8_unchecked(&source_bytes[range.start_byte..range.end_byte])
+        str::from_utf8_unchecked(&source_bytes[node.byte_range()])
     }
 }
 

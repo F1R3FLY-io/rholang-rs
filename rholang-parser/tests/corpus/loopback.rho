@@ -4,7 +4,7 @@ new ret in {
   contract loopback(@input, return) = {
     return!(input)
   }
-
+  |
   loopback!("Hello, world!", *ret) |
   for(@msg <- ret) {
     stdout!(msg)
