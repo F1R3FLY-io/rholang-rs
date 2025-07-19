@@ -1,0 +1,93 @@
+---
+source: rholang-parser/tests/golden.rs
+expression: result
+---
+Good(
+    [
+        AnnProc {
+            proc: New {
+                decls: [
+                    NameDecl {
+                        id: Id {
+                            name: "stderr",
+                            pos: SourcePos {
+                                line: 1,
+                                col: 5,
+                            },
+                        },
+                        uri: Some(
+                            Uri(
+                                "rho:io:stderr",
+                            ),
+                        ),
+                    },
+                ],
+                proc: AnnProc {
+                    proc: Send {
+                        channel: AnnName {
+                            name: ProcVar(
+                                Id(
+                                    Id {
+                                        name: "stderr",
+                                        pos: SourcePos {
+                                            line: 2,
+                                            col: 3,
+                                        },
+                                    },
+                                ),
+                            ),
+                            span: SourceSpan {
+                                start: SourcePos {
+                                    line: 2,
+                                    col: 3,
+                                },
+                                end: SourcePos {
+                                    line: 2,
+                                    col: 9,
+                                },
+                            },
+                        },
+                        send_type: Single,
+                        inputs: [
+                            AnnProc {
+                                proc: StringLiteral(
+                                    "hello, world!",
+                                ),
+                                span: SourceSpan {
+                                    start: SourcePos {
+                                        line: 2,
+                                        col: 11,
+                                    },
+                                    end: SourcePos {
+                                        line: 2,
+                                        col: 26,
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 2,
+                            col: 3,
+                        },
+                        end: SourcePos {
+                            line: 2,
+                            col: 27,
+                        },
+                    },
+                },
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 1,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 3,
+                    col: 2,
+                },
+            },
+        },
+    ],
+)

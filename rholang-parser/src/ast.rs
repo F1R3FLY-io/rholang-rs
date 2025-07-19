@@ -3,7 +3,7 @@ use std::{
     ops::Deref,
 };
 
-use smallvec::{SmallVec, ToSmallVec};
+use smallvec::SmallVec;
 
 use crate::{SourcePos, SourceSpan};
 
@@ -317,11 +317,7 @@ pub enum BinaryExpOp {
 // for-comprehensions
 
 pub type Receipts<'a> = SmallVec<[Receipt<'a>; 1]>;
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Receipt<'a> {
-    pub binds: SmallVec<[Bind<'a>; 1]>,
-}
+pub type Receipt<'a> = SmallVec<[Bind<'a>; 1]>;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Bind<'ast> {

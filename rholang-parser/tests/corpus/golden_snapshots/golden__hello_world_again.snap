@@ -1,0 +1,607 @@
+---
+source: rholang-parser/tests/golden.rs
+expression: result
+---
+Good(
+    [
+        AnnProc {
+            proc: New {
+                decls: [
+                    NameDecl {
+                        id: Id {
+                            name: "helloworld",
+                            pos: SourcePos {
+                                line: 3,
+                                col: 5,
+                            },
+                        },
+                        uri: None,
+                    },
+                    NameDecl {
+                        id: Id {
+                            name: "stdout",
+                            pos: SourcePos {
+                                line: 3,
+                                col: 17,
+                            },
+                        },
+                        uri: Some(
+                            Uri(
+                                "rho:io:stdout",
+                            ),
+                        ),
+                    },
+                ],
+                proc: AnnProc {
+                    proc: Par {
+                        left: AnnProc {
+                            proc: Contract {
+                                name: AnnName {
+                                    name: ProcVar(
+                                        Id(
+                                            Id {
+                                                name: "helloworld",
+                                                pos: SourcePos {
+                                                    line: 4,
+                                                    col: 14,
+                                                },
+                                            },
+                                        ),
+                                    ),
+                                    span: SourceSpan {
+                                        start: SourcePos {
+                                            line: 4,
+                                            col: 14,
+                                        },
+                                        end: SourcePos {
+                                            line: 4,
+                                            col: 24,
+                                        },
+                                    },
+                                },
+                                formals: Names {
+                                    names: [
+                                        AnnName {
+                                            name: ProcVar(
+                                                Id(
+                                                    Id {
+                                                        name: "world",
+                                                        pos: SourcePos {
+                                                            line: 4,
+                                                            col: 26,
+                                                        },
+                                                    },
+                                                ),
+                                            ),
+                                            span: SourceSpan {
+                                                start: SourcePos {
+                                                    line: 4,
+                                                    col: 26,
+                                                },
+                                                end: SourcePos {
+                                                    line: 4,
+                                                    col: 31,
+                                                },
+                                            },
+                                        },
+                                    ],
+                                    remainder: None,
+                                },
+                                body: AnnProc {
+                                    proc: ForComprehension {
+                                        receipts: [
+                                            [
+                                                Linear {
+                                                    lhs: Names {
+                                                        names: [
+                                                            AnnName {
+                                                                name: Quote(
+                                                                    ProcVar(
+                                                                        Id(
+                                                                            Id {
+                                                                                name: "msg",
+                                                                                pos: SourcePos {
+                                                                                    line: 5,
+                                                                                    col: 15,
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                    ),
+                                                                ),
+                                                                span: SourceSpan {
+                                                                    start: SourcePos {
+                                                                        line: 5,
+                                                                        col: 14,
+                                                                    },
+                                                                    end: SourcePos {
+                                                                        line: 5,
+                                                                        col: 18,
+                                                                    },
+                                                                },
+                                                            },
+                                                        ],
+                                                        remainder: None,
+                                                    },
+                                                    rhs: Simple {
+                                                        name: AnnName {
+                                                            name: ProcVar(
+                                                                Id(
+                                                                    Id {
+                                                                        name: "world",
+                                                                        pos: SourcePos {
+                                                                            line: 5,
+                                                                            col: 22,
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            ),
+                                                            span: SourceSpan {
+                                                                start: SourcePos {
+                                                                    line: 5,
+                                                                    col: 22,
+                                                                },
+                                                                end: SourcePos {
+                                                                    line: 5,
+                                                                    col: 27,
+                                                                },
+                                                            },
+                                                        },
+                                                    },
+                                                },
+                                            ],
+                                        ],
+                                        proc: AnnProc {
+                                            proc: Send {
+                                                channel: AnnName {
+                                                    name: ProcVar(
+                                                        Id(
+                                                            Id {
+                                                                name: "stdout",
+                                                                pos: SourcePos {
+                                                                    line: 6,
+                                                                    col: 13,
+                                                                },
+                                                            },
+                                                        ),
+                                                    ),
+                                                    span: SourceSpan {
+                                                        start: SourcePos {
+                                                            line: 6,
+                                                            col: 13,
+                                                        },
+                                                        end: SourcePos {
+                                                            line: 6,
+                                                            col: 19,
+                                                        },
+                                                    },
+                                                },
+                                                send_type: Single,
+                                                inputs: [
+                                                    AnnProc {
+                                                        proc: ProcVar(
+                                                            Id(
+                                                                Id {
+                                                                    name: "msg",
+                                                                    pos: SourcePos {
+                                                                        line: 6,
+                                                                        col: 21,
+                                                                    },
+                                                                },
+                                                            ),
+                                                        ),
+                                                        span: SourceSpan {
+                                                            start: SourcePos {
+                                                                line: 6,
+                                                                col: 21,
+                                                            },
+                                                            end: SourcePos {
+                                                                line: 6,
+                                                                col: 24,
+                                                            },
+                                                        },
+                                                    },
+                                                ],
+                                            },
+                                            span: SourceSpan {
+                                                start: SourcePos {
+                                                    line: 6,
+                                                    col: 13,
+                                                },
+                                                end: SourcePos {
+                                                    line: 6,
+                                                    col: 25,
+                                                },
+                                            },
+                                        },
+                                    },
+                                    span: SourceSpan {
+                                        start: SourcePos {
+                                            line: 5,
+                                            col: 9,
+                                        },
+                                        end: SourcePos {
+                                            line: 7,
+                                            col: 10,
+                                        },
+                                    },
+                                },
+                            },
+                            span: SourceSpan {
+                                start: SourcePos {
+                                    line: 4,
+                                    col: 5,
+                                },
+                                end: SourcePos {
+                                    line: 8,
+                                    col: 6,
+                                },
+                            },
+                        },
+                        right: AnnProc {
+                            proc: New {
+                                decls: [
+                                    NameDecl {
+                                        id: Id {
+                                            name: "world",
+                                            pos: SourcePos {
+                                                line: 9,
+                                                col: 9,
+                                            },
+                                        },
+                                        uri: None,
+                                    },
+                                    NameDecl {
+                                        id: Id {
+                                            name: "world2",
+                                            pos: SourcePos {
+                                                line: 9,
+                                                col: 16,
+                                            },
+                                        },
+                                        uri: None,
+                                    },
+                                ],
+                                proc: AnnProc {
+                                    proc: Par {
+                                        left: AnnProc {
+                                            proc: Par {
+                                                left: AnnProc {
+                                                    proc: Par {
+                                                        left: AnnProc {
+                                                            proc: Send {
+                                                                channel: AnnName {
+                                                                    name: ProcVar(
+                                                                        Id(
+                                                                            Id {
+                                                                                name: "helloworld",
+                                                                                pos: SourcePos {
+                                                                                    line: 10,
+                                                                                    col: 9,
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                    ),
+                                                                    span: SourceSpan {
+                                                                        start: SourcePos {
+                                                                            line: 10,
+                                                                            col: 9,
+                                                                        },
+                                                                        end: SourcePos {
+                                                                            line: 10,
+                                                                            col: 19,
+                                                                        },
+                                                                    },
+                                                                },
+                                                                send_type: Single,
+                                                                inputs: [
+                                                                    AnnProc {
+                                                                        proc: Eval {
+                                                                            name: AnnName {
+                                                                                name: ProcVar(
+                                                                                    Id(
+                                                                                        Id {
+                                                                                            name: "world",
+                                                                                            pos: SourcePos {
+                                                                                                line: 10,
+                                                                                                col: 22,
+                                                                                            },
+                                                                                        },
+                                                                                    ),
+                                                                                ),
+                                                                                span: SourceSpan {
+                                                                                    start: SourcePos {
+                                                                                        line: 10,
+                                                                                        col: 22,
+                                                                                    },
+                                                                                    end: SourcePos {
+                                                                                        line: 10,
+                                                                                        col: 27,
+                                                                                    },
+                                                                                },
+                                                                            },
+                                                                        },
+                                                                        span: SourceSpan {
+                                                                            start: SourcePos {
+                                                                                line: 10,
+                                                                                col: 21,
+                                                                            },
+                                                                            end: SourcePos {
+                                                                                line: 10,
+                                                                                col: 27,
+                                                                            },
+                                                                        },
+                                                                    },
+                                                                ],
+                                                            },
+                                                            span: SourceSpan {
+                                                                start: SourcePos {
+                                                                    line: 10,
+                                                                    col: 9,
+                                                                },
+                                                                end: SourcePos {
+                                                                    line: 10,
+                                                                    col: 28,
+                                                                },
+                                                            },
+                                                        },
+                                                        right: AnnProc {
+                                                            proc: Send {
+                                                                channel: AnnName {
+                                                                    name: ProcVar(
+                                                                        Id(
+                                                                            Id {
+                                                                                name: "world",
+                                                                                pos: SourcePos {
+                                                                                    line: 11,
+                                                                                    col: 9,
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                    ),
+                                                                    span: SourceSpan {
+                                                                        start: SourcePos {
+                                                                            line: 11,
+                                                                            col: 9,
+                                                                        },
+                                                                        end: SourcePos {
+                                                                            line: 11,
+                                                                            col: 14,
+                                                                        },
+                                                                    },
+                                                                },
+                                                                send_type: Single,
+                                                                inputs: [
+                                                                    AnnProc {
+                                                                        proc: StringLiteral(
+                                                                            "Hello World",
+                                                                        ),
+                                                                        span: SourceSpan {
+                                                                            start: SourcePos {
+                                                                                line: 11,
+                                                                                col: 16,
+                                                                            },
+                                                                            end: SourcePos {
+                                                                                line: 11,
+                                                                                col: 29,
+                                                                            },
+                                                                        },
+                                                                    },
+                                                                ],
+                                                            },
+                                                            span: SourceSpan {
+                                                                start: SourcePos {
+                                                                    line: 11,
+                                                                    col: 9,
+                                                                },
+                                                                end: SourcePos {
+                                                                    line: 11,
+                                                                    col: 30,
+                                                                },
+                                                            },
+                                                        },
+                                                    },
+                                                    span: SourceSpan {
+                                                        start: SourcePos {
+                                                            line: 10,
+                                                            col: 9,
+                                                        },
+                                                        end: SourcePos {
+                                                            line: 11,
+                                                            col: 30,
+                                                        },
+                                                    },
+                                                },
+                                                right: AnnProc {
+                                                    proc: Send {
+                                                        channel: AnnName {
+                                                            name: ProcVar(
+                                                                Id(
+                                                                    Id {
+                                                                        name: "helloworld",
+                                                                        pos: SourcePos {
+                                                                            line: 12,
+                                                                            col: 9,
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            ),
+                                                            span: SourceSpan {
+                                                                start: SourcePos {
+                                                                    line: 12,
+                                                                    col: 9,
+                                                                },
+                                                                end: SourcePos {
+                                                                    line: 12,
+                                                                    col: 19,
+                                                                },
+                                                            },
+                                                        },
+                                                        send_type: Single,
+                                                        inputs: [
+                                                            AnnProc {
+                                                                proc: Eval {
+                                                                    name: AnnName {
+                                                                        name: ProcVar(
+                                                                            Id(
+                                                                                Id {
+                                                                                    name: "world2",
+                                                                                    pos: SourcePos {
+                                                                                        line: 12,
+                                                                                        col: 22,
+                                                                                    },
+                                                                                },
+                                                                            ),
+                                                                        ),
+                                                                        span: SourceSpan {
+                                                                            start: SourcePos {
+                                                                                line: 12,
+                                                                                col: 22,
+                                                                            },
+                                                                            end: SourcePos {
+                                                                                line: 12,
+                                                                                col: 28,
+                                                                            },
+                                                                        },
+                                                                    },
+                                                                },
+                                                                span: SourceSpan {
+                                                                    start: SourcePos {
+                                                                        line: 12,
+                                                                        col: 21,
+                                                                    },
+                                                                    end: SourcePos {
+                                                                        line: 12,
+                                                                        col: 28,
+                                                                    },
+                                                                },
+                                                            },
+                                                        ],
+                                                    },
+                                                    span: SourceSpan {
+                                                        start: SourcePos {
+                                                            line: 12,
+                                                            col: 9,
+                                                        },
+                                                        end: SourcePos {
+                                                            line: 12,
+                                                            col: 29,
+                                                        },
+                                                    },
+                                                },
+                                            },
+                                            span: SourceSpan {
+                                                start: SourcePos {
+                                                    line: 10,
+                                                    col: 9,
+                                                },
+                                                end: SourcePos {
+                                                    line: 12,
+                                                    col: 29,
+                                                },
+                                            },
+                                        },
+                                        right: AnnProc {
+                                            proc: Send {
+                                                channel: AnnName {
+                                                    name: ProcVar(
+                                                        Id(
+                                                            Id {
+                                                                name: "world2",
+                                                                pos: SourcePos {
+                                                                    line: 13,
+                                                                    col: 9,
+                                                                },
+                                                            },
+                                                        ),
+                                                    ),
+                                                    span: SourceSpan {
+                                                        start: SourcePos {
+                                                            line: 13,
+                                                            col: 9,
+                                                        },
+                                                        end: SourcePos {
+                                                            line: 13,
+                                                            col: 15,
+                                                        },
+                                                    },
+                                                },
+                                                send_type: Single,
+                                                inputs: [
+                                                    AnnProc {
+                                                        proc: StringLiteral(
+                                                            "Hello World again",
+                                                        ),
+                                                        span: SourceSpan {
+                                                            start: SourcePos {
+                                                                line: 13,
+                                                                col: 17,
+                                                            },
+                                                            end: SourcePos {
+                                                                line: 13,
+                                                                col: 36,
+                                                            },
+                                                        },
+                                                    },
+                                                ],
+                                            },
+                                            span: SourceSpan {
+                                                start: SourcePos {
+                                                    line: 13,
+                                                    col: 9,
+                                                },
+                                                end: SourcePos {
+                                                    line: 13,
+                                                    col: 37,
+                                                },
+                                            },
+                                        },
+                                    },
+                                    span: SourceSpan {
+                                        start: SourcePos {
+                                            line: 10,
+                                            col: 9,
+                                        },
+                                        end: SourcePos {
+                                            line: 13,
+                                            col: 37,
+                                        },
+                                    },
+                                },
+                            },
+                            span: SourceSpan {
+                                start: SourcePos {
+                                    line: 9,
+                                    col: 5,
+                                },
+                                end: SourcePos {
+                                    line: 14,
+                                    col: 6,
+                                },
+                            },
+                        },
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 4,
+                            col: 5,
+                        },
+                        end: SourcePos {
+                            line: 14,
+                            col: 6,
+                        },
+                    },
+                },
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 3,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 15,
+                    col: 2,
+                },
+            },
+        },
+    ],
+)
