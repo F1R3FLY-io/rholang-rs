@@ -35,7 +35,6 @@ pub(super) fn node_to_ast<'ast>(
     ast_builder: &'ast ASTBuilder<'ast>,
     source: &'ast str,
 ) -> Validated<AnnProc<'ast>, AnnParsingError> {
-    println!("{}", start_node.to_sexp());
     let mut errors = Vec::new();
     let mut proc_stack = ProcStack::new();
     let mut cont_stack = Vec::with_capacity(32);
