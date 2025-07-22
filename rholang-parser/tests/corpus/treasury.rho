@@ -1,0 +1,104 @@
+new stdout(`rho:io:stdout`), 
+    boardMembers, 
+    proposals, 
+    treasuryBalance, 
+    createProposal, 
+    approveProposal, 
+    executeProposal, 
+    getBalance 
+in {
+  
+  // Treasury balance initialization (example: 1000 tokens)
+  treasuryBalance!(1000) |
+
+  // List of authorized board members
+  boardMembers!(Set("Alice", "Bob", "Charlie")) |
+
+  // Proposals data structure
+  proposals!([]) |
+
+  // Function to create a proposal (only board members can create proposals)
+  contract createProposal(@creator, @amount, @recipient, ret) = {
+    for (@currentBoardMembers <- boardMembers) {
+      if (currentBoardMembers.contains(creator)) {
+        for (@currentProposals <- proposals) {
+          let newProposal = { 
+            "creator": creator, 
+            "amount": amount, 
+            "recipient": recipient, 
+            "approvals": Set(creator)  // Initial approval from the creator
+          } in {
+            proposals!(currentProposals ++ [newProposal]) |
+            ret!("Proposal created.")
+          }
+        }
+      } else {
+        ret!("Only board members can create proposals.")
+      }
+    }
+  } |
+
+  // Function to approve a proposal (only board members can approve)
+  contract approveProposal(@member, @proposalIndex, ret) = {
+    for (@currentBoardMembers <- boardMembers) {
+      if (currentBoardMembers.contains(member)) {
+        for (@currentProposals <- proposals) {
+          let proposal = currentProposals.get(proposalIndex);
+              updatedProposal = proposal.set("approvals", proposal.get("approvals").add(member));
+              updatedProposals = currentProposals.set(proposalIndex, updatedProposal) in {
+            proposals!(updatedProposals) |
+            ret!("Proposal approved by " ++ member)
+          }
+        }
+      } else {
+        ret!("Only board members can approve proposals.")
+      }
+    }
+  } |
+
+  // Function to execute a proposal (requires majority approvals)
+  contract executeProposal(@proposalIndex, ret) = {
+    for (@currentBoardMembers <- boardMembers) {
+      for (@currentProposals <- proposals) {
+        let proposal = currentProposals.get(proposalIndex);
+            approvalCount = proposal.get("approvals").size() in {
+          if (approvalCount > currentBoardMembers.size() / 2) {
+            for (@balance <- treasuryBalance) {
+              if (balance >= proposal.get("amount")) {
+                let updatedBalance = balance - proposal.get("amount") in {
+                  treasuryBalance!(updatedBalance) |
+                  stdout!("Executed proposal: Transferred " ++ proposal.get("amount").toString() ++ " to " ++ proposal.get("recipient")) |
+                  ret!("Proposal executed successfully.")
+                }
+              } else {
+                ret!("Insufficient funds in the treasury.")
+              }
+            }
+          } else {
+            ret!("Not enough approvals to execute the proposal.")
+          }
+        }
+      }
+    }
+  } |
+
+  // Function to check the treasury balance
+  contract getBalance(ret) = {
+    for (@balance <- treasuryBalance) {
+      ret!("Treasury balance: " ++ balance.toString())
+    }
+  } |
+
+  // Example usage
+  // Board member "Alice" creates a proposal to transfer 100 tokens to "Dave"
+  createProposal!("Alice", 100, "Dave", *stdout) |
+  
+  // Board member "Bob" approves the proposal
+  approveProposal!("Bob", 0, *stdout) |
+
+  // Execute the proposal after approvals
+  executeProposal!(0, *stdout) |
+
+  // Check treasury balance
+  getBalance!(*stdout)
+}
