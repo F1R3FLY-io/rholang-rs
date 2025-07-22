@@ -5,7 +5,9 @@ expression: result
 Fail(
     [
         AnnParsingError {
-            error: SyntaxError,
+            error: SyntaxError {
+                sexp: "(ERROR (var))",
+            },
             span: SourceSpan {
                 start: SourcePos {
                     line: 12,

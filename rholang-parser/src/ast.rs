@@ -186,7 +186,7 @@ impl<'a> TryFrom<&Proc<'a>> for Name<'a> {
             Proc::ProcVar(var) => Ok(Name::ProcVar(*var)),
             Proc::Quote { proc } => Ok(Name::Quote(*proc)),
             Proc::Bad => Ok(Name::ProcVar(Var::Wildcard)), //helps with error recovery
-            other => Err(format!("{other:?} is not a name")),
+            other => Err(format!("{{ {other:?} }} is not a name")),
         }
     }
 }
