@@ -335,15 +335,22 @@ pub(super) fn node_to_ast<'ast>(
 
                 kind!("contract") => {
                     let name_node = get_field(&node, field!("name"));
-                    let formals_node = get_field(&node, field!("formals"));
                     let proc_node = get_field(&node, field!("proc"));
 
-                    cont_stack.push(K::ConsumeContract {
-                        arity: formals_node.named_child_count(),
-                        has_cont: formals_node.child_by_field_name("cont").is_some(),
-                        span,
-                    });
-                    cont_stack.push(K::EvalList(formals_node.walk()));
+                    if let Some(formals_node) = node.child_by_field_id(field!("formals")) {
+                        cont_stack.push(K::ConsumeContract {
+                            arity: formals_node.named_child_count(),
+                            has_cont: formals_node.child_by_field_name("cont").is_some(),
+                            span,
+                        });
+                        cont_stack.push(K::EvalList(formals_node.walk()));
+                    } else {
+                        cont_stack.push(K::ConsumeContract {
+                            arity: 0,
+                            has_cont: false,
+                            span,
+                        });
+                    }
                     cont_stack.push(K::EvalDelayed(proc_node));
                     node = name_node;
                     continue 'parse;
