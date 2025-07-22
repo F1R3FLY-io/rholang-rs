@@ -35,6 +35,7 @@ pub(super) fn node_to_ast<'ast>(
     ast_builder: &'ast ASTBuilder<'ast>,
     source: &'ast str,
 ) -> Validated<AnnProc<'ast>, AnnParsingError> {
+    println!("{}", start_node.to_sexp());
     let mut errors = Vec::new();
     let mut proc_stack = ProcStack::new();
     let mut cont_stack = Vec::with_capacity(32);
@@ -43,13 +44,28 @@ pub(super) fn node_to_ast<'ast>(
     'parse: loop {
         let mut bad = false;
 
-        if node.is_error() {
-            errors.push(AnnParsingError::from_error(&node, source.as_bytes()));
-            bad = true;
-        } else if node.is_missing() {
-            errors.push(AnnParsingError::from_mising(&node));
+        if node.is_error() || node.is_missing() {
+            // the errors will be discovered when parsing is done
             bad = true;
         } else {
+            fn eval_named_pairs<'a>(
+                of: &tree_sitter::Node<'a>,
+                kind: u16,
+                fst_selector: u16,
+                snd_selector: u16,
+                cont_stack: &mut Vec<K<'a, '_>>,
+            ) -> usize {
+                let mut arity = 0;
+                for child in named_children_of_kind(of, kind, &mut of.walk()) {
+                    cont_stack.push(K::EvalDelayed(get_field(&child, fst_selector)));
+                    cont_stack.push(K::EvalDelayed(get_field(&child, snd_selector)));
+                    arity += 1;
+                }
+                cont_stack.reverse();
+
+                return arity;
+            }
+
             let span = node.range().into();
             match node.kind_id() {
                 kind!("block") => {
@@ -214,48 +230,61 @@ pub(super) fn node_to_ast<'ast>(
 
                 kind!("collection") => {
                     let collection_node = get_first_child(&node);
-                    let arity = collection_node.named_child_count();
                     let collection_type = collection_node.kind_id();
                     let is_tuple = collection_type == kind!("tuple");
-                    let is_map = collection_type == kind!("map");
-                    let has_remainder = if is_tuple {
-                        false
+                    let remainder_node = if is_tuple {
+                        None
                     } else {
-                        collection_node
-                            .child_by_field_id(field!("remainder"))
-                            .is_some()
+                        collection_node.child_by_field_id(field!("remainder"))
                     };
                     match collection_type {
-                        kind!("list") => cont_stack.push(K::ConsumeList {
-                            arity,
-                            has_remainder,
-                            span,
-                        }),
-                        kind!("set") => cont_stack.push(K::ConsumeSet {
-                            arity,
-                            has_remainder,
-                            span,
-                        }),
-                        kind!("tuple") => cont_stack.push(K::ConsumeTuple { arity, span }),
-                        kind!("map") => cont_stack.push(K::ConsumeMap {
-                            arity,
-                            has_remainder,
-                            span,
-                        }),
-                        _ => unreachable!("Rholang collections are: list, set, tuple and map"),
-                    }
-                    if is_map {
-                        cont_stack.push(K::EvalNamedPairs {
-                            cursor: collection_node.walk(),
-                            fst_selector: field!("key"),
-                            snd_selector: field!("value"),
-                        });
-                        if has_remainder {
-                            let remainder_node = get_field(&collection_node, field!("remainder"));
-                            cont_stack.push(K::EvalDelayed(remainder_node));
+                        kind!("list") => {
+                            cont_stack.push(K::ConsumeList {
+                                arity: collection_node.named_child_count(),
+                                has_remainder: remainder_node.is_some(),
+                                span,
+                            });
+                            cont_stack.push(K::EvalList(collection_node.walk()));
                         }
-                    } else {
-                        cont_stack.push(K::EvalList(collection_node.walk()));
+                        kind!("set") => {
+                            cont_stack.push(K::ConsumeSet {
+                                arity: collection_node.named_child_count(),
+                                has_remainder: remainder_node.is_some(),
+                                span,
+                            });
+                            cont_stack.push(K::EvalList(collection_node.walk()));
+                        }
+                        kind!("tuple") => {
+                            cont_stack.push(K::ConsumeTuple {
+                                arity: collection_node.named_child_count(),
+                                span,
+                            });
+                            cont_stack.push(K::EvalList(collection_node.walk()));
+                        }
+                        kind!("map") => {
+                            let mut temp_cont_stack =
+                                Vec::with_capacity(collection_node.named_child_count() * 2);
+                            let arity = eval_named_pairs(
+                                &collection_node,
+                                kind!("key_value_pair"),
+                                field!("key"),
+                                field!("value"),
+                                &mut temp_cont_stack,
+                            );
+                            let has_remainder = remainder_node.is_some();
+                            cont_stack.push(K::ConsumeMap {
+                                arity,
+                                has_remainder,
+                                span,
+                            });
+                            cont_stack.append(&mut temp_cont_stack);
+                            if has_remainder {
+                                let remainder_node =
+                                    get_field(&collection_node, field!("remainder"));
+                                cont_stack.push(K::EvalDelayed(remainder_node));
+                            }
+                        }
+                        _ => unreachable!("Rholang collections are: list, set, tuple and map"),
                     }
                 }
 
@@ -416,9 +445,10 @@ pub(super) fn node_to_ast<'ast>(
                             len: receipt_len,
                         });
                     }
+                    temp_cont_stack.reverse();
 
                     cont_stack.push(K::ConsumeForComprehension { desc: rs, span });
-                    cont_stack.extend(temp_cont_stack.into_iter().rev());
+                    cont_stack.append(&mut temp_cont_stack);
                     node = proc_node;
                     continue 'parse;
                 }
@@ -427,15 +457,18 @@ pub(super) fn node_to_ast<'ast>(
                     let expression_node = get_field(&node, field!("expression"));
                     let cases_node = get_field(&node, field!("cases"));
 
-                    cont_stack.push(K::ConsumeMatch {
-                        span,
-                        arity: cases_node.named_child_count(),
-                    });
-                    cont_stack.push(K::EvalNamedPairs {
-                        cursor: cases_node.walk(),
-                        fst_selector: field!("pattern"),
-                        snd_selector: field!("proc"),
-                    });
+                    let mut temp_cont_stack =
+                        Vec::with_capacity(2 * cases_node.named_child_count());
+                    let arity = eval_named_pairs(
+                        &cases_node,
+                        kind!("case"),
+                        field!("pattern"),
+                        field!("proc"),
+                        &mut temp_cont_stack,
+                    );
+
+                    cont_stack.push(K::ConsumeMatch { span, arity });
+                    cont_stack.append(&mut temp_cont_stack);
 
                     node = expression_node;
                     continue 'parse;
@@ -473,12 +506,14 @@ pub(super) fn node_to_ast<'ast>(
                             rhs: rhs.named_child_count(),
                         });
                     }
+                    temp_cont_stack.reverse();
+
                     cont_stack.push(K::ConsumeLet {
                         span,
                         concurrent,
                         let_decls,
                     });
-                    cont_stack.extend(temp_cont_stack.into_iter().rev());
+                    cont_stack.append(&mut temp_cont_stack);
 
                     node = body_node;
                     continue 'parse;
@@ -554,6 +589,10 @@ pub(super) fn node_to_ast<'ast>(
             let step = apply_cont(&mut cont_stack, &mut proc_stack, ast_builder);
             match step {
                 Step::Done => {
+                    if start_node.has_error() {
+                        // discover all the errors
+                        query_errors(start_node, source, &mut errors);
+                    }
                     if let Some(some_errors) = NEVec::try_from_vec(errors) {
                         return Validated::Fail(some_errors);
                     }
@@ -586,6 +625,34 @@ fn parse_decls<'a>(from: &tree_sitter::Node, source: &'a str) -> Vec<NameDecl<'a
     }
 
     result
+}
+
+fn query_errors(of: &tree_sitter::Node, source: &str, into: &mut Vec<AnnParsingError>) {
+    use tree_sitter::StreamingIterator;
+
+    let rholang_language: tree_sitter::Language = rholang_tree_sitter::LANGUAGE.into();
+    let query = tree_sitter::Query::new(
+        &rholang_language,
+        "(ERROR) @error-node (MISSING) @missing-node",
+    )
+    .expect("Error when trying to query errors");
+    let mut query_cursor = tree_sitter::QueryCursor::new();
+    let source_bytes = source.as_bytes();
+    let mut iter = query_cursor.matches(&query, *of, source_bytes);
+    while let Some(error_match) = iter.next() {
+        for found in error_match.captures {
+            let error_node = found.node;
+            if error_node.is_missing() {
+                into.push(AnnParsingError::from_mising(&error_node));
+            } else {
+                if error_node.parent().map_or(false, |p| p.is_error()) {
+                    // if parent of this node is an error, we skip it because it is UNEXPECTED node which we process somewhere else
+                    continue;
+                }
+                into.push(AnnParsingError::from_error(&error_node, source_bytes))
+            }
+        }
+    }
 }
 
 fn apply_cont<'tree, 'ast>(
@@ -623,29 +690,6 @@ fn apply_cont<'tree, 'ast>(
                     return Step::Continue(cursor.node());
                 }
                 cont_stack.pop();
-            }
-            K::EvalNamedPairs {
-                cursor,
-                fst_selector,
-                snd_selector,
-            } => {
-                if move_cursor_to_named(cursor) {
-                    let next = cursor.node();
-                    let maybe_pair = next.child_by_field_id(*fst_selector).and_then(|fst| {
-                        next.child_by_field_id(*snd_selector).map(|snd| (fst, snd))
-                    });
-                    match maybe_pair {
-                        Some((fst, snd)) => {
-                            cont_stack.push(K::EvalDelayed(snd));
-                            return Step::Continue(fst);
-                        }
-                        None => {
-                            cont_stack.pop(); // we end the current continuation and try to apply the next one
-                        }
-                    }
-                } else {
-                    cont_stack.pop();
-                };
             }
             _ => {
                 //consumes
@@ -968,11 +1012,6 @@ enum K<'tree, 'ast> {
     },
     EvalDelayed(tree_sitter::Node<'tree>),
     EvalList(tree_sitter::TreeCursor<'tree>),
-    EvalNamedPairs {
-        cursor: tree_sitter::TreeCursor<'tree>,
-        fst_selector: u16,
-        snd_selector: u16,
-    },
 }
 
 impl Debug for K<'_, '_> {
@@ -1087,10 +1126,6 @@ impl Debug for K<'_, '_> {
             Self::EvalList(arg0) => f
                 .debug_struct("EvalList")
                 .field("at", &arg0.node())
-                .finish(),
-            Self::EvalNamedPairs { cursor, .. } => f
-                .debug_struct("EvalNamedPairs")
-                .field("at", &cursor.node())
                 .finish(),
         }
     }
@@ -1263,6 +1298,15 @@ fn get_node_value<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
         // string slices are expected to contain valid utf8
         str::from_utf8_unchecked(&source_bytes[node.byte_range()])
     }
+}
+
+fn named_children_of_kind<'a>(
+    node: &tree_sitter::Node<'a>,
+    kind: u16,
+    cursor: &mut tree_sitter::TreeCursor<'a>,
+) -> impl Iterator<Item = tree_sitter::Node<'a>> {
+    node.named_children(cursor)
+        .filter(move |child| child.kind_id() == kind)
 }
 
 #[derive(Debug, Clone, Copy)]

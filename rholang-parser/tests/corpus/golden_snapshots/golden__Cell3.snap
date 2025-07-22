@@ -1,0 +1,98 @@
+---
+source: rholang-parser/tests/golden.rs
+expression: result
+---
+Fail(
+    [
+        AnnParsingError {
+            error: SyntaxError {
+                sexp: "(ERROR (var) (var))",
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 12,
+                    col: 10,
+                },
+                end: SourcePos {
+                    line: 12,
+                    col: 22,
+                },
+            },
+        },
+        AnnParsingError {
+            error: SyntaxError {
+                sexp: "(ERROR)",
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 13,
+                    col: 16,
+                },
+                end: SourcePos {
+                    line: 13,
+                    col: 17,
+                },
+            },
+        },
+        AnnParsingError {
+            error: SyntaxError {
+                sexp: "(ERROR (par (par (send channel: (var) send_type: (send_single) inputs: (inputs (var))) (send channel: (var) send_type: (send_single) inputs: (inputs (var)))) (var)))",
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 14,
+                    col: 9,
+                },
+                end: SourcePos {
+                    line: 14,
+                    col: 39,
+                },
+            },
+        },
+        AnnParsingError {
+            error: SyntaxError {
+                sexp: "(ERROR (var))",
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 16,
+                    col: 7,
+                },
+                end: SourcePos {
+                    line: 16,
+                    col: 10,
+                },
+            },
+        },
+        AnnParsingError {
+            error: SyntaxError {
+                sexp: "(ERROR (par (send channel: (var) send_type: (send_single) inputs: (inputs (var))) (var)))",
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 17,
+                    col: 9,
+                },
+                end: SourcePos {
+                    line: 17,
+                    col: 34,
+                },
+            },
+        },
+        AnnParsingError {
+            error: MissingToken(
+                "}",
+            ),
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 20,
+                    col: 2,
+                },
+                end: SourcePos {
+                    line: 20,
+                    col: 2,
+                },
+            },
+        },
+    ],
+)
