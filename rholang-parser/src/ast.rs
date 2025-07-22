@@ -257,9 +257,6 @@ impl<'a> Names<'a> {
         if with_remainder {
             match slice.split_last() {
                 None => Err("attempt to build 'x, y ...@z' out of zero names".to_string()),
-                Some((_, init)) if init.is_empty() => {
-                    Err("attempt to build 'x, y ...@z' out of one name".to_string())
-                }
                 Some((last, init)) => {
                     let names = to_names(init)?;
                     let remainder = (*last).try_into()?;
@@ -270,16 +267,20 @@ impl<'a> Names<'a> {
                 }
             }
         } else {
-            if slice.is_empty() {
-                Err("attempt to build empty names".to_string())
-            } else {
-                let names = to_names(slice)?;
-                Ok(Names {
-                    names,
-                    remainder: None,
-                })
-            }
+            let names = to_names(slice)?;
+            Ok(Names {
+                names,
+                remainder: None,
+            })
         }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.names.is_empty() && self.remainder.is_none()
+    }
+
+    pub fn only_remainder(&self) -> bool {
+        self.names.is_empty() && self.remainder.is_some()
     }
 }
 
