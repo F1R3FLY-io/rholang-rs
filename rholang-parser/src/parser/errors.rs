@@ -1,4 +1,6 @@
-use crate::{SourcePos, SourceSpan};
+use nonempty_collections::NEVec;
+
+use crate::{SourcePos, SourceSpan, ast::AnnProc};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParsingError {
@@ -50,4 +52,10 @@ impl AnnParsingError {
             span: node.range().into(),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsingFailure<'a> {
+    pub partial_tree: Option<AnnProc<'a>>,
+    pub errors: NEVec<AnnParsingError>,
 }

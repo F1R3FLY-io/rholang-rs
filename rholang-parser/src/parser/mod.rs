@@ -6,7 +6,7 @@ use validated::Validated;
 
 use crate::{
     ast::AnnProc,
-    parser::{ast_builder::ASTBuilder, errors::AnnParsingError},
+    parser::{ast_builder::ASTBuilder, errors::ParsingFailure},
 };
 
 pub struct RholangParser<'a> {
@@ -23,7 +23,7 @@ impl<'a> RholangParser<'a> {
     pub fn parse<'code: 'a>(
         &'a self,
         code: &'code str,
-    ) -> Validated<Vec<AnnProc<'a>>, AnnParsingError> {
+    ) -> Validated<Vec<AnnProc<'a>>, ParsingFailure<'a>> {
         let tree = parsing::parse_to_tree(code);
         let mut walker = tree.walk();
 

@@ -7,6 +7,7 @@ use std::slice::Iter as SliceIter;
 use validated::Validated;
 
 use crate::ast::Var;
+use crate::parser::errors::ParsingFailure;
 use crate::{
     SourceSpan,
     ast::{
@@ -34,7 +35,7 @@ pub(super) fn node_to_ast<'ast>(
     start_node: &tree_sitter::Node,
     ast_builder: &'ast ASTBuilder<'ast>,
     source: &'ast str,
-) -> Validated<AnnProc<'ast>, AnnParsingError> {
+) -> Validated<AnnProc<'ast>, ParsingFailure<'ast>> {
     let mut errors = Vec::new();
     let mut proc_stack = ProcStack::new();
     let mut cont_stack = Vec::with_capacity(32);
@@ -593,7 +594,10 @@ pub(super) fn node_to_ast<'ast>(
                         query_errors(start_node, source, &mut errors);
                     }
                     if let Some(some_errors) = NEVec::try_from_vec(errors) {
-                        return Validated::Fail(some_errors);
+                        return Validated::fail(ParsingFailure {
+                            partial_tree: proc_stack.to_proc_partial(),
+                            errors: some_errors,
+                        });
                     }
                     let last = proc_stack.to_proc();
                     return Validated::Good(last);
@@ -1154,6 +1158,10 @@ impl<'a> ProcStack<'a> {
             "bug: parsing finished prematurely\n.Remaining process stack: {stack:#?}"
         );
         unsafe { *stack.last().unwrap_unchecked() }
+    }
+
+    fn to_proc_partial(&self) -> Option<AnnProc<'a>> {
+        self.stack.last().copied()
     }
 
     #[inline]
