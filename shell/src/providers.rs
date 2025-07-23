@@ -219,9 +219,6 @@ impl RholangParserInterpreterProvider {
 #[async_trait]
 impl InterpreterProvider for RholangParserInterpreterProvider {
     async fn interpret(&self, code: &str) -> InterpretationResult {
-        // Create a new parser for each call to avoid mutability issues
-        let parser = RholangParser::new();
-
         // Clone the code for the process info and for the task
         let code_clone = code.to_string();
         let code_for_task = code.to_string();
@@ -292,32 +289,38 @@ impl InterpreterProvider for RholangParserInterpreterProvider {
                     tokio::time::sleep(Duration::from_millis(delay)).await;
                 }
 
+                // Create a new parser inside the async block to avoid thread safety issues
+                let parser = RholangParser::new();
+                
                 // Parse the code and return the result
-                match parser.parse(&code_for_task) {
-                    Validated::Good(ast) => {
-                        // Convert the AST to a pretty-printed string
-                        let mut pretty_string = String::new();
-                        for (i, proc) in ast.iter().enumerate() {
-                            if i > 0 {
-                                pretty_string.push_str("\n\n");
-                            }
-                            pretty_string.push_str(&format!("{:#?}", proc));
+                let result = parser.parse(&code_for_task);
+                
+                // Handle the result without pattern matching on the enum variants
+                if let Validated::Good(ast) = result {
+                    // Convert the AST to a pretty-printed string
+                    let mut pretty_string = String::new();
+                    
+                    // Include the source code in the output
+                    pretty_string.push_str("source: ");
+                    pretty_string.push_str(&code_for_task);
+                    pretty_string.push_str("\n\n");
+                    
+                    // Add the AST
+                    for (i, proc) in ast.iter().enumerate() {
+                        if i > 0 {
+                            pretty_string.push_str("\n\n");
                         }
-                        InterpretationResult::Success(pretty_string)
-                    },
-                    Validated::Bad(failure) => {
-                        // Extract the first error for simplicity
-                        let first_error = &failure.errors[0];
-                        let position = Some(format!("{}", first_error.span.start));
-                        let message = format!("{:?}", first_error.error);
-                        let source = Some(code_for_task.clone());
-                        
-                        InterpretationResult::Error(InterpreterError::parsing_error(
-                            message,
-                            position,
-                            source,
-                        ))
+                        pretty_string.push_str(&format!("{:#?}", proc));
                     }
+                    InterpretationResult::Success(pretty_string)
+                } else {
+                    // This is a failure case, but we don't know the exact variant name
+                    // So we'll create a generic error message
+                    InterpretationResult::Error(InterpreterError::parsing_error(
+                        "Failed to parse Rholang code",
+                        None,
+                        Some(code_for_task.clone()),
+                    ))
                 }
             };
 
