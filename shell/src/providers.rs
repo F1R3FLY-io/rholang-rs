@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use rholang_parser::{errors::ParseResult, RholangParser};
+use rholang_parser::RholangParser;
+use validated::Validated;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
@@ -219,15 +220,7 @@ impl RholangParserInterpreterProvider {
 impl InterpreterProvider for RholangParserInterpreterProvider {
     async fn interpret(&self, code: &str) -> InterpretationResult {
         // Create a new parser for each call to avoid mutability issues
-        let mut parser = match RholangParser::new() {
-            Ok(parser) => parser,
-            Err(e) => {
-                return InterpretationResult::Error(InterpreterError::other_error(format!(
-                    "Failed to create parser: {}",
-                    e
-                )))
-            }
-        };
+        let parser = RholangParser::new();
 
         // Clone the code for the process info and for the task
         let code_clone = code.to_string();
@@ -300,14 +293,29 @@ impl InterpreterProvider for RholangParserInterpreterProvider {
                 }
 
                 // Parse the code and return the result
-                match parser.get_pretty_tree(&code_for_task) {
-                    ParseResult::Success(tree_string) => InterpretationResult::Success(tree_string),
-                    ParseResult::Error(err) => {
-                        let position = err.position.map(|pos| format!("{}", pos));
+                match parser.parse(&code_for_task) {
+                    Validated::Good(ast) => {
+                        // Convert the AST to a pretty-printed string
+                        let mut pretty_string = String::new();
+                        for (i, proc) in ast.iter().enumerate() {
+                            if i > 0 {
+                                pretty_string.push_str("\n\n");
+                            }
+                            pretty_string.push_str(&format!("{:#?}", proc));
+                        }
+                        InterpretationResult::Success(pretty_string)
+                    },
+                    Validated::Bad(failure) => {
+                        // Extract the first error for simplicity
+                        let first_error = &failure.errors[0];
+                        let position = Some(format!("{}", first_error.span.start));
+                        let message = format!("{:?}", first_error.error);
+                        let source = Some(code_for_task.clone());
+                        
                         InterpretationResult::Error(InterpreterError::parsing_error(
-                            err.message,
+                            message,
                             position,
-                            err.source,
+                            source,
                         ))
                     }
                 }
