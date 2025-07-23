@@ -89,7 +89,7 @@ module.exports = grammar({
         contract: $ => prec(2, seq(
             'contract',
             field('name', $.name),
-            '(', field('formals', $.names), ')',
+            '(', optional(field('formals', $.names)), ')',
             '=',
             field('proc', $.block)
         )),
@@ -267,7 +267,7 @@ module.exports = grammar({
         bool_literal: $ => choice('true', 'false'),
         long_literal: $ => token(/-?\d+/),
         string_literal: $ => token(/"([^"\\]|(\\[0nrt\\"])|(\\[0-9]+))*"/),
-        uri_literal: $ => token(/`[^`]*`/),
+        uri_literal: $ => token(/`[^`]+`/),
 
         nil: $ => 'Nil',
 
@@ -297,7 +297,7 @@ module.exports = grammar({
         wildcard: $ => '_',
         var: $ => token(/[a-zA-Z]([a-zA-Z0-9_'])*|_([a-zA-Z0-9_'])+/),
 
-        names: $ => seq(commaSep1($.name), optional($._name_remainder)),
+        names: $ => choice(seq(commaSep1($.name), optional($._name_remainder)), $._name_remainder),
         _name_remainder: $ => seq('...', '@', field('cont', $._proc_var)),
 
         // comments
