@@ -83,6 +83,7 @@ pub(super) fn node_to_ast<'ast>(
                 }
 
                 kind!("nil") => proc_stack.push(&ast_builder.NIL, span),
+                kind!("unit") => proc_stack.push(&ast_builder.UNIT, span),
                 kind!("simple_type") => {
                     let lit_value = get_node_value(&node, source);
                     let simple_type_value = match lit_value {
@@ -1536,7 +1537,7 @@ impl<'slice, 'a> LetBindingIter<'slice, 'a> {
                     iter: init.iter().zip(rhs.iter()),
                     tail: Some((
                         (*rem).try_into().expect("expected a var"),
-                        &rhs[lhs.len()..],
+                        &rhs[(lhs.len() - 1)..],
                     )),
                 }
             } else {

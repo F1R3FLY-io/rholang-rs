@@ -1253,6 +1253,10 @@
           {
             "type": "SYMBOL",
             "name": "simple_type"
+          },
+          {
+            "type": "SYMBOL",
+            "name": "unit"
           }
         ]
       }
@@ -1942,6 +1946,19 @@
         "value": "`[^`]+`"
       }
     },
+    "unit": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "("
+        },
+        {
+          "type": "STRING",
+          "value": ")"
+        }
+      ]
+    },
     "nil": {
       "type": "STRING",
       "value": "Nil"
@@ -2480,8 +2497,17 @@
         "type": "SEQ",
         "members": [
           {
-            "type": "STRING",
-            "value": "//"
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "//"
+              },
+              {
+                "type": "STRING",
+                "value": "#"
+              }
+            ]
           },
           {
             "type": "PATTERN",

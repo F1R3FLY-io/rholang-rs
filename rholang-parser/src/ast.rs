@@ -12,6 +12,7 @@ pub type ProcList<'a> = SmallVec<[AnnProc<'a>; 1]>;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Proc<'ast> {
     Nil,
+    Unit,
     BoolLiteral(bool),
     LongLiteral(i64),
     StringLiteral(&'ast str),
@@ -59,7 +60,7 @@ pub enum Proc<'ast> {
     },
 
     Let {
-        bindings: SmallVec<[LetBinding<'ast>; 1]>,
+        bindings: LetBindings<'ast>,
         body: AnnProc<'ast>,
         concurrent: bool,
     },
@@ -446,6 +447,8 @@ pub enum BundleType {
 }
 
 // let declarations
+
+pub type LetBindings<'a> = SmallVec<[LetBinding<'a>; 1]>;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum LetBinding<'ast> {
