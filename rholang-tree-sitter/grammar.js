@@ -302,7 +302,7 @@ module.exports = grammar({
 
         // comments
 
-        _line_comment: $ => token(seq('//', /[^\n]*/)),
+        _line_comment: $ => token(seq(choice('//', '#'), /[^\n]*/)),
         _block_comment: $ => token(seq(
             '/*',
             /[^*]*\*+([^/*][^*]*\*+)*/,
