@@ -9,7 +9,7 @@ For a complete and accurate implementation of bytecode, here we will describe a 
     - `RSPACE_MEM_CONC`: In-memory concurrent (concurrent hashmap)
     - `RSPACE_STORE_SEQ`: On-store sequential (LMDB wrapper)
     - `RSPACE_STORE_CONC`: On-store concurrent (LMDB wrapper)
-- **Integration**: VM communicates with appropriate RSpace through typed instructions
+- **Integration**: VM communicates with appropriate RSpace through typed instructions (need to change to VM that representable as a GLST and fully abstract encoding of VM state and RSpace state)
 
 ### RSpace Type Selection Guidelines
 **Name Analysis and Escape Analysis**: The choice of RSpace type is determined by static analysis of name usage and escape analysis during compilation, not at runtime. This analysis determines:
@@ -42,6 +42,15 @@ For a complete and accurate implementation of bytecode, here we will describe a 
 - Production blockchain operations
 - Distributed systems
 - Top-level names and contracts
+
+**Examples**
+```
+// Top-level: MUST use persistent storage
+new toplevel in { contract Foo() = ... }  // → RSPACE_STORE_CONC
+
+// Nested: CAN use memory storage  
+{ new local in { local!(42) | for(x <- local) P } }  // → RSPACE_MEM_CONC
+```
 
 ### Core VM Instructions
 ```
@@ -127,10 +136,99 @@ RSPACE INSTRUCTIONS:
 1. **Explicit Type Flags**: Each instruction carries the RSpace type as a parameter
 2. **Channel Properties**: RSpace remembers properties when names are created, requiring upgrade/downgrade instructions
 
-**TODO: need to add examples**
+### Real rholang code to bytecode transformation examples
+**Name Creation**
 ```
-[[new x, y in P]] <top level> == --- then the translation is
-[[new x, y in { ... new p, q in Q ... } ]] == -- then the translation is a bit idfferent
+[[new x, y in P]] <top level>
+├──NAME_CREATE RSPACE_STORE_CONC     // Create fresh name x in persistent RSpace
+├──STORE_LOCAL 0                     // Store x in local slot 0
+├──NAME_CREATE RSPACE_STORE_CONC     // Create fresh name y in persistent RSpace  
+├──STORE_LOCAL 1                     // Store y in local slot 1
+├──PUSH_PROC P                       // Push process P
+├──EVAL                              // Evaluate with local bindings
+
+[[new x, y in { ... new p, q in Q ... }]] <nested context> (can use memory RSpace for nested names)
+├──NAME_CREATE RSPACE_MEM_CONC       // Create fresh name x in memory RSpace
+├──STORE_LOCAL 0                     // Store x in local slot 0
+├──NAME_CREATE RSPACE_MEM_CONC       // Create fresh name y in memory RSpace
+├──STORE_LOCAL 1                     // Store y in local slot 1
+├──PUSH_PROC { ... new p, q in Q ... } // Push nested process
+├──EVAL                              // Evaluate with local bindings
+// Inner new p, q also uses RSPACE_MEM_CONC
+```
+
+**Send Operation**
+```
+[[chan!(data)]] <where chan is top-level>
+├──PUSH_PROC data                    // Push data (not evaluated)
+├──PUSH_PROC chan                    // Push channel name
+├──EVAL                              // Evaluate channel only
+├──RSPACE_PRODUCE RSPACE_STORE_CONC  // Produce to persistent RSpace
+
+[[localChan!(10 + 5)]] <where localChan is local> (memory channel with top-level expression evaluation)
+├──PUSH_INT 15                       // 10 + 5 evaluated to 15 at compile time
+├──PUSH_PROC localChan               // Push channel name
+├──EVAL                              // Evaluate channel
+├──RSPACE_PRODUCE RSPACE_MEM_CONC    // Produce to memory RSpace
+```
+
+**Receive Operation**
+```
+[[for(x <- publicChannel) P]] <contract context> (persistent channel)
+├──LOAD_VAR publicChannel            // Load channel name
+├──ALLOC_LOCAL                       // Allocate slot for x
+├──PATTERN_COMPILE RSPACE_STORE_CONC x  // Compile pattern for persistent RSpace
+├──CONTINUATION_STORE RSPACE_STORE_CONC P // Store continuation persistently
+├──RSPACE_CONSUME RSPACE_STORE_CONC  // Consume from persistent RSpace
+├──PATTERN_BIND RSPACE_STORE_CONC    // Bind received value to x
+├──CONTINUATION_RESUME RSPACE_STORE_CONC // Resume with bound x
+
+[[for(x <- localChan) P]] <inside local scope> (memory channel)
+├──LOAD_VAR localChan                // Load channel name
+├──ALLOC_LOCAL                       // Allocate slot for x
+├──PATTERN_COMPILE RSPACE_MEM_CONC x // Compile pattern for memory RSpace
+├──CONTINUATION_STORE RSPACE_MEM_CONC P // Store continuation in memory
+├──RSPACE_CONSUME RSPACE_MEM_CONC    // Consume from memory RSpace
+├──PATTERN_BIND RSPACE_MEM_CONC      // Bind received value to x
+├──CONTINUATION_RESUME RSPACE_MEM_CONC // Resume with bound x
+```
+
+**Complex Pattern**
+```
+[[for(pattern{x, y} <- chan) P]] <complex pattern>
+├──LOAD_VAR chan                     // Load channel name
+├──PATTERN_COMPILE RSPACE_STORE_CONC pattern{x, y} // Compile complex pattern
+├──CONTINUATION_STORE RSPACE_STORE_CONC P // Store continuation
+├──RSPACE_CONSUME RSPACE_STORE_CONC  // Consume with pattern matching
+├──PATTERN_BIND RSPACE_STORE_CONC    // Extract bound variables x, y
+├──CONTINUATION_RESUME RSPACE_STORE_CONC // Resume with all bindings
+```
+
+**Let Binding**
+```
+[[let x = 10 + 5; y = "hello" in P]] <sequential binding>
+├──PUSH_INT 15                       // Evaluate 10 + 5 to 15
+├──ALLOC_LOCAL                       // Allocate slot for x
+├──STORE_LOCAL 0                     // Store 15 in x
+├──PUSH_STR "hello"                  // Push string literal
+├──ALLOC_LOCAL                       // Allocate slot for y
+├──STORE_LOCAL 1                     // Store "hello" in y
+├──PUSH_PROC P                       // Push body process
+├──EVAL                              // Execute with bindings
+
+[[let x = expensiveComputation() & y = anotherProcess() in P]] <concurrent binding>
+├──NAME_CREATE RSPACE_MEM_CONC       // Create coordination channel
+├──STORE_LOCAL 0                     // Store coordination channel
+├──PUSH_PROC expensiveComputation()  // Push first process
+├──CONTINUATION_STORE RSPACE_MEM_CONC x_binding // Store x binding continuation
+├──SPAWN_ASYNC RSPACE_MEM_CONC       // Spawn first evaluation
+├──PUSH_PROC anotherProcess()        // Push second process  
+├──CONTINUATION_STORE RSPACE_MEM_CONC y_binding // Store y binding continuation
+├──SPAWN_ASYNC RSPACE_MEM_CONC       // Spawn second evaluation
+├──RSPACE_CONSUME RSPACE_MEM_CONC    // Wait for first binding
+├──RSPACE_CONSUME RSPACE_MEM_CONC    // Wait for second binding
+├──PUSH_PROC P                       // Push body process
+├──EVAL                              // Execute with accumulated bindings
 ```
 
 ### Core Process Constructs
@@ -636,3 +734,33 @@ for (x <= Name) { P }
 - **Process arguments**: Remain as suspended computations/closures
 - **Pattern matching**: Works on introspection form, not evaluated values
 - **Lazy evaluation**: Arguments evaluated only when needed
+
+### Static Analysis-Driven Selection
+```
+Local Variable → Escape Analysis → RSpace Type Selection
+    ↓                    ↓                    ↓
+let x = 5     →    Doesn't escape    →   RSPACE_MEM_SEQ
+new chan      →    Shared across     →   RSPACE_STORE_CONC
+              →    processes         →
+```
+
+### Compilation Pipeline
+```
+Source Code → AST → Name Analysis → Escape Analysis → Bytecode Generation
+                           ↓
+                   RSpace Type Assignment
+```
+
+**Key Analysis Phases**
+1. Name Usage Analysis:
+   * Track where names are defined
+   * Identify where names are used
+   * Detect cross-process communication
+2. Escape Analysis:
+   * Does this name leave its lexical scope?
+   * Is it passed to other processes?
+   * Does it appear in top-level constructs?
+3. Concurrency Analysis:
+   * Are multiple threads accessing this name?
+   * Is it used in parallel compositions (P | Q)?
+   * Does it appear in concurrent let bindings (let x = P & y = Q)?
