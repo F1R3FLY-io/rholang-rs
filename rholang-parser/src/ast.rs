@@ -12,6 +12,7 @@ pub type ProcList<'a> = SmallVec<[AnnProc<'a>; 1]>;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Proc<'ast> {
     Nil,
+    Unit,
     BoolLiteral(bool),
     LongLiteral(i64),
     StringLiteral(&'ast str),
