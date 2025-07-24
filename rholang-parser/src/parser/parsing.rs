@@ -1536,7 +1536,7 @@ impl<'slice, 'a> LetBindingIter<'slice, 'a> {
                     iter: init.iter().zip(rhs.iter()),
                     tail: Some((
                         (*rem).try_into().expect("expected a var"),
-                        &rhs[lhs.len()..],
+                        &rhs[(lhs.len() - 1)..],
                     )),
                 }
             } else {
