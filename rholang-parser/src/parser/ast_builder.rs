@@ -14,6 +14,7 @@ pub(super) struct ASTBuilder<'ast> {
     pub(super) TRUE: Proc<'ast>,
     pub(super) FALSE: Proc<'ast>,
     pub(super) WILD: Proc<'ast>,
+    pub(super) UNIT: Proc<'ast>,
     pub(super) BAD: Proc<'ast>,
     EMPTY_LIST: Proc<'ast>,
     ZERO: Proc<'ast>,
@@ -32,6 +33,7 @@ impl<'ast> ASTBuilder<'ast> {
             TRUE: Proc::BoolLiteral(true),
             FALSE: Proc::BoolLiteral(false),
             WILD: Proc::ProcVar(Var::Wildcard),
+            UNIT: Proc::Unit,
             EMPTY_LIST: Proc::Collection(Collection::List {
                 elements: Vec::new(),
                 remainder: None,
