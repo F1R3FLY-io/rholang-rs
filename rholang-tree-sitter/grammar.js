@@ -178,7 +178,7 @@ module.exports = grammar({
         disjunction: $ => prec.left(13, seq($._proc, '\\/', $._proc)),
         conjunction: $ => prec.left(14, seq($._proc, '/\\', $._proc)),
         negation: $ => prec(15, seq('~', $._proc)),
-        _ground_expression: $ => prec(16, choice($.block, $._literal, $.nil, $.collection, $._proc_var, $.simple_type)),
+        _ground_expression: $ => prec(16, choice($.block, $._literal, $.nil, $.collection, $._proc_var, $.simple_type, $.unit)),
 
         // synchronous send continuations
         sync_send_cont: $ => choice($.empty_cont, $.non_empty_cont),
@@ -268,6 +268,8 @@ module.exports = grammar({
         long_literal: $ => token(/-?\d+/),
         string_literal: $ => token(/"([^"\\]|(\\[0nrt\\"])|(\\[0-9]+))*"/),
         uri_literal: $ => token(/`[^`]+`/),
+
+        unit: $ => seq('(', ')'),
 
         nil: $ => 'Nil',
 

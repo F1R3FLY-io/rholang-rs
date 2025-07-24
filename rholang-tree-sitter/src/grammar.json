@@ -1253,6 +1253,10 @@
           {
             "type": "SYMBOL",
             "name": "simple_type"
+          },
+          {
+            "type": "SYMBOL",
+            "name": "unit"
           }
         ]
       }
@@ -1941,6 +1945,19 @@
         "type": "PATTERN",
         "value": "`[^`]+`"
       }
+    },
+    "unit": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "("
+        },
+        {
+          "type": "STRING",
+          "value": ")"
+        }
+      ]
     },
     "nil": {
       "type": "STRING",
