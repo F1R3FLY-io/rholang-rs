@@ -1,0 +1,498 @@
+====================
+Simple bank contract
+====================
+
+new
+  stdout(`rho:io:stdout`),
+  registry(`rho:registry:lookup`),
+  registryInsert(`rho:registry:insert`),
+  makeBank,
+  return in {
+
+  contract makeBank(@initialBalances, ret) = {
+
+    new balances, loop in {
+
+      # Initialize account balances
+      for (@() <- loop) {
+        for (@(name, balance) <- initialBalances) {
+          balances!(name, balance)
+        }
+      } |
+
+      loop!(*nil) |
+
+      # Define the bank contract
+      contract bank(@"deposit", name, amount, ack) = {
+        for (name2, old <- balances) {
+          match name == name2 {
+            true => {
+              let newBalance = old + amount in {
+                balances!(name, newBalance) |
+                ack!("Deposited " ++ amount.toString() ++ " into " ++ name)
+              }
+            }
+            false => {
+              ack!("Account not found")
+            }
+          }
+        }
+      } |
+
+      contract bank(@"withdraw", name, amount, ack) = {
+        for (name2, old <- balances) {
+          match name == name2 {
+            true => {
+              match old >= amount {
+                true => {
+                  let newBalance = old - amount in {
+                    balances!(name, newBalance) |
+                    ack!("Withdrew " ++ amount.toString() ++ " from " ++ name)
+                  }
+                }
+                false => {
+                  ack!("Insufficient funds")
+                }
+              }
+            }
+            false => {
+              ack!("Account not found")
+            }
+          }
+        }
+      } |
+
+      contract bank(@"getBalance", name, ack) = {
+        for (name2, balance <- balances) {
+          match name == name2 {
+            true => ack!(balance)
+            false => ack!("Account not found")
+          }
+        }
+      } |
+
+      ret!(bank)
+    }
+  } |
+
+  # Example usage:
+  makeBank!([["Alice", 100], ["Bob", 50]], *return) |
+
+  for (bank <- return) {
+    new ack1, ack2, ack3, ack4 in {
+      bank!("deposit", "Alice", 25, *ack1) |
+      bank!("withdraw", "Bob", 20, *ack2) |
+      bank!("getBalance", "Alice", *ack3) |
+      bank!("getBalance", "Charlie", *ack4) |
+
+      for (msg <- ack1) { stdout!(msg) } |
+      for (msg <- ack2) { stdout!(msg) } |
+      for (msg <- ack3) { stdout!("Alice's balance: " ++ msg.toString()) } |
+      for (msg <- ack4) { stdout!(msg) }
+    }
+  }
+}
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var)
+        uri: (uri_literal))
+      (name_decl
+        (var)
+        uri: (uri_literal))
+      (name_decl
+        (var)
+        uri: (uri_literal))
+      (name_decl
+        (var))
+      (name_decl
+        (var)))
+    proc: (block
+      (par
+        (par
+          (contract
+            name: (var)
+            formals: (names
+              (quote
+                (var))
+              (var))
+            proc: (block
+              (new
+                decls: (name_decls
+                  (name_decl
+                    (var))
+                  (name_decl
+                    (var)))
+                proc: (block
+                  (par
+                    (par
+                      (par
+                        (par
+                          (par
+                            (input
+                              receipts: (receipts
+                                (receipt
+                                  (linear_bind
+                                    names: (names
+                                      (quote
+                                        (unit)))
+                                    input: (simple_source
+                                      (var)))))
+                              proc: (block
+                                (input
+                                  receipts: (receipts
+                                    (receipt
+                                      (linear_bind
+                                        names: (names
+                                          (quote
+                                            (collection
+                                              (tuple
+                                                (var)
+                                                (var)))))
+                                        input: (simple_source
+                                          (var)))))
+                                  proc: (block
+                                    (send
+                                      channel: (var)
+                                      send_type: (send_single)
+                                      inputs: (inputs
+                                        (var)
+                                        (var)))))))
+                            (send
+                              channel: (var)
+                              send_type: (send_single)
+                              inputs: (inputs
+                                (eval
+                                  (var)))))
+                          (contract
+                            name: (var)
+                            formals: (names
+                              (quote
+                                (string_literal))
+                              (var)
+                              (var)
+                              (var))
+                            proc: (block
+                              (input
+                                receipts: (receipts
+                                  (receipt
+                                    (linear_bind
+                                      names: (names
+                                        (var)
+                                        (var))
+                                      input: (simple_source
+                                        (var)))))
+                                proc: (block
+                                  (match
+                                    expression: (eq
+                                      (var)
+                                      (var))
+                                    cases: (cases
+                                      (case
+                                        pattern: (bool_literal)
+                                        proc: (block
+                                          (let
+                                            decls: (linear_decls
+                                              (decl
+                                                names: (names
+                                                  (var))
+                                                procs: (procs
+                                                  (add
+                                                    (var)
+                                                    (var)))))
+                                            proc: (block
+                                              (par
+                                                (send
+                                                  channel: (var)
+                                                  send_type: (send_single)
+                                                  inputs: (inputs
+                                                    (var)
+                                                    (var)))
+                                                (send
+                                                  channel: (var)
+                                                  send_type: (send_single)
+                                                  inputs: (inputs
+                                                    (concat
+                                                      (concat
+                                                        (concat
+                                                          (string_literal)
+                                                          (method
+                                                            receiver: (var)
+                                                            name: (var)
+                                                            args: (args)))
+                                                        (string_literal))
+                                                      (var)))))))))
+                                      (case
+                                        pattern: (bool_literal)
+                                        proc: (block
+                                          (send
+                                            channel: (var)
+                                            send_type: (send_single)
+                                            inputs: (inputs
+                                              (string_literal))))))))))))
+                        (contract
+                          name: (var)
+                          formals: (names
+                            (quote
+                              (string_literal))
+                            (var)
+                            (var)
+                            (var))
+                          proc: (block
+                            (input
+                              receipts: (receipts
+                                (receipt
+                                  (linear_bind
+                                    names: (names
+                                      (var)
+                                      (var))
+                                    input: (simple_source
+                                      (var)))))
+                              proc: (block
+                                (match
+                                  expression: (eq
+                                    (var)
+                                    (var))
+                                  cases: (cases
+                                    (case
+                                      pattern: (bool_literal)
+                                      proc: (block
+                                        (match
+                                          expression: (gte
+                                            (var)
+                                            (var))
+                                          cases: (cases
+                                            (case
+                                              pattern: (bool_literal)
+                                              proc: (block
+                                                (let
+                                                  decls: (linear_decls
+                                                    (decl
+                                                      names: (names
+                                                        (var))
+                                                      procs: (procs
+                                                        (sub
+                                                          (var)
+                                                          (var)))))
+                                                  proc: (block
+                                                    (par
+                                                      (send
+                                                        channel: (var)
+                                                        send_type: (send_single)
+                                                        inputs: (inputs
+                                                          (var)
+                                                          (var)))
+                                                      (send
+                                                        channel: (var)
+                                                        send_type: (send_single)
+                                                        inputs: (inputs
+                                                          (concat
+                                                            (concat
+                                                              (concat
+                                                                (string_literal)
+                                                                (method
+                                                                  receiver: (var)
+                                                                  name: (var)
+                                                                  args: (args)))
+                                                              (string_literal))
+                                                            (var)))))))))
+                                            (case
+                                              pattern: (bool_literal)
+                                              proc: (block
+                                                (send
+                                                  channel: (var)
+                                                  send_type: (send_single)
+                                                  inputs: (inputs
+                                                    (string_literal)))))))))
+                                    (case
+                                      pattern: (bool_literal)
+                                      proc: (block
+                                        (send
+                                          channel: (var)
+                                          send_type: (send_single)
+                                          inputs: (inputs
+                                            (string_literal))))))))))))
+                      (contract
+                        name: (var)
+                        formals: (names
+                          (quote
+                            (string_literal))
+                          (var)
+                          (var))
+                        proc: (block
+                          (input
+                            receipts: (receipts
+                              (receipt
+                                (linear_bind
+                                  names: (names
+                                    (var)
+                                    (var))
+                                  input: (simple_source
+                                    (var)))))
+                            proc: (block
+                              (match
+                                expression: (eq
+                                  (var)
+                                  (var))
+                                cases: (cases
+                                  (case
+                                    pattern: (bool_literal)
+                                    proc: (send
+                                      channel: (var)
+                                      send_type: (send_single)
+                                      inputs: (inputs
+                                        (var))))
+                                  (case
+                                    pattern: (bool_literal)
+                                    proc: (send
+                                      channel: (var)
+                                      send_type: (send_single)
+                                      inputs: (inputs
+                                        (string_literal)))))))))))
+                    (send
+                      channel: (var)
+                      send_type: (send_single)
+                      inputs: (inputs
+                        (var))))))))
+          (send
+            channel: (var)
+            send_type: (send_single)
+            inputs: (inputs
+              (collection
+                (list
+                  (collection
+                    (list
+                      (string_literal)
+                      (long_literal)))
+                  (collection
+                    (list
+                      (string_literal)
+                      (long_literal)))))
+              (eval
+                (var)))))
+        (input
+          receipts: (receipts
+            (receipt
+              (linear_bind
+                names: (names
+                  (var))
+                input: (simple_source
+                  (var)))))
+          proc: (block
+            (new
+              decls: (name_decls
+                (name_decl
+                  (var))
+                (name_decl
+                  (var))
+                (name_decl
+                  (var))
+                (name_decl
+                  (var)))
+              proc: (block
+                (par
+                  (par
+                    (par
+                      (par
+                        (par
+                          (par
+                            (par
+                              (send
+                                channel: (var)
+                                send_type: (send_single)
+                                inputs: (inputs
+                                  (string_literal)
+                                  (string_literal)
+                                  (long_literal)
+                                  (eval
+                                    (var))))
+                              (send
+                                channel: (var)
+                                send_type: (send_single)
+                                inputs: (inputs
+                                  (string_literal)
+                                  (string_literal)
+                                  (long_literal)
+                                  (eval
+                                    (var)))))
+                            (send
+                              channel: (var)
+                              send_type: (send_single)
+                              inputs: (inputs
+                                (string_literal)
+                                (string_literal)
+                                (eval
+                                  (var)))))
+                          (send
+                            channel: (var)
+                            send_type: (send_single)
+                            inputs: (inputs
+                              (string_literal)
+                              (string_literal)
+                              (eval
+                                (var)))))
+                        (input
+                          receipts: (receipts
+                            (receipt
+                              (linear_bind
+                                names: (names
+                                  (var))
+                                input: (simple_source
+                                  (var)))))
+                          proc: (block
+                            (send
+                              channel: (var)
+                              send_type: (send_single)
+                              inputs: (inputs
+                                (var))))))
+                      (input
+                        receipts: (receipts
+                          (receipt
+                            (linear_bind
+                              names: (names
+                                (var))
+                              input: (simple_source
+                                (var)))))
+                        proc: (block
+                          (send
+                            channel: (var)
+                            send_type: (send_single)
+                            inputs: (inputs
+                              (var))))))
+                    (input
+                      receipts: (receipts
+                        (receipt
+                          (linear_bind
+                            names: (names
+                              (var))
+                            input: (simple_source
+                              (var)))))
+                      proc: (block
+                        (send
+                          channel: (var)
+                          send_type: (send_single)
+                          inputs: (inputs
+                            (concat
+                              (string_literal)
+                              (method
+                                receiver: (var)
+                                name: (var)
+                                args: (args))))))))
+                  (input
+                    receipts: (receipts
+                      (receipt
+                        (linear_bind
+                          names: (names
+                            (var))
+                          input: (simple_source
+                            (var)))))
+                    proc: (block
+                      (send
+                        channel: (var)
+                        send_type: (send_single)
+                        inputs: (inputs
+                          (var))))))))))))))
