@@ -51,15 +51,15 @@ async fn main() -> Result<()> {
     // Create a program with local variables
     println!("\nExecuting a program with local variables...");
     let locals_program = vec![
-        Instruction::AllocLocal,       // Allocate local 0
-        Instruction::PushInt(42),      // Push 42
-        Instruction::StoreLocal(0),    // Store 42 in local 0
-        Instruction::AllocLocal,       // Allocate local 1
-        Instruction::PushInt(7),       // Push 7
-        Instruction::StoreLocal(1),    // Store 7 in local 1
-        Instruction::LoadLocal(0),     // Load local 0 (42)
-        Instruction::LoadLocal(1),     // Load local 1 (7)
-        Instruction::Mul,              // Multiply them
+        Instruction::AllocLocal,    // Allocate local 0
+        Instruction::PushInt(42),   // Push 42
+        Instruction::StoreLocal(0), // Store 42 in local 0
+        Instruction::AllocLocal,    // Allocate local 1
+        Instruction::PushInt(7),    // Push 7
+        Instruction::StoreLocal(1), // Store 7 in local 1
+        Instruction::LoadLocal(0),  // Load local 0 (42)
+        Instruction::LoadLocal(1),  // Load local 1 (7)
+        Instruction::Mul,           // Multiply them
     ];
     println!("Local variables program created");
 

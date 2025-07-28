@@ -147,7 +147,9 @@ impl RSpace for MemorySequentialRSpace {
             .data
             .lock()
             .map_err(|e| anyhow!("Failed to lock data: {}", e))?;
-        let values = data_map.get_mut(&channel).ok_or_else(|| anyhow!("Channel not found"))?;
+        let values = data_map
+            .get_mut(&channel)
+            .ok_or_else(|| anyhow!("Channel not found"))?;
         if values.is_empty() {
             bail!("No data available on channel");
         }
@@ -345,7 +347,9 @@ impl RSpace for MemoryConcurrentRSpace {
         pattern: Pattern,
         continuation: Continuation,
     ) -> Result<Option<ConsumeResult>> {
-        self.sequential.consume(channel, pattern, continuation).await
+        self.sequential
+            .consume(channel, pattern, continuation)
+            .await
     }
 
     async fn produce(&self, channel: ChannelName, data: Value) -> Result<()> {
