@@ -389,10 +389,15 @@ pub(super) fn node_to_ast<'ast>(
                         let mut receipt_len = 0;
 
                         for bind_node in receipt_node.named_children(&mut receipt_node.walk()) {
-                            let (names_node, source_node) = get_left_and_right(&bind_node);
-                            let name_count = names_node.named_child_count();
-                            let cont_present =
-                                names_node.child_by_field_id(field!("cont")).is_some();
+                            let (names_node, source_node) = if bind_node.named_child_count() > 1 {
+                                let (ns, s) = get_left_and_right(&bind_node);
+                                (Some(ns), s)
+                            } else {
+                                (None, get_first_child(&bind_node))
+                            };
+                            let name_count = names_node.map_or(0, |n| n.named_child_count());
+                            let cont_present = names_node
+                                .map_or(false, |n| n.child_by_field_id(field!("cont")).is_some());
 
                             let bind_desc = match bind_node.kind_id() {
                                 kind!("linear_bind") => {
@@ -443,7 +448,9 @@ pub(super) fn node_to_ast<'ast>(
                                     temp_cont_stack.push(K::EvalDelayed(source_node))
                                 }
                             }
-                            temp_cont_stack.push(K::EvalList(names_node.walk()));
+                            if let Some(names) = names_node {
+                                temp_cont_stack.push(K::EvalList(names.walk()));
+                            }
 
                             bs.push(bind_desc);
                             receipt_len += bind_desc.arity();

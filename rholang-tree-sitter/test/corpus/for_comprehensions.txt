@@ -6,6 +6,8 @@ for (x <- a; y <-b) { P }
 for (x, y, z <= chan) { Q }
 for (x <- a & y <- b & z <- c) { R }
 for (x <- a; y <- b & z <- c) { R }
+for (<- chan) { S }
+for (@() <- chan ) { S }
 
 ---
 
@@ -74,6 +76,25 @@ for (x <- a; y <- b & z <- c) { R }
         (linear_bind
           names: (names
             (var))
+          input: (simple_source
+            (var)))))
+    proc: (block
+      (var)))
+  (input
+    receipts: (receipts
+      (receipt
+        (linear_bind
+          input: (simple_source
+            (var)))))
+    proc: (block
+      (var)))
+  (input
+    receipts: (receipts
+      (receipt
+        (linear_bind
+          names: (names
+            (quote
+              (unit)))
           input: (simple_source
             (var)))))
     proc: (block
