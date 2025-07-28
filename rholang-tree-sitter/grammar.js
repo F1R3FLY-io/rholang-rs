@@ -221,19 +221,19 @@ module.exports = grammar({
         receipt: $ => conc1(choice($.linear_bind, $.repeated_bind, $.peek_bind)),
 
         linear_bind: $ => seq(
-            field('names', $.names),
+            optional(field('names', $.names)),
             '<-',
             field('input', $._source)
         ),
 
         repeated_bind: $ => seq(
-            field('names', $.names),
+            optional(field('names', $.names)),
             '<=',
             field('input', $.name)
         ),
 
         peek_bind: $ => seq(
-            field('names', $.names),
+            optional(field('names', $.names)),
             '<<-',
             field('input', $.name)
         ),
