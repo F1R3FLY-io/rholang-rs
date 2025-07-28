@@ -2,10 +2,10 @@
 // Based on the design in BYTECODE_DESIGN.md
 
 pub mod bytecode;
-pub mod vm;
-pub mod rspace;
-pub mod interpreter;
 pub mod compiler;
+pub mod interpreter;
+pub mod rspace;
+pub mod vm;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -19,9 +19,7 @@ pub struct RholangVM {
 impl RholangVM {
     /// Create a new Rholang VM instance
     pub fn new() -> Result<Self> {
-        Ok(RholangVM {
-            vm: vm::VM::new()?,
-        })
+        Ok(RholangVM { vm: vm::VM::new()? })
     }
 
     /// Execute bytecode in the VM

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// RSpace types as defined in the bytecode design
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum RSpaceType {
     /// In-memory sequential (hashmap)
     MemorySequential,

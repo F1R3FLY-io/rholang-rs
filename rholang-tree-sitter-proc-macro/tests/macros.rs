@@ -124,7 +124,7 @@ fn test_field_macro() {
             "proc" => field!("proc"),
             "decls" => field!("decls"),
             "bundle_type" => field!("bundle_type"),
-            _ => panic!("Unknown field: {}", field_name),
+            _ => panic!("Unknown field: {field_name}"),
         }
     }
 
