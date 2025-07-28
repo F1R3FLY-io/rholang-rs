@@ -1,0 +1,25 @@
+[package]
+name = "rholang-vm"
+version = "0.1.0"
+edition = "2021"
+description = "Virtual Machine for executing Rholang bytecode"
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+rholang-parser = { path = "../rholang-parser" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+rstest = { workspace = true }
+async-std = { workspace = true }
+
+[[example]]
+name = "simple_arithmetic"
+path = "examples/simple_arithmetic.rs"
+
+[[example]]
+name = "shell_integration"
+path = "examples/shell_integration.rs"
