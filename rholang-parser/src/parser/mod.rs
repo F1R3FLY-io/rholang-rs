@@ -13,6 +13,12 @@ pub struct RholangParser<'a> {
     ast_builder: ASTBuilder<'a>,
 }
 
+impl<'a> Default for RholangParser<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a> RholangParser<'a> {
     pub fn new() -> Self {
         RholangParser {

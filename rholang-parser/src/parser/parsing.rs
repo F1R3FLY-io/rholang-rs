@@ -63,7 +63,7 @@ pub(super) fn node_to_ast<'ast>(
                 }
                 cont_stack.reverse();
 
-                return arity;
+                arity
             }
 
             let span = node.range().into();
@@ -655,7 +655,7 @@ fn query_errors(of: &tree_sitter::Node, source: &str, into: &mut Vec<AnnParsingE
             if error_node.is_missing() {
                 into.push(AnnParsingError::from_mising(&error_node));
             } else {
-                if error_node.parent().map_or(false, |p| p.is_error()) {
+                if error_node.parent().is_some_and(|p| p.is_error()) {
                     // if parent of this node is an error, we skip it because it is UNEXPECTED node which we process somewhere else
                     continue;
                 }
@@ -679,15 +679,15 @@ fn apply_cont<'tree, 'ast>(
         while has_more && !cursor.node().is_named() {
             has_more = cursor.goto_next_sibling();
         }
-        return has_more;
+        has_more
     }
 
     loop {
-        let cc;
-        match cont_stack.last_mut() {
+        
+        let cc = match cont_stack.last_mut() {
             None => return Step::Done,
-            Some(k) => cc = k,
-        }
+            Some(k) => k,
+        };
 
         match cc {
             K::EvalDelayed(node) => {
@@ -1190,7 +1190,7 @@ impl<'a> ProcStack<'a> {
             return false;
         }
         self.replace_top_unchecked(replace);
-        return true;
+        true
     }
 
     #[inline]
@@ -1213,7 +1213,7 @@ impl<'a> ProcStack<'a> {
             return false;
         }
         self.replace_top2_unchecked(replace);
-        return true;
+        true
     }
 
     #[inline]
@@ -1236,7 +1236,7 @@ impl<'a> ProcStack<'a> {
             return false;
         }
         self.replace_top3_unchecked(replace);
-        return true;
+        true
     }
 
     fn replace_top_slice_unchecked<F>(&mut self, n: usize, replace: F)
@@ -1259,7 +1259,7 @@ impl<'a> ProcStack<'a> {
             return false;
         }
         self.replace_top_slice_unchecked(n, replace);
-        return true;
+        true
     }
 }
 
@@ -1382,7 +1382,7 @@ impl BindDesc {
                     SourceDesc::RS => Source::ReceiveSend { name: channel_name },
                     SourceDesc::SR { arity } => Source::SendReceive {
                         name: channel_name,
-                        inputs: (&procs[1..=*arity]).to_smallvec(),
+                        inputs: procs[1..=*arity].to_smallvec(),
                     },
                 };
                 Bind::Linear {

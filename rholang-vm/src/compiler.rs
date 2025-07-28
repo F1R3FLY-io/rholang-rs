@@ -78,146 +78,154 @@ impl RholangCompiler {
             // Parallel composition
             Proc::Par { left, right } => {
                 let mut instructions = Vec::new();
-                
+
                 // Compile left process
                 let mut left_instructions = self.compile_proc(left)?;
                 instructions.append(&mut left_instructions);
-                
+
                 // Compile right process
                 let mut right_instructions = self.compile_proc(right)?;
                 instructions.append(&mut right_instructions);
-                
+
                 // Combine with Par
                 instructions.push(Instruction::Eval); // Evaluate left
                 instructions.push(Instruction::Eval); // Evaluate right
-                
+
                 Ok(instructions)
             }
 
             // Conditional
-            Proc::IfThenElse { condition, if_true, if_false } => {
+            Proc::IfThenElse {
+                condition,
+                if_true,
+                if_false,
+            } => {
                 let mut instructions = Vec::new();
-                
+
                 // Compile condition
                 let mut cond_instructions = self.compile_proc(condition)?;
                 instructions.append(&mut cond_instructions);
                 instructions.push(Instruction::EvalBool);
-                
+
                 // Generate labels
                 let else_label = self.gen_label("else");
                 let end_label = self.gen_label("end_if");
-                
+
                 // Branch to else if condition is false
                 instructions.push(Instruction::BranchFalse(else_label.clone()));
-                
+
                 // Compile true branch
                 let mut true_instructions = self.compile_proc(if_true)?;
                 instructions.append(&mut true_instructions);
                 instructions.push(Instruction::Jump(end_label.clone()));
-                
+
                 // Else branch
                 instructions.push(Instruction::Label(else_label));
-                
+
                 // Compile false branch if it exists
                 if let Some(false_branch) = if_false {
                     let mut false_instructions = self.compile_proc(false_branch)?;
                     instructions.append(&mut false_instructions);
                 }
-                
+
                 // End label
                 instructions.push(Instruction::Label(end_label));
-                
+
                 Ok(instructions)
             }
 
             // Send
-            Proc::Send { channel, send_type, inputs } => {
+            Proc::Send {
+                channel,
+                send_type,
+                inputs,
+            } => {
                 let mut instructions = Vec::new();
-                
+
                 // Compile channel
                 let mut channel_instructions = self.compile_name(channel)?;
                 instructions.append(&mut channel_instructions);
-                
+
                 // Compile inputs
                 for input in inputs.iter() {
                     let mut input_instructions = self.compile_proc(input)?;
                     instructions.append(&mut input_instructions);
                     instructions.push(Instruction::EvalToRSpace);
                 }
-                
+
                 // Create list of inputs
                 instructions.push(Instruction::CreateList(inputs.len()));
-                
+
                 // Send to channel
                 instructions.push(Instruction::RSpacePut(RSpaceType::MemoryConcurrent));
-                
+
                 Ok(instructions)
             }
 
             // New
             Proc::New { decls, proc } => {
                 let mut instructions = Vec::new();
-                
+
                 // Create fresh names for each declaration
                 for decl in decls.iter() {
                     instructions.push(Instruction::NameCreate(RSpaceType::MemoryConcurrent));
                     instructions.push(Instruction::AllocLocal);
-                    
+
                     // Store the name in a local variable
                     let index = self.bindings.len();
                     self.bindings.insert(decl.name.name.to_string(), index);
                     instructions.push(Instruction::StoreLocal(index));
                 }
-                
+
                 // Compile the body
                 let mut body_instructions = self.compile_proc(proc)?;
                 instructions.append(&mut body_instructions);
-                
+
                 Ok(instructions)
             }
 
             // For comprehension
             Proc::ForComprehension { receipts, proc } => {
                 let mut instructions = Vec::new();
-                
+
                 // Compile each receipt
                 for receipt in receipts.receipts.iter() {
                     // Compile channel
                     let mut channel_instructions = self.compile_name(&receipt.channel)?;
                     instructions.append(&mut channel_instructions);
-                    
+
                     // Compile pattern
                     let mut pattern_instructions = self.compile_proc(&receipt.pattern)?;
                     instructions.append(&mut pattern_instructions);
-                    
+
                     // Create pattern
                     instructions.push(Instruction::PatternCompile(RSpaceType::MemoryConcurrent));
-                    
+
                     // Store continuation
                     let mut body_instructions = self.compile_proc(proc)?;
                     instructions.append(&mut body_instructions);
-                    
+
                     // Consume from channel
                     instructions.push(Instruction::RSpaceConsume(RSpaceType::MemoryConcurrent));
                 }
-                
+
                 Ok(instructions)
             }
 
             // Expressions
             Proc::BinaryExp { op, left, right } => {
                 let mut instructions = Vec::new();
-                
+
                 // Compile left operand
                 let mut left_instructions = self.compile_proc(left)?;
                 instructions.append(&mut left_instructions);
                 instructions.push(Instruction::Eval);
-                
+
                 // Compile right operand
                 let mut right_instructions = self.compile_proc(right)?;
                 instructions.append(&mut right_instructions);
                 instructions.push(Instruction::Eval);
-                
+
                 // Apply operator
                 match op {
                     rholang_parser::ast::BinaryExpOp::Add => instructions.push(Instruction::Add),
@@ -233,7 +241,7 @@ impl RholangCompiler {
                     rholang_parser::ast::BinaryExpOp::Neq => instructions.push(Instruction::CmpNeq),
                     _ => bail!("Unsupported binary operator: {:?}", op),
                 }
-                
+
                 Ok(instructions)
             }
 
@@ -262,11 +270,11 @@ impl RholangCompiler {
             Name::ProcVar(var) => self.compile_var(&var),
             Name::Quote(proc) => {
                 let mut instructions = Vec::new();
-                
+
                 // Create a quoted process
                 instructions.push(Instruction::PushProc(format!("{:?}", proc)));
                 instructions.push(Instruction::NameQuote(RSpaceType::MemoryConcurrent));
-                
+
                 Ok(instructions)
             }
         }
@@ -281,10 +289,10 @@ mod tests {
     fn test_compile_simple_arithmetic() -> Result<()> {
         let mut compiler = RholangCompiler::new()?;
         let bytecode = compiler.compile("1 + 2")?;
-        
+
         // The bytecode should push 1 and 2, then add them
         assert!(bytecode.len() > 0);
-        
+
         Ok(())
     }
 
@@ -292,10 +300,10 @@ mod tests {
     fn test_compile_if_then_else() -> Result<()> {
         let mut compiler = RholangCompiler::new()?;
         let bytecode = compiler.compile("if (true) { 1 } else { 2 }")?;
-        
+
         // The bytecode should include conditional branching
         assert!(bytecode.len() > 0);
-        
+
         Ok(())
     }
 
@@ -303,10 +311,10 @@ mod tests {
     fn test_compile_new() -> Result<()> {
         let mut compiler = RholangCompiler::new()?;
         let bytecode = compiler.compile("new x in { x!(5) }")?;
-        
+
         // The bytecode should create a new name and send to it
         assert!(bytecode.len() > 0);
-        
+
         Ok(())
     }
 }

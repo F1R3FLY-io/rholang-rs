@@ -208,7 +208,7 @@ impl RholangVMInterpreterProvider {
             .compiler
             .lock()
             .map_err(|e| anyhow!("Failed to lock compiler: {}", e))?;
-        
+
         // Compile the code
         compiler.compile(code)
     }
@@ -419,45 +419,45 @@ mod tests {
     #[tokio::test]
     async fn test_list_processes() -> Result<()> {
         let provider = RholangVMInterpreterProvider::new()?;
-        
+
         // Start a long-running process
         let code = "for(_ <- @\"channel\") { Nil }";
         let _result = provider.interpret(code).await;
-        
+
         // List processes
         let processes = provider.list_processes()?;
         assert_eq!(processes.len(), 0); // The process should have completed
-        
+
         Ok(())
     }
 
     #[tokio::test]
     async fn test_kill_process() -> Result<()> {
         let provider = RholangVMInterpreterProvider::new()?;
-        
+
         // Start a long-running process
         let code = "for(_ <- @\"channel\") { Nil }";
         let _result = provider.interpret(code).await;
-        
+
         // Kill a non-existent process
         let killed = provider.kill_process(999)?;
         assert!(!killed);
-        
+
         Ok(())
     }
 
     #[tokio::test]
     async fn test_kill_all_processes() -> Result<()> {
         let provider = RholangVMInterpreterProvider::new()?;
-        
+
         // Start a long-running process
         let code = "for(_ <- @\"channel\") { Nil }";
         let _result = provider.interpret(code).await;
-        
+
         // Kill all processes
         let count = provider.kill_all_processes()?;
         assert_eq!(count, 0); // The process should have completed
-        
+
         Ok(())
     }
 }
