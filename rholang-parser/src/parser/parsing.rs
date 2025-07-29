@@ -238,11 +238,12 @@ pub(super) fn node_to_ast<'ast>(
                     } else {
                         collection_node.child_by_field_id(field!("remainder"))
                     };
+                    let has_remainder = remainder_node.is_some();
                     match collection_type {
                         kind!("list") => {
                             cont_stack.push(K::ConsumeList {
                                 arity: collection_node.named_child_count(),
-                                has_remainder: remainder_node.is_some(),
+                                has_remainder,
                                 span,
                             });
                             cont_stack.push(K::EvalList(collection_node.walk()));
@@ -250,7 +251,7 @@ pub(super) fn node_to_ast<'ast>(
                         kind!("set") => {
                             cont_stack.push(K::ConsumeSet {
                                 arity: collection_node.named_child_count(),
-                                has_remainder: remainder_node.is_some(),
+                                has_remainder,
                                 span,
                             });
                             cont_stack.push(K::EvalList(collection_node.walk()));
@@ -272,17 +273,14 @@ pub(super) fn node_to_ast<'ast>(
                                 field!("value"),
                                 &mut temp_cont_stack,
                             );
-                            let has_remainder = remainder_node.is_some();
                             cont_stack.push(K::ConsumeMap {
                                 arity,
                                 has_remainder,
                                 span,
                             });
                             cont_stack.append(&mut temp_cont_stack);
-                            if has_remainder {
-                                let remainder_node =
-                                    get_field(&collection_node, field!("remainder"));
-                                cont_stack.push(K::EvalDelayed(remainder_node));
+                            if let Some(rem) = remainder_node {
+                                cont_stack.push(K::EvalDelayed(rem));
                             }
                         }
                         _ => unreachable!("Rholang collections are: list, set, tuple and map"),
