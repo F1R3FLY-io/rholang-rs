@@ -1,7 +1,7 @@
 // Rholang VM Interpreter Provider
 // Integrates the VM with the shell through the InterpreterProvider interface
 
-use crate::bytecode::{Instruction, Value};
+use crate::bytecode::Instruction;
 use crate::compiler::RholangCompiler;
 use crate::vm::VM;
 use anyhow::{anyhow, Result};
