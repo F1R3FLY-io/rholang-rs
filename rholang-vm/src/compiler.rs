@@ -1,7 +1,7 @@
 // New Rholang Bytecode Compiler
 // Translates Rholang AST to bytecode
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use rholang_parser::{
     ast::{AnnProc, Bind, Name, Proc, Source, Var},
     RholangParser,
@@ -9,7 +9,7 @@ use rholang_parser::{
 use std::collections::HashMap;
 use validated::Validated;
 
-use crate::bytecode::{Instruction, Label, RSpaceType, Value};
+use crate::bytecode::{Instruction, Label, RSpaceType};
 
 /// The Rholang bytecode compiler
 pub struct RholangCompiler {
@@ -136,7 +136,7 @@ impl RholangCompiler {
             // Send
             Proc::Send {
                 channel,
-                send_type,
+                send_type: _,
                 inputs,
             } => {
                 let mut instructions = Vec::new();
@@ -192,7 +192,7 @@ impl RholangCompiler {
                     // Each receipt is a collection of binds
                     for bind in receipt.iter() {
                         match bind {
-                            Bind::Linear { lhs, rhs } => {
+                            Bind::Linear { lhs: _, rhs } => {
                                 // Compile channel from the rhs
                                 match rhs {
                                     Source::Simple { name } => {
