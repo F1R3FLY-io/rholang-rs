@@ -29,9 +29,8 @@ impl RholangVM {
 
     /// Compile Rholang code to bytecode
     pub fn compile(&self, code: &str) -> Result<Vec<bytecode::Instruction>> {
-        // This will be implemented later
-        // For now, return a placeholder error
-        anyhow::bail!("Compilation not yet implemented")
+        let mut compiler = compiler::RholangCompiler::new();
+        compiler.compile(code)
     }
 
     /// Compile and execute Rholang code

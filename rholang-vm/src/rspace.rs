@@ -219,30 +219,53 @@ impl RSpace for MemorySequentialRSpace {
     }
 
     async fn produce(&self, channel: ChannelName, data: Value) -> Result<()> {
-        // Check if there are continuations waiting for data on this channel
-        let mut cont_map = self
-            .continuations
-            .lock()
-            .map_err(|e| anyhow!("Failed to lock continuations: {}", e))?;
-        let continuations = match cont_map.get_mut(&channel) {
-            Some(continuations) => continuations,
-            None => {
-                // No continuations waiting, just store the data
-                return self.put(channel, data).await;
-            }
+        // First, check if there are continuations waiting for this channel
+        let has_continuations = {
+            let cont_map = self
+                .continuations
+                .lock()
+                .map_err(|e| anyhow!("Failed to lock continuations: {}", e))?;
+            
+            cont_map.get(&channel).map_or(false, |conts| !conts.is_empty())
         };
 
-        if continuations.is_empty() {
+        if !has_continuations {
             // No continuations waiting, just store the data
             return self.put(channel, data).await;
         }
 
-        // For now, just remove the first continuation
-        // In a real implementation, we would match the data against the patterns
-        let (_pattern, _continuation) = continuations.remove(0);
-        // We would resume the continuation here
-        // For now, just store the data
-        self.put(channel, data).await
+        // If we have continuations, try to get one
+        let continuation_opt = {
+            let mut cont_map = self
+                .continuations
+                .lock()
+                .map_err(|e| anyhow!("Failed to lock continuations: {}", e))?;
+            
+            cont_map.get_mut(&channel).and_then(|conts| {
+                if conts.is_empty() {
+                    None
+                } else {
+                    Some(conts.remove(0))
+                }
+            })
+        };
+
+        match continuation_opt {
+            Some((_pattern, _continuation)) => {
+                // In a real implementation, we would match the data against the pattern
+                // For now, we'll assume the match is successful and create empty bindings
+                let _bindings: HashMap<String, Value> = HashMap::new();
+                
+                // In a real implementation, we would resume the continuation with the data and bindings
+                // For now, we'll just return success without storing the data
+                // since the continuation has "consumed" it
+                Ok(())
+            },
+            None => {
+                // No continuations found (this should be rare due to our check above)
+                self.put(channel, data).await
+            }
+        }
     }
 
     async fn peek(&self, channel: ChannelName) -> Result<Option<Value>> {
