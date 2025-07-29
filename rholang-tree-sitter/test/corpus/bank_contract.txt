@@ -13,7 +13,7 @@ new
 
     new balances, loop in {
 
-      # Initialize account balances
+      // Initialize account balances
       for (@() <- loop) {
         for (@(name, balance) <- initialBalances) {
           balances!(name, balance)
@@ -22,7 +22,7 @@ new
 
       loop!(*nil) |
 
-      # Define the bank contract
+      // Define the bank contract
       contract bank(@"deposit", name, amount, ack) = {
         for (name2, old <- balances) {
           match name == name2 {
@@ -75,7 +75,7 @@ new
     }
   } |
 
-  # Example usage:
+  // Example usage:
   makeBank!([["Alice", 100], ["Bob", 50]], *return) |
 
   for (bank <- return) {
