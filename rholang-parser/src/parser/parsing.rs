@@ -516,9 +516,9 @@ pub(super) fn node_to_ast<'ast>(
                         temp_cont_stack.push(K::EvalList(lhs.walk()));
                         temp_cont_stack.push(K::EvalList(rhs.walk()));
                         let_decls.push(LetDecl {
-                            lhs: lhs.named_child_count(),
-                            lhs_has_cont: lhs.child_by_field_id(field!("cont")).is_some(),
-                            rhs: rhs.named_child_count(),
+                            lhs_arity,
+                            lhs_has_cont,
+                            rhs_arity,
                         });
                     }
                     temp_cont_stack.reverse();
@@ -773,7 +773,7 @@ fn apply_cont<'tree, 'ast>(
                         } => {
                             let n = let_decls
                                 .iter()
-                                .map(|decl| decl.lhs + decl.rhs)
+                                .map(|decl| decl.lhs_arity + decl.rhs_arity)
                                 .sum::<usize>();
                             proc_stack.replace_top_slice(n + 1, |body_procs| {
                                 let body = body_procs[0];
@@ -1523,9 +1523,9 @@ where
 
 #[derive(Debug, Clone, Copy)]
 struct LetDecl {
-    lhs: usize,
+    lhs_arity: usize,
     lhs_has_cont: bool,
-    rhs: usize,
+    rhs_arity: usize,
 }
 
 struct LetBindingIter<'slice, 'a> {
@@ -1535,9 +1535,9 @@ struct LetBindingIter<'slice, 'a> {
 
 impl<'slice, 'a> LetBindingIter<'slice, 'a> {
     fn new(decl: &LetDecl, slice: &'slice [AnnProc<'a>]) -> Self {
-        assert!(!slice.is_empty() && slice.len() == decl.lhs + decl.rhs);
+        assert!(!slice.is_empty() && slice.len() == decl.lhs_arity + decl.rhs_arity);
         unsafe {
-            let (lhs, rhs) = slice.split_at_unchecked(decl.lhs);
+            let (lhs, rhs) = slice.split_at_unchecked(decl.lhs_arity);
             if decl.lhs_has_cont && rhs.len() > lhs.len() {
                 let (rem, init) = lhs.split_last().unwrap_unchecked();
                 LetBindingIter {
@@ -1626,7 +1626,9 @@ where
             // Either no current inner, or it's exhausted
             match self.outer.next() {
                 Some(let_decl) => unsafe {
-                    let (this, rest) = self.procs.split_at_unchecked(let_decl.lhs + let_decl.rhs);
+                    let (this, rest) = self
+                        .procs
+                        .split_at_unchecked(let_decl.lhs_arity + let_decl.rhs_arity);
                     self.current_inner = Some(LetBindingIter::new(let_decl, this));
                     self.procs = rest;
                 },
