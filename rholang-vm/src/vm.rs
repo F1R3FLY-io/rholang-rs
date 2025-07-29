@@ -1,9 +1,9 @@
 // Rholang Virtual Machine Implementation
 // Based on the design in BYTECODE_DESIGN.md
 
-use crate::bytecode::{BytecodeProgram, Instruction, Label, RSpaceType, Value};
+use crate::bytecode::{Instruction, Label, Value};
 use anyhow::{anyhow, bail, Result};
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 /// The VM execution context
 pub struct ExecutionContext {
@@ -106,16 +106,13 @@ impl ExecutionContext {
 
 /// The Rholang Virtual Machine
 pub struct VM {
-    /// The execution context queue
-    contexts: VecDeque<ExecutionContext>,
+    // VM is currently stateless, but this struct is kept for future extensions
 }
 
 impl VM {
     /// Create a new VM instance
     pub fn new() -> Result<Self> {
-        Ok(VM {
-            contexts: VecDeque::new(),
-        })
+        Ok(VM {})
     }
 
     /// Execute a bytecode program
@@ -335,7 +332,7 @@ impl VM {
                     (Value::String(a), Value::String(b)) => {
                         context.push(Value::String(a + &b));
                     }
-                    (Value::List(mut a), Value::List(b)) => {
+                    (Value::List(a), Value::List(b)) => {
                         let mut result = a;
                         result.extend(b);
                         context.push(Value::List(result));

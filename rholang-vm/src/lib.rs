@@ -8,7 +8,6 @@ pub mod rspace;
 pub mod vm;
 
 use anyhow::Result;
-use async_trait::async_trait;
 
 /// The main Rholang VM interface
 pub struct RholangVM {
