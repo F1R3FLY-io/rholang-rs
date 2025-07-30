@@ -17,9 +17,16 @@ impl ParsingError {
         if let Some(child) = node.named_child(0) {
             if child.is_error() {
                 unsafe {
+                    // SAFETY: source code is expected to contain valid utf8 and our grammar does not allow to
+                    // chop any single character. So, byte ranges of all nodes must start and end on valid UTF-8
+                    // slice
                     let text = str::from_utf8_unchecked(&code[child.byte_range()]);
-                    if text.len() == 1 {
-                        return ParsingError::Unexpected(text.chars().next().unwrap_unchecked());
+                    let mut chars = text.chars();
+                    if let Some(unexpected) = chars.next() {
+                        // it's a single char
+                        if chars.next().is_none() {
+                            return ParsingError::Unexpected(unexpected);
+                        }
                     }
                 }
             }
