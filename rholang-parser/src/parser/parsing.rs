@@ -710,7 +710,10 @@ fn apply_cont<'tree, 'ast>(
             _ => {
                 //consumes
                 unsafe {
+                    // SAFETY: We only enter this branch when cont_stack.last_mut() returned
+                    // Some(_), which guarantees the stack is non-empty. The pop() cannot fail.
                     let k = cont_stack.pop().unwrap_unchecked();
+
                     let underflow = !match k {
                         K::ConsumeBinaryExp { op, span } => {
                             proc_stack.replace_top2(|left, right| AnnProc {
@@ -792,6 +795,7 @@ fn apply_cont<'tree, 'ast>(
                         } => proc_stack.replace_top_slice(arity, |elems| {
                             let list = if has_remainder {
                                 assert!(!elems.is_empty());
+                                // SAFETY: We have checked above that there is at least one element
                                 let (last, init) = elems.split_last().unwrap_unchecked();
                                 ast_builder.alloc_list_with_remainder(
                                     init,
@@ -882,6 +886,8 @@ fn apply_cont<'tree, 'ast>(
                             proc_stack.replace_top_slice(arity + 2, |name_inputs_cont| {
                                 let channel =
                                     name_inputs_cont[0].try_into().expect("expected a name");
+                                // SAFETY: Because we successfully consumed |arity + 2|
+                                // elements, then the slice.len() is greater or equal 2
                                 let (last, messages) =
                                     name_inputs_cont[1..].split_last().unwrap_unchecked();
                                 let cont = *last;
@@ -899,6 +905,7 @@ fn apply_cont<'tree, 'ast>(
                         } => proc_stack.replace_top_slice(arity, |elems| {
                             let set = if has_remainder {
                                 assert!(!elems.is_empty());
+                                // SAFETY: We have checked above that there is at least one element
                                 let (last, init) = elems.split_last().unwrap_unchecked();
                                 ast_builder.alloc_set_with_remainder(
                                     init,
@@ -1170,7 +1177,10 @@ impl<'a> ProcStack<'a> {
             stack.len() == 1,
             "bug: parsing finished prematurely\n.Remaining process stack: {stack:#?}"
         );
-        unsafe { *stack.last().unwrap_unchecked() }
+        unsafe {
+            // SAFETY: We check above that the stack contains exactly one element.
+            *stack.last().unwrap_unchecked()
+        }
     }
 
     fn to_proc_partial(&self) -> Option<AnnProc<'a>> {
@@ -1315,7 +1325,9 @@ fn get_field<'a>(of: &tree_sitter::Node<'a>, id: u16) -> tree_sitter::Node<'a> {
 fn get_node_value<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
     let source_bytes = source.as_bytes();
     unsafe {
-        // string slices are expected to contain valid utf8
+        // SAFETY: source code is expected to contain valid utf8 and our grammar does not allow to
+        // chop any single character. So, byte ranges of all nodes must start and end on valid UTF-8
+        // slice
         str::from_utf8_unchecked(&source_bytes[node.byte_range()])
     }
 }
@@ -1433,12 +1445,10 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(next) = self.iter.next() {
-            unsafe {
-                let (this, rest) = self.procs.split_at_unchecked(next.arity());
-                let item = next.to_bind(this);
-                self.procs = rest;
-                return Some(item);
-            }
+            let (this, rest) = self.procs.split_at(next.arity());
+            let item = next.to_bind(this);
+            self.procs = rest;
+            return Some(item);
         }
 
         None
@@ -1490,15 +1500,13 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(next) = self.iter.next() {
-            unsafe {
-                let (this, rest) = self.procs.split_at_unchecked(next.len);
-                let item = BindIter {
-                    iter: next.parts.iter(),
-                    procs: this,
-                };
-                self.procs = rest;
-                return Some(item);
-            }
+            let (this, rest) = self.procs.split_at(next.len);
+            let item = BindIter {
+                iter: next.parts.iter(),
+                procs: this,
+            };
+            self.procs = rest;
+            return Some(item);
         }
 
         None
@@ -1535,8 +1543,11 @@ impl<'slice, 'a> LetBindingIter<'slice, 'a> {
     fn new(decl: &LetDecl, slice: &'slice [AnnProc<'a>]) -> Self {
         assert!(!slice.is_empty() && slice.len() == decl.lhs_arity + decl.rhs_arity);
         unsafe {
+            // SAFETY: We check above that the slice contains exactly |lhs_arity + rhs_arity|
+            // elements, and it is not zero. Therefore, lhs_arity <= slice.len()
             let (lhs, rhs) = slice.split_at_unchecked(decl.lhs_arity);
             if decl.lhs_has_cont && rhs.len() > lhs.len() {
+                // SAFETY: If lhs has a continuation then it's arity is at least 1
                 let (rem, init) = lhs.split_last().unwrap_unchecked();
                 LetBindingIter {
                     iter: init.iter().zip(rhs.iter()),
@@ -1623,13 +1634,11 @@ where
             }
             // Either no current inner, or it's exhausted
             match self.outer.next() {
-                Some(let_decl) => unsafe {
-                    let (this, rest) = self
-                        .procs
-                        .split_at_unchecked(let_decl.lhs_arity + let_decl.rhs_arity);
+                Some(let_decl) => {
+                    let (this, rest) = self.procs.split_at(let_decl.lhs_arity + let_decl.rhs_arity);
                     self.current_inner = Some(LetBindingIter::new(let_decl, this));
                     self.procs = rest;
-                },
+                }
                 None => return None,
             }
         }
