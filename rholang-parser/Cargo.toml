@@ -8,6 +8,10 @@ edition = "2024"
 name = "rholang_parser"
 crate-type = ["cdylib", "rlib"]
 
+[[bench]]
+name = "parsing"
+harness = false
+
 [dependencies]
 bitvec = { workspace = true }
 nonempty-collections = "1.0.0"
@@ -19,5 +23,6 @@ typed-arena = "2.0.2"
 validated = { workspace = true }
 
 [dev-dependencies]
+divan = { workspace = true }
 insta = "1.43.1"
 rstest = { workspace = true }
