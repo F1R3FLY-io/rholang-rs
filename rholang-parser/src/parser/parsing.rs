@@ -395,7 +395,7 @@ pub(super) fn node_to_ast<'ast>(
                             };
                             let name_count = names_node.map_or(0, |n| n.named_child_count());
                             let cont_present = names_node
-                                .map_or(false, |n| n.child_by_field_id(field!("cont")).is_some());
+                                .is_some_and(|n| n.child_by_field_id(field!("cont")).is_some());
 
                             let bind_desc = match bind_node.kind_id() {
                                 kind!("linear_bind") => {
@@ -1285,6 +1285,7 @@ impl Debug for ProcStack<'_> {
     }
 }
 
+#[inline]
 fn get_first_child<'a>(of: &tree_sitter::Node<'a>) -> tree_sitter::Node<'a> {
     of.named_child(0).unwrap_or_else(|| {
         panic!(
@@ -1309,6 +1310,7 @@ fn get_left_and_right<'a>(
         })
 }
 
+#[inline]
 fn get_field<'a>(of: &tree_sitter::Node<'a>, id: u16) -> tree_sitter::Node<'a> {
     of.child_by_field_id(id).unwrap_or_else(|| {
         let rholang_language: tree_sitter::Language = rholang_tree_sitter::LANGUAGE.into();
