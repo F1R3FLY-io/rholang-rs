@@ -109,12 +109,24 @@ pub trait RSpace: Send + Sync {
     async fn name_unquote(&self, name: ChannelName) -> Result<String>;
 }
 
+/// Type alias for data storage in RSpace
+type DataStorage = Arc<Mutex<HashMap<ChannelName, Vec<Value>>>>;
+
+/// Type alias for continuations storage in RSpace
+type ContinuationStorage = Arc<Mutex<HashMap<ChannelName, Vec<(Pattern, Continuation)>>>>;
+
 /// In-memory sequential RSpace implementation
 pub struct MemorySequentialRSpace {
     /// The data stored in the RSpace
-    data: Arc<Mutex<HashMap<ChannelName, Vec<Value>>>>,
+    data: DataStorage,
     /// The continuations stored in the RSpace
-    continuations: Arc<Mutex<HashMap<ChannelName, Vec<(Pattern, Continuation)>>>>,
+    continuations: ContinuationStorage,
+}
+
+impl Default for MemorySequentialRSpace {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MemorySequentialRSpace {
@@ -226,7 +238,7 @@ impl RSpace for MemorySequentialRSpace {
                 .lock()
                 .map_err(|e| anyhow!("Failed to lock continuations: {}", e))?;
             
-            cont_map.get(&channel).map_or(false, |conts| !conts.is_empty())
+            cont_map.get(&channel).is_some_and(|conts| !conts.is_empty())
         };
 
         if !has_continuations {
@@ -335,6 +347,12 @@ pub struct MemoryConcurrentRSpace {
     /// The underlying sequential RSpace
     /// In a real implementation, this would use a concurrent data structure
     sequential: MemorySequentialRSpace,
+}
+
+impl Default for MemoryConcurrentRSpace {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MemoryConcurrentRSpace {

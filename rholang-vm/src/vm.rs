@@ -17,6 +17,12 @@ pub struct ExecutionContext {
     pub labels: HashMap<Label, usize>,
 }
 
+impl Default for ExecutionContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ExecutionContext {
     /// Create a new execution context
     pub fn new() -> Self {
@@ -135,7 +141,7 @@ impl VM {
 
         // Return the top of the stack as the result
         match context.pop() {
-            Ok(value) => Ok(format!("{:?}", value)),
+            Ok(value) => Ok(format!("{value:?}")),
             Err(_) => Ok("(no result)".to_string()),
         }
     }
