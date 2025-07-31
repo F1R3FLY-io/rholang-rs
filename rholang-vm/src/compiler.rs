@@ -19,6 +19,12 @@ pub struct RholangCompiler {
     bindings: HashMap<String, usize>,
 }
 
+impl Default for RholangCompiler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RholangCompiler {
     /// Create a new Rholang bytecode compiler
     pub fn new() -> Self {
@@ -69,7 +75,7 @@ impl RholangCompiler {
             Proc::BoolLiteral(b) => Ok(vec![Instruction::PushBool(*b)]),
             Proc::LongLiteral(n) => Ok(vec![Instruction::PushInt(*n)]),
             Proc::StringLiteral(s) => Ok(vec![Instruction::PushStr(s.to_string())]),
-            Proc::UriLiteral(uri) => Ok(vec![Instruction::PushStr(format!("{:?}", uri))]),
+            Proc::UriLiteral(uri) => Ok(vec![Instruction::PushStr(format!("{uri:?}"))]),
 
             // Variables
             Proc::ProcVar(var) => self.compile_var(var),
@@ -326,7 +332,7 @@ impl RholangCompiler {
                 let mut instructions = Vec::new();
 
                 // Create a quoted process
-                instructions.push(Instruction::PushProc(format!("{:?}", proc)));
+                instructions.push(Instruction::PushProc(format!("{proc:?}")));
                 instructions.push(Instruction::NameQuote(RSpaceType::MemoryConcurrent));
 
                 Ok(instructions)

@@ -36,7 +36,7 @@ impl InterpretationResult {
     pub fn unwrap(self) -> String {
         match self {
             InterpretationResult::Success(value) => value,
-            InterpretationResult::Error(err) => panic!("Called unwrap on an error result: {}", err),
+            InterpretationResult::Error(err) => panic!("Called unwrap on an error result: {err}"),
         }
     }
 
@@ -127,11 +127,11 @@ impl std::fmt::Display for InterpreterError {
         write!(f, "{}", self.message)?;
 
         if let Some(position) = &self.position {
-            write!(f, " at {}", position)?;
+            write!(f, " at {position}")?;
         }
 
         if let Some(source) = &self.source {
-            write!(f, "\nSource: {}", source)?;
+            write!(f, "\nSource: {source}")?;
         }
 
         Ok(())
@@ -234,8 +234,7 @@ impl InterpreterProvider for RholangVMInterpreterProvider {
                 Ok(guard) => guard,
                 Err(e) => {
                     return InterpretationResult::Error(InterpreterError::other_error(format!(
-                        "Failed to lock next_pid: {}",
-                        e
+                        "Failed to lock next_pid: {e}"
                     )))
                 }
             };
@@ -250,8 +249,7 @@ impl InterpreterProvider for RholangVMInterpreterProvider {
                 Ok(guard) => guard,
                 Err(e) => {
                     return InterpretationResult::Error(InterpreterError::other_error(format!(
-                        "Failed to lock processes: {}",
-                        e
+                        "Failed to lock processes: {e}"
                     )))
                 }
             };
@@ -269,8 +267,7 @@ impl InterpreterProvider for RholangVMInterpreterProvider {
             Ok(guard) => *guard,
             Err(e) => {
                 return InterpretationResult::Error(InterpreterError::other_error(format!(
-                    "Failed to lock delay_ms: {}",
-                    e
+                    "Failed to lock delay_ms: {e}"
                 )))
             }
         };
@@ -280,7 +277,7 @@ impl InterpreterProvider for RholangVMInterpreterProvider {
             Ok(bytecode) => bytecode,
             Err(e) => {
                 return InterpretationResult::Error(InterpreterError::compilation_error(
-                    format!("Failed to compile code: {}", e),
+                    format!("Failed to compile code: {e}"),
                 ));
             }
         };
@@ -302,7 +299,7 @@ impl InterpreterProvider for RholangVMInterpreterProvider {
                     Ok(vm) => vm,
                     Err(e) => {
                         return InterpretationResult::Error(InterpreterError::execution_error(
-                            format!("Failed to create VM: {}", e),
+                            format!("Failed to create VM: {e}"),
                         ));
                     }
                 };
@@ -311,7 +308,7 @@ impl InterpreterProvider for RholangVMInterpreterProvider {
                 match vm.execute(&bytecode).await {
                     Ok(result) => InterpretationResult::Success(result),
                     Err(e) => InterpretationResult::Error(InterpreterError::execution_error(
-                        format!("Failed to execute bytecode: {}", e),
+                        format!("Failed to execute bytecode: {e}"),
                     )),
                 }
             };
@@ -332,7 +329,7 @@ impl InterpreterProvider for RholangVMInterpreterProvider {
 
         // Wait for the task to complete
         let result = handle.await.unwrap_or_else(|e| {
-            InterpretationResult::Error(InterpreterError::other_error(format!("Task error: {}", e)))
+            InterpretationResult::Error(InterpreterError::other_error(format!("Task error: {e}")))
         });
 
         // Remove the process from the map
@@ -340,8 +337,7 @@ impl InterpreterProvider for RholangVMInterpreterProvider {
             Ok(guard) => guard,
             Err(e) => {
                 return InterpretationResult::Error(InterpreterError::other_error(format!(
-                    "Failed to lock processes: {}",
-                    e
+                    "Failed to lock processes: {e}"
                 )))
             }
         };
