@@ -1,0 +1,71 @@
+name: Publish js bindings
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    # branches: [main]
+    paths:
+      - "rholang-tree-sitter/**"
+      - "!rholang-tree-sitter/bindings/*/**"
+      - "rholang-tree-sitter/bindings/js/**"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      packages: write
+
+    env:
+      NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    defaults:
+      run:
+        working-directory: rholang-tree-sitter
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          cache: npm
+          cache-dependency-path: rholang-tree-sitter/bindings/js/package.json
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build wasm
+        run: npm run build:wasm
+
+      - name: Collect artifact
+        run: mv tree-sitter-rholang.wasm bindings/js/tree-sitter-rholang.wasm
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: rholang-tree-sitter/bindings/js
+
+      - name: Build bindings
+        run: npm run build
+        working-directory: rholang-tree-sitter/bindings/js
+
+      - name: Bump version
+        run: npm version patch --no-git-tag-version --no-commit-hooks --no-workspaces-update
+        working-directory: rholang-tree-sitter/bindings/js
+
+      - name: Publish
+        run: npm publish --no-git-checks --access public
+        env:
+          NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: rholang-tree-sitter/bindings/js
+
+      - name: Update package.json
+        uses: stefanzweifel/git-auto-commit-action@v6
+        with:
+          commit_message: Apply package.json changes for js bindings
