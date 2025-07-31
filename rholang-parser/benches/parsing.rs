@@ -5,11 +5,13 @@ fn main() {
 }
 
 #[divan::bench(args = each_corpus_file())]
-fn parsing(arg: &PathBuf) {
+fn parsing(bencher: divan::Bencher, arg: &PathBuf) {
     let code = fs::read_to_string(arg).expect("expected a readable file");
-    let parser = rholang_parser::RholangParser::new();
-    let result = parser.parse(&code);
-    divan::black_box_drop(result);
+    bencher.bench_local(|| {
+        let parser = rholang_parser::RholangParser::new();
+        let result = parser.parse(&code);
+        divan::black_box_drop(result);
+    });
 }
 
 fn each_corpus_file() -> impl Iterator<Item = PathBuf> {
