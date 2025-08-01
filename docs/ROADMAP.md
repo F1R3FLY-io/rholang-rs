@@ -62,6 +62,8 @@ Build a high-performance, production-ready Rholang interpreter in Rust for the F
     - *Implementation: rholang-tree-sitter/grammar.js lines 140-160 define arithmetic and logical expressions with proper precedence*
   - [x] Pattern matching syntax
     - *Implementation: rholang-tree-sitter/grammar.js lines 72-79 define match expressions and line 214 defines case patterns*
+  - [x] Performance benchmarking
+    - *Implementation: rholang-parser/benches/parsing.rs implements benchmarks for parsing performance, see [BENCHMARKS.md](./BENCHMARKS.md)*
   - [ ] Error recovery and reporting
 
 - [ ] **AST to RholangValue Conversion**
@@ -306,7 +308,7 @@ Build a high-performance, production-ready Rholang interpreter in Rust for the F
 - **Parser**: Tree-sitter for parsing (implemented in rholang-tree-sitter)
 - **Async Runtime**: Built on `tokio` for async execution
 - **Testing**: `rstest` for parameterized testing
-- **Benchmarking**: `criterion` for performance testing
+- **Benchmarking**: `divan` for performance testing (see [BENCHMARKS.md](./BENCHMARKS.md) for parsing benchmarks)
 
 ### Related Projects
 - **RChain**: Reference Rholang implementation
