@@ -4,8 +4,10 @@ use smallvec::ToSmallVec;
 use std::fmt::Debug;
 use std::iter::Zip;
 use std::slice::Iter as SliceIter;
+use std::sync::OnceLock;
 use validated::Validated;
 
+use crate::SourcePos;
 use crate::ast::Var;
 use crate::parser::errors::ParsingFailure;
 use crate::{
@@ -646,26 +648,34 @@ fn parse_decls<'a>(from: &tree_sitter::Node, source: &'a str) -> Vec<NameDecl<'a
 fn query_errors(of: &tree_sitter::Node, source: &str, into: &mut Vec<AnnParsingError>) {
     use tree_sitter::StreamingIterator;
 
-    let rholang_language: tree_sitter::Language = rholang_tree_sitter::LANGUAGE.into();
-    let query = tree_sitter::Query::new(
-        &rholang_language,
-        "(ERROR) @error-node (MISSING) @missing-node",
-    )
-    .expect("Error when trying to query errors");
-    let mut query_cursor = tree_sitter::QueryCursor::new();
+    static QUERY: OnceLock<tree_sitter::Query> = OnceLock::new();
+
+    let query = QUERY.get_or_init(|| {
+        let rholang_language = rholang_tree_sitter::LANGUAGE.into();
+        tree_sitter::Query::new(
+            &rholang_language,
+            "(ERROR) @error-node (MISSING) @missing-node",
+        )
+        .expect("failed to compile error query")
+    });
+
+    let mut cursor = tree_sitter::QueryCursor::new();
     let source_bytes = source.as_bytes();
-    let mut iter = query_cursor.matches(&query, *of, source_bytes);
-    while let Some(error_match) = iter.next() {
-        for found in error_match.captures {
-            let error_node = found.node;
-            if error_node.is_missing() {
-                into.push(AnnParsingError::from_mising(&error_node));
-            } else {
-                if error_node.parent().is_some_and(|p| p.is_error()) {
-                    // if parent of this node is an error, we skip it because it is UNEXPECTED node which we process somewhere else
-                    continue;
+
+    let mut matches = cursor.matches(query, *of, source_bytes);
+    while let Some(m) = matches.next() {
+        for capture in m.captures {
+            let node = capture.node;
+            match capture.index {
+                1 => {
+                    into.push(AnnParsingError::from_mising(&node));
                 }
-                into.push(AnnParsingError::from_error(&error_node, source_bytes))
+                _ => {
+                    if node.parent().is_some_and(|p| p.is_error()) {
+                        continue; // skip UNEXPECTED, we process it somewhere else
+                    }
+                    into.push(AnnParsingError::from_error(&node, source_bytes));
+                }
             }
         }
     }
