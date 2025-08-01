@@ -1,6 +1,6 @@
 use nonempty_collections::NEVec;
 use rholang_tree_sitter_proc_macro::{field, kind};
-use smallvec::ToSmallVec;
+use smallvec::{SmallVec, ToSmallVec};
 use std::fmt::Debug;
 use std::iter::Zip;
 use std::slice::Iter as SliceIter;
@@ -389,14 +389,13 @@ pub(super) fn node_to_ast<'ast>(
                     let receipts_node = get_field(&node, field!("receipts"));
                     let proc_node = get_field(&node, field!("proc"));
 
-                    let receipts_count = receipts_node.named_child_count();
-                    let mut rs = Vec::with_capacity(receipts_count);
-                    let mut temp_cont_stack = Vec::with_capacity(receipts_count * 2);
+                    let mut rs = SmallVec::with_capacity(receipts_node.named_child_count());
+                    let mut temp_cont_stack = Vec::with_capacity(rs.capacity() * 2);
 
                     let mut total_len = 0;
 
                     for receipt_node in receipts_node.named_children(&mut receipts_node.walk()) {
-                        let mut bs = Vec::with_capacity(receipt_node.named_child_count());
+                        let mut bs = SmallVec::with_capacity(receipt_node.named_child_count());
                         let mut receipt_len = 0;
 
                         for bind_node in receipt_node.named_children(&mut receipt_node.walk()) {
@@ -529,9 +528,8 @@ pub(super) fn node_to_ast<'ast>(
 
                     let concurrent = decls_node.kind_id() == kind!("conc_decls");
 
-                    let arity = decls_node.named_child_count();
-                    let mut let_decls = Vec::with_capacity(arity);
-                    let mut temp_cont_stack = Vec::with_capacity(2 * arity);
+                    let mut let_decls = SmallVec::with_capacity(decls_node.named_child_count());
+                    let mut temp_cont_stack = Vec::with_capacity(2 * let_decls.capacity());
 
                     let mut total_len = 0;
 
@@ -989,6 +987,10 @@ enum Step<'a> {
     Continue(tree_sitter::Node<'a>),
 }
 
+type LetDecls = SmallVec<[LetDecl; 1]>;
+type ReceiptDescripts = SmallVec<[ReceiptDesc; 1]>;
+type BindDescripts = SmallVec<[BindDesc; 1]>;
+
 #[derive(Clone)]
 enum K<'tree, 'ast> {
     ConsumeBinaryExp {
@@ -1008,7 +1010,7 @@ enum K<'tree, 'ast> {
         span: SourceSpan,
     },
     ConsumeForComprehension {
-        desc: Vec<ReceiptDesc>,
+        desc: ReceiptDescripts,
         total_len: usize,
         span: SourceSpan,
     },
@@ -1021,7 +1023,7 @@ enum K<'tree, 'ast> {
     ConsumeLet {
         span: SourceSpan,
         concurrent: bool,
-        let_decls: Vec<LetDecl>,
+        let_decls: LetDecls,
         total_len: usize,
     },
     ConsumeList {
@@ -1351,6 +1353,7 @@ fn get_first_child<'a>(of: &tree_sitter::Node<'a>) -> tree_sitter::Node<'a> {
     })
 }
 
+#[inline]
 fn get_left_and_right<'a>(
     of: &tree_sitter::Node<'a>,
 ) -> (tree_sitter::Node<'a>, tree_sitter::Node<'a>) {
@@ -1493,7 +1496,7 @@ impl BindDesc {
 
 #[derive(Debug, Clone)]
 struct ReceiptDesc {
-    parts: Vec<BindDesc>,
+    parts: BindDescripts,
     len: usize,
 }
 
