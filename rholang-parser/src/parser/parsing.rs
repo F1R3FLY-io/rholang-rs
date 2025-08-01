@@ -311,18 +311,29 @@ pub(super) fn node_to_ast<'ast>(
                 }
 
                 kind!("new") => {
+                    fn check_for_duplicate_decls(
+                        decls: &[NameDecl],
+                    ) -> Option<(SourcePos, SourcePos)> {
+                        decls.windows(2).find_map(|w| {
+                            if w[0] == w[1] {
+                                let mut first = w[0].id.pos;
+                                let mut second = w[1].id.pos;
+                                if second < first {
+                                    std::mem::swap(&mut first, &mut second);
+                                }
+                                Some((first, second))
+                            } else {
+                                None
+                            }
+                        })
+                    }
+
                     let decls_node = get_field(&node, field!("decls"));
                     let proc_node = get_field(&node, field!("proc"));
 
                     let mut decls = parse_decls(&decls_node, source);
                     decls.sort_unstable();
-                    let maybe_duplicate = decls.windows(2).find(|w| w[0] == w[1]);
-                    if let Some(duplicate) = maybe_duplicate {
-                        let mut first = duplicate[0].id.pos;
-                        let mut second = duplicate[1].id.pos;
-                        if second < first {
-                            std::mem::swap(&mut first, &mut second);
-                        };
+                    if let Some((first, second)) = check_for_duplicate_decls(&decls) {
                         errors.push(AnnParsingError {
                             error: ParsingError::DuplicateNameDecl { first, second },
                             span: decls_node.range().into(),
@@ -380,12 +391,12 @@ pub(super) fn node_to_ast<'ast>(
 
                     let receipts_count = receipts_node.named_child_count();
                     let mut rs = Vec::with_capacity(receipts_count);
-
                     let mut temp_cont_stack = Vec::with_capacity(receipts_count * 2);
 
+                    let mut total_len = 0;
+
                     for receipt_node in receipts_node.named_children(&mut receipts_node.walk()) {
-                        let bind_count = receipt_node.named_child_count();
-                        let mut bs = Vec::with_capacity(bind_count);
+                        let mut bs = Vec::with_capacity(receipt_node.named_child_count());
                         let mut receipt_len = 0;
 
                         for bind_node in receipt_node.named_children(&mut receipt_node.walk()) {
@@ -395,9 +406,13 @@ pub(super) fn node_to_ast<'ast>(
                             } else {
                                 (None, get_first_child(&bind_node))
                             };
-                            let name_count = names_node.map_or(0, |n| n.named_child_count());
-                            let cont_present = names_node
-                                .is_some_and(|n| n.child_by_field_id(field!("cont")).is_some());
+                            let (name_count, cont_present) = match names_node {
+                                Some(names) => (
+                                    names.named_child_count(),
+                                    names.child_by_field_id(field!("cont")).is_some(),
+                                ),
+                                None => (0, false),
+                            };
 
                             let bind_desc = match bind_node.kind_id() {
                                 kind!("linear_bind") => {
@@ -435,34 +450,45 @@ pub(super) fn node_to_ast<'ast>(
                                 ),
                             };
 
-                            match bind_desc {
-                                BindDesc::Linear { ref source, .. } => {
+                            match &bind_desc {
+                                BindDesc::Linear {
+                                    source: SourceDesc::SR { .. },
+                                    ..
+                                } => {
+                                    let inputs = get_field(&source_node, field!("inputs"));
                                     temp_cont_stack
                                         .push(K::EvalDelayed(get_first_child(&source_node)));
-                                    if let SourceDesc::SR { arity: _ } = source {
-                                        let inputs = get_field(&source_node, field!("inputs"));
-                                        temp_cont_stack.push(K::EvalList(inputs.walk()));
-                                    }
+                                    temp_cont_stack.push(K::EvalList(inputs.walk()));
                                 }
-                                BindDesc::Repeated { .. } | BindDesc::Peek { .. } => {
-                                    temp_cont_stack.push(K::EvalDelayed(source_node))
+                                BindDesc::Linear { .. } => {
+                                    temp_cont_stack
+                                        .push(K::EvalDelayed(get_first_child(&source_node)));
+                                }
+                                _ => {
+                                    temp_cont_stack.push(K::EvalDelayed(source_node));
                                 }
                             }
+
                             if let Some(names) = names_node {
                                 temp_cont_stack.push(K::EvalList(names.walk()));
                             }
 
                             bs.push(bind_desc);
-                            receipt_len += bind_desc.arity();
+                            receipt_len += bind_desc.len();
                         }
                         rs.push(ReceiptDesc {
                             parts: bs,
                             len: receipt_len,
                         });
+                        total_len += receipt_len;
                     }
                     temp_cont_stack.reverse();
 
-                    cont_stack.push(K::ConsumeForComprehension { desc: rs, span });
+                    cont_stack.push(K::ConsumeForComprehension {
+                        desc: rs,
+                        total_len,
+                        span,
+                    });
                     cont_stack.append(&mut temp_cont_stack);
                     node = proc_node;
                     continue 'parse;
@@ -490,21 +516,32 @@ pub(super) fn node_to_ast<'ast>(
                 }
 
                 kind!("let") => {
+                    fn let_decl_is_malformed(
+                        lhs_arity: usize,
+                        rhs_arity: usize,
+                        lhs_has_cont: bool,
+                    ) -> bool {
+                        (lhs_has_cont && lhs_arity > rhs_arity) || lhs_arity != rhs_arity
+                    }
+
                     let decls_node = get_field(&node, field!("decls"));
                     let body_node = get_field(&node, field!("proc"));
 
                     let concurrent = decls_node.kind_id() == kind!("conc_decls");
-                    let arity = decls_node.named_child_count();
 
+                    let arity = decls_node.named_child_count();
                     let mut let_decls = Vec::with_capacity(arity);
                     let mut temp_cont_stack = Vec::with_capacity(2 * arity);
+
+                    let mut total_len = 0;
+
                     for decl_node in decls_node.named_children(&mut decls_node.walk()) {
                         let (lhs, rhs) = get_left_and_right(&decl_node);
                         let lhs_arity = lhs.named_child_count();
                         let rhs_arity = rhs.named_child_count();
                         let lhs_has_cont = lhs.child_by_field_id(field!("cont")).is_some();
 
-                        if (lhs_has_cont && lhs_arity > rhs_arity) || lhs_arity != rhs_arity {
+                        if let_decl_is_malformed(lhs_arity, rhs_arity, lhs_has_cont) {
                             errors.push(AnnParsingError {
                                 error: ParsingError::MalformedLetDecl {
                                     lhs_arity,
@@ -520,6 +557,7 @@ pub(super) fn node_to_ast<'ast>(
                             lhs_has_cont,
                             rhs_arity,
                         });
+                        total_len += lhs_arity + rhs_arity;
                     }
                     temp_cont_stack.reverse();
 
@@ -527,6 +565,7 @@ pub(super) fn node_to_ast<'ast>(
                         span,
                         concurrent,
                         let_decls,
+                        total_len,
                     });
                     cont_stack.append(&mut temp_cont_stack);
 
@@ -753,18 +792,18 @@ fn apply_cont<'tree, 'ast>(
                             proc: ast_builder.alloc_eval(proc.try_into().expect("expected a name")),
                             span,
                         }),
-                        K::ConsumeForComprehension { desc, span } => {
-                            let n: usize = desc.iter().map(|r| r.len).sum();
-                            proc_stack.replace_top_slice(n + 1, |body_procs| {
-                                let body = body_procs[0];
-                                let procs = &body_procs[1..];
-                                AnnProc {
-                                    proc: ast_builder
-                                        .alloc_for(ReceiptIter::new(&desc, procs), body),
-                                    span,
-                                }
-                            })
-                        }
+                        K::ConsumeForComprehension {
+                            desc,
+                            total_len,
+                            span,
+                        } => proc_stack.replace_top_slice(total_len + 1, |body_procs| {
+                            let body = body_procs[0];
+                            let procs = &body_procs[1..];
+                            AnnProc {
+                                proc: ast_builder.alloc_for(ReceiptIter::new(&desc, procs), body),
+                                span,
+                            }
+                        }),
                         K::ConsumeIfThen { span } => {
                             proc_stack.replace_top2(|cond, if_true| AnnProc {
                                 proc: ast_builder.alloc_if_then(cond, if_true),
@@ -781,23 +820,18 @@ fn apply_cont<'tree, 'ast>(
                             span,
                             concurrent,
                             let_decls,
-                        } => {
-                            let n = let_decls
-                                .iter()
-                                .map(|decl| decl.lhs_arity + decl.rhs_arity)
-                                .sum::<usize>();
-                            proc_stack.replace_top_slice(n + 1, |body_procs| {
-                                let body = body_procs[0];
-                                AnnProc {
-                                    proc: ast_builder.alloc_let(
-                                        LetDeclIter::new(&let_decls, &body_procs[1..]),
-                                        body,
-                                        concurrent,
-                                    ),
-                                    span,
-                                }
-                            })
-                        }
+                            total_len,
+                        } => proc_stack.replace_top_slice(total_len + 1, |body_procs| {
+                            let body = body_procs[0];
+                            AnnProc {
+                                proc: ast_builder.alloc_let(
+                                    LetDeclIter::new(&let_decls, &body_procs[1..]),
+                                    body,
+                                    concurrent,
+                                ),
+                                span,
+                            }
+                        }),
                         K::ConsumeList {
                             arity,
                             has_remainder,
@@ -975,6 +1009,7 @@ enum K<'tree, 'ast> {
     },
     ConsumeForComprehension {
         desc: Vec<ReceiptDesc>,
+        total_len: usize,
         span: SourceSpan,
     },
     ConsumeIfThen {
@@ -987,6 +1022,7 @@ enum K<'tree, 'ast> {
         span: SourceSpan,
         concurrent: bool,
         let_decls: Vec<LetDecl>,
+        total_len: usize,
     },
     ConsumeList {
         arity: usize,
@@ -1068,9 +1104,14 @@ impl Debug for K<'_, '_> {
             Self::ConsumeEval { span } => {
                 f.debug_struct("ConsumeEval").field("span", span).finish()
             }
-            Self::ConsumeForComprehension { desc, span } => f
+            Self::ConsumeForComprehension {
+                desc,
+                total_len,
+                span,
+            } => f
                 .debug_struct("ConsumeForComprehension")
                 .field("desc", desc)
+                .field("total_len", total_len)
                 .field("span", span)
                 .finish(),
             Self::ConsumeIfThen { span } => {
@@ -1084,10 +1125,12 @@ impl Debug for K<'_, '_> {
                 span,
                 concurrent,
                 let_decls,
+                total_len,
             } => f
                 .debug_struct("ConsumeLet")
                 .field("concurrent", concurrent)
                 .field("let_decls", let_decls)
+                .field("total_len", total_len)
                 .field("span", span)
                 .finish(),
             Self::ConsumeList { arity, span, .. } => f
@@ -1197,17 +1240,16 @@ impl<'a> ProcStack<'a> {
         self.stack.last().copied()
     }
 
-    #[inline]
-    fn replace_top_unchecked<F>(&mut self, replace: F)
+    #[inline(always)]
+    unsafe fn replace_top_unchecked<F>(&mut self, replace: F)
     where
         F: FnOnce(AnnProc<'a>) -> AnnProc<'a>,
     {
-        unsafe {
-            let top = self.stack.last_mut().unwrap_unchecked();
-            *top = replace(*top);
-        }
+        let top = self.stack.last_mut().unwrap_unchecked();
+        *top = replace(*top);
     }
 
+    #[inline]
     fn replace_top<F>(&mut self, replace: F) -> bool
     where
         F: FnOnce(AnnProc<'a>) -> AnnProc<'a>,
@@ -1215,19 +1257,19 @@ impl<'a> ProcStack<'a> {
         if self.stack.is_empty() {
             return false;
         }
-        self.replace_top_unchecked(replace);
+        unsafe {
+            self.replace_top_unchecked(replace);
+        }
         return true;
     }
 
-    #[inline]
-    fn replace_top2_unchecked<F>(&mut self, replace: F)
+    #[inline(always)]
+    unsafe fn replace_top2_unchecked<F>(&mut self, replace: F)
     where
         F: FnOnce(AnnProc<'a>, AnnProc<'a>) -> AnnProc<'a>,
     {
-        unsafe {
-            let top = self.stack.pop().unwrap_unchecked();
-            self.replace_top_unchecked(|top_1| replace(top_1, top));
-        }
+        let top = self.stack.pop().unwrap_unchecked();
+        self.replace_top_unchecked(|top_1| replace(top_1, top));
     }
 
     #[inline]
@@ -1238,19 +1280,19 @@ impl<'a> ProcStack<'a> {
         if self.stack.len() < 2 {
             return false;
         }
-        self.replace_top2_unchecked(replace);
+        unsafe {
+            self.replace_top2_unchecked(replace);
+        }
         return true;
     }
 
-    #[inline]
-    fn replace_top3_unchecked<F>(&mut self, replace: F)
+    #[inline(always)]
+    unsafe fn replace_top3_unchecked<F>(&mut self, replace: F)
     where
         F: FnOnce(AnnProc<'a>, AnnProc<'a>, AnnProc<'a>) -> AnnProc<'a>,
     {
-        unsafe {
-            let top = self.stack.pop().unwrap_unchecked();
-            self.replace_top2_unchecked(|top_2, top_1| replace(top_2, top_1, top));
-        }
+        let top = self.stack.pop().unwrap_unchecked();
+        self.replace_top2_unchecked(|top_2, top_1| replace(top_2, top_1, top));
     }
 
     #[inline]
@@ -1261,7 +1303,9 @@ impl<'a> ProcStack<'a> {
         if self.stack.len() < 3 {
             return false;
         }
-        self.replace_top3_unchecked(replace);
+        unsafe {
+            self.replace_top3_unchecked(replace);
+        }
         return true;
     }
 
@@ -1271,9 +1315,10 @@ impl<'a> ProcStack<'a> {
     {
         let stack = &mut self.stack;
         let top = stack.len();
-        let slice = &stack[top - n..];
+        let split = top - n;
+        let slice = &stack[split..];
         let result = replace(slice);
-        stack.truncate(top - n);
+        stack.truncate(split);
         stack.push(result);
     }
 
@@ -1361,10 +1406,10 @@ enum SourceDesc {
 }
 
 impl SourceDesc {
-    fn arity(&self) -> usize {
+    fn len(&self) -> usize {
         match self {
             SourceDesc::Simple | SourceDesc::RS => 1,
-            SourceDesc::SR { arity } => *arity,
+            SourceDesc::SR { arity } => *arity + 1,
         }
     }
 }
@@ -1387,11 +1432,11 @@ enum BindDesc {
 }
 
 impl BindDesc {
-    fn arity(&self) -> usize {
+    fn len(&self) -> usize {
         match self {
             BindDesc::Linear {
                 name_count, source, ..
-            } => name_count + source.arity(),
+            } => name_count + source.len(),
             BindDesc::Repeated { name_count, .. } | BindDesc::Peek { name_count, .. } => {
                 name_count + 1
             }
@@ -1399,38 +1444,49 @@ impl BindDesc {
     }
 
     fn to_bind<'a>(&self, procs: &[AnnProc<'a>]) -> Bind<'a> {
-        assert!(procs.len() == self.arity());
-        let channel_name = procs[0].try_into().expect("expected a name");
-        match self {
-            BindDesc::Linear {
-                cont_present,
-                source,
-                ..
-            } => {
-                let rhs = match source {
-                    SourceDesc::Simple => Source::Simple { name: channel_name },
-                    SourceDesc::RS => Source::ReceiveSend { name: channel_name },
-                    SourceDesc::SR { arity } => Source::SendReceive {
-                        name: channel_name,
-                        inputs: (&procs[1..=*arity]).to_smallvec(),
-                    },
-                };
-                Bind::Linear {
-                    lhs: Names::from_slice(&procs[source.arity()..], *cont_present)
-                        .expect("expected a list of names"),
-                    rhs,
+        fn slice_to_names<'a>(slice: &[AnnProc<'a>], cont: bool) -> Names<'a> {
+            Names::from_slice(slice, cont).expect("expected a list of names")
+        }
+
+        assert!(procs.len() == self.len());
+        unsafe {
+            // SAFETY: We check above that the slice contains exactly |self.len()| elements which is
+            // always > 0 by construction
+            let (first, rest) = procs.split_first().unwrap_unchecked();
+            let channel_name = (*first).try_into().expect("expected a name");
+            match self {
+                BindDesc::Linear {
+                    cont_present,
+                    source,
+                    ..
+                } => {
+                    let rhs = match source {
+                        SourceDesc::Simple => Source::Simple { name: channel_name },
+                        SourceDesc::RS => Source::ReceiveSend { name: channel_name },
+                        SourceDesc::SR { arity } => {
+                            let inputs = &rest[..*arity];
+                            Source::SendReceive {
+                                name: channel_name,
+                                inputs: inputs.to_smallvec(),
+                            }
+                        }
+                    };
+
+                    let lhs_start = source.len() - 1;
+                    let lhs = slice_to_names(&rest[lhs_start..], *cont_present);
+
+                    Bind::Linear { lhs, rhs }
                 }
+                BindDesc::Repeated { cont_present, .. } => Bind::Repeated {
+                    lhs: slice_to_names(rest, *cont_present),
+                    rhs: channel_name,
+                },
+
+                BindDesc::Peek { cont_present, .. } => Bind::Peek {
+                    lhs: slice_to_names(rest, *cont_present),
+                    rhs: channel_name,
+                },
             }
-            BindDesc::Repeated { cont_present, .. } => Bind::Repeated {
-                lhs: Names::from_slice(&procs[1..], *cont_present)
-                    .expect("expected a list of names"),
-                rhs: channel_name,
-            },
-            BindDesc::Peek { cont_present, .. } => Bind::Peek {
-                lhs: Names::from_slice(&procs[1..], *cont_present)
-                    .expect("expected a list of names"),
-                rhs: channel_name,
-            },
         }
     }
 }
@@ -1457,7 +1513,7 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(next) = self.iter.next() {
-            let (this, rest) = self.procs.split_at(next.arity());
+            let (this, rest) = self.procs.split_at(next.len());
             let item = next.to_bind(this);
             self.procs = rest;
             return Some(item);
