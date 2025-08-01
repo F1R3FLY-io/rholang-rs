@@ -132,6 +132,62 @@ The VM supports different RSpace types for data storage:
 - `StoreSequential`: On-store sequential storage (not yet implemented)
 - `StoreConcurrent`: On-store concurrent storage (not yet implemented)
 
+## Benchmarks
+
+The VM includes benchmarks to measure performance in different areas:
+
+### Compilation Benchmark
+
+Measures the performance of compiling Rholang code to bytecode:
+
+```bash
+cargo bench --bench compilation
+```
+
+### Execution Benchmark
+
+Measures the performance of executing bytecode (compilation is done outside the benchmark):
+
+```bash
+cargo bench --bench execution
+```
+
+### End-to-End Benchmark
+
+Measures the performance of the complete process (compilation + execution):
+
+```bash
+cargo bench --bench end_to_end
+```
+
+All benchmarks use the test corpus from the rholang-parser crate and automatically skip files that can't be compiled.
+
+## Tests
+
+The VM includes tests to verify functionality with real Rholang code examples:
+
+### Corpus Tests
+
+Tests that compile and execute all examples from the rholang-parser test corpus:
+
+```bash
+cargo test --test corpus_tests
+```
+
+To see detailed output including compilation and execution results:
+
+```bash
+cargo test --test corpus_tests -- --nocapture
+```
+
+The corpus tests include three test functions:
+
+1. **Compilation Test**: Attempts to compile each corpus file and reports success/failure counts
+2. **Compile and Execute Test**: Attempts to compile and then execute each corpus file, reporting detailed success/failure counts for both steps
+3. **End-to-End Test**: Tests the complete process using the `compile_and_execute` method
+
+These tests help ensure that the VM can handle a wide variety of Rholang code examples and provide visibility into which features are working correctly and which need further implementation.
+
 ## Future Work
 
 - Implement more Rholang features
