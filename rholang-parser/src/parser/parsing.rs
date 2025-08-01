@@ -1446,7 +1446,7 @@ impl BindDesc {
         }
     }
 
-    fn to_bind<'a>(&self, procs: &[AnnProc<'a>]) -> Bind<'a> {
+    fn to_bind<'a>(self, procs: &[AnnProc<'a>]) -> Bind<'a> {
         fn slice_to_names<'a>(slice: &[AnnProc<'a>], cont: bool) -> Names<'a> {
             Names::from_slice(slice, cont).expect("expected a list of names")
         }
@@ -1467,7 +1467,7 @@ impl BindDesc {
                         SourceDesc::Simple => Source::Simple { name: channel_name },
                         SourceDesc::RS => Source::ReceiveSend { name: channel_name },
                         SourceDesc::SR { arity } => {
-                            let inputs = &rest[..*arity];
+                            let inputs = &rest[..arity];
                             Source::SendReceive {
                                 name: channel_name,
                                 inputs: inputs.to_smallvec(),
@@ -1476,17 +1476,17 @@ impl BindDesc {
                     };
 
                     let lhs_start = source.len() - 1;
-                    let lhs = slice_to_names(&rest[lhs_start..], *cont_present);
+                    let lhs = slice_to_names(&rest[lhs_start..], cont_present);
 
                     Bind::Linear { lhs, rhs }
                 }
                 BindDesc::Repeated { cont_present, .. } => Bind::Repeated {
-                    lhs: slice_to_names(rest, *cont_present),
+                    lhs: slice_to_names(rest, cont_present),
                     rhs: channel_name,
                 },
 
                 BindDesc::Peek { cont_present, .. } => Bind::Peek {
-                    lhs: slice_to_names(rest, *cont_present),
+                    lhs: slice_to_names(rest, cont_present),
                     rhs: channel_name,
                 },
             }
