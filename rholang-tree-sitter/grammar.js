@@ -89,7 +89,7 @@ module.exports = grammar({
         contract: $ => prec(2, seq(
             'contract',
             field('name', $.name),
-            '(', field('formals', $.names), ')',
+            '(', optional(field('formals', $.names)), ')',
             '=',
             field('proc', $.block)
         )),
@@ -178,7 +178,7 @@ module.exports = grammar({
         disjunction: $ => prec.left(13, seq($._proc, '\\/', $._proc)),
         conjunction: $ => prec.left(14, seq($._proc, '/\\', $._proc)),
         negation: $ => prec(15, seq('~', $._proc)),
-        _ground_expression: $ => prec(16, choice($.block, $._literal, $.nil, $.collection, $._proc_var, $.simple_type)),
+        _ground_expression: $ => prec(16, choice($.block, $._literal, $.nil, $.collection, $._proc_var, $.simple_type, $.unit)),
 
         // synchronous send continuations
         sync_send_cont: $ => choice($.empty_cont, $.non_empty_cont),
@@ -221,19 +221,19 @@ module.exports = grammar({
         receipt: $ => conc1(choice($.linear_bind, $.repeated_bind, $.peek_bind)),
 
         linear_bind: $ => seq(
-            field('names', $.names),
+            optional(field('names', $.names)),
             '<-',
             field('input', $._source)
         ),
 
         repeated_bind: $ => seq(
-            field('names', $.names),
+            optional(field('names', $.names)),
             '<=',
             field('input', $.name)
         ),
 
         peek_bind: $ => seq(
-            field('names', $.names),
+            optional(field('names', $.names)),
             '<<-',
             field('input', $.name)
         ),
@@ -267,7 +267,9 @@ module.exports = grammar({
         bool_literal: $ => choice('true', 'false'),
         long_literal: $ => token(/-?\d+/),
         string_literal: $ => token(/"([^"\\]|(\\[0nrt\\"])|(\\[0-9]+))*"/),
-        uri_literal: $ => token(/`[^`]*`/),
+        uri_literal: $ => token(/`[^`]+`/),
+
+        unit: $ => seq('(', ')'),
 
         nil: $ => 'Nil',
 
@@ -297,7 +299,7 @@ module.exports = grammar({
         wildcard: $ => '_',
         var: $ => token(/[a-zA-Z]([a-zA-Z0-9_'])*|_([a-zA-Z0-9_'])+/),
 
-        names: $ => seq(commaSep1($.name), optional($._name_remainder)),
+        names: $ => choice(seq(commaSep1($.name), optional($._name_remainder)), $._name_remainder),
         _name_remainder: $ => seq('...', '@', field('cont', $._proc_var)),
 
         // comments

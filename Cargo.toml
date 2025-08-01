@@ -1,10 +1,8 @@
 [workspace]
 resolver = "3"
 members = [
-    "shell",
     "rholang-tree-sitter",
     "rholang-parser",
-    "rholang-jni-bridge",
     "rholang-tree-sitter-proc-macro"
 ]
 
@@ -14,6 +12,9 @@ anyhow = "1.0.98"
 
 # Used by: shell
 async-trait = "0.1.88"
+
+# General purpose, used mostly by rholang-parser
+bitvec = "1.0.1"
 
 # Used by: shell
 tokio = { version = "1.45.1", features = ["rt", "rt-multi-thread", "full"] }
@@ -33,14 +34,20 @@ async-std = { version = "1.13.1", features = ["attributes"] }
 # Used by: shell
 bracket-parser = "0.1.0"
 
-# Used by: rholang-tree-sitter
-cc = "1.2.26"
+# Library for benchmarking
+divan = "0.1.21"
+
+# Used by: rholang-parser
+smallvec = { version = "1.15.1", features = ["union", "const_generics", "const_new", "may_dangle"] }
 
 # Used by: rholang-parser, rholang-tree-sitter
-tree-sitter = "0.25.6"
+tree-sitter = "0.25.8"
 
 # Used by: rholang-tree-sitter
 tree-sitter-language = "0.1.5"
+
+# Used by: rholang-parser
+validated = "1.0.0"
 
 # Used by: rholang-parser, rholang-jni-bridge
 serde = { version = "1.0.188", features = ["derive"] }
@@ -60,3 +67,6 @@ is-terminal = "0.4.12"
 
 [profile.dev]
 debug = true
+
+[profile.bench]
+debug = "line-tables-only"
