@@ -342,9 +342,9 @@ Fail(
             ),
             errors: [
                 AnnParsingError {
-                    error: SyntaxError {
-                        sexp: "(ERROR (var) (var))",
-                    },
+                    error: UnexpectedVar(
+                        "request",
+                    ),
                     span: SourceSpan {
                         start: SourcePos {
                             line: 12,
@@ -352,7 +352,52 @@ Fail(
                         },
                         end: SourcePos {
                             line: 12,
+                            col: 17,
+                        },
+                    },
+                },
+                AnnParsingError {
+                    error: UnexpectedVar(
+                        "with",
+                    ),
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 12,
+                            col: 18,
+                        },
+                        end: SourcePos {
+                            line: 12,
                             col: 22,
+                        },
+                    },
+                },
+                AnnParsingError {
+                    error: UnexpectedVar(
+                        "set",
+                    ),
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 16,
+                            col: 7,
+                        },
+                        end: SourcePos {
+                            line: 16,
+                            col: 10,
+                        },
+                    },
+                },
+                AnnParsingError {
+                    error: MissingToken(
+                        "}",
+                    ),
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 20,
+                            col: 2,
+                        },
+                        end: SourcePos {
+                            line: 20,
+                            col: 2,
                         },
                     },
                 },
@@ -388,21 +433,6 @@ Fail(
                 },
                 AnnParsingError {
                     error: SyntaxError {
-                        sexp: "(ERROR (var))",
-                    },
-                    span: SourceSpan {
-                        start: SourcePos {
-                            line: 16,
-                            col: 7,
-                        },
-                        end: SourcePos {
-                            line: 16,
-                            col: 10,
-                        },
-                    },
-                },
-                AnnParsingError {
-                    error: SyntaxError {
                         sexp: "(ERROR (par (send channel: (var) send_type: (send_single) inputs: (inputs (var))) (var)))",
                     },
                     span: SourceSpan {
@@ -413,21 +443,6 @@ Fail(
                         end: SourcePos {
                             line: 17,
                             col: 34,
-                        },
-                    },
-                },
-                AnnParsingError {
-                    error: MissingToken(
-                        "}",
-                    ),
-                    span: SourceSpan {
-                        start: SourcePos {
-                            line: 20,
-                            col: 2,
-                        },
-                        end: SourcePos {
-                            line: 20,
-                            col: 2,
                         },
                     },
                 },

@@ -1436,17 +1436,17 @@ Fail(
             ),
             errors: [
                 AnnParsingError {
-                    error: SyntaxError {
-                        sexp: "(ERROR (var))",
-                    },
+                    error: UnexpectedVar(
+                        "Map",
+                    ),
                     span: SourceSpan {
                         start: SourcePos {
                             line: 12,
-                            col: 11,
+                            col: 15,
                         },
                         end: SourcePos {
                             line: 12,
-                            col: 20,
+                            col: 18,
                         },
                     },
                 },
