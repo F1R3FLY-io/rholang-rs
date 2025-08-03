@@ -14,7 +14,7 @@ Fail(
                                     Id {
                                         name: "Cell",
                                         pos: SourcePos {
-                                            line: 10,
+                                            line: 1,
                                             col: 10,
                                         },
                                     },
@@ -22,11 +22,11 @@ Fail(
                             ),
                             span: SourceSpan {
                                 start: SourcePos {
-                                    line: 10,
+                                    line: 1,
                                     col: 10,
                                 },
                                 end: SourcePos {
-                                    line: 10,
+                                    line: 1,
                                     col: 14,
                                 },
                             },
@@ -39,7 +39,7 @@ Fail(
                                             Id {
                                                 name: "client",
                                                 pos: SourcePos {
-                                                    line: 10,
+                                                    line: 1,
                                                     col: 16,
                                                 },
                                             },
@@ -47,11 +47,11 @@ Fail(
                                     ),
                                     span: SourceSpan {
                                         start: SourcePos {
-                                            line: 10,
+                                            line: 1,
                                             col: 16,
                                         },
                                         end: SourcePos {
-                                            line: 10,
+                                            line: 1,
                                             col: 22,
                                         },
                                     },
@@ -62,7 +62,7 @@ Fail(
                                             Id {
                                                 name: "state",
                                                 pos: SourcePos {
-                                                    line: 10,
+                                                    line: 1,
                                                     col: 24,
                                                 },
                                             },
@@ -70,11 +70,11 @@ Fail(
                                     ),
                                     span: SourceSpan {
                                         start: SourcePos {
-                                            line: 10,
+                                            line: 1,
                                             col: 24,
                                         },
                                         end: SourcePos {
-                                            line: 10,
+                                            line: 1,
                                             col: 29,
                                         },
                                     },
@@ -95,7 +95,7 @@ Fail(
                                                                 Id {
                                                                     name: "request",
                                                                     pos: SourcePos {
-                                                                        line: 11,
+                                                                        line: 2,
                                                                         col: 8,
                                                                     },
                                                                 },
@@ -103,11 +103,11 @@ Fail(
                                                         ),
                                                         span: SourceSpan {
                                                             start: SourcePos {
-                                                                line: 11,
+                                                                line: 2,
                                                                 col: 8,
                                                             },
                                                             end: SourcePos {
-                                                                line: 11,
+                                                                line: 2,
                                                                 col: 15,
                                                             },
                                                         },
@@ -122,7 +122,7 @@ Fail(
                                                             Id {
                                                                 name: "client",
                                                                 pos: SourcePos {
-                                                                    line: 11,
+                                                                    line: 2,
                                                                     col: 19,
                                                                 },
                                                             },
@@ -130,11 +130,11 @@ Fail(
                                                     ),
                                                     span: SourceSpan {
                                                         start: SourcePos {
-                                                            line: 11,
+                                                            line: 2,
                                                             col: 19,
                                                         },
                                                         end: SourcePos {
-                                                            line: 11,
+                                                            line: 2,
                                                             col: 25,
                                                         },
                                                     },
@@ -152,7 +152,7 @@ Fail(
                                                                 Id {
                                                                     name: "v",
                                                                     pos: SourcePos {
-                                                                        line: 11,
+                                                                        line: 2,
                                                                         col: 27,
                                                                     },
                                                                 },
@@ -160,11 +160,11 @@ Fail(
                                                         ),
                                                         span: SourceSpan {
                                                             start: SourcePos {
-                                                                line: 11,
+                                                                line: 2,
                                                                 col: 27,
                                                             },
                                                             end: SourcePos {
-                                                                line: 11,
+                                                                line: 2,
                                                                 col: 28,
                                                             },
                                                         },
@@ -179,7 +179,7 @@ Fail(
                                                             Id {
                                                                 name: "state",
                                                                 pos: SourcePos {
-                                                                    line: 11,
+                                                                    line: 2,
                                                                     col: 32,
                                                                 },
                                                             },
@@ -187,11 +187,11 @@ Fail(
                                                     ),
                                                     span: SourceSpan {
                                                         start: SourcePos {
-                                                            line: 11,
+                                                            line: 2,
                                                             col: 32,
                                                         },
                                                         end: SourcePos {
-                                                            line: 11,
+                                                            line: 2,
                                                             col: 37,
                                                         },
                                                     },
@@ -203,25 +203,67 @@ Fail(
                                 proc: AnnProc {
                                     proc: Match {
                                         expression: AnnProc {
-                                            proc: ProcVar(
-                                                Id(
-                                                    Id {
-                                                        name: "get",
-                                                        pos: SourcePos {
-                                                            line: 13,
-                                                            col: 7,
+                                            proc: BinaryExp {
+                                                op: Mult,
+                                                left: AnnProc {
+                                                    proc: Eval {
+                                                        name: AnnName {
+                                                            name: ProcVar(
+                                                                Id(
+                                                                    Id {
+                                                                        name: "request",
+                                                                        pos: SourcePos {
+                                                                            line: 3,
+                                                                            col: 12,
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            ),
+                                                            span: SourceSpan {
+                                                                start: SourcePos {
+                                                                    line: 3,
+                                                                    col: 12,
+                                                                },
+                                                                end: SourcePos {
+                                                                    line: 3,
+                                                                    col: 19,
+                                                                },
+                                                            },
                                                         },
                                                     },
-                                                ),
-                                            ),
+                                                    span: SourceSpan {
+                                                        start: SourcePos {
+                                                            line: 3,
+                                                            col: 11,
+                                                        },
+                                                        end: SourcePos {
+                                                            line: 3,
+                                                            col: 19,
+                                                        },
+                                                    },
+                                                },
+                                                right: AnnProc {
+                                                    proc: Bad,
+                                                    span: SourceSpan {
+                                                        start: SourcePos {
+                                                            line: 3,
+                                                            col: 20,
+                                                        },
+                                                        end: SourcePos {
+                                                            line: 3,
+                                                            col: 24,
+                                                        },
+                                                    },
+                                                },
+                                            },
                                             span: SourceSpan {
                                                 start: SourcePos {
-                                                    line: 13,
-                                                    col: 7,
+                                                    line: 3,
+                                                    col: 11,
                                                 },
                                                 end: SourcePos {
-                                                    line: 13,
-                                                    col: 10,
+                                                    line: 4,
+                                                    col: 12,
                                                 },
                                             },
                                         },
@@ -233,33 +275,73 @@ Fail(
                                                             Id {
                                                                 name: "rtn",
                                                                 pos: SourcePos {
-                                                                    line: 13,
-                                                                    col: 12,
+                                                                    line: 4,
+                                                                    col: 15,
                                                                 },
                                                             },
                                                         ),
                                                     ),
                                                     span: SourceSpan {
                                                         start: SourcePos {
-                                                            line: 13,
-                                                            col: 12,
+                                                            line: 4,
+                                                            col: 15,
                                                         },
                                                         end: SourcePos {
-                                                            line: 13,
-                                                            col: 15,
+                                                            line: 4,
+                                                            col: 18,
                                                         },
                                                     },
                                                 },
                                                 proc: AnnProc {
-                                                    proc: Bad,
+                                                    proc: BinaryExp {
+                                                        op: Mult,
+                                                        left: AnnProc {
+                                                            proc: Bad,
+                                                            span: SourceSpan {
+                                                                start: SourcePos {
+                                                                    line: 5,
+                                                                    col: 9,
+                                                                },
+                                                                end: SourcePos {
+                                                                    line: 5,
+                                                                    col: 41,
+                                                                },
+                                                            },
+                                                        },
+                                                        right: AnnProc {
+                                                            proc: Quote {
+                                                                proc: ProcVar(
+                                                                    Id(
+                                                                        Id {
+                                                                            name: "set",
+                                                                            pos: SourcePos {
+                                                                                line: 7,
+                                                                                col: 9,
+                                                                            },
+                                                                        },
+                                                                    ),
+                                                                ),
+                                                            },
+                                                            span: SourceSpan {
+                                                                start: SourcePos {
+                                                                    line: 7,
+                                                                    col: 8,
+                                                                },
+                                                                end: SourcePos {
+                                                                    line: 7,
+                                                                    col: 12,
+                                                                },
+                                                            },
+                                                        },
+                                                    },
                                                     span: SourceSpan {
                                                         start: SourcePos {
-                                                            line: 14,
-                                                            col: 9,
+                                                            line: 4,
+                                                            col: 24,
                                                         },
                                                         end: SourcePos {
-                                                            line: 14,
-                                                            col: 39,
+                                                            line: 7,
+                                                            col: 12,
                                                         },
                                                     },
                                                 },
@@ -271,20 +353,20 @@ Fail(
                                                             Id {
                                                                 name: "newValue",
                                                                 pos: SourcePos {
-                                                                    line: 16,
-                                                                    col: 12,
+                                                                    line: 7,
+                                                                    col: 14,
                                                                 },
                                                             },
                                                         ),
                                                     ),
                                                     span: SourceSpan {
                                                         start: SourcePos {
-                                                            line: 16,
-                                                            col: 12,
+                                                            line: 7,
+                                                            col: 14,
                                                         },
                                                         end: SourcePos {
-                                                            line: 16,
-                                                            col: 20,
+                                                            line: 7,
+                                                            col: 22,
                                                         },
                                                     },
                                                 },
@@ -292,12 +374,12 @@ Fail(
                                                     proc: Bad,
                                                     span: SourceSpan {
                                                         start: SourcePos {
-                                                            line: 17,
+                                                            line: 8,
                                                             col: 9,
                                                         },
                                                         end: SourcePos {
-                                                            line: 17,
-                                                            col: 34,
+                                                            line: 8,
+                                                            col: 35,
                                                         },
                                                     },
                                                 },
@@ -306,11 +388,11 @@ Fail(
                                     },
                                     span: SourceSpan {
                                         start: SourcePos {
-                                            line: 12,
-                                            col: 4,
+                                            line: 3,
+                                            col: 5,
                                         },
                                         end: SourcePos {
-                                            line: 19,
+                                            line: 10,
                                             col: 4,
                                         },
                                     },
@@ -318,11 +400,11 @@ Fail(
                             },
                             span: SourceSpan {
                                 start: SourcePos {
-                                    line: 11,
+                                    line: 2,
                                     col: 3,
                                 },
                                 end: SourcePos {
-                                    line: 20,
+                                    line: 11,
                                     col: 2,
                                 },
                             },
@@ -330,11 +412,11 @@ Fail(
                     },
                     span: SourceSpan {
                         start: SourcePos {
-                            line: 10,
+                            line: 1,
                             col: 1,
                         },
                         end: SourcePos {
-                            line: 20,
+                            line: 11,
                             col: 2,
                         },
                     },
@@ -343,31 +425,16 @@ Fail(
             errors: [
                 AnnParsingError {
                     error: UnexpectedVar(
-                        "request",
-                    ),
-                    span: SourceSpan {
-                        start: SourcePos {
-                            line: 12,
-                            col: 10,
-                        },
-                        end: SourcePos {
-                            line: 12,
-                            col: 17,
-                        },
-                    },
-                },
-                AnnParsingError {
-                    error: UnexpectedVar(
                         "with",
                     ),
                     span: SourceSpan {
                         start: SourcePos {
-                            line: 12,
-                            col: 18,
+                            line: 3,
+                            col: 20,
                         },
                         end: SourcePos {
-                            line: 12,
-                            col: 22,
+                            line: 3,
+                            col: 24,
                         },
                     },
                 },
@@ -378,27 +445,12 @@ Fail(
                     },
                     span: SourceSpan {
                         start: SourcePos {
-                            line: 14,
-                            col: 39,
+                            line: 5,
+                            col: 41,
                         },
                         end: SourcePos {
-                            line: 14,
-                            col: 56,
-                        },
-                    },
-                },
-                AnnParsingError {
-                    error: UnexpectedVar(
-                        "set",
-                    ),
-                    span: SourceSpan {
-                        start: SourcePos {
-                            line: 16,
-                            col: 7,
-                        },
-                        end: SourcePos {
-                            line: 16,
-                            col: 10,
+                            line: 5,
+                            col: 60,
                         },
                     },
                 },
@@ -409,12 +461,12 @@ Fail(
                     },
                     span: SourceSpan {
                         start: SourcePos {
-                            line: 17,
-                            col: 34,
+                            line: 8,
+                            col: 35,
                         },
                         end: SourcePos {
-                            line: 17,
-                            col: 51,
+                            line: 8,
+                            col: 54,
                         },
                     },
                 },
@@ -424,12 +476,27 @@ Fail(
                     ),
                     span: SourceSpan {
                         start: SourcePos {
-                            line: 20,
+                            line: 11,
                             col: 2,
                         },
                         end: SourcePos {
-                            line: 20,
+                            line: 11,
                             col: 2,
+                        },
+                    },
+                },
+                AnnParsingError {
+                    error: Unexpected(
+                        '#',
+                    ),
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 4,
+                            col: 14,
+                        },
+                        end: SourcePos {
+                            line: 4,
+                            col: 15,
                         },
                     },
                 },
@@ -439,12 +506,12 @@ Fail(
                     },
                     span: SourceSpan {
                         start: SourcePos {
-                            line: 13,
-                            col: 16,
+                            line: 4,
+                            col: 19,
                         },
                         end: SourcePos {
-                            line: 13,
-                            col: 17,
+                            line: 4,
+                            col: 20,
                         },
                     },
                 },
