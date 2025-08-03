@@ -4,12 +4,11 @@ use smallvec::{SmallVec, ToSmallVec};
 use std::fmt::Debug;
 use std::iter::Zip;
 use std::slice::Iter as SliceIter;
-use std::sync::OnceLock;
 use validated::Validated;
 
 use crate::SourcePos;
 use crate::ast::Var;
-use crate::parser::errors::ParsingFailure;
+use crate::parser::errors::{self, ParsingFailure};
 use crate::{
     SourceSpan,
     ast::{
@@ -643,7 +642,7 @@ pub(super) fn node_to_ast<'ast>(
                 Step::Done => {
                     if start_node.has_error() {
                         // discover all the errors
-                        query_errors(start_node, source, &mut errors);
+                        errors::query_errors(start_node, source, &mut errors);
                     }
                     if let Some(some_errors) = NEVec::try_from_vec(errors) {
                         return Validated::fail(ParsingFailure {
@@ -680,42 +679,6 @@ fn parse_decls<'a>(from: &tree_sitter::Node, source: &'a str) -> Vec<NameDecl<'a
     }
 
     result
-}
-
-fn query_errors(of: &tree_sitter::Node, source: &str, into: &mut Vec<AnnParsingError>) {
-    use tree_sitter::StreamingIterator;
-
-    static QUERY: OnceLock<tree_sitter::Query> = OnceLock::new();
-
-    let query = QUERY.get_or_init(|| {
-        let rholang_language = rholang_tree_sitter::LANGUAGE.into();
-        tree_sitter::Query::new(
-            &rholang_language,
-            "(ERROR) @error-node (MISSING) @missing-node",
-        )
-        .expect("failed to compile error query")
-    });
-
-    let mut cursor = tree_sitter::QueryCursor::new();
-    let source_bytes = source.as_bytes();
-
-    let mut matches = cursor.matches(query, *of, source_bytes);
-    while let Some(m) = matches.next() {
-        for capture in m.captures {
-            let node = capture.node;
-            match capture.index {
-                1 => {
-                    into.push(AnnParsingError::from_mising(&node));
-                }
-                _ => {
-                    if node.parent().is_some_and(|p| p.is_error()) {
-                        continue; // skip UNEXPECTED, we process it somewhere else
-                    }
-                    into.push(AnnParsingError::from_error(&node, source_bytes));
-                }
-            }
-        }
-    }
 }
 
 fn apply_cont<'tree, 'ast>(
