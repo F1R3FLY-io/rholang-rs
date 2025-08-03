@@ -6,13 +6,25 @@ use crate::{SourcePos, SourceSpan, ast::AnnProc};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParsingError {
-    SyntaxError { sexp: String },
+    SyntaxError {
+        sexp: String,
+    },
     MissingToken(&'static str),
     Unexpected(char),
     UnexpectedVar(String),
+    UnexpectedMatchAfter {
+        rule: &'static str,
+        offender: &'static str,
+    },
     NumberOutOfRange,
-    DuplicateNameDecl { first: SourcePos, second: SourcePos },
-    MalformedLetDecl { lhs_arity: usize, rhs_arity: usize },
+    DuplicateNameDecl {
+        first: SourcePos,
+        second: SourcePos,
+    },
+    MalformedLetDecl {
+        lhs_arity: usize,
+        rhs_arity: usize,
+    },
 }
 
 impl ParsingError {
@@ -50,7 +62,7 @@ impl AnnParsingError {
         }
     }
 
-    pub(super) fn from_mising(node: &tree_sitter::Node) -> Self {
+    pub(super) fn from_missing(node: &tree_sitter::Node) -> Self {
         let kind = node.kind();
         AnnParsingError {
             error: ParsingError::MissingToken(kind),
@@ -63,6 +75,27 @@ impl AnnParsingError {
         AnnParsingError {
             error: ParsingError::UnexpectedVar(var.to_owned()),
             span: var_node.range().into(),
+        }
+    }
+
+    pub(super) fn from_unexpected_match(matched: tree_sitter::Node, after: &'static str) -> Self {
+        fn sole_named_child_or<'a>(node: tree_sitter::Node<'a>) -> tree_sitter::Node<'a> {
+            if node.named_child_count() == 1 {
+                node.named_child(0).unwrap_or(node)
+            } else {
+                node
+            }
+        }
+
+        // if matched has a single named child, then we get more precise reporting by descending
+        // into it
+        let offender = sole_named_child_or(matched);
+        AnnParsingError {
+            error: ParsingError::UnexpectedMatchAfter {
+                rule: after,
+                offender: offender.kind(),
+            },
+            span: offender.range().into(),
         }
     }
 }
@@ -82,10 +115,16 @@ pub struct ParsingFailure<'a> {
     pub errors: NEVec<AnnParsingError>,
 }
 
+static QUERY: OnceLock<tree_sitter::Query> = OnceLock::new();
+
+// constants for captures
+const ERROR_VAR: u32 = 0;
+const MISSING_NODE: u32 = 1;
+const ERROR_PAR: u32 = 2;
+const AFTER_PAR: u32 = 3;
+
 pub(super) fn query_errors(of: &tree_sitter::Node, source: &str, into: &mut Vec<AnnParsingError>) {
     use tree_sitter::StreamingIterator;
-
-    static QUERY: OnceLock<tree_sitter::Query> = OnceLock::new();
 
     let query = QUERY.get_or_init(|| {
         let rholang_language = rholang_tree_sitter::LANGUAGE.into();
@@ -93,6 +132,7 @@ pub(super) fn query_errors(of: &tree_sitter::Node, source: &str, into: &mut Vec<
             &rholang_language,
             "(ERROR (var) @error-var)
             (MISSING) @missing-node 
+            ((ERROR (par (_) (_)) ) @error-par . (_) @after-par)
             (ERROR) @fallback",
         )
         .expect("failed to compile error query")
@@ -113,16 +153,20 @@ pub(super) fn query_errors(of: &tree_sitter::Node, source: &str, into: &mut Vec<
             let node = capture.node;
 
             match capture.index {
-                0 => {
-                    // @error-var
+                ERROR_VAR => {
                     if let Some(parent) = node.parent() {
                         claimed_error_ranges.insert(parent.byte_range());
                     }
                     into.push(AnnParsingError::from_var(&node, source_bytes));
                 }
-                1 => {
-                    // @missing-node
-                    into.push(AnnParsingError::from_mising(&node));
+                MISSING_NODE => {
+                    into.push(AnnParsingError::from_missing(&node));
+                }
+                ERROR_PAR => {
+                    claimed_error_ranges.insert(node.byte_range());
+                }
+                AFTER_PAR => {
+                    into.push(AnnParsingError::from_unexpected_match(node, "par"));
                 }
                 _ => {
                     if node.parent().is_some_and(|p| p.is_error()) {
