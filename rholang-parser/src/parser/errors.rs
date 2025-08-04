@@ -29,15 +29,15 @@ pub enum ParsingError {
 
 impl ParsingError {
     fn from_error_node(node: &tree_sitter::Node, code: &[u8]) -> Self {
-        if let Some(child) = node.named_child(0) {
-            if child.is_error() {
-                let text = get_text(&child, code);
-                let mut chars = text.chars();
-                if let Some(unexpected) = chars.next() {
-                    // it's a single char
-                    if chars.next().is_none() {
-                        return ParsingError::Unexpected(unexpected);
-                    }
+        if let Some(child) = node.named_child(0)
+            && child.is_error()
+        {
+            let text = get_text(&child, code);
+            let mut chars = text.chars();
+            if let Some(unexpected) = chars.next() {
+                // it's a single char
+                if chars.next().is_none() {
+                    return ParsingError::Unexpected(unexpected);
                 }
             }
         }

@@ -10,15 +10,16 @@ use crate::ast::{
 pub(super) struct ASTBuilder<'ast> {
     arena: Arena<Proc<'ast>>,
     // useful quasi-constants
-    pub(super) NIL: Proc<'ast>,
-    pub(super) TRUE: Proc<'ast>,
-    pub(super) FALSE: Proc<'ast>,
-    pub(super) WILD: Proc<'ast>,
-    pub(super) UNIT: Proc<'ast>,
-    pub(super) BAD: Proc<'ast>,
-    EMPTY_LIST: Proc<'ast>,
-    ZERO: Proc<'ast>,
-    ONE: Proc<'ast>,
+    nil: Proc<'ast>,
+    r#true: Proc<'ast>,
+    r#false: Proc<'ast>,
+    wild: Proc<'ast>,
+    unit: Proc<'ast>,
+    bad: Proc<'ast>,
+    empty_list: Proc<'ast>,
+    empty_map: Proc<'ast>,
+    zero: Proc<'ast>,
+    one: Proc<'ast>,
 }
 
 impl<'ast> ASTBuilder<'ast> {
@@ -29,19 +30,55 @@ impl<'ast> ASTBuilder<'ast> {
     pub(super) fn with_capacity(capacity: usize) -> Self {
         ASTBuilder {
             arena: Arena::with_capacity(capacity),
-            NIL: Proc::Nil,
-            TRUE: Proc::BoolLiteral(true),
-            FALSE: Proc::BoolLiteral(false),
-            WILD: Proc::ProcVar(Var::Wildcard),
-            UNIT: Proc::Unit,
-            EMPTY_LIST: Proc::Collection(Collection::List {
+            nil: Proc::Nil,
+            r#true: Proc::BoolLiteral(true),
+            r#false: Proc::BoolLiteral(false),
+            wild: Proc::ProcVar(Var::Wildcard),
+            unit: Proc::Unit,
+            empty_list: Proc::Collection(Collection::List {
                 elements: Vec::new(),
                 remainder: None,
             }),
-            ZERO: Proc::LongLiteral(0),
-            ONE: Proc::LongLiteral(1),
-            BAD: Proc::Bad,
+            empty_map: Proc::Collection(Collection::Map {
+                elements: Vec::new(),
+                remainder: None,
+            }),
+            zero: Proc::LongLiteral(0),
+            one: Proc::LongLiteral(1),
+            bad: Proc::Bad,
         }
+    }
+
+    pub(super) fn const_nil(&self) -> &Proc<'ast> {
+        &self.nil
+    }
+
+    pub(super) fn const_true(&self) -> &Proc<'ast> {
+        &self.r#true
+    }
+
+    pub(super) fn const_false(&self) -> &Proc<'ast> {
+        &self.r#false
+    }
+
+    pub(super) fn const_wild(&self) -> &Proc<'ast> {
+        &self.wild
+    }
+
+    pub(super) fn const_unit(&self) -> &Proc<'ast> {
+        &self.unit
+    }
+
+    pub(super) fn const_empty_list(&self) -> &Proc<'ast> {
+        &self.empty_list
+    }
+
+    pub(super) fn const_empty_map(&self) -> &Proc<'ast> {
+        &self.empty_map
+    }
+
+    pub(super) fn bad_const(&self) -> &Proc<'ast> {
+        &self.bad
     }
 
     pub(super) fn alloc_string_literal(&self, value: &'ast str) -> &Proc<'ast> {
@@ -51,8 +88,8 @@ impl<'ast> ASTBuilder<'ast> {
 
     pub(super) fn alloc_long_literal(&self, value: i64) -> &Proc<'ast> {
         match value {
-            0 => &self.ZERO,
-            1 => &self.ONE,
+            0 => &self.zero,
+            1 => &self.one,
             other => self.arena.alloc(Proc::LongLiteral(other)),
         }
     }
@@ -67,7 +104,7 @@ impl<'ast> ASTBuilder<'ast> {
 
     pub(super) fn alloc_list(&self, procs: &[AnnProc<'ast>]) -> &Proc<'ast> {
         if procs.is_empty() {
-            return &self.EMPTY_LIST;
+            return self.const_empty_list();
         }
         self.arena.alloc(Proc::Collection(Collection::List {
             elements: procs.to_vec(),
@@ -114,6 +151,9 @@ impl<'ast> ASTBuilder<'ast> {
     }
 
     pub(super) fn alloc_map(&self, pairs: &[AnnProc<'ast>]) -> &Proc<'ast> {
+        if pairs.is_empty() {
+            return self.const_empty_map();
+        }
         self.arena.alloc(Proc::Collection(Collection::Map {
             elements: Self::to_key_value(pairs),
             remainder: None,
