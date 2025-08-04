@@ -33,3 +33,9 @@ impl<'a> RholangParser<'a> {
             .collect()
     }
 }
+
+impl Default for RholangParser<'_> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
