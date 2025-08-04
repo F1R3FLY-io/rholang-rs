@@ -2,11 +2,17 @@
   "name": "tree-sitter-rholang-js",
   "version": "1.1.0",
   "description": "Parser for Rholang (Mercury)",
-  "repository": "https://github.com/F1R3FLY-io/rholang-rs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/F1R3FLY-io/rholang-rs.git"
+  },
   "license": "MIT",
   "author": {
     "name": "Marcin Rzeźnicki",
     "email": "marcin.rzeznicki@gmail.com"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   },
   "type": "module",
   "main": "dist/tree-sitter-rholang-js.cjs.js",
