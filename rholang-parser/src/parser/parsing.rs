@@ -74,7 +74,7 @@ pub(super) fn node_to_ast<'ast>(
                     continue 'parse;
                 }
 
-                kind!("wildcard") => proc_stack.push(&ast_builder.WILD, span),
+                kind!("wildcard") => proc_stack.push(ast_builder.const_wild(), span),
                 kind!("var") => {
                     let id = Id {
                         name: get_node_value(&node, source),
@@ -83,8 +83,8 @@ pub(super) fn node_to_ast<'ast>(
                     proc_stack.push(ast_builder.alloc_var(id), span);
                 }
 
-                kind!("nil") => proc_stack.push(&ast_builder.NIL, span),
-                kind!("unit") => proc_stack.push(&ast_builder.UNIT, span),
+                kind!("nil") => proc_stack.push(ast_builder.const_nil(), span),
+                kind!("unit") => proc_stack.push(ast_builder.const_unit(), span),
                 kind!("simple_type") => {
                     let lit_value = get_node_value(&node, source);
                     let simple_type_value = match lit_value {
@@ -102,8 +102,8 @@ pub(super) fn node_to_ast<'ast>(
                 kind!("bool_literal") => {
                     let lit_value = get_node_value(&node, source);
                     let bool_proc = match lit_value {
-                        "true" => &ast_builder.TRUE,
-                        "false" => &ast_builder.FALSE,
+                        "true" => ast_builder.const_true(),
+                        "false" => ast_builder.const_false(),
                         _ => unreachable!("Boolean literal is always 'true' or 'false'"),
                     };
                     proc_stack.push(bool_proc, span);
@@ -242,12 +242,17 @@ pub(super) fn node_to_ast<'ast>(
                     let has_remainder = remainder_node.is_some();
                     match collection_type {
                         kind!("list") => {
-                            cont_stack.push(K::ConsumeList {
-                                arity: collection_node.named_child_count(),
-                                has_remainder,
-                                span,
-                            });
-                            cont_stack.push(K::EvalList(collection_node.walk()));
+                            let arity = collection_node.named_child_count();
+                            if arity == 0 {
+                                proc_stack.push(ast_builder.const_empty_list(), span);
+                            } else {
+                                cont_stack.push(K::ConsumeList {
+                                    arity,
+                                    has_remainder,
+                                    span,
+                                });
+                                cont_stack.push(K::EvalList(collection_node.walk()));
+                            }
                         }
                         kind!("set") => {
                             cont_stack.push(K::ConsumeSet {
@@ -274,14 +279,18 @@ pub(super) fn node_to_ast<'ast>(
                                 field!("value"),
                                 &mut temp_cont_stack,
                             );
-                            cont_stack.push(K::ConsumeMap {
-                                arity,
-                                has_remainder,
-                                span,
-                            });
-                            cont_stack.append(&mut temp_cont_stack);
-                            if let Some(rem) = remainder_node {
-                                cont_stack.push(K::EvalDelayed(rem));
+                            if arity == 0 {
+                                proc_stack.push(ast_builder.const_empty_map(), span);
+                            } else {
+                                cont_stack.push(K::ConsumeMap {
+                                    arity,
+                                    has_remainder,
+                                    span,
+                                });
+                                cont_stack.append(&mut temp_cont_stack);
+                                if let Some(rem) = remainder_node {
+                                    cont_stack.push(K::EvalDelayed(rem));
+                                }
                             }
                         }
                         _ => unreachable!("Rholang collections are: list, set, tuple and map"),
@@ -634,7 +643,7 @@ pub(super) fn node_to_ast<'ast>(
         }
 
         if bad {
-            proc_stack.push(&ast_builder.BAD, node.range().into());
+            proc_stack.push(ast_builder.bad_const(), node.range().into());
         }
         loop {
             let step = apply_cont(&mut cont_stack, &mut proc_stack, ast_builder);
@@ -695,15 +704,14 @@ fn apply_cont<'tree, 'ast>(
         while has_more && !cursor.node().is_named() {
             has_more = cursor.goto_next_sibling();
         }
-        return has_more;
+        has_more
     }
 
     loop {
-        let cc;
-        match cont_stack.last_mut() {
+        let cc = match cont_stack.last_mut() {
             None => return Step::Done,
-            Some(k) => cc = k,
-        }
+            Some(k) => k,
+        };
 
         match cc {
             K::EvalDelayed(node) => {
@@ -1210,8 +1218,10 @@ impl<'a> ProcStack<'a> {
     where
         F: FnOnce(AnnProc<'a>) -> AnnProc<'a>,
     {
-        let top = self.stack.last_mut().unwrap_unchecked();
-        *top = replace(*top);
+        unsafe {
+            let top = self.stack.last_mut().unwrap_unchecked();
+            *top = replace(*top);
+        }
     }
 
     #[inline]
@@ -1225,7 +1235,7 @@ impl<'a> ProcStack<'a> {
         unsafe {
             self.replace_top_unchecked(replace);
         }
-        return true;
+        true
     }
 
     #[inline(always)]
@@ -1233,8 +1243,10 @@ impl<'a> ProcStack<'a> {
     where
         F: FnOnce(AnnProc<'a>, AnnProc<'a>) -> AnnProc<'a>,
     {
-        let top = self.stack.pop().unwrap_unchecked();
-        self.replace_top_unchecked(|top_1| replace(top_1, top));
+        unsafe {
+            let top = self.stack.pop().unwrap_unchecked();
+            self.replace_top_unchecked(|top_1| replace(top_1, top));
+        }
     }
 
     #[inline]
@@ -1248,7 +1260,7 @@ impl<'a> ProcStack<'a> {
         unsafe {
             self.replace_top2_unchecked(replace);
         }
-        return true;
+        true
     }
 
     #[inline(always)]
@@ -1256,8 +1268,10 @@ impl<'a> ProcStack<'a> {
     where
         F: FnOnce(AnnProc<'a>, AnnProc<'a>, AnnProc<'a>) -> AnnProc<'a>,
     {
-        let top = self.stack.pop().unwrap_unchecked();
-        self.replace_top2_unchecked(|top_2, top_1| replace(top_2, top_1, top));
+        unsafe {
+            let top = self.stack.pop().unwrap_unchecked();
+            self.replace_top2_unchecked(|top_2, top_1| replace(top_2, top_1, top));
+        }
     }
 
     #[inline]
@@ -1271,7 +1285,7 @@ impl<'a> ProcStack<'a> {
         unsafe {
             self.replace_top3_unchecked(replace);
         }
-        return true;
+        true
     }
 
     fn replace_top_slice_unchecked<F>(&mut self, n: usize, replace: F)
@@ -1295,7 +1309,7 @@ impl<'a> ProcStack<'a> {
             return false;
         }
         self.replace_top_slice_unchecked(n, replace);
-        return true;
+        true
     }
 }
 
@@ -1661,10 +1675,10 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            if let Some(inner) = &mut self.current_inner {
-                if let Some(item) = inner.next() {
-                    return Some(item);
-                }
+            if let Some(inner) = &mut self.current_inner
+                && let Some(item) = inner.next()
+            {
+                return Some(item);
             }
             // Either no current inner, or it's exhausted
             match self.outer.next() {
