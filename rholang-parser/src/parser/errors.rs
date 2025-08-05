@@ -11,7 +11,7 @@ pub enum ParsingError {
     },
     MissingToken(&'static str),
     Unexpected(char),
-    UnexpectedVar(String),
+    UnexpectedVar,
     UnexpectedMatchAfter {
         rule: &'static str,
         offender: &'static str,
@@ -51,15 +51,21 @@ impl ParsingError {
 pub struct AnnParsingError {
     pub error: ParsingError,
     pub span: SourceSpan,
+    pub byte_range: Range<usize>,
 }
 
 impl AnnParsingError {
-    pub(super) fn from_error(node: &tree_sitter::Node, code: &[u8]) -> Self {
-        let error = ParsingError::from_error_node(node, code);
+    pub fn new(error: ParsingError, node: &tree_sitter::Node) -> Self {
         AnnParsingError {
             error,
             span: node.range().into(),
+            byte_range: node.byte_range(),
         }
+    }
+
+    pub(super) fn from_error(node: &tree_sitter::Node, code: &[u8]) -> Self {
+        let error = ParsingError::from_error_node(node, code);
+        AnnParsingError::new(error, node)
     }
 
     pub(super) fn from_missing(node: &tree_sitter::Node) -> Self {
@@ -67,14 +73,7 @@ impl AnnParsingError {
         AnnParsingError {
             error: ParsingError::MissingToken(kind),
             span: node.range().into(),
-        }
-    }
-
-    pub(super) fn from_var(var_node: &tree_sitter::Node, code: &[u8]) -> Self {
-        let var = get_text(var_node, code);
-        AnnParsingError {
-            error: ParsingError::UnexpectedVar(var.to_owned()),
-            span: var_node.range().into(),
+            byte_range: node.byte_range(),
         }
     }
 
@@ -90,13 +89,13 @@ impl AnnParsingError {
         // if matched has a single named child, then we get more precise reporting by descending
         // into it
         let offender = sole_named_child_or(matched);
-        AnnParsingError {
-            error: ParsingError::UnexpectedMatchAfter {
+        AnnParsingError::new(
+            ParsingError::UnexpectedMatchAfter {
                 rule: after,
                 offender: offender.kind(),
             },
-            span: offender.range().into(),
-        }
+            &offender,
+        )
     }
 }
 
@@ -157,7 +156,7 @@ pub(super) fn query_errors(of: &tree_sitter::Node, source: &str, into: &mut Vec<
                     if let Some(parent) = node.parent() {
                         claimed_error_ranges.insert(parent.byte_range());
                     }
-                    into.push(AnnParsingError::from_var(&node, source_bytes));
+                    into.push(AnnParsingError::new(ParsingError::UnexpectedVar, &node));
                 }
                 MISSING_NODE => {
                     into.push(AnnParsingError::from_missing(&node));
