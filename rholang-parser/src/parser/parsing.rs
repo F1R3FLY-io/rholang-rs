@@ -64,7 +64,7 @@ pub(super) fn node_to_ast<'ast>(
                 }
                 cont_stack.reverse();
 
-                return arity;
+                arity
             }
 
             let span = node.range().into();
@@ -155,16 +155,19 @@ pub(super) fn node_to_ast<'ast>(
                     let name_node = get_field(&node, field!("name"));
                     let args_node = get_field(&node, field!("args"));
 
+                    let arity = args_node.named_child_count();
                     cont_stack.push(K::ConsumeMethod {
                         id: Id {
                             name: get_node_value(&name_node, source),
                             pos: name_node.start_position().into(),
                         },
-                        arity: args_node.named_child_count(),
+                        arity,
                         span,
                     });
 
-                    cont_stack.push(K::EvalList(args_node.walk()));
+                    if arity > 0 {
+                        cont_stack.push(K::EvalList(args_node.walk()));
+                    }
                     node = receiver_node;
                     continue 'parse;
                 }
@@ -313,7 +316,9 @@ pub(super) fn node_to_ast<'ast>(
                         arity,
                         span,
                     });
-                    cont_stack.push(K::EvalList(inputs_node.walk()));
+                    if arity > 0 {
+                        cont_stack.push(K::EvalList(inputs_node.walk()));
+                    }
                     node = name_node;
                     continue 'parse;
                 }
@@ -1243,9 +1248,11 @@ impl<'a> ProcStack<'a> {
     where
         F: FnOnce(AnnProc<'a>, AnnProc<'a>) -> AnnProc<'a>,
     {
+        let stack = &mut self.stack;
         unsafe {
-            let top = self.stack.pop().unwrap_unchecked();
-            self.replace_top_unchecked(|top_1| replace(top_1, top));
+            let top = stack.pop().unwrap_unchecked();
+            let top_1 = stack.last_mut().unwrap_unchecked();
+            *top_1 = replace(*top_1, top);
         }
     }
 
@@ -1268,9 +1275,12 @@ impl<'a> ProcStack<'a> {
     where
         F: FnOnce(AnnProc<'a>, AnnProc<'a>, AnnProc<'a>) -> AnnProc<'a>,
     {
+        let stack = &mut self.stack;
         unsafe {
-            let top = self.stack.pop().unwrap_unchecked();
-            self.replace_top2_unchecked(|top_2, top_1| replace(top_2, top_1, top));
+            let top = stack.pop().unwrap_unchecked();
+            let top_1 = stack.pop().unwrap_unchecked();
+            let top_2 = stack.last_mut().unwrap_unchecked();
+            *top_2 = replace(*top_2, top_1, top);
         }
     }
 
