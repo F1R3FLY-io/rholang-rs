@@ -116,10 +116,8 @@ pub(super) fn node_to_ast<'ast>(
                         }
                         Err(_) => {
                             // the only possibility is pos/neg overflow
-                            errors.push(AnnParsingError {
-                                error: ParsingError::NumberOutOfRange,
-                                span,
-                            });
+                            errors
+                                .push(AnnParsingError::new(ParsingError::NumberOutOfRange, &node));
                             bad = true;
                         }
                     }
@@ -347,10 +345,10 @@ pub(super) fn node_to_ast<'ast>(
                     let mut decls = parse_decls(&decls_node, source);
                     decls.sort_unstable();
                     if let Some((first, second)) = check_for_duplicate_decls(&decls) {
-                        errors.push(AnnParsingError {
-                            error: ParsingError::DuplicateNameDecl { first, second },
-                            span: decls_node.range().into(),
-                        });
+                        errors.push(AnnParsingError::new(
+                            ParsingError::DuplicateNameDecl { first, second },
+                            &decls_node,
+                        ));
                     }
 
                     cont_stack.push(K::ConsumeNew { decls, span });
@@ -553,13 +551,13 @@ pub(super) fn node_to_ast<'ast>(
                         let lhs_has_cont = lhs.child_by_field_id(field!("cont")).is_some();
 
                         if let_decl_is_malformed(lhs_arity, rhs_arity, lhs_has_cont) {
-                            errors.push(AnnParsingError {
-                                error: ParsingError::MalformedLetDecl {
+                            errors.push(AnnParsingError::new(
+                                ParsingError::MalformedLetDecl {
                                     lhs_arity,
                                     rhs_arity,
                                 },
-                                span: decl_node.range().into(),
-                            });
+                                &decl_node,
+                            ));
                         }
                         temp_cont_stack.push(K::EvalList(lhs.walk()));
                         temp_cont_stack.push(K::EvalList(rhs.walk()));
