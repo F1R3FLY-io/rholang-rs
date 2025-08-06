@@ -6,7 +6,7 @@
 use std::fmt::{Debug, Display, Write};
 
 pub mod ast;
-mod parser;
+pub mod parser;
 
 pub use parser::RholangParser;
 
