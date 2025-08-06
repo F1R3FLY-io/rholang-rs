@@ -233,9 +233,10 @@ new helloworld, stdout(`rho:io:stdout`) in {
 3. Run the full test suite and static analysis
 4. Submit a pull request with comprehensive tests
 
-## License
+## 📄 License
 
-This project is part of the F1r3fly open-source ecosystem.
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+
 
 ## Resources
 
