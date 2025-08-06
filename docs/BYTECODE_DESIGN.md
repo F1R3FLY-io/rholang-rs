@@ -340,114 +340,173 @@ let x = P; y = Q in R  // Sequential binding
 ```
 
 ### Core Process Constructs
-**Parallel Composition (par)**
+### Parallel Composition (par)
+**Context Analysis Required**: Parallel composition forces concurrent RSpace types for shared names.
+
+***Top-level Parallel Composition***
+```rholang
+P | Q  // Top-level context
 ```
-par (P | Q)  -> BYTECODE
-├── EVAL_PROCESS P       // Evaluate P in current context
-└── EVAL_PROCESS Q       // Evaluate Q in current context
+→ **Analysis**: Top-level scope, processes may share global resources
+→ **RSpace**: `RSPACE_STORE_CONC`
+```
+├── PUSH_PROC P                     // Push first process
+├── SPAWN_ASYNC RSPACE_STORE_CONC   // Spawn P in persistent concurrent RSpace
+├── PUSH_PROC Q                     // Push second process  
+└── SPAWN_ASYNC RSPACE_STORE_CONC   // Spawn Q in persistent concurrent RSpace
 ```
 
-**Name Creation (new)**
-Top-level names (persistent, shared):
+***Local Parallel Composition***
+```rholang
+{ new x in { P(x) | Q(x) } }  // Nested local context with shared name
 ```
-new x, y in P -> BYTECODE (top-level, requires persistent RSpace)
-├── NAME_CREATE RSPACE_STORE_CONC   // Create fresh name in persistent RSpace
-├── STORE_LOCAL 0                   // Store x in local slot
-├── NAME_CREATE RSPACE_STORE_CONC   // Create fresh name for y
-├── STORE_LOCAL 1                   // Store y in local slot
+→ **Analysis**: Local scope but parallel access to shared name x
+→ **RSpace**: `RSPACE_MEM_CONC`
+```
+├── PUSH_PROC P(x)                  // Push first process
+├── SPAWN_ASYNC RSPACE_MEM_CONC     // Spawn P in memory concurrent RSpace
+├── PUSH_PROC Q(x)                  // Push second process
+└── SPAWN_ASYNC RSPACE_MEM_CONC     // Spawn Q in memory concurrent RSpace
+```
+
+### Name Creation (new)
+**Context Analysis**: Scope and sharing determine RSpace type.
+
+***Top-level Contract Names***
+```rholang
+new x, y in P  // Top-level, contract deployment
+```
+→ **Analysis**: Top-level scope, must survive blockchain restarts, shared across processes
+→ **RSpace**: `RSPACE_STORE_CONC`
+```
+├── NAME_CREATE RSPACE_STORE_CONC   // Create x in persistent concurrent RSpace
+├── STORE_LOCAL 0                   // Store x binding
+├── NAME_CREATE RSPACE_STORE_CONC   // Create y in persistent concurrent RSpace
+├── STORE_LOCAL 1                   // Store y binding
 ├── PUSH_PROC P                     // Push process P
-└── EVAL                            // Evaluate with local bindings
+└── EVAL                            // Evaluate with bindings
 ```
 
-Nested names (local, can use memory RSpace):
+***Nested Names with Sequential Access***
+```rholang
+{ new x in { P(x); Q(x) } }  // Sequential access pattern
 ```
-new x, y in { ... new p, q in Q ... } -> BYTECODE (nested, can use memory)
-├── NAME_CREATE RSPACE_MEM_CONC     // Create fresh name in memory RSpace
-├── STORE_LOCAL 0                   // Store x in local slot
-├── NAME_CREATE RSPACE_MEM_CONC     // Create fresh name for y
-├── STORE_LOCAL 1                   // Store y in local slot
-├── PUSH_PROC P                     // Push process P
-└── EVAL                            // Evaluate with local bindings
+→ **Analysis**: Local scope, sequential access, no concurrency needed
+→ **RSpace**: `RSPACE_MEM_SEQ`
+```
+├── NAME_CREATE RSPACE_MEM_SEQ      // Create x in sequential memory RSpace
+├── STORE_LOCAL 0                   // Store x binding
+├── PUSH_PROC P(x); Q(x)            // Push sequential composition
+└── EVAL                            // Evaluate sequentially
 ```
 
-**Asynchronous Send (channel!)**
-Memory-based (local channels):
+***Nested Names with Concurrent Access***
+```rholang
+{ new x in { P(x) | Q(x) } }  // Parallel access pattern
 ```
-chan!(data)  -> BYTECODE
-├── PUSH_PROC data                  // Push data to stack (not evaluated)
-├── PUSH_PROC chan                  // Push channel name
+→ **Analysis**: Local scope but parallel access requires concurrency
+→ **RSpace**: `RSPACE_MEM_CONC`
+```
+├── NAME_CREATE RSPACE_MEM_CONC     // Create x in concurrent memory RSpace
+├── STORE_LOCAL 0                   // Store x binding
+├── PUSH_PROC P(x) | Q(x)           // Push parallel composition
+└── EVAL                            // Evaluate with concurrent access
+```
+
+## Send/Receive Operations
+
+### Asynchronous Send (channel!)
+**Context Analysis**: Channel scope and evaluation strategy determine RSpace type.
+
+***Contract Channel Send (Lazy Evaluation)***
+```rholang
+contractChannel!(complex_process)  // Contract-level channel, no star
+```
+→ **Analysis**: Contract channel (persistent), lazy evaluation preserves pattern matching
+→ **RSpace**: `RSPACE_STORE_CONC`
+```
+├── PUSH_PROC complex_process       // Suspended computation (closure)
+├── PUSH_PROC contractChannel       // Push channel
 ├── EVAL                            // Evaluate channel only
-└── RSPACE_PRODUCE RSPACE_MEM_CONC  // Produce data into concurrent memory RSpace
+└── RSPACE_PRODUCE RSPACE_STORE_CONC // Send to persistent concurrent RSpace
 ```
 
-Persistent (shared/top-level channels):
+***Local Channel Send (Explicit Evaluation)***
+```rholang
+{ new local in { local!(*arithmetic_expr) } }  // Star forces evaluation
 ```
-chan!(data)  -> BYTECODE
-├── PUSH_PROC data                  // Push data to stack (not evaluated)
-├── PUSH_PROC chan                  // Push channel name  
-├── EVAL                            // Evaluate channel only
-└── RSPACE_PRODUCE RSPACE_STORE_CONC // Produce data into persistent concurrent RSpace
+→ **Analysis**: Local channel, explicit evaluation, confined scope
+→ **RSpace**: `RSPACE_MEM_CONC`
 ```
-**Note on Evaluation**: Only top-level expressions are evaluated during send. Arguments remain as suspended computations (closures) to preserve pattern matching capabilities and enable lazy evaluation semantics.
-
-**Synchronous Send (send_sync)**
-```
-chan!?(data); P  -> BYTECODE (memory-based)
-├── LOAD_VAR chan                       // Load channel name
-├── PUSH_PROC data                      // Push data process (not evaluated)
-├── NAME_QUOTE RSPACE_MEM_CONC          // Convert to name through memory RSpace
-├── CONTINUATION_STORE RSPACE_MEM_CONC P // Store continuation in memory RSpace
-├── RSPACE_PRODUCE_SYNC RSPACE_MEM_CONC // Send and wait for ack
-└── CONTINUATION_RESUME RSPACE_MEM_CONC // Resume when ack received
-
-chan!?(data); P  -> BYTECODE (persistent)
-├── LOAD_VAR chan                         // Load channel name
-├── PUSH_PROC data                        // Push data process (not evaluated)
-├── NAME_QUOTE RSPACE_STORE_CONC          // Convert to name through persistent RSpace
-├── CONTINUATION_STORE RSPACE_STORE_CONC P // Store continuation in persistent RSpace
-├── RSPACE_PRODUCE_SYNC RSPACE_STORE_CONC // Send and wait for ack
-└── CONTINUATION_RESUME RSPACE_STORE_CONC // Resume when ack received
+├── PUSH_PROC arithmetic_expr       // Push expression
+├── EVAL_STAR                       // Force evaluation due to star
+├── PUSH_PROC local                 // Push local channel
+├── EVAL                            // Evaluate channel
+└── RSPACE_PRODUCE RSPACE_MEM_CONC  // Send to memory concurrent RSpace
 ```
 
-**Input/Receive (for)**
-Simple receive without pattern matching (memory-based):
+***Sequential Local Send***
+```rholang
+let x = chan; y = data in { x!(y) }  // Sequential binding context
 ```
-for(x <- chan) P  -> BYTECODE
-├── LOAD_VAR chan                       // Load channel name
-├── ALLOC_LOCAL                         // Allocate slot for x
-├── PATTERN_COMPILE RSPACE_MEM_CONC x   // Compile simple variable pattern
-├── CONTINUATION_STORE RSPACE_MEM_CONC P // Store continuation in memory RSpace
-├── RSPACE_CONSUME RSPACE_MEM_CONC      // Consume from memory RSpace
-├── PATTERN_BIND RSPACE_MEM_CONC        // Bind received value to x
-└── CONTINUATION_RESUME RSPACE_MEM_CONC // Resume with bound x
+→ **Analysis**: Sequential binding context, no concurrent access needed
+→ **RSpace**: `RSPACE_MEM_SEQ`
 ```
-
-Pattern matching receive (memory-based):
-```
-for(pattern <- chan) P  -> BYTECODE
-├── LOAD_VAR chan                         // Load channel name
-├── PATTERN_COMPILE RSPACE_MEM_CONC pattern // Compile pattern for memory RSpace
-├── CONTINUATION_STORE RSPACE_MEM_CONC P  // Store continuation in memory RSpace
-├── RSPACE_CONSUME RSPACE_MEM_CONC        // Consume from memory RSpace with pattern matching
-├── PATTERN_BIND RSPACE_MEM_CONC          // Extract all bound variables
-└── CONTINUATION_RESUME RSPACE_MEM_CONC   // Resume with bindings
-```
-**Multiple receive patterns**:
-```
-for (x <- a; y <- b) { P }     // Sequential - both must match
-for (x <- a & y <- b) { P }    // Concurrent - can match in any order
-for (x,y,z <= chan) { P }      // Repeated receive: for(x,y,z <- chan) { P | for(x,y,z <- chan) { P } }
-for (x,y,z <<- chan) { P }     // Peek bind: for(x,y,z <- chan) { chan!(x,y,z) | P }
+├── PUSH_PROC data                  // Push data
+├── PUSH_PROC chan                  // Push channel
+├── EVAL                            // Evaluate channel
+└── RSPACE_PRODUCE RSPACE_MEM_SEQ   // Send to sequential memory RSpace
 ```
 
-**Replicated Receive (contract)**
+### Input/Receive (for)
+**Context Analysis**: Channel scope and pattern complexity determine RSpace type.
+
+***Contract Reception (Persistent)***
+```rholang
+contract MyContract(x) = { P }  // Desugared to: for(x <= MyContract) { P }
 ```
-contract Name(x) = P  -> BYTECODE
-├── PUSH_PROC Name                      // Push contract name
-├── EVAL                                // Evaluate name
+→ **Analysis**: Contract context, public interface, persistent across deployments
+→ **RSpace**: `RSPACE_STORE_CONC`
+```
+├── LOAD_VAR MyContract             // Load contract name
+├── ALLOC_LOCAL                     // Allocate slot for x
 ├── PATTERN_COMPILE RSPACE_STORE_CONC x // Compile pattern for persistent RSpace
-├── CONTINUATION_STORE RSPACE_STORE_CONC P // Store contract body persistently
-└── RSPACE_CONSUME_PERSISTENT RSPACE_STORE_CONC // Set up persistent consumer
+├── CONTINUATION_STORE RSPACE_STORE_CONC P // Store persistent continuation
+├── RSPACE_CONSUME_PERSISTENT RSPACE_STORE_CONC // Set up persistent listener
+├── PATTERN_BIND RSPACE_STORE_CONC  // Bind variables when matched
+└── CONTINUATION_RESUME RSPACE_STORE_CONC // Resume with bindings
+```
+
+***Local Scope Reception with Complex Pattern***
+```rholang
+{ new local in { for({x: y} <- local) { P } } }  // Complex pattern matching
+```
+→ **Analysis**: Local scope, complex pattern requires concurrent matching capability
+→ **RSpace**: `RSPACE_MEM_CONC`
+```
+├── LOAD_VAR local                  // Load local channel
+├── ALLOC_LOCAL                     // Allocate for pattern vars
+├── PATTERN_COMPILE RSPACE_MEM_CONC {x: y} // Compile complex pattern
+├── CONTINUATION_STORE RSPACE_MEM_CONC P // Store continuation
+├── RSPACE_CONSUME RSPACE_MEM_CONC  // Consume with pattern matching
+├── PATTERN_BIND RSPACE_MEM_CONC    // Extract bound variables
+└── CONTINUATION_RESUME RSPACE_MEM_CONC // Resume with bindings
+```
+
+***Sequential Reception***
+```rholang
+let chan = x in { for(y <- chan) { P } }  // Sequential binding context
+```
+→ **Analysis**: Sequential context, single consumer, no concurrency needed
+→ **RSpace**: `RSPACE_MEM_SEQ`
+```
+├── LOAD_VAR chan                   // Load channel from sequential binding
+├── ALLOC_LOCAL                     // Allocate for y
+├── PATTERN_COMPILE RSPACE_MEM_SEQ y // Compile for sequential RSpace
+├── CONTINUATION_STORE RSPACE_MEM_SEQ P // Store sequential continuation
+├── RSPACE_CONSUME RSPACE_MEM_SEQ   // Sequential consume
+├── PATTERN_BIND RSPACE_MEM_SEQ     // Bind in sequential context
+└── CONTINUATION_RESUME RSPACE_MEM_SEQ // Resume sequentially
 ```
 
 ### Control Flow Constructs
@@ -660,37 +719,69 @@ P %% Q  -> BYTECODE
 └── INTERPOLATE         // Perform string interpolation
 ```
 
-### Variable binding constructs
-**Let Binding (Linear)**
+## Variable Binding Constructs
+### Let Binding Analysis
+**Context Analysis**: Binding operator and continuation context determine RSpace type.
+
+***Sequential Let Binding***
+```rholang
+let x = P; y = Q in R  // Sequential composition (;)
 ```
-let x = P; y = Q in R  -> BYTECODE
+→ **Analysis**: Sequential binding, stack-based evaluation sufficient, no RSpace needed
+→ **RSpace**: None (stack-based)
+```
 ├── PUSH_PROC P         // Push value for x
-├── EVAL                // Evaluate P (stack-based)
-├── ALLOC_LOCAL         // Allocate slot for x
-├── STORE_LOCAL 0       // Store P result in x
-├── PUSH_PROC Q         // Push value for y
-├── EVAL                // Evaluate Q (stack-based)
-├── ALLOC_LOCAL         // Allocate slot for y
-├── STORE_LOCAL 1       // Store Q result in y
-├── PUSH_PROC R         // Push body process R
-└── EVAL                // Evaluate R with local bindings
+├── EVAL                // Evaluate P on stack
+├── ALLOC_LOCAL         // Allocate x
+├── STORE_LOCAL 0       // Store P result
+├── PUSH_PROC Q         // Push value for y  
+├── EVAL                // Evaluate Q on stack
+├── ALLOC_LOCAL         // Allocate y
+├── STORE_LOCAL 1       // Store Q result
+├── PUSH_PROC R         // Push body R
+└── EVAL                // Evaluate with local bindings
 ```
 
-**Let Binding (Concurrent)**
+***Concurrent Let Binding***
+```rholang
+let x = P & y = Q in R  // Concurrent composition (&)
 ```
-let x = P & y = Q in R  -> BYTECODE (memory-based)
+→ **Analysis**: Concurrent binding operator requires coordination, can use memory RSpace
+→ **RSpace**: `RSPACE_MEM_CONC` (for coordination)
+```
 ├── NAME_CREATE RSPACE_MEM_CONC                 // Create coordination channel
-├── STORE_LOCAL 0                               // Store coordination channel
-├── PUSH_PROC P                                 // Push process P
-├── CONTINUATION_STORE RSPACE_MEM_CONC x_binding // Store x binding continuation
-├── SPAWN_ASYNC RSPACE_MEM_CONC                 // Spawn P evaluation in memory RSpace
-├── PUSH_PROC Q                                 // Push process Q
-├── CONTINUATION_STORE RSPACE_MEM_CONC y_binding // Store y binding continuation
-├── SPAWN_ASYNC RSPACE_MEM_CONC                 // Spawn Q evaluation in memory RSpace
-├── RSPACE_CONSUME RSPACE_MEM_CONC              // Wait for both bindings
-├── RSPACE_CONSUME RSPACE_MEM_CONC              // Wait for both bindings
-├── PUSH_PROC R                                 // Push body process R
-└── EVAL                                        // Execute R with accumulated bindings
+├── STORE_LOCAL 0                               // Store sync channel
+├── PUSH_PROC P                                 // Push P for concurrent eval
+├── CONTINUATION_STORE RSPACE_MEM_CONC x_complete // Store x completion handler
+├── SPAWN_ASYNC RSPACE_MEM_CONC                 // Spawn P evaluation
+├── PUSH_PROC Q                                 // Push Q for concurrent eval
+├── CONTINUATION_STORE RSPACE_MEM_CONC y_complete // Store y completion handler
+├── SPAWN_ASYNC RSPACE_MEM_CONC                 // Spawn Q evaluation
+├── RSPACE_CONSUME RSPACE_MEM_CONC              // Wait for x completion
+├── RSPACE_CONSUME RSPACE_MEM_CONC              // Wait for y completion
+├── PUSH_PROC R                                 // Push body with both bindings
+└── EVAL                                        // Evaluate R
+```
+
+***Top-level Concurrent Let***
+```rholang
+let x = P & y = Q in R  // At contract/top level
+```
+→ **Analysis**: Top-level concurrent binding, must persist across restarts
+→ **RSpace**: `RSPACE_STORE_CONC`
+```
+├── NAME_CREATE RSPACE_STORE_CONC               // Persistent coordination
+├── STORE_LOCAL 0                               
+├── PUSH_PROC P                                 
+├── CONTINUATION_STORE RSPACE_STORE_CONC x_complete 
+├── SPAWN_ASYNC RSPACE_STORE_CONC               
+├── PUSH_PROC Q                                 
+├── CONTINUATION_STORE RSPACE_STORE_CONC y_complete 
+├── SPAWN_ASYNC RSPACE_STORE_CONC               
+├── RSPACE_CONSUME RSPACE_STORE_CONC            
+├── RSPACE_CONSUME RSPACE_STORE_CONC            
+├── PUSH_PROC R                                 
+└── EVAL                                        
 ```
 
 ### Data Constructs
@@ -741,19 +832,15 @@ let x = P & y = Q in R  -> BYTECODE (memory-based)
 ```
 
 ### Advanced Constructs
-**Bundle Operations**
-```rholang
-bundle+ { P }  // Bundle context determines RSpace
-```
-***Memory-based bundle***:
-```
-├── RSPACE_BUNDLE_BEGIN RSPACE_MEM_CONC WRITE
-├── PUSH_PROC P                             
-├── EVAL_IN_BUNDLE                          
-└── RSPACE_BUNDLE_END RSPACE_MEM_CONC
-```
+### Bundle Operations
+**Context Analysis**: Bundle scope and access patterns determine RSpace type.
 
-***Persistent bundle***:
+***Contract-level Bundle***
+```rholang
+contract BundleContract() = { bundle+ { P } }  // Contract context
+```
+→ **Analysis**: Contract-level bundle, must persist, shared access
+→ **RSpace**: `RSPACE_STORE_CONC`
 ```
 ├── RSPACE_BUNDLE_BEGIN RSPACE_STORE_CONC WRITE
 ├── PUSH_PROC P                               
@@ -761,32 +848,65 @@ bundle+ { P }  // Bundle context determines RSpace
 └── RSPACE_BUNDLE_END RSPACE_STORE_CONC
 ```
 
-**Quote/Unquote**
-***Static Quote (Compile-time)***
+***Local Bundle***
 ```rholang
-@{known_process}  // Static analysis can determine
+{ new x in { bundle- { x!(data) } | for(y <- x) { P } } }  // Local coordination
 ```
+→ **Analysis**: Local bundle for coordination, concurrent access needed
+→ **RSpace**: `RSPACE_MEM_CONC`
 ```
-├── PUSH_PROC known_process     // Introspection form cached
-└── NOP                         // No evaluation needed
+├── RSPACE_BUNDLE_BEGIN RSPACE_MEM_CONC READ
+├── PUSH_PROC x!(data)                      
+├── EVAL_IN_BUNDLE                          
+├── RSPACE_BUNDLE_END RSPACE_MEM_CONC
+├── PUSH_PROC for(y <- x) { P }             
+└── EVAL                                    
 ```
 
-***Dynamic Quote (Runtime)***
+***Sequential Bundle***
 ```rholang
-@x  // Where x is free variable
+let x = bundle0 { computation } in { processResult(x) }  // Sequential processing
 ```
+→ **Analysis**: Sequential bundle processing, no concurrent access
+→ **RSpace**: `RSPACE_MEM_SEQ`
 ```
-├── LOAD_VAR x                          
-└── NAME_QUOTE RSPACE_MEM_CONC          // Context-dependent RSpace
+├── RSPACE_BUNDLE_BEGIN RSPACE_MEM_SEQ EQUIV
+├── PUSH_PROC computation                   
+├── EVAL_IN_BUNDLE                          
+├── RSPACE_BUNDLE_END RSPACE_MEM_SEQ
+├── ALLOC_LOCAL                             
+├── STORE_LOCAL 0                           
+├── PUSH_PROC processResult(x)              
+└── EVAL                                    
 ```
 
-***Unquote***
+### Quote/Unquote with Context
+***Contract-level Quote/Unquote***
 ```rholang
-*name
+contract QuoteContract(process) = { @process!(result) }  // Contract using quotes
 ```
+→ **Analysis**: Contract context, quote operations must persist
+→ **RSpace**: `RSPACE_STORE_CONC`
 ```
-├── LOAD_VAR name                       
-└── NAME_UNQUOTE RSPACE_MEM_CONC        // Match quote context
+├── LOAD_VAR process                        
+├── NAME_QUOTE RSPACE_STORE_CONC            // Quote in persistent context
+├── LOAD_VAR result                         
+├── RSPACE_PRODUCE RSPACE_STORE_CONC        // Send quoted process
+```
+
+***Local Quote/Unquote***
+```rholang
+{ new x in { x!(@{P}) | for(quotedP <- x) { *quotedP } } }  // Local quote coordination
+```
+→ **Analysis**: Local scope quote/unquote coordination
+→ **RSpace**: `RSPACE_MEM_CONC`
+```
+├── PUSH_PROC P                             
+├── NAME_QUOTE RSPACE_MEM_CONC              // Quote in memory context
+├── LOAD_VAR x                              
+├── RSPACE_PRODUCE RSPACE_MEM_CONC          // Send quoted process
+├── LOAD_VAR quotedP                        
+└── NAME_UNQUOTE RSPACE_MEM_CONC            // Unquote in matching context
 ```
 
 **Variable Reference**
