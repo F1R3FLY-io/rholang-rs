@@ -146,8 +146,8 @@ fn main() -> Result<()> {
         analyze_send_operations(&root_node, send_id, &code, &mut cursor, &mut send_count);
 
         println!("\nOperation statistics:");
-        println!("  - New declarations: {new_count}");
-        println!("  - Send operations: {send_count}");
+        println!("  - New declarations: {}", new_count);
+        println!("  - Send operations: {}", send_count);
 
         // Example 3: Find all bundle declarations
         println!("\nExample 3: Finding bundle declarations");
@@ -172,7 +172,7 @@ fn main() -> Result<()> {
                         .to_string();
                     *bundle_types.entry(bundle_type_text.clone()).or_insert(0) += 1;
 
-                    println!("Found bundle declaration with type: {bundle_type_text}");
+                    println!("Found bundle declaration with type: {}", bundle_type_text);
 
                     // Get the proc field
                     let proc_field = field!("proc");
@@ -204,7 +204,7 @@ fn main() -> Result<()> {
             println!("  No bundle declarations found");
         } else {
             for (bundle_type, count) in bundle_types.iter() {
-                println!("  - '{bundle_type}': {count} occurrence(s)");
+                println!("  - '{}': {} occurrence(s)", bundle_type, count);
             }
         }
     }
