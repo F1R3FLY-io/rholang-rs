@@ -5,7 +5,7 @@ export default defineConfig({
   build: {
     lib: {
       entry: path.resolve(__dirname, "src/index.ts"),
-      fileName: (format) => `embers-client-sdk.${format}.js`,
+      fileName: (format) => `tree-sitter-rholang-js.${format}.js`,
       formats: ["es", "cjs", "umd"],
       name: "TreeSitterRholang",
     },
