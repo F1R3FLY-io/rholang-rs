@@ -37,6 +37,8 @@ pub enum BundleOp {
     Write,
     /// Read-write bundle
     ReadWrite,
+    /// Equivalence bundle
+    Equiv,
 }
 
 /// Value types that can be stored on the stack
@@ -136,14 +138,18 @@ pub enum Instruction {
     CreateList(usize),
     /// Create tuple from n stack elements
     CreateTuple(usize),
+    /// Create map from n key-value pairs on stack
+    CreateMap(usize),
     /// Method invocation
     InvokeMethod,
 
     // Evaluation Instructions
-    /// Evaluate process on stack
+    /// Evaluate process on stack (with current locals)
     Eval,
     /// Evaluate to boolean
     EvalBool,
+    /// Explicit evaluation (star syntax)
+    EvalStar,
     /// Evaluate and prepare for RSpace
     EvalToRSpace,
     /// Evaluate with local bindings
@@ -161,19 +167,15 @@ pub enum Instruction {
     /// Extract bound variables from pattern match
     ExtractBindings,
 
-    // Data Structure Instructions
-    /// Start map construction
-    MapBegin,
-    /// Add key-value pair to map
-    MapPut,
-    /// Finish map construction
-    MapEnd,
-
     // Process Control Instructions
     /// Spawn process asynchronously
-    SpawnAsync,
+    SpawnAsync(RSpaceType),
     /// Process negation
     ProcNeg,
+    /// Process conjunction (both must succeed)
+    Conj,
+    /// Process disjunction (either can succeed)
+    Disj,
 
     // Reference Instructions
     /// Copy value
@@ -186,22 +188,24 @@ pub enum Instruction {
     LoadMethod(String),
 
     // RSpace Instructions
-    /// Put data into specified RSpace
-    RSpacePut(RSpaceType),
-    /// Get data from specified RSpace (blocking)
-    RSpaceGet(RSpaceType),
-    /// Get data from specified RSpace (non-blocking)
-    RSpaceGetNonblock(RSpaceType),
-    /// Consume data from specified RSpace
-    RSpaceConsume(RSpaceType),
     /// Produce data to specified RSpace
     RSpaceProduce(RSpaceType),
+    /// Consume data from specified RSpace (blocking)
+    RSpaceConsume(RSpaceType),
+    /// Consume data from specified RSpace (non-blocking)
+    RSpaceConsumeNonblock(RSpaceType),
+    /// Consume data from specified RSpace (persistent)
+    RSpaceConsumePersistent(RSpaceType),
     /// Peek at data without consuming
     RSpacePeek(RSpaceType),
     /// Pattern match against specified RSpace data
     RSpaceMatch(RSpaceType),
-    /// Atomic select operation across channels
-    RSpaceSelect(RSpaceType),
+    /// Begin atomic select operation across channels
+    RSpaceSelectBegin(RSpaceType),
+    /// Add channel to select set
+    RSpaceSelectAdd(RSpaceType),
+    /// Wait for any channel in select set
+    RSpaceSelectWait(RSpaceType),
     /// Create fresh name in specified RSpace
     NameCreate(RSpaceType),
     /// Quote process to name in specified RSpace
