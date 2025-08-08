@@ -370,6 +370,16 @@ impl VM {
                 tuple.reverse(); // Reverse to maintain original order
                 context.push(Value::Tuple(tuple));
             }
+            Instruction::CreateMap(n) => {
+                let mut map = Vec::with_capacity(*n);
+                for _ in 0..*n {
+                    let value = context.pop()?;
+                    let key = context.pop()?;
+                    map.push((key, value));
+                }
+                map.reverse(); // Reverse to maintain original order
+                context.push(Value::Map(map));
+            }
             Instruction::InvokeMethod => {
                 // This will be implemented when we have method invocation semantics
                 bail!("InvokeMethod not implemented yet");
@@ -383,6 +393,10 @@ impl VM {
             Instruction::EvalBool => {
                 // This will be implemented when we have process evaluation semantics
                 bail!("EvalBool not implemented yet");
+            }
+            Instruction::EvalStar => {
+                // This will be implemented when we have explicit evaluation semantics
+                bail!("EvalStar not implemented yet");
             }
             Instruction::EvalToRSpace => {
                 // This will be implemented when we have RSpace integration
@@ -415,28 +429,22 @@ impl VM {
                 bail!("ExtractBindings not implemented yet");
             }
 
-            // Data Structure Instructions
-            Instruction::MapBegin => {
-                // This will be implemented when we have map construction semantics
-                bail!("MapBegin not implemented yet");
-            }
-            Instruction::MapPut => {
-                // This will be implemented when we have map construction semantics
-                bail!("MapPut not implemented yet");
-            }
-            Instruction::MapEnd => {
-                // This will be implemented when we have map construction semantics
-                bail!("MapEnd not implemented yet");
-            }
-
             // Process Control Instructions
-            Instruction::SpawnAsync => {
+            Instruction::SpawnAsync(_rspace_type) => {
                 // This will be implemented when we have process spawning semantics
                 bail!("SpawnAsync not implemented yet");
             }
             Instruction::ProcNeg => {
                 // This will be implemented when we have process negation semantics
                 bail!("ProcNeg not implemented yet");
+            }
+            Instruction::Conj => {
+                // This will be implemented when we have process conjunction semantics
+                bail!("Conj not implemented yet");
+            }
+            Instruction::Disj => {
+                // This will be implemented when we have process disjunction semantics
+                bail!("Disj not implemented yet");
             }
 
             // Reference Instructions
@@ -458,25 +466,21 @@ impl VM {
             }
 
             // RSpace Instructions
-            Instruction::RSpacePut(_rspace_type) => {
+            Instruction::RSpaceProduce(_rspace_type) => {
                 // This will be implemented when we have RSpace integration
-                bail!("RSpacePut not implemented yet");
-            }
-            Instruction::RSpaceGet(_rspace_type) => {
-                // This will be implemented when we have RSpace integration
-                bail!("RSpaceGet not implemented yet");
-            }
-            Instruction::RSpaceGetNonblock(_rspace_type) => {
-                // This will be implemented when we have RSpace integration
-                bail!("RSpaceGetNonblock not implemented yet");
+                bail!("RSpaceProduce not implemented yet");
             }
             Instruction::RSpaceConsume(_rspace_type) => {
                 // This will be implemented when we have RSpace integration
                 bail!("RSpaceConsume not implemented yet");
             }
-            Instruction::RSpaceProduce(_rspace_type) => {
+            Instruction::RSpaceConsumeNonblock(_rspace_type) => {
                 // This will be implemented when we have RSpace integration
-                bail!("RSpaceProduce not implemented yet");
+                bail!("RSpaceConsumeNonblock not implemented yet");
+            }
+            Instruction::RSpaceConsumePersistent(_rspace_type) => {
+                // This will be implemented when we have RSpace integration
+                bail!("RSpaceConsumePersistent not implemented yet");
             }
             Instruction::RSpacePeek(_rspace_type) => {
                 // This will be implemented when we have RSpace integration
@@ -486,9 +490,17 @@ impl VM {
                 // This will be implemented when we have RSpace integration
                 bail!("RSpaceMatch not implemented yet");
             }
-            Instruction::RSpaceSelect(_rspace_type) => {
+            Instruction::RSpaceSelectBegin(_rspace_type) => {
                 // This will be implemented when we have RSpace integration
-                bail!("RSpaceSelect not implemented yet");
+                bail!("RSpaceSelectBegin not implemented yet");
+            }
+            Instruction::RSpaceSelectAdd(_rspace_type) => {
+                // This will be implemented when we have RSpace integration
+                bail!("RSpaceSelectAdd not implemented yet");
+            }
+            Instruction::RSpaceSelectWait(_rspace_type) => {
+                // This will be implemented when we have RSpace integration
+                bail!("RSpaceSelectWait not implemented yet");
             }
             Instruction::NameCreate(_rspace_type) => {
                 // This will be implemented when we have RSpace integration

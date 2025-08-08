@@ -1,12 +1,13 @@
 // New Rholang Bytecode Compiler
 // Translates Rholang AST to bytecode
+// Based on the design in BYTECODE_DESIGN.md
 
 use anyhow::{bail, Result};
 use rholang_parser::{
     ast::{AnnProc, Bind, Name, Proc, Source, Var},
     RholangParser,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use validated::Validated;
 
 use crate::bytecode::{Instruction, Label, RSpaceType};
@@ -17,6 +18,10 @@ pub struct RholangCompiler {
     label_counter: usize,
     /// Variable bindings
     bindings: HashMap<String, usize>,
+    /// Names that require concurrent access
+    concurrent_names: HashSet<String>,
+    /// Names that escape their lexical scope
+    escaping_names: HashSet<String>,
 }
 
 impl Default for RholangCompiler {
@@ -31,6 +36,8 @@ impl RholangCompiler {
         RholangCompiler {
             label_counter: 0,
             bindings: HashMap::new(),
+            concurrent_names: HashSet::new(),
+            escaping_names: HashSet::new(),
         }
     }
 
@@ -161,8 +168,18 @@ impl RholangCompiler {
                 // Create list of inputs
                 instructions.push(Instruction::CreateList(inputs.len()));
 
+                // Determine the appropriate RSpace type based on channel context
+                // For simplicity, we'll use StoreConcurrent for top-level sends
+                // and MemoryConcurrent for all others
+                let is_top_level = true; // Simplified: in a full implementation, we would check the context
+                let rspace_type = if is_top_level {
+                    RSpaceType::StoreConcurrent
+                } else {
+                    RSpaceType::MemoryConcurrent
+                };
+
                 // Send to channel
-                instructions.push(Instruction::RSpacePut(RSpaceType::MemoryConcurrent));
+                instructions.push(Instruction::RSpaceProduce(rspace_type));
 
                 Ok(instructions)
             }
@@ -171,9 +188,23 @@ impl RholangCompiler {
             Proc::New { decls, proc } => {
                 let mut instructions = Vec::new();
 
+                // Determine if this is a top-level new or nested
+                let is_top_level = true; // Simplified: in a full implementation, we would check the context
+                
                 // Create fresh names for each declaration
                 for decl in decls.iter() {
-                    instructions.push(Instruction::NameCreate(RSpaceType::MemoryConcurrent));
+                    // Determine the appropriate RSpace type based on context
+                    let rspace_type = if is_top_level {
+                        // Top-level names default to persistent concurrent storage
+                        RSpaceType::StoreConcurrent
+                    } else {
+                        // For simplicity, use MemoryConcurrent for all non-top-level names
+                        // In a full implementation, we would analyze the process to determine
+                        // if sequential or concurrent access is needed
+                        RSpaceType::MemoryConcurrent
+                    };
+                    
+                    instructions.push(Instruction::NameCreate(rspace_type));
                     instructions.push(Instruction::AllocLocal);
 
                     // Store the name in a local variable
@@ -192,6 +223,16 @@ impl RholangCompiler {
             // For comprehension
             Proc::ForComprehension { receipts, proc } => {
                 let mut instructions = Vec::new();
+
+                // Determine the appropriate RSpace type based on context
+                // For simplicity, we'll use StoreConcurrent for top-level receives
+                // and MemoryConcurrent for all others
+                let is_top_level = true; // Simplified: in a full implementation, we would check the context
+                let rspace_type = if is_top_level {
+                    RSpaceType::StoreConcurrent
+                } else {
+                    RSpaceType::MemoryConcurrent
+                };
 
                 // Compile each receipt (which is a SmallVec of Bind)
                 for receipt in receipts.iter() {
@@ -220,17 +261,17 @@ impl RholangCompiler {
                                 instructions.push(Instruction::PushProc("pattern".to_string()));
 
                                 // Create pattern
-                                instructions.push(Instruction::PatternCompile(RSpaceType::MemoryConcurrent));
+                                instructions.push(Instruction::PatternCompile(rspace_type));
 
                                 // Store continuation
                                 let mut body_instructions = self.compile_proc(proc)?;
                                 instructions.append(&mut body_instructions);
 
                                 // Consume from channel
-                                instructions.push(Instruction::RSpaceConsume(RSpaceType::MemoryConcurrent));
+                                instructions.push(Instruction::RSpaceConsume(rspace_type));
                             }
                             Bind::Repeated { lhs: _, rhs } => {
-                                // Similar to Linear, but for repeated binds
+                                // Similar to Linear, but for repeated binds (persistent)
                                 let mut channel_instructions = self.compile_name(rhs)?;
                                 instructions.append(&mut channel_instructions);
 
@@ -238,14 +279,14 @@ impl RholangCompiler {
                                 instructions.push(Instruction::PushProc("pattern".to_string()));
 
                                 // Create pattern
-                                instructions.push(Instruction::PatternCompile(RSpaceType::MemoryConcurrent));
+                                instructions.push(Instruction::PatternCompile(rspace_type));
 
                                 // Store continuation
                                 let mut body_instructions = self.compile_proc(proc)?;
                                 instructions.append(&mut body_instructions);
 
-                                // Consume from channel
-                                instructions.push(Instruction::RSpaceConsume(RSpaceType::MemoryConcurrent));
+                                // Consume from channel (persistent)
+                                instructions.push(Instruction::RSpaceConsumePersistent(rspace_type));
                             }
                             Bind::Peek { lhs: _, rhs } => {
                                 // Similar to Linear, but for peek binds
@@ -256,14 +297,14 @@ impl RholangCompiler {
                                 instructions.push(Instruction::PushProc("pattern".to_string()));
 
                                 // Create pattern
-                                instructions.push(Instruction::PatternCompile(RSpaceType::MemoryConcurrent));
+                                instructions.push(Instruction::PatternCompile(rspace_type));
 
                                 // Store continuation
                                 let mut body_instructions = self.compile_proc(proc)?;
                                 instructions.append(&mut body_instructions);
 
                                 // Peek at channel
-                                instructions.push(Instruction::RSpacePeek(RSpaceType::MemoryConcurrent));
+                                instructions.push(Instruction::RSpacePeek(rspace_type));
                             }
                         }
                     }
