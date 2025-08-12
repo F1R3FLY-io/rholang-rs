@@ -1,7 +1,8 @@
 use anyhow::Result;
 use rstest::rstest;
 use std::{fs, path::PathBuf};
-use tokio::runtime::Runtime;
+mod test_utils;
+use test_utils::make_rt_vm;
 
 // This function finds all .rho files in the corpus directory
 fn each_corpus_file() -> Vec<PathBuf> {
@@ -23,8 +24,8 @@ fn each_corpus_file() -> Vec<PathBuf> {
 #[rstest]
 #[case::all_corpus_files(each_corpus_file())]
 fn test_compile_corpus_files(#[case] paths: Vec<PathBuf>) -> Result<()> {
-    // Create a VM instance
-    let vm = rholang_vm::RholangVM::new()?;
+    // Create a runtime and VM instance
+    let (_rt, vm) = make_rt_vm()?;
     
     // Track compilation results
     let mut success_count = 0;
@@ -60,11 +61,8 @@ fn test_compile_corpus_files(#[case] paths: Vec<PathBuf>) -> Result<()> {
 #[rstest]
 #[case::all_corpus_files(each_corpus_file())]
 fn test_compile_and_execute_corpus_files(#[case] paths: Vec<PathBuf>) -> Result<()> {
-    // Create a VM instance
-    let vm = rholang_vm::RholangVM::new()?;
-    
-    // Create a runtime for executing async code
-    let rt = Runtime::new()?;
+    // Create a runtime and VM instance
+    let (rt, vm) = make_rt_vm()?;
     
     // Track execution results
     let mut compile_success_count = 0;
@@ -119,11 +117,8 @@ fn test_compile_and_execute_corpus_files(#[case] paths: Vec<PathBuf>) -> Result<
 #[rstest]
 #[case::all_corpus_files(each_corpus_file())]
 fn test_end_to_end_corpus_files(#[case] paths: Vec<PathBuf>) -> Result<()> {
-    // Create a VM instance
-    let vm = rholang_vm::RholangVM::new()?;
-    
-    // Create a runtime for executing async code
-    let rt = Runtime::new()?;
+    // Create a runtime and VM instance
+    let (rt, vm) = make_rt_vm()?;
     
     // Track results
     let mut success_count = 0;
