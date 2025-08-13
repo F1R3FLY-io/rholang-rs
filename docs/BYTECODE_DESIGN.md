@@ -36,6 +36,161 @@ The VM shape is highly constrained by the requirements to:
     - `RSPACE_STORE_CONC`: On-store concurrent (LMDB wrapper) - multi-threaded, persistent, blockchain operations
 - **State Representation**: VM state must be representable as GSLT with fully abstract encoding
 
+## Bytecode Type System and Data Representation
+### Type System Overview
+The bytecode instructions reference several abstract types that serve as interfaces between the bytecode format and the runtime system. These types are deliberately abstracted to allow optimization of runtime representation while maintaining stable bytecode format.
+
+### Core Type Definitions
+#### Process (Proc)
+Represents a Rholang process or computation that can be executed by the VM.
+```
+ProcessRef:
+  - Inline: Direct bytecode sequence embedded in instruction stream
+  - HeapRef: Reference to process stored in heap (4-byte ID)
+  - Closure: Process with captured environment (4-byte closure ID)
+  
+Encoding: [1 byte type tag][4 bytes length/ID][variable data]
+```
+
+#### Name
+Represents channel names and quoted processes in the rho-calculus.
+```
+NameRef:
+  - Unforgeable: Created by 'new' operation (32-byte hash)
+  - Quoted: Reference to quoted process (@P)
+  - System: Predefined system channels
+  
+Encoding: [1 byte type tag][variable length data]
+```
+
+#### Continuation (Cont)
+Represents suspended computations waiting on channel operations.
+```
+Continuation:
+  - code: ProcessRef to resume
+  - environment: Captured variable bindings (Environment ID)
+  - pattern: Optional pattern for binding received data
+  - rspace_type: Target RSpace for resumption
+  
+Encoding: [4 bytes continuation ID] (references continuation table)
+```
+
+#### Pattern (Ptrn)
+Compiled pattern matching structures for data destructuring.
+```
+Pattern:
+  - Literal: Exact value match
+  - Variable: Bind to variable (with optional type constraint)
+  - Structural: Destructuring patterns for collections
+  - Guard: Pattern with additional boolean condition
+  - Wildcard: Match anything without binding
+  
+Encoding: [1 byte pattern type][2 bytes length][pattern bytecode]
+```
+
+#### Label (L)
+Jump targets for control flow instructions.
+```
+Label:
+  - Absolute: Direct bytecode offset from module start
+  - Relative: Signed offset from current instruction
+  - Dynamic: Runtime-computed jump (for computed gotos)
+  
+Encoding: [1 byte mode][4 bytes offset/address]
+```
+
+#### Key
+Channel identifiers for RSpace operations.
+```
+Key:
+  - NameRef: Reference to Name type
+  - Hash: Direct channel hash (32 bytes)
+  - Local: Stack-local channel reference (2 bytes)
+  
+Encoding: [1 byte key type][variable data]
+```
+
+#### Value
+Data being sent through channels or matched against patterns.
+```
+Value:
+  - Primitive: Int, String, Bool (inline encoding)
+  - Collection: List, Tuple, Map (heap reference)
+  - Process: ProcessRef for higher-order sending
+  - Quoted: Quoted name for reflection
+  
+Encoding: [1 byte value type][4 bytes length/ref][data]
+```
+
+### Memory Layout and Management
+#### Type Storage Areas
+```
+VM Memory Layout:
+┌─────────────────────────┐
+│    Bytecode Segment     │ <- Instructions and inline data
+├─────────────────────────┤
+│    Constant Pool        │ <- Literals, patterns, predefined processes
+├─────────────────────────┤
+│    Process Heap         │ <- Dynamic processes and closures
+├─────────────────────────┤
+│    Continuation Table   │ <- Suspended computations
+├─────────────────────────┤
+│    Pattern Cache        │ <- Compiled pattern matchers
+├─────────────────────────┤
+│    Name Registry        │ <- Unforgeable names and quotes
+└─────────────────────────┘
+```
+**Reference Management**
+* Process References: Reference counted with cycle detection
+* Continuations: Owned by RSpace, cleaned on consumption
+* Names: Immutable, shared via reference counting
+* Patterns: Cached and reused across matches
+
+### RSpace Type Integration
+#### Key Resolution
+Keys in RSpace instructions resolve to specific channel identifiers:
+```
+Key Resolution Pipeline:
+Instruction Key -> Name Resolution -> RSpace Selection -> Channel Hash
+```
+
+#### Value Serialization
+Values are serialized for RSpace storage using a compact binary format:
+```
+Serialization Format:
+[Type Tag (1 byte)][Length (4 bytes)][Data (variable)]
+
+Special Cases:
+- Processes: Store as suspended bytecode
+- Continuations: Store continuation ID + environment snapshot
+- Collections: Recursive serialization with type preservation
+```
+
+#### Continuation Storage
+Continuations are stored differently based on RSpace type:
+```
+RSPACE_MEM_*:   In-memory continuation table
+RSPACE_STORE_*: Serialized to persistent storage with environment
+```
+
+### Type Safety and Validation
+**Compile-Time Validation**
+* Type checking for instruction operands
+* Pattern exhaustiveness checking
+* Label target validation
+
+**Runtime Type Checks**
+* Dynamic type guards for heterogeneous collections
+* Pattern match type compatibility
+* Channel type consistency (when type annotations present)
+
+### Optimization Considerations
+#### Type Specialization
+**Common type combinations can be specialized:**
+* `TELL_INT`: Optimized for integer sends
+* `ASK_SIMPLE`: Optimized for non-pattern receives
+* `MATCH_LITERAL`: Fast path for literal pattern matching
+
 ## Compilation Pipeline
 ### Three-Stage Architecture
 The compilation follows a structured three-stage pipeline:
@@ -151,7 +306,7 @@ EVALUATION INSTRUCTIONS:
 ├── EXEC                // Execute process on stack
 
 PATTERN MATCHING INSTRUCTIONS:
-├── PATTERN pat         // Load pattern
+├── PATTERN ptrn        // Load pattern
 ├── MATCH_TEST          // Test pattern match (leaves boolean on stack)
 ├── EXTRACT_BINDINGS    // Extract bound variables from pattern match
 
@@ -166,28 +321,25 @@ REFERENCE INSTRUCTIONS:
 ├── LOAD_METHOD name    // Load method name for invocation
 ```
 
-### RSpace Instructions (Type-Specific)
+### RSpace Instructions
 ```
 RSPACE INSTRUCTIONS:
-├── RSPACE_PRODUCE <type>          // Produce data to specified RSpace
-├── RSPACE_CONSUME <type>          // Consume data from specified RSpace (blocking)
-├── RSPACE_CONSUME_NONBLOCK <type> // Consume data from specified RSpace (non-blocking)
-├── RSPACE_PEEK <type>             // Peek at data without consuming
-├── RSPACE_MATCH <type>            // Pattern match against specified RSpace data
-├── RSPACE_SELECT <type>           // Atomic select operation across channels
-├── NAME_CREATE <type>             // Create fresh name in specified RSpace
-├── NAME_QUOTE <type>              // Quote process to name in specified RSpace
-├── NAME_UNQUOTE <type>            // Unquote name to process in specified RSpace
-├── PATTERN_COMPILE <type>         // Compile pattern for specified RSpace matching
-├── PATTERN_BIND <type>            // Bind pattern variables from specified RSpace match
-├── CONTINUATION_STORE <type>      // Store continuation in specified RSpace
-├── CONTINUATION_RESUME <type>     // Resume stored continuation from specified RSpace
-├── RSPACE_BUNDLE_BEGIN <type>     // Start bundle in specified RSpace
-├── RSPACE_BUNDLE_END <type>       // End bundle in specified RSpace
+├── TELL key value      // Produce data to specified RSpace
+├── ASK key cont        // Consume data from specified RSpace (blocking)
+├── ASK_NB key cont     // Consume data from specified RSpace (non-blocking)
+├── PEEK key cont       // Peek at data without consuming
+├── MATCH ptrn value    // Pattern match against specified RSpace data
+├── NAME_CREATE         // Create fresh name in specified RSpace
+├── NAME_QUOTE proc     // Quote process to name in specified RSpace
+├── NAME_UNQUOTE name   // Unquote name to process in specified RSpace
+├── CONT_STORE cont     // Store continuation in specified RSpace
+├── CONT_RESUME cont    // Resume stored continuation from specified RSpace
+├── BUNDLE_BEGIN        // Start bundle in specified RSpace
+├── BUNDLE_END          // End bundle in specified RSpace
 ```
 
 ### RSpace Type Selection Implementation
-The `<type>` parameter is determined by combining:
+The RSpace type is determined by combining:
 1. **Explicit flags**: Override any channel properties for specific instructions
 2. **Channel properties**: RSpace remembers properties when names are created
 3. **Expression context**: Analysis of the whole expression, especially parallel compositions
@@ -203,9 +355,9 @@ new x, y in P  // Top level
 → **Analysis**: Top-level scope, potentially shared across processes, must survive restarts
 → **RSpace**: `RSPACE_STORE_CONC`
 ```
-├── NAME_CREATE RSPACE_STORE_CONC     // x goes to persistent concurrent
+├── NAME_CREATE                       // x goes to persistent concurrent
 ├── STORE_LOCAL 0                     
-├── NAME_CREATE RSPACE_STORE_CONC     // y goes to persistent concurrent
+├── NAME_CREATE                       // y goes to persistent concurrent
 ├── STORE_LOCAL 1                     
 ├── PUSH_PROC P                       
 └── EVAL
@@ -218,7 +370,7 @@ let x = <expression> in (P1(x) | P2(x))  // Parallel composition using x
 → **Analysis**: Local scope but parallel access in continuation
 → **RSpace**: `RSPACE_MEM_CONC`
 ```
-├── NAME_CREATE RSPACE_MEM_CONC       // Concurrent due to parallel composition
+├── NAME_CREATE                       // Concurrent due to parallel composition
 ├── STORE_LOCAL 0                     
 ├── PUSH_PROC (P1(x) | P2(x))         
 └── EVAL
@@ -231,7 +383,7 @@ let x = <expression> in P(x)  // Sequential access only
 → **Analysis**: Local scope, sequential access
 → **RSpace**: `RSPACE_MEM_SEQ`
 ```
-├── NAME_CREATE RSPACE_MEM_SEQ        // Sequential is sufficient
+├── NAME_CREATE                       // Sequential is sufficient
 ├── STORE_LOCAL 0                     
 ├── PUSH_PROC P(x)                    
 └── EVAL
@@ -248,7 +400,7 @@ chan!(complex_process)  // No star - keep as closure
 ├── PUSH_PROC complex_process          // Suspended computation
 ├── PUSH_PROC chan                     
 ├── EVAL                               // Evaluate channel only
-└── RSPACE_PRODUCE RSPACE_STORE_CONC
+└── TELL chan complex_process
 ```
 
 ***Local Channel with Explicit Evaluation***
@@ -262,7 +414,7 @@ localChan!(*arithmetic_expr)  // Star forces evaluation
 ├── EVAL_STAR                          // Explicit evaluation due to star
 ├── PUSH_PROC localChan                
 ├── EVAL                               
-└── RSPACE_PRODUCE RSPACE_MEM_CONC
+└── TELL localChan evaluated_expr
 ```
 
 **Receive Operation**
@@ -275,11 +427,11 @@ for(x <- publicChannel) P  // Contract parameter
 ```
 ├── LOAD_VAR publicChannel             
 ├── ALLOC_LOCAL                        
-├── PATTERN_COMPILE RSPACE_STORE_CONC x
-├── CONTINUATION_STORE RSPACE_STORE_CONC P
-├── RSPACE_CONSUME RSPACE_STORE_CONC   
-├── PATTERN_BIND RSPACE_STORE_CONC     
-└── CONTINUATION_RESUME RSPACE_STORE_CONC
+├── PATTERN x                          
+├── CONT_STORE P                       
+├── ASK publicChannel P                
+├── EXTRACT_BINDINGS                   
+└── CONT_RESUME P
 ```
 
 ***Local Scope Reception***
@@ -291,11 +443,11 @@ for(x <- publicChannel) P  // Contract parameter
 ```
 ├── LOAD_VAR local                     
 ├── ALLOC_LOCAL                        
-├── PATTERN_COMPILE RSPACE_MEM_CONC x  
-├── CONTINUATION_STORE RSPACE_MEM_CONC P
-├── RSPACE_CONSUME RSPACE_MEM_CONC     
-├── PATTERN_BIND RSPACE_MEM_CONC       
-└── CONTINUATION_RESUME RSPACE_MEM_CONC
+├── PATTERN x                          
+├── CONT_STORE P                       
+├── ASK local P                        
+├── EXTRACT_BINDINGS                   
+└── CONT_RESUME P
 ```
 
 **Let Binding**
@@ -306,16 +458,16 @@ let x = P & y = Q in R  // Concurrent binding
 → **Analysis**: Concurrent binding operator (&) determines RSpace type
 → **RSpace**: `RSPACE_MEM_CONC` for coordination
 ```
-├── NAME_CREATE RSPACE_MEM_CONC                 // Coordination channel
+├── NAME_CREATE                                 // Coordination channel
 ├── STORE_LOCAL 0                               
 ├── PUSH_PROC P                                 
-├── CONTINUATION_STORE RSPACE_MEM_CONC x_binding
-├── SPAWN_ASYNC RSPACE_MEM_CONC                 
+├── CONT_STORE x_binding                        
+├── SPAWN_ASYNC                                 
 ├── PUSH_PROC Q                                 
-├── CONTINUATION_STORE RSPACE_MEM_CONC y_binding
-├── SPAWN_ASYNC RSPACE_MEM_CONC                 
-├── RSPACE_CONSUME RSPACE_MEM_CONC              // Wait for x
-├── RSPACE_CONSUME RSPACE_MEM_CONC              // Wait for y
+├── CONT_STORE y_binding                        
+├── SPAWN_ASYNC                                 
+├── ASK coord_channel x_binding                 // Wait for x
+├── ASK coord_channel y_binding                 // Wait for y
 ├── PUSH_PROC R                                 
 └── EVAL
 ```
@@ -351,9 +503,9 @@ P | Q  // Top-level context
 → **RSpace**: `RSPACE_STORE_CONC`
 ```
 ├── PUSH_PROC P                     // Push first process
-├── SPAWN_ASYNC RSPACE_STORE_CONC   // Spawn P in persistent concurrent RSpace
+├── SPAWN_ASYNC                     // Spawn P in persistent concurrent RSpace
 ├── PUSH_PROC Q                     // Push second process  
-└── SPAWN_ASYNC RSPACE_STORE_CONC   // Spawn Q in persistent concurrent RSpace
+└── SPAWN_ASYNC                     // Spawn Q in persistent concurrent RSpace
 ```
 
 ***Local Parallel Composition***
@@ -364,9 +516,9 @@ P | Q  // Top-level context
 → **RSpace**: `RSPACE_MEM_CONC`
 ```
 ├── PUSH_PROC P(x)                  // Push first process
-├── SPAWN_ASYNC RSPACE_MEM_CONC     // Spawn P in memory concurrent RSpace
+├── SPAWN_ASYNC                     // Spawn P in memory concurrent RSpace
 ├── PUSH_PROC Q(x)                  // Push second process
-└── SPAWN_ASYNC RSPACE_MEM_CONC     // Spawn Q in memory concurrent RSpace
+└── SPAWN_ASYNC                     // Spawn Q in memory concurrent RSpace
 ```
 
 ### Name Creation (new)
@@ -379,9 +531,9 @@ new x, y in P  // Top-level, contract deployment
 → **Analysis**: Top-level scope, must survive blockchain restarts, shared across processes
 → **RSpace**: `RSPACE_STORE_CONC`
 ```
-├── NAME_CREATE RSPACE_STORE_CONC   // Create x in persistent concurrent RSpace
+├── NAME_CREATE                     // Create x in persistent concurrent RSpace
 ├── STORE_LOCAL 0                   // Store x binding
-├── NAME_CREATE RSPACE_STORE_CONC   // Create y in persistent concurrent RSpace
+├── NAME_CREATE                     // Create y in persistent concurrent RSpace
 ├── STORE_LOCAL 1                   // Store y binding
 ├── PUSH_PROC P                     // Push process P
 └── EVAL                            // Evaluate with bindings
@@ -394,7 +546,7 @@ new x, y in P  // Top-level, contract deployment
 → **Analysis**: Local scope, sequential access, no concurrency needed
 → **RSpace**: `RSPACE_MEM_SEQ`
 ```
-├── NAME_CREATE RSPACE_MEM_SEQ      // Create x in sequential memory RSpace
+├── NAME_CREATE                     // Create x in sequential memory RSpace
 ├── STORE_LOCAL 0                   // Store x binding
 ├── PUSH_PROC P(x); Q(x)            // Push sequential composition
 └── EVAL                            // Evaluate sequentially
@@ -407,7 +559,7 @@ new x, y in P  // Top-level, contract deployment
 → **Analysis**: Local scope but parallel access requires concurrency
 → **RSpace**: `RSPACE_MEM_CONC`
 ```
-├── NAME_CREATE RSPACE_MEM_CONC     // Create x in concurrent memory RSpace
+├── NAME_CREATE                     // Create x in concurrent memory RSpace
 ├── STORE_LOCAL 0                   // Store x binding
 ├── PUSH_PROC P(x) | Q(x)           // Push parallel composition
 └── EVAL                            // Evaluate with concurrent access
@@ -428,7 +580,7 @@ contractChannel!(complex_process)  // Contract-level channel, no star
 ├── PUSH_PROC complex_process       // Suspended computation (closure)
 ├── PUSH_PROC contractChannel       // Push channel
 ├── EVAL                            // Evaluate channel only
-└── RSPACE_PRODUCE RSPACE_STORE_CONC // Send to persistent concurrent RSpace
+└── TELL contractChannel complex_process // Send to persistent concurrent RSpace
 ```
 
 ***Local Channel Send (Explicit Evaluation)***
@@ -442,7 +594,7 @@ contractChannel!(complex_process)  // Contract-level channel, no star
 ├── EVAL_STAR                       // Force evaluation due to star
 ├── PUSH_PROC local                 // Push local channel
 ├── EVAL                            // Evaluate channel
-└── RSPACE_PRODUCE RSPACE_MEM_CONC  // Send to memory concurrent RSpace
+└── TELL local evaluated_expr       // Send to memory concurrent RSpace
 ```
 
 ***Sequential Local Send***
@@ -455,7 +607,7 @@ let x = chan; y = data in { x!(y) }  // Sequential binding context
 ├── PUSH_PROC data                  // Push data
 ├── PUSH_PROC chan                  // Push channel
 ├── EVAL                            // Evaluate channel
-└── RSPACE_PRODUCE RSPACE_MEM_SEQ   // Send to sequential memory RSpace
+└── TELL chan data                  // Send to sequential memory RSpace
 ```
 
 ### Input/Receive (for)
@@ -470,11 +622,11 @@ contract MyContract(x) = { P }  // Desugared to: for(x <= MyContract) { P }
 ```
 ├── LOAD_VAR MyContract             // Load contract name
 ├── ALLOC_LOCAL                     // Allocate slot for x
-├── PATTERN_COMPILE RSPACE_STORE_CONC x // Compile pattern for persistent RSpace
-├── CONTINUATION_STORE RSPACE_STORE_CONC P // Store persistent continuation
-├── RSPACE_CONSUME_PERSISTENT RSPACE_STORE_CONC // Set up persistent listener
-├── PATTERN_BIND RSPACE_STORE_CONC  // Bind variables when matched
-└── CONTINUATION_RESUME RSPACE_STORE_CONC // Resume with bindings
+├── PATTERN x                       // Compile pattern for persistent RSpace
+├── CONT_STORE P                    // Store persistent continuation
+├── ASK MyContract P                // Set up persistent listener
+├── EXTRACT_BINDINGS                // Bind variables when matched
+└── CONT_RESUME P                   // Resume with bindings
 ```
 
 ***Local Scope Reception with Complex Pattern***
@@ -486,11 +638,11 @@ contract MyContract(x) = { P }  // Desugared to: for(x <= MyContract) { P }
 ```
 ├── LOAD_VAR local                  // Load local channel
 ├── ALLOC_LOCAL                     // Allocate for pattern vars
-├── PATTERN_COMPILE RSPACE_MEM_CONC {x: y} // Compile complex pattern
-├── CONTINUATION_STORE RSPACE_MEM_CONC P // Store continuation
-├── RSPACE_CONSUME RSPACE_MEM_CONC  // Consume with pattern matching
-├── PATTERN_BIND RSPACE_MEM_CONC    // Extract bound variables
-└── CONTINUATION_RESUME RSPACE_MEM_CONC // Resume with bindings
+├── PATTERN {x: y}                  // Compile complex pattern
+├── CONT_STORE P                    // Store continuation
+├── ASK local P                     // Consume with pattern matching
+├── EXTRACT_BINDINGS                // Extract bound variables
+└── CONT_RESUME P                   // Resume with bindings
 ```
 
 ***Sequential Reception***
@@ -502,11 +654,11 @@ let chan = x in { for(y <- chan) { P } }  // Sequential binding context
 ```
 ├── LOAD_VAR chan                   // Load channel from sequential binding
 ├── ALLOC_LOCAL                     // Allocate for y
-├── PATTERN_COMPILE RSPACE_MEM_SEQ y // Compile for sequential RSpace
-├── CONTINUATION_STORE RSPACE_MEM_SEQ P // Store sequential continuation
-├── RSPACE_CONSUME RSPACE_MEM_SEQ   // Sequential consume
-├── PATTERN_BIND RSPACE_MEM_SEQ     // Bind in sequential context
-└── CONTINUATION_RESUME RSPACE_MEM_SEQ // Resume sequentially
+├── PATTERN y                       // Compile for sequential RSpace
+├── CONT_STORE P                    // Store sequential continuation
+├── ASK chan P                      // Sequential consume
+├── EXTRACT_BINDINGS                // Bind in sequential context
+└── CONT_RESUME P                   // Resume sequentially
 ```
 
 ### Control Flow Constructs
@@ -545,27 +697,6 @@ match expr { pat1 => P1; pat2 => P2 }  -> BYTECODE
 └── L_END: NOP          // Continue
 ```
 
-**Select/Choice (select)**
-* Dont use for now, not implemented in Rholang
-```
-select { x <- chan1 => P1; y <- chan2 => P2 }  -> BYTECODE
-├── RSPACE_SELECT_BEGIN RSPACE_MEM_CONC // Begin atomic select in memory RSpace
-├── PUSH_PROC chan1                     // Push first channel
-├── EVAL_TO_RSPACE                      // Evaluate channel 1
-├── PATTERN_COMPILE RSPACE_MEM_CONC x   // Compile pattern for memory RSpace
-├── CONTINUATION_STORE RSPACE_MEM_CONC P1 // Store continuation in memory RSpace
-├── RSPACE_SELECT_ADD RSPACE_MEM_CONC   // Add to select set
-├── PUSH_PROC chan2                     // Push second channel
-├── EVAL_TO_RSPACE                      // Evaluate channel 2
-├── PATTERN_COMPILE RSPACE_MEM_CONC y   // Compile pattern for memory RSpace
-├── CONTINUATION_STORE RSPACE_MEM_CONC P2 // Store continuation in memory RSpace
-├── RSPACE_SELECT_ADD RSPACE_MEM_CONC   // Add to select set
-├── RSPACE_SELECT_WAIT RSPACE_MEM_CONC  // Wait for any channel
-├── PATTERN_BIND RSPACE_MEM_CONC        // Bind variables from selected channel
-└── CONTINUATION_RESUME RSPACE_MEM_CONC // Resume selected continuation
-```
-* The RSpace would need to support this atomic selection mechanism, probably using something like compare-and-swap operations or locks to ensure atomicity
-
 ### Expression Constructs
 **Arithmetic Operations** - The conversion of these operations will be almost the same, so I won't describe them all. But here are the types we have in general:
 Addition, Subtraction, Multiplication, Division, Modulo, Negation?
@@ -599,7 +730,7 @@ obj.method(args)  -> BYTECODE
 ├── PUSH_PROC args                      // Push arguments
 ├── EVAL                                // Evaluate arguments
 ├── LOAD_METHOD method                  // Load method name
-└── INVOKE_METHOD RSPACE_MEM_CONC       // Invoke method with RSpace context
+└── INVOKE_METHOD                       // Invoke method with RSpace context
 ```
 
 ### Comparison Expression Constructs
@@ -749,16 +880,16 @@ let x = P & y = Q in R  // Concurrent composition (&)
 → **Analysis**: Concurrent binding operator requires coordination, can use memory RSpace
 → **RSpace**: `RSPACE_MEM_CONC` (for coordination)
 ```
-├── NAME_CREATE RSPACE_MEM_CONC                 // Create coordination channel
+├── NAME_CREATE                                 // Create coordination channel
 ├── STORE_LOCAL 0                               // Store sync channel
 ├── PUSH_PROC P                                 // Push P for concurrent eval
-├── CONTINUATION_STORE RSPACE_MEM_CONC x_complete // Store x completion handler
-├── SPAWN_ASYNC RSPACE_MEM_CONC                 // Spawn P evaluation
+├── CONT_STORE x_complete                       // Store x completion handler
+├── SPAWN_ASYNC                                 // Spawn P evaluation
 ├── PUSH_PROC Q                                 // Push Q for concurrent eval
-├── CONTINUATION_STORE RSPACE_MEM_CONC y_complete // Store y completion handler
-├── SPAWN_ASYNC RSPACE_MEM_CONC                 // Spawn Q evaluation
-├── RSPACE_CONSUME RSPACE_MEM_CONC              // Wait for x completion
-├── RSPACE_CONSUME RSPACE_MEM_CONC              // Wait for y completion
+├── CONT_STORE y_complete                       // Store y completion handler
+├── SPAWN_ASYNC                                 // Spawn Q evaluation
+├── ASK coord_channel x_complete                // Wait for x completion
+├── ASK coord_channel y_complete                // Wait for y completion
 ├── PUSH_PROC R                                 // Push body with both bindings
 └── EVAL                                        // Evaluate R
 ```
@@ -770,16 +901,16 @@ let x = P & y = Q in R  // At contract/top level
 → **Analysis**: Top-level concurrent binding, must persist across restarts
 → **RSpace**: `RSPACE_STORE_CONC`
 ```
-├── NAME_CREATE RSPACE_STORE_CONC               // Persistent coordination
+├── NAME_CREATE                                 // Persistent coordination
 ├── STORE_LOCAL 0                               
 ├── PUSH_PROC P                                 
-├── CONTINUATION_STORE RSPACE_STORE_CONC x_complete 
-├── SPAWN_ASYNC RSPACE_STORE_CONC               
+├── CONT_STORE x_complete                       
+├── SPAWN_ASYNC                                 
 ├── PUSH_PROC Q                                 
-├── CONTINUATION_STORE RSPACE_STORE_CONC y_complete 
-├── SPAWN_ASYNC RSPACE_STORE_CONC               
-├── RSPACE_CONSUME RSPACE_STORE_CONC            
-├── RSPACE_CONSUME RSPACE_STORE_CONC            
+├── CONT_STORE y_complete                       
+├── SPAWN_ASYNC                                 
+├── ASK coord_channel x_complete                
+├── ASK coord_channel y_complete                
 ├── PUSH_PROC R                                 
 └── EVAL                                        
 ```
@@ -842,10 +973,10 @@ contract BundleContract() = { bundle+ { P } }  // Contract context
 → **Analysis**: Contract-level bundle, must persist, shared access
 → **RSpace**: `RSPACE_STORE_CONC`
 ```
-├── RSPACE_BUNDLE_BEGIN RSPACE_STORE_CONC WRITE
+├── BUNDLE_BEGIN                              
 ├── PUSH_PROC P                               
 ├── EVAL_IN_BUNDLE                            
-└── RSPACE_BUNDLE_END RSPACE_STORE_CONC
+└── BUNDLE_END
 ```
 
 ***Local Bundle***
@@ -855,10 +986,10 @@ contract BundleContract() = { bundle+ { P } }  // Contract context
 → **Analysis**: Local bundle for coordination, concurrent access needed
 → **RSpace**: `RSPACE_MEM_CONC`
 ```
-├── RSPACE_BUNDLE_BEGIN RSPACE_MEM_CONC READ
+├── BUNDLE_BEGIN                            
 ├── PUSH_PROC x!(data)                      
 ├── EVAL_IN_BUNDLE                          
-├── RSPACE_BUNDLE_END RSPACE_MEM_CONC
+├── BUNDLE_END                              
 ├── PUSH_PROC for(y <- x) { P }             
 └── EVAL                                    
 ```
@@ -870,10 +1001,10 @@ let x = bundle0 { computation } in { processResult(x) }  // Sequential processin
 → **Analysis**: Sequential bundle processing, no concurrent access
 → **RSpace**: `RSPACE_MEM_SEQ`
 ```
-├── RSPACE_BUNDLE_BEGIN RSPACE_MEM_SEQ EQUIV
+├── BUNDLE_BEGIN                            
 ├── PUSH_PROC computation                   
 ├── EVAL_IN_BUNDLE                          
-├── RSPACE_BUNDLE_END RSPACE_MEM_SEQ
+├── BUNDLE_END                              
 ├── ALLOC_LOCAL                             
 ├── STORE_LOCAL 0                           
 ├── PUSH_PROC processResult(x)              
@@ -889,9 +1020,9 @@ contract QuoteContract(process) = { @process!(result) }  // Contract using quote
 → **RSpace**: `RSPACE_STORE_CONC`
 ```
 ├── LOAD_VAR process                        
-├── NAME_QUOTE RSPACE_STORE_CONC            // Quote in persistent context
+├── NAME_QUOTE process                      // Quote in persistent context
 ├── LOAD_VAR result                         
-├── RSPACE_PRODUCE RSPACE_STORE_CONC        // Send quoted process
+├── TELL quoted_process result              // Send quoted process
 ```
 
 ***Local Quote/Unquote***
@@ -902,11 +1033,11 @@ contract QuoteContract(process) = { @process!(result) }  // Contract using quote
 → **RSpace**: `RSPACE_MEM_CONC`
 ```
 ├── PUSH_PROC P                             
-├── NAME_QUOTE RSPACE_MEM_CONC              // Quote in memory context
+├── NAME_QUOTE P                            // Quote in memory context
 ├── LOAD_VAR x                              
-├── RSPACE_PRODUCE RSPACE_MEM_CONC          // Send quoted process
+├── TELL x quoted_P                         // Send quoted process
 ├── LOAD_VAR quotedP                        
-└── NAME_UNQUOTE RSPACE_MEM_CONC            // Unquote in matching context
+└── NAME_UNQUOTE quotedP                    // Unquote in matching context
 ```
 
 **Variable Reference**
@@ -915,12 +1046,12 @@ contract QuoteContract(process) = { @process!(result) }  // Contract using quote
 =var  -> BYTECODE
 ├── LOAD_VAR var                        // Load variable
 ├── COPY                                // Create copy
-└── REF RSPACE_MEM_CONC                 // Create reference through memory RSpace
+└── REF                                 // Create reference through memory RSpace
 
 =*var  -> BYTECODE
 ├── LOAD_VAR var                        // Load variable
 ├── MOVE                                // Transfer ownership
-└── REF RSPACE_MEM_CONC                 // Create reference with move through memory RSpace
+└── REF                                 // Create reference with move through memory RSpace
 ```
 
 ### Literal Constructs*
@@ -954,9 +1085,9 @@ for (x <= Name) { P }
 ```
 ├── LOAD_VAR Name
 ├── ALLOC_LOCAL
-├── PATTERN_COMPILE RSPACE_STORE_CONC x
-├── CONTINUATION_STORE RSPACE_STORE_CONC P
-├── RSPACE_CONSUME_PERSISTENT RSPACE_STORE_CONC
-├── PATTERN_BIND RSPACE_STORE_CONC
-└── CONTINUATION_RESUME RSPACE_STORE_CONC
+├── PATTERN x
+├── CONT_STORE P
+├── ASK Name P
+├── EXTRACT_BINDINGS
+└── CONT_RESUME P
 ```
