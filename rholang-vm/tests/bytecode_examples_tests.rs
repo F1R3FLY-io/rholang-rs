@@ -333,8 +333,8 @@ fn test_arithmetic_and_logical() -> Result<()> {
     assert_eq!(result, "Bool(true)");
 
     // Error paths: division by zero, modulo by zero
-    test_utils::run_and_expect_err(&rt, &vm, vec![Instruction::PushInt(1), Instruction::PushInt(0), Instruction::Div], "Division by zero");
-    test_utils::run_and_expect_err(&rt, &vm, vec![Instruction::PushInt(1), Instruction::PushInt(0), Instruction::Mod], "Modulo by zero");
+    run_and_expect_err(&rt, &vm, vec![Instruction::PushInt(1), Instruction::PushInt(0), Instruction::Div], "Division by zero");
+    run_and_expect_err(&rt, &vm, vec![Instruction::PushInt(1), Instruction::PushInt(0), Instruction::Mod], "Modulo by zero");
 
     Ok(())
 }
