@@ -15,6 +15,8 @@ pub struct ExecutionContext {
     pub ip: usize,
     /// Label to instruction index mapping
     pub labels: HashMap<Label, usize>,
+    /// Cached RSpace instances by type for the duration of program execution
+    pub rspaces: HashMap<crate::bytecode::RSpaceType, Box<dyn crate::rspace::RSpace>>,
 }
 
 impl Default for ExecutionContext {
@@ -31,6 +33,7 @@ impl ExecutionContext {
             locals: Vec::new(),
             ip: 0,
             labels: HashMap::new(),
+            rspaces: HashMap::new(),
         }
     }
 
@@ -71,6 +74,15 @@ impl ExecutionContext {
         }
         self.locals[index] = value;
         Ok(())
+    }
+
+    /// Get or create an RSpace instance for the given type
+    pub fn get_or_create_rspace(&mut self, rspace_type: crate::bytecode::RSpaceType) -> Result<&mut Box<dyn crate::rspace::RSpace>> {
+        if !self.rspaces.contains_key(&rspace_type) {
+            let r = crate::rspace::RSpaceFactory::create(rspace_type)?;
+            self.rspaces.insert(rspace_type, r);
+        }
+        Ok(self.rspaces.get_mut(&rspace_type).expect("rspace must exist"))
     }
 
     /// Jump to a label
@@ -192,29 +204,35 @@ impl VM {
                 let _index = context.alloc_local();
             }
             Instruction::BranchTrue(label) => {
+                // BranchTrue: Pop Bool; if true, jump to label; else fall through
                 context.branch_true(label)?;
             }
             Instruction::BranchFalse(label) => {
+                // BranchFalse: Pop Bool; if false, jump to label; else fall through
                 context.branch_false(label)?;
             }
             Instruction::BranchSuccess(_label) => {
-                // This will be implemented when we have success/failure semantics
+                // BranchSuccess: Jump on previous operation success (semantics TBD)
                 bail!("BranchSuccess not implemented yet");
             }
             Instruction::Jump(label) => {
+                // Jump: Unconditional jump to label
                 context.jump(label)?;
             }
             Instruction::CmpEq => {
+                // CmpEq: Pop b, then a; push Bool(a == b)
                 let b = context.pop()?;
                 let a = context.pop()?;
                 context.push(Value::Bool(a == b));
             }
             Instruction::CmpNeq => {
+                // CmpNeq: Pop b, then a; push Bool(a != b)
                 let b = context.pop()?;
                 let a = context.pop()?;
                 context.push(Value::Bool(a != b));
             }
             Instruction::CmpLt => {
+                // CmpLt: Pop b, then a; require Ints; push Bool(a < b)
                 let b = context.pop()?;
                 let a = context.pop()?;
                 match (a, b) {
@@ -225,6 +243,7 @@ impl VM {
                 }
             }
             Instruction::CmpLte => {
+                // CmpLte: Pop b, then a; require Ints; push Bool(a <= b)
                 let b = context.pop()?;
                 let a = context.pop()?;
                 match (a, b) {
@@ -235,6 +254,7 @@ impl VM {
                 }
             }
             Instruction::CmpGt => {
+                // CmpGt: Pop b, then a; require Ints; push Bool(a > b)
                 let b = context.pop()?;
                 let a = context.pop()?;
                 match (a, b) {
@@ -245,6 +265,7 @@ impl VM {
                 }
             }
             Instruction::CmpGte => {
+                // CmpGte: Pop b, then a; require Ints; push Bool(a >= b)
                 let b = context.pop()?;
                 let a = context.pop()?;
                 match (a, b) {
@@ -255,6 +276,7 @@ impl VM {
                 }
             }
             Instruction::Add => {
+                // Add: Pop b, then a; if Ints => a+b; if Strings => concat; push result
                 let b = context.pop()?;
                 let a = context.pop()?;
                 match (a, b) {
@@ -268,6 +290,7 @@ impl VM {
                 }
             }
             Instruction::Sub => {
+                // Sub: Pop b, then a; require Ints; push Int(a - b)
                 let b = context.pop()?;
                 let a = context.pop()?;
                 match (a, b) {
@@ -278,6 +301,7 @@ impl VM {
                 }
             }
             Instruction::Mul => {
+                // Mul: Pop b, then a; require Ints; push Int(a * b)
                 let b = context.pop()?;
                 let a = context.pop()?;
                 match (a, b) {
@@ -288,6 +312,7 @@ impl VM {
                 }
             }
             Instruction::Div => {
+                // Div: Pop b, then a; require Ints; error on divide-by-zero; push Int(a / b)
                 let b = context.pop()?;
                 let a = context.pop()?;
                 match (a, b) {
@@ -301,6 +326,7 @@ impl VM {
                 }
             }
             Instruction::Mod => {
+                // Mod: Pop b, then a; require Ints; error on modulo-by-zero; push Int(a % b)
                 let b = context.pop()?;
                 let a = context.pop()?;
                 match (a, b) {
@@ -314,6 +340,7 @@ impl VM {
                 }
             }
             Instruction::Neg => {
+                // Neg: Pop Int a; push Int(-a)
                 let a = context.pop()?;
                 match a {
                     Value::Int(a) => {
@@ -323,6 +350,7 @@ impl VM {
                 }
             }
             Instruction::Not => {
+                // Not: Pop Bool a; push Bool(!a)
                 let a = context.pop()?;
                 match a {
                     Value::Bool(a) => {
@@ -332,6 +360,7 @@ impl VM {
                 }
             }
             Instruction::Concat => {
+                // Concat: Pop b, then a; concat Strings or Lists; push result
                 let b = context.pop()?;
                 let a = context.pop()?;
                 match (a, b) {
@@ -347,14 +376,15 @@ impl VM {
                 }
             }
             Instruction::Diff => {
-                // This will be implemented when we have collection difference semantics
+                // Diff: Collection difference (semantics TBD)
                 bail!("Diff not implemented yet");
             }
             Instruction::Interpolate => {
-                // This will be implemented when we have string interpolation semantics
+                // Interpolate: String interpolation (semantics TBD)
                 bail!("Interpolate not implemented yet");
             }
             Instruction::CreateList(n) => {
+                // CreateList(n): Pop n values (rightmost first), reverse to original order; push List
                 let mut list = Vec::with_capacity(*n);
                 for _ in 0..*n {
                     list.push(context.pop()?);
@@ -363,6 +393,7 @@ impl VM {
                 context.push(Value::List(list));
             }
             Instruction::CreateTuple(n) => {
+                // CreateTuple(n): Pop n values, reverse to original order; push Tuple
                 let mut tuple = Vec::with_capacity(*n);
                 for _ in 0..*n {
                     tuple.push(context.pop()?);
@@ -371,6 +402,7 @@ impl VM {
                 context.push(Value::Tuple(tuple));
             }
             Instruction::CreateMap(n) => {
+                // CreateMap(n): Pop n value/key pairs (value then key), reverse to original order; push Map
                 let mut map = Vec::with_capacity(*n);
                 for _ in 0..*n {
                     let value = context.pop()?;
@@ -381,75 +413,75 @@ impl VM {
                 context.push(Value::Map(map));
             }
             Instruction::InvokeMethod => {
-                // This will be implemented when we have method invocation semantics
+                // InvokeMethod: Invoke a previously loaded method (object model TBD)
                 bail!("InvokeMethod not implemented yet");
             }
 
             // Evaluation Instructions
             Instruction::Eval => {
-                // This will be implemented when we have process evaluation semantics
+                // Eval: Evaluate a process on stack in current env
                 bail!("Eval not implemented yet");
             }
             Instruction::EvalBool => {
-                // This will be implemented when we have process evaluation semantics
+                // EvalBool: Evaluate and coerce to Bool
                 bail!("EvalBool not implemented yet");
             }
             Instruction::EvalStar => {
-                // This will be implemented when we have explicit evaluation semantics
+                // EvalStar: Explicit evaluation (Rholang * semantics)
                 bail!("EvalStar not implemented yet");
             }
             Instruction::EvalToRSpace => {
-                // This will be implemented when we have RSpace integration
+                // EvalToRSpace: Evaluate to a Value suitable for RSpace
                 bail!("EvalToRSpace not implemented yet");
             }
             Instruction::EvalWithLocals => {
-                // This will be implemented when we have process evaluation semantics
+                // EvalWithLocals: Evaluate with provided local bindings
                 bail!("EvalWithLocals not implemented yet");
             }
             Instruction::EvalInBundle => {
-                // This will be implemented when we have bundle semantics
+                // EvalInBundle: Evaluate within a bundle capability context
                 bail!("EvalInBundle not implemented yet");
             }
             Instruction::Exec => {
-                // This will be implemented when we have process execution semantics
+                // Exec: Execute a process (fire-and-forget)
                 bail!("Exec not implemented yet");
             }
 
             // Pattern Matching Instructions
             Instruction::Pattern(_pattern) => {
-                // This will be implemented when we have pattern matching semantics
+                // Pattern: Load/compile a pattern representation
                 bail!("Pattern not implemented yet");
             }
             Instruction::MatchTest => {
-                // This will be implemented when we have pattern matching semantics
+                // MatchTest: Test pattern match, push Bool
                 bail!("MatchTest not implemented yet");
             }
             Instruction::ExtractBindings => {
-                // This will be implemented when we have pattern matching semantics
+                // ExtractBindings: Extract bound variables from last match
                 bail!("ExtractBindings not implemented yet");
             }
 
             // Process Control Instructions
             Instruction::SpawnAsync(_rspace_type) => {
-                // This will be implemented when we have process spawning semantics
+                // SpawnAsync: Spawn a process asynchronously
                 bail!("SpawnAsync not implemented yet");
             }
             Instruction::ProcNeg => {
-                // This will be implemented when we have process negation semantics
+                // ProcNeg: Process negation
                 bail!("ProcNeg not implemented yet");
             }
             Instruction::Conj => {
-                // This will be implemented when we have process conjunction semantics
+                // Conj: Process conjunction (both must succeed)
                 bail!("Conj not implemented yet");
             }
             Instruction::Disj => {
-                // This will be implemented when we have process disjunction semantics
+                // Disj: Process disjunction (either can succeed)
                 bail!("Disj not implemented yet");
             }
 
             // Reference Instructions
             Instruction::Copy => {
-                // This will be implemented when we have reference semantics
+                // Copy: Copy value (reference semantics TBD)
                 bail!("Copy not implemented yet");
             }
             Instruction::Move => {
@@ -466,25 +498,71 @@ impl VM {
             }
 
             // RSpace Instructions
-            Instruction::RSpaceProduce(_rspace_type) => {
-                // This will be implemented when we have RSpace integration
-                bail!("RSpaceProduce not implemented yet");
+            Instruction::RSpaceProduce(rspace_type) => {
+                // Stack: ... , channel(Name), data(Value)
+                let data = context.pop()?;
+                let channel_name = match context.pop()? {
+                    Value::Name(s) => s,
+                    other => bail!("RSpaceProduce expects a Name channel on stack, got {:?}", other),
+                };
+                let rspace = context.get_or_create_rspace(*rspace_type)?;
+                let channel = crate::rspace::ChannelName { name: channel_name, rspace_type: *rspace_type };
+                rspace.produce(channel, data).await?;
+                // Indicate success
+                context.push(Value::Bool(true));
             }
-            Instruction::RSpaceConsume(_rspace_type) => {
-                // This will be implemented when we have RSpace integration
-                bail!("RSpaceConsume not implemented yet");
+            Instruction::RSpaceConsume(rspace_type) => {
+                // Blocking consume mapped to RSpace::get
+                let channel_name = match context.pop()? {
+                    Value::Name(s) => s,
+                    other => bail!("RSpaceConsume expects a Name channel on stack, got {:?}", other),
+                };
+                let rspace = context.get_or_create_rspace(*rspace_type)?;
+                let channel = crate::rspace::ChannelName { name: channel_name, rspace_type: *rspace_type };
+                let value = rspace.get(channel).await?;
+                context.push(value);
             }
-            Instruction::RSpaceConsumeNonblock(_rspace_type) => {
-                // This will be implemented when we have RSpace integration
-                bail!("RSpaceConsumeNonblock not implemented yet");
+            Instruction::RSpaceConsumeNonblock(rspace_type) => {
+                // Non-blocking consume mapped to RSpace::get_nonblock
+                let channel_name = match context.pop()? {
+                    Value::Name(s) => s,
+                    other => bail!("RSpaceConsumeNonblock expects a Name channel on stack, got {:?}", other),
+                };
+                let rspace = context.get_or_create_rspace(*rspace_type)?;
+                let channel = crate::rspace::ChannelName { name: channel_name, rspace_type: *rspace_type };
+                let value_opt = rspace.get_nonblock(channel).await?;
+                match value_opt {
+                    Some(v) => context.push(v),
+                    None => context.push(Value::Nil),
+                }
             }
-            Instruction::RSpaceConsumePersistent(_rspace_type) => {
-                // This will be implemented when we have RSpace integration
-                bail!("RSpaceConsumePersistent not implemented yet");
+            Instruction::RSpaceConsumePersistent(rspace_type) => {
+                // Persistent consume behaves like peek (non-consuming)
+                let channel_name = match context.pop()? {
+                    Value::Name(s) => s,
+                    other => bail!("RSpaceConsumePersistent expects a Name channel on stack, got {:?}", other),
+                };
+                let rspace = context.get_or_create_rspace(*rspace_type)?;
+                let channel = crate::rspace::ChannelName { name: channel_name, rspace_type: *rspace_type };
+                let value_opt = rspace.peek(channel).await?;
+                match value_opt {
+                    Some(v) => context.push(v),
+                    None => context.push(Value::Nil),
+                }
             }
-            Instruction::RSpacePeek(_rspace_type) => {
-                // This will be implemented when we have RSpace integration
-                bail!("RSpacePeek not implemented yet");
+            Instruction::RSpacePeek(rspace_type) => {
+                // Peek at data without consuming
+                let channel_name = match context.pop()? {
+                    Value::Name(s) => s,
+                    other => bail!("RSpacePeek expects a Name channel on stack, got {:?}", other),
+                };
+                let rspace = context.get_or_create_rspace(*rspace_type)?;
+                let channel = crate::rspace::ChannelName { name: channel_name, rspace_type: *rspace_type };
+                let value_opt = rspace.peek(channel).await?;
+                match value_opt {
+                    Some(v) => context.push(v),
+                    None => context.push(Value::Nil),
+                }
             }
             Instruction::RSpaceMatch(_rspace_type) => {
                 // This will be implemented when we have RSpace integration
@@ -502,17 +580,36 @@ impl VM {
                 // This will be implemented when we have RSpace integration
                 bail!("RSpaceSelectWait not implemented yet");
             }
-            Instruction::NameCreate(_rspace_type) => {
-                // This will be implemented when we have RSpace integration
-                bail!("NameCreate not implemented yet");
+            Instruction::NameCreate(rspace_type) => {
+                // Create a corresponding RSpace and generate a fresh name
+                // Use cached RSpace of the given type to create a fresh name
+                let rspace = context.get_or_create_rspace(*rspace_type)?;
+                let channel = rspace.name_create().await?;
+                // Push the created name onto the stack as a Value::Name
+                context.push(Value::Name(channel.name));
             }
-            Instruction::NameQuote(_rspace_type) => {
-                // This will be implemented when we have RSpace integration
-                bail!("NameQuote not implemented yet");
+            Instruction::NameQuote(rspace_type) => {
+                // Pop a process and quote it to a name in the given RSpace
+                let proc_str = match context.pop()? {
+                    Value::Process(s) => s,
+                    Value::String(s) => s,
+                    other => bail!("NameQuote expects a Process or String on stack, got {:?}", other),
+                };
+                let rspace = context.get_or_create_rspace(*rspace_type)?;
+                let name = rspace.name_quote(proc_str).await?;
+                context.push(Value::Name(name.name));
             }
-            Instruction::NameUnquote(_rspace_type) => {
-                // This will be implemented when we have RSpace integration
-                bail!("NameUnquote not implemented yet");
+            Instruction::NameUnquote(rspace_type) => {
+                // Pop a name and unquote it to a process string
+                let channel_name = match context.pop()? {
+                    Value::Name(s) => s,
+                    other => bail!("NameUnquote expects a Name on stack, got {:?}", other),
+                };
+                let rspace = context.get_or_create_rspace(*rspace_type)?;
+                let process = rspace
+                    .name_unquote(crate::rspace::ChannelName { name: channel_name, rspace_type: *rspace_type })
+                    .await?;
+                context.push(Value::Process(process));
             }
             Instruction::PatternCompile(_rspace_type) => {
                 // This will be implemented when we have RSpace integration
