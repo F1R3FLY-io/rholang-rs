@@ -372,19 +372,11 @@ fn test_unimplemented_instructions() -> Result<()> {
     run_and_expect_err(&rt, &vm, vec![Instruction::LoadMethod("m".to_string())], "LoadMethod not implemented yet");
     run_and_expect_err(&rt, &vm, vec![Instruction::InvokeMethod], "InvokeMethod not implemented yet");
 
-    // RSpace instruction placeholders (various types)
-    run_and_expect_err(&rt, &vm, vec![Instruction::RSpaceProduce(RSpaceType::MemorySequential)], "RSpaceProduce not implemented yet");
-    run_and_expect_err(&rt, &vm, vec![Instruction::RSpaceConsume(RSpaceType::MemorySequential)], "RSpaceConsume not implemented yet");
-    run_and_expect_err(&rt, &vm, vec![Instruction::RSpaceConsumeNonblock(RSpaceType::MemorySequential)], "RSpaceConsumeNonblock not implemented yet");
-    run_and_expect_err(&rt, &vm, vec![Instruction::RSpaceConsumePersistent(RSpaceType::MemorySequential)], "RSpaceConsumePersistent not implemented yet");
-    run_and_expect_err(&rt, &vm, vec![Instruction::RSpacePeek(RSpaceType::MemorySequential)], "RSpacePeek not implemented yet");
+    // RSpace/Name placeholders that remain unimplemented
     run_and_expect_err(&rt, &vm, vec![Instruction::RSpaceMatch(RSpaceType::MemorySequential)], "RSpaceMatch not implemented yet");
     run_and_expect_err(&rt, &vm, vec![Instruction::RSpaceSelectBegin(RSpaceType::MemoryConcurrent)], "RSpaceSelectBegin not implemented yet");
     run_and_expect_err(&rt, &vm, vec![Instruction::RSpaceSelectAdd(RSpaceType::MemoryConcurrent)], "RSpaceSelectAdd not implemented yet");
     run_and_expect_err(&rt, &vm, vec![Instruction::RSpaceSelectWait(RSpaceType::MemoryConcurrent)], "RSpaceSelectWait not implemented yet");
-    run_and_expect_err(&rt, &vm, vec![Instruction::NameCreate(RSpaceType::StoreConcurrent)], "NameCreate not implemented yet");
-    run_and_expect_err(&rt, &vm, vec![Instruction::NameQuote(RSpaceType::StoreConcurrent)], "NameQuote not implemented yet");
-    run_and_expect_err(&rt, &vm, vec![Instruction::NameUnquote(RSpaceType::StoreConcurrent)], "NameUnquote not implemented yet");
     run_and_expect_err(&rt, &vm, vec![Instruction::PatternCompile(RSpaceType::MemorySequential)], "PatternCompile not implemented yet");
     run_and_expect_err(&rt, &vm, vec![Instruction::PatternBind(RSpaceType::MemorySequential)], "PatternBind not implemented yet");
     run_and_expect_err(&rt, &vm, vec![Instruction::ContinuationStore(RSpaceType::MemorySequential)], "ContinuationStore not implemented yet");

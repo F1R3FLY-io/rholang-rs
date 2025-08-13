@@ -5,6 +5,39 @@ use crate::bytecode::{Instruction, Label, Value};
 use anyhow::{anyhow, bail, Result};
 use std::collections::HashMap;
 
+/// VM Memory Layout segments as per BYTECODE_DESIGN.md
+#[derive(Default)]
+pub struct VmMemory {
+    /// Bytecode Segment: instructions and inline data
+    pub bytecode_segment: Vec<Instruction>,
+    /// Constant Pool: literals, patterns, predefined processes
+    pub constant_pool: Vec<Value>,
+    /// Process Heap: dynamic processes and closures (addressed by ID)
+    pub process_heap: HashMap<u32, Value>,
+    /// Continuation Table: suspended computations keyed by ID
+    pub continuation_table: HashMap<u32, ContinuationRecord>,
+    /// Pattern Cache: compiled pattern matchers
+    pub pattern_cache: HashMap<String, PatternCompiled>,
+    /// Name Registry: unforgeable names and quotes
+    pub name_registry: HashMap<String, Value>,
+}
+
+/// Minimal placeholder for a compiled pattern representation
+#[derive(Clone, Default)]
+pub struct PatternCompiled {
+    /// textual key or descriptor; real impl would be bytecode or DFA
+    pub key: String,
+}
+
+/// Minimal placeholder for a continuation record
+#[derive(Clone, Default)]
+pub struct ContinuationRecord {
+    /// textual reference to process/closure; real impl would be ProcessRef
+    pub proc_ref: String,
+    /// optional environment snapshot id (not implemented)
+    pub env_id: Option<u32>,
+}
+
 /// The VM execution context
 pub struct ExecutionContext {
     /// The stack for computational operations
@@ -17,6 +50,8 @@ pub struct ExecutionContext {
     pub labels: HashMap<Label, usize>,
     /// Cached RSpace instances by type for the duration of program execution
     pub rspaces: HashMap<crate::bytecode::RSpaceType, Box<dyn crate::rspace::RSpace>>,
+    /// VM Memory Layout segments
+    pub memory: VmMemory,
 }
 
 impl Default for ExecutionContext {
@@ -34,6 +69,7 @@ impl ExecutionContext {
             ip: 0,
             labels: HashMap::new(),
             rspaces: HashMap::new(),
+            memory: VmMemory::default(),
         }
     }
 
@@ -95,6 +131,18 @@ impl ExecutionContext {
         Ok(())
     }
 
+    /// Accessors for memory segments (minimal stubs for future use)
+    pub fn constant_pool(&self) -> &Vec<Value> { &self.memory.constant_pool }
+    pub fn constant_pool_mut(&mut self) -> &mut Vec<Value> { &mut self.memory.constant_pool }
+    pub fn process_heap(&self) -> &HashMap<u32, Value> { &self.memory.process_heap }
+    pub fn process_heap_mut(&mut self) -> &mut HashMap<u32, Value> { &mut self.memory.process_heap }
+    pub fn continuation_table(&self) -> &HashMap<u32, ContinuationRecord> { &self.memory.continuation_table }
+    pub fn continuation_table_mut(&mut self) -> &mut HashMap<u32, ContinuationRecord> { &mut self.memory.continuation_table }
+    pub fn pattern_cache(&self) -> &HashMap<String, PatternCompiled> { &self.memory.pattern_cache }
+    pub fn pattern_cache_mut(&mut self) -> &mut HashMap<String, PatternCompiled> { &mut self.memory.pattern_cache }
+    pub fn name_registry(&self) -> &HashMap<String, Value> { &self.memory.name_registry }
+    pub fn name_registry_mut(&mut self) -> &mut HashMap<String, Value> { &mut self.memory.name_registry }
+
     /// Jump to a label if the top of the stack is true
     pub fn branch_true(&mut self, label: &Label) -> Result<()> {
         let condition = self.pop()?;
@@ -137,17 +185,20 @@ impl VM {
     pub async fn execute(&self, program: &[Instruction]) -> Result<String> {
         let mut context = ExecutionContext::new();
 
-        // First pass: collect all labels
-        for (i, instruction) in program.iter().enumerate() {
+        // Initialize memory layout: load bytecode segment
+        context.memory.bytecode_segment = program.to_vec();
+
+        // First pass: collect all labels from bytecode segment
+        for (i, instruction) in context.memory.bytecode_segment.iter().enumerate() {
             if let Instruction::Label(label) = instruction {
                 context.labels.insert(label.clone(), i);
             }
         }
 
-        // Second pass: execute instructions
-        while context.ip < program.len() {
-            let instruction = &program[context.ip];
-            self.execute_instruction(&mut context, instruction).await?;
+        // Second pass: execute instructions from bytecode segment
+        while context.ip < context.memory.bytecode_segment.len() {
+            let instruction = context.memory.bytecode_segment[context.ip].clone();
+            self.execute_instruction(&mut context, &instruction).await?;
             context.ip += 1;
         }
 
