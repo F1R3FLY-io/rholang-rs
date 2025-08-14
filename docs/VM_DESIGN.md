@@ -147,3 +147,22 @@ If you’re looking for details, see `compiler.rs` (`gen_label`, `compile_proc`,
 
 ---
 If you change instructions, RSpace capabilities, or compiler behavior, please update this document and `BYTECODE_DESIGN.md` together. Keeping docs close to the code has saved us many round-trips during review.
+
+
+## VM State Snapshots (GSLT/JSON)
+
+To support verifiable, fully abstract VM state representation, the VM exposes a canonical JSON snapshot format aligned with a formal JSON Schema.
+
+- Schema: rholang-vm/vm_state_schema.json
+- Module: rholang-vm/src/state.rs
+- Public APIs:
+  - state::snapshot_from_context(&vm::ExecutionContext) -> VmStateSnapshot
+  - state::serialize_state_to_json(&vm::ExecutionContext) -> anyhow::Result<String>
+  - state::deserialize_state_from_json(&str) -> anyhow::Result<VmStateSnapshot> (two-stage validation: parse + schema)
+
+Canonicalization strategy:
+- All map-like structures are represented with BTreeMap and labels by their string names; rspaces are sorted by backend type. This ensures byte-for-byte identical JSON for observationally equivalent states.
+
+Testing:
+- See rholang-vm/tests/vm_state_tests.rs for round-trip, canonicalization, and schema-negative tests.
+- RSpace snapshot provider verifies channel data and parked continuations are populated in VmStateSnapshot.rspaces.

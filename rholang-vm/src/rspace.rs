@@ -4,9 +4,10 @@
 use crate::bytecode::{RSpaceType, Value};
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use serde_json::Value as JsonValue;
 
 /// A pattern for matching against data in an RSpace
 #[derive(Debug, Clone, PartialEq)]
@@ -67,6 +68,8 @@ pub struct ConsumeResult {
 /// The RSpace interface
 #[async_trait]
 pub trait RSpace: Send + Sync {
+    /// Support downcasting to concrete types for snapshotting
+    fn as_any(&self) -> &dyn std::any::Any;
     /// Get the type of this RSpace
     fn get_type(&self) -> RSpaceType;
 
@@ -117,6 +120,13 @@ type DataStorage = Arc<Mutex<HashMap<ChannelName, Vec<Value>>>>;
 type ContinuationStorage = Arc<Mutex<HashMap<ChannelName, Vec<(Pattern, Continuation)>>>>;
 
 /// In-memory sequential RSpace implementation
+/// Snapshot provider for guest-visible RSpace state
+pub trait RSpaceSnapshotProvider {
+    /// Returns a canonical map: channel_name -> JSON object with data and continuations
+    fn snapshot_channels(&self) -> BTreeMap<String, JsonValue>;
+}
+
+/// In-memory sequential RSpace implementation
 pub struct MemorySequentialRSpace {
     /// The data stored in the RSpace
     data: DataStorage,
@@ -140,8 +150,77 @@ impl MemorySequentialRSpace {
     }
 }
 
+impl RSpaceSnapshotProvider for MemorySequentialRSpace {
+    fn snapshot_channels(&self) -> BTreeMap<String, JsonValue> {
+        // Try to take non-blocking locks to avoid async in snapshot path
+        let mut map: BTreeMap<String, JsonValue> = BTreeMap::new();
+        let data_opt = self.data.try_lock();
+        let cont_opt = self.continuations.try_lock();
+
+        let data_map = match data_opt {
+            Ok(g) => Some(g),
+            Err(_) => None,
+        };
+        let cont_map = match cont_opt {
+            Ok(g) => Some(g),
+            Err(_) => None,
+        };
+
+        // Collect all channel names from either map
+        let mut channel_names: Vec<String> = Vec::new();
+        if let Some(dm) = data_map.as_ref() {
+            for ch in dm.keys() { channel_names.push(ch.name.clone()); }
+        }
+        if let Some(cm) = cont_map.as_ref() {
+            for ch in cm.keys() { channel_names.push(ch.name.clone()); }
+        }
+        channel_names.sort();
+        channel_names.dedup();
+
+        for ch_name in channel_names {
+            // Collect data list
+            let data_list = if let Some(dm) = data_map.as_ref() {
+                // find by constructed ChannelName key; rspace_type can be taken from self.get_type()
+                let key = ChannelName { name: ch_name.clone(), rspace_type: self.get_type() };
+                if let Some(values) = dm.get(&key) {
+                    let arr: Vec<JsonValue> = values.iter().map(|v| serde_json::to_value(v).unwrap_or(JsonValue::Null)).collect();
+                    arr
+                } else { vec![] }
+            } else { vec![] };
+
+            // Collect continuations list (redacted to guest-visible summary)
+            let cont_list = if let Some(cm) = cont_map.as_ref() {
+                let key = ChannelName { name: ch_name.clone(), rspace_type: self.get_type() };
+                if let Some(conts) = cm.get(&key) {
+                    let mut out: Vec<JsonValue> = Vec::new();
+                    for (pat, kont) in conts.iter() {
+                        let env_json = serde_json::to_value(&kont.environment).unwrap_or(JsonValue::Null);
+                        let obj = serde_json::json!({
+                            "pattern": pat.pattern,
+                            "bindings": pat.bindings,
+                            "process": kont.process,
+                            "environment": env_json
+                        });
+                        out.push(obj);
+                    }
+                    out
+                } else { vec![] }
+            } else { vec![] };
+
+            let obj = serde_json::json!({
+                "data": data_list,
+                "continuations": cont_list
+            });
+            map.insert(ch_name, obj);
+        }
+
+        map
+    }
+}
+
 #[async_trait]
 impl RSpace for MemorySequentialRSpace {
+    fn as_any(&self) -> &dyn std::any::Any { self }
     fn get_type(&self) -> RSpaceType {
         RSpaceType::MemorySequential
     }
@@ -335,8 +414,16 @@ impl MemoryConcurrentRSpace {
     }
 }
 
+impl RSpaceSnapshotProvider for MemoryConcurrentRSpace {
+    fn snapshot_channels(&self) -> BTreeMap<String, JsonValue> {
+        // Delegate to underlying sequential backend
+        self.sequential.snapshot_channels()
+    }
+}
+
 #[async_trait]
 impl RSpace for MemoryConcurrentRSpace {
+    fn as_any(&self) -> &dyn std::any::Any { self }
     fn get_type(&self) -> RSpaceType {
         RSpaceType::MemoryConcurrent
     }

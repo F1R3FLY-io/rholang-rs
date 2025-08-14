@@ -46,6 +46,19 @@ Build a high-performance, production-ready Rholang interpreter in Rust for the F
 - [x] Unit tests and benches for VM, compiler, bytecode, and RSpace (see rholang-vm/tests and rholang-vm/benches)
 - [x] Design docs updated: docs/BYTECODE_DESIGN.md, docs/VM_DESIGN.md
 
+### 🧾 GSLT/JSON VM State Snapshots (v0.4.1)
+- [x] Canonical JSON snapshot format with JSON Schema (rholang-vm/vm_state_schema.json)
+- [x] Snapshot module: rholang-vm/src/state.rs
+  - [x] snapshot_from_context(&vm::ExecutionContext) -> VmStateSnapshot
+  - [x] serialize_state_to_json(&vm::ExecutionContext) -> anyhow::Result<String>
+  - [x] deserialize_state_from_json(&str) -> anyhow::Result<VmStateSnapshot> (two-stage validation: parse + schema)
+- [x] Tests for canonicalization and schema validation (rholang-vm/tests/vm_state_tests.rs)
+- [x] Documentation updated (docs/VM_DESIGN.md § VM State Snapshots, docs/rholang-vm-gslt-json-plan.md)
+- [x] RSpace snapshot provider trait and implementations to populate channel/continuation state
+- [ ] VM pause_and_snapshot()/resume_from_snapshot() APIs
+- [ ] CLI: export/import state commands in shell (feature-gated)
+- [ ] Streaming/large-state snapshot strategy and benchmarks
+
 ## Phase 1: Core Language Implementation (Q1-Q2 2025)
 
 ### 🎯 Parser and AST (v0.2.0)
@@ -277,7 +290,7 @@ Build a high-performance, production-ready Rholang interpreter in Rust for the F
 - **Container**: Docker, Podman support
 
 ### Quality Metrics
-- **Test Coverage**: >90% code coverage
+- **Test Coverage**: 100% code coverage (measured with cargo-tarpaulin; enforced by scripts/check_src_coverage.sh)
 - **Security**: Zero known vulnerabilities
 - **Performance**: Benchmarked against reference implementations
 - **Documentation**: Complete API and tutorial coverage
