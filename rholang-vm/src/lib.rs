@@ -6,6 +6,7 @@ pub mod compiler;
 pub mod interpreter;
 pub mod rspace;
 pub mod vm;
+pub mod state;
 
 use anyhow::Result;
 

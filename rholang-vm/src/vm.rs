@@ -6,7 +6,7 @@ use anyhow::{anyhow, bail, Result};
 use std::collections::HashMap;
 
 /// VM Memory Layout segments as per BYTECODE_DESIGN.md
-#[derive(Default)]
+#[derive(Default, serde::Serialize, serde::Deserialize, Debug)]
 pub struct VmMemory {
     /// Bytecode Segment: instructions and inline data
     pub bytecode_segment: Vec<Instruction>,
@@ -23,14 +23,14 @@ pub struct VmMemory {
 }
 
 /// Minimal placeholder for a compiled pattern representation
-#[derive(Clone, Default)]
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize, Debug)]
 pub struct PatternCompiled {
     /// textual key or descriptor; real impl would be bytecode or DFA
     pub key: String,
 }
 
 /// Minimal placeholder for a continuation record
-#[derive(Clone, Default)]
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize, Debug)]
 pub struct ContinuationRecord {
     /// textual reference to process/closure; real impl would be ProcessRef
     pub proc_ref: String,
