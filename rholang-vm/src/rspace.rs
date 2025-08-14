@@ -5,7 +5,8 @@ use crate::bytecode::{RSpaceType, Value};
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 /// A pattern for matching against data in an RSpace
 #[derive(Debug, Clone, PartialEq)]
@@ -146,19 +147,13 @@ impl RSpace for MemorySequentialRSpace {
     }
 
     async fn put(&self, channel: ChannelName, data: Value) -> Result<()> {
-        let mut data_map = self
-            .data
-            .lock()
-            .map_err(|e| anyhow!("Failed to lock data: {}", e))?;
+        let mut data_map = self.data.lock().await;
         data_map.entry(channel).or_insert_with(Vec::new).push(data);
         Ok(())
     }
 
     async fn get(&self, channel: ChannelName) -> Result<Value> {
-        let mut data_map = self
-            .data
-            .lock()
-            .map_err(|e| anyhow!("Failed to lock data: {}", e))?;
+        let mut data_map = self.data.lock().await;
         let values = data_map
             .get_mut(&channel)
             .ok_or_else(|| anyhow!("Channel not found"))?;
@@ -169,10 +164,7 @@ impl RSpace for MemorySequentialRSpace {
     }
 
     async fn get_nonblock(&self, channel: ChannelName) -> Result<Option<Value>> {
-        let mut data_map = self
-            .data
-            .lock()
-            .map_err(|e| anyhow!("Failed to lock data: {}", e))?;
+        let mut data_map = self.data.lock().await;
         let values = match data_map.get_mut(&channel) {
             Some(values) => values,
             None => return Ok(None),
@@ -190,18 +182,12 @@ impl RSpace for MemorySequentialRSpace {
         continuation: Continuation,
     ) -> Result<Option<ConsumeResult>> {
         // Check if there's data available
-        let mut data_map = self
-            .data
-            .lock()
-            .map_err(|e| anyhow!("Failed to lock data: {}", e))?;
+        let mut data_map = self.data.lock().await;
         let values = match data_map.get_mut(&channel) {
             Some(values) => values,
             None => {
                 // No data available, store the continuation
-                let mut cont_map = self
-                    .continuations
-                    .lock()
-                    .map_err(|e| anyhow!("Failed to lock continuations: {}", e))?;
+                let mut cont_map = self.continuations.lock().await;
                 cont_map
                     .entry(channel)
                     .or_insert_with(Vec::new)
@@ -212,10 +198,7 @@ impl RSpace for MemorySequentialRSpace {
 
         if values.is_empty() {
             // No data available, store the continuation
-            let mut cont_map = self
-                .continuations
-                .lock()
-                .map_err(|e| anyhow!("Failed to lock continuations: {}", e))?;
+            let mut cont_map = self.continuations.lock().await;
             cont_map
                 .entry(channel)
                 .or_insert_with(Vec::new)
@@ -233,10 +216,7 @@ impl RSpace for MemorySequentialRSpace {
     async fn produce(&self, channel: ChannelName, data: Value) -> Result<()> {
         // First, check if there are continuations waiting for this channel
         let has_continuations = {
-            let cont_map = self
-                .continuations
-                .lock()
-                .map_err(|e| anyhow!("Failed to lock continuations: {}", e))?;
+            let cont_map = self.continuations.lock().await;
             
             cont_map.get(&channel).is_some_and(|conts| !conts.is_empty())
         };
@@ -248,10 +228,7 @@ impl RSpace for MemorySequentialRSpace {
 
         // If we have continuations, try to get one
         let continuation_opt = {
-            let mut cont_map = self
-                .continuations
-                .lock()
-                .map_err(|e| anyhow!("Failed to lock continuations: {}", e))?;
+            let mut cont_map = self.continuations.lock().await;
             
             cont_map.get_mut(&channel).and_then(|conts| {
                 if conts.is_empty() {
@@ -281,10 +258,7 @@ impl RSpace for MemorySequentialRSpace {
     }
 
     async fn peek(&self, channel: ChannelName) -> Result<Option<Value>> {
-        let data_map = self
-            .data
-            .lock()
-            .map_err(|e| anyhow!("Failed to lock data: {}", e))?;
+        let data_map = self.data.lock().await;
         let values = match data_map.get(&channel) {
             Some(values) => values,
             None => return Ok(None),
@@ -301,10 +275,7 @@ impl RSpace for MemorySequentialRSpace {
         _pattern: Pattern,
     ) -> Result<Option<HashMap<String, Value>>> {
         // Check if there's data available
-        let data_map = self
-            .data
-            .lock()
-            .map_err(|e| anyhow!("Failed to lock data: {}", e))?;
+        let data_map = self.data.lock().await;
         let values = match data_map.get(&channel) {
             Some(values) => values,
             None => return Ok(None),
