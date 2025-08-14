@@ -55,7 +55,7 @@ Build a high-performance, production-ready Rholang interpreter in Rust for the F
 - [x] Tests for canonicalization and schema validation (rholang-vm/tests/vm_state_tests.rs)
 - [x] Documentation updated (docs/VM_DESIGN.md § VM State Snapshots, docs/rholang-vm-gslt-json-plan.md)
 - [x] RSpace snapshot provider trait and implementations to populate channel/continuation state
-- [ ] VM pause_and_snapshot()/resume_from_snapshot() APIs
+- [x] VM pause_and_snapshot()/resume_from_snapshot() APIs
 - [ ] CLI: export/import state commands in shell (feature-gated)
 - [ ] Streaming/large-state snapshot strategy and benchmarks
 
@@ -338,4 +338,4 @@ Build a high-performance, production-ready Rholang interpreter in Rust for the F
 
 ---
 
-*This roadmap is a living document and will be updated based on community feedback, technical discoveries, and changing requirements. Last updated: August 2025*
+*This roadmap is a living document and will be updated based on community feedback, technical discoveries, and changing requirements. Last updated: August 15, 2025*

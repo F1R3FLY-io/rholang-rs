@@ -73,6 +73,46 @@ impl ExecutionContext {
         }
     }
 
+    /// Pause execution and produce a canonical snapshot of the current state
+    pub fn pause_and_snapshot(&self) -> crate::state::VmStateSnapshot {
+        crate::state::snapshot_from_context(self)
+    }
+
+    /// Resume this execution context from a given snapshot
+    pub fn resume_from_snapshot(&mut self, snapshot: &crate::state::VmStateSnapshot) -> anyhow::Result<()> {
+        use std::collections::HashMap;
+        use crate::bytecode::Label;
+        use crate::rspace::RSpaceFactory;
+
+        // Restore simple fields
+        self.stack = snapshot.stack.clone();
+        self.locals = snapshot.locals.clone();
+        self.ip = snapshot.ip;
+
+        // Restore labels map
+        let mut labels: HashMap<Label, usize> = HashMap::new();
+        for (name, idx) in &snapshot.labels {
+            labels.insert(Label(name.clone()), *idx);
+        }
+        self.labels = labels;
+
+        // Restore memory segments
+        self.memory.constant_pool = snapshot.memory.constant_pool.clone();
+        self.memory.process_heap = snapshot.memory.process_heap.iter().map(|(k, v)| (*k, v.clone())).collect();
+        self.memory.continuation_table = snapshot.memory.continuation_table.iter().map(|(k, v)| (*k, v.clone())).collect();
+        self.memory.pattern_cache = snapshot.memory.pattern_cache.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+        self.memory.name_registry = snapshot.memory.name_registry.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+
+        // Recreate RSpaces listed in snapshot (empty instances; guest-visible state restore TBD)
+        self.rspaces.clear();
+        for rs_snap in &snapshot.rspaces {
+            let rs = RSpaceFactory::create(rs_snap.rspace_type)?;
+            self.rspaces.insert(rs_snap.rspace_type, rs);
+        }
+
+        Ok(())
+    }
+
     /// Push a value onto the stack
     pub fn push(&mut self, value: Value) {
         self.stack.push(value);
@@ -179,6 +219,18 @@ impl VM {
     /// Create a new VM instance
     pub fn new() -> Result<Self> {
         Ok(VM {})
+    }
+
+    /// Pause given context and return snapshot (convenience wrapper)
+    pub fn pause_and_snapshot(&self, context: &ExecutionContext) -> crate::state::VmStateSnapshot {
+        context.pause_and_snapshot()
+    }
+
+    /// Create a new execution context from a snapshot (convenience wrapper)
+    pub fn resume_from_snapshot(&self, snapshot: &crate::state::VmStateSnapshot) -> Result<ExecutionContext> {
+        let mut ctx = ExecutionContext::new();
+        ctx.resume_from_snapshot(snapshot)?;
+        Ok(ctx)
     }
 
     /// Execute a bytecode program
