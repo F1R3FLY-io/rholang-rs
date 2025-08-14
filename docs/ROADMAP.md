@@ -20,7 +20,7 @@ Build a high-performance, production-ready Rholang interpreter in Rust for the F
 - [x] Static analysis pipeline (clippy, fmt, audit)
   - *Implementation: scripts/check_code_quality.sh, scripts/fix_code_quality.sh, and scripts/check_src_coverage.sh for code quality and test coverage*
 - [x] Documentation structure and developer guidelines
-  - *Implementation: docs/ directory contains ROADMAP.md and BYTECODE.md, README.md provides comprehensive developer guidelines*
+  - *Implementation: docs/ directory contains ROADMAP.md, BYTECODE_DESIGN.md and VM_DESIGN.md; README.md provides comprehensive developer guidelines*
 
 #### 📦 JSON Support (v0.1.1)
 - [x] Core Rholang data types with JSON serialization
@@ -38,6 +38,14 @@ Build a high-performance, production-ready Rholang interpreter in Rust for the F
 - [x] Scripts for running tests and examples across workspace crates
   - *Implementation: Added run_all_tests.sh and run_all_examples.sh scripts, integrated into quality check script and Makefile*
 
+### 🧠 Virtual Machine Core (v0.4.0-alpha)
+- [x] Bytecode instruction set scaffold implemented (see docs/BYTECODE_DESIGN.md)
+- [x] Virtual Machine executes a substantial subset of instructions (rholang-vm/src/vm.rs)
+- [x] RSpace in-memory backends (sequential and concurrent) with basic produce/consume/peek/match (rholang-vm/src/rspace.rs)
+- [x] Initial compiler from AST to bytecode for a subset of the language (rholang-vm/src/compiler.rs)
+- [x] Unit tests and benches for VM, compiler, bytecode, and RSpace (see rholang-vm/tests and rholang-vm/benches)
+- [x] Design docs updated: docs/BYTECODE_DESIGN.md, docs/VM_DESIGN.md
+
 ## Phase 1: Core Language Implementation (Q1-Q2 2025)
 
 ### 🎯 Parser and AST (v0.2.0)
@@ -53,16 +61,17 @@ Build a high-performance, production-ready Rholang interpreter in Rust for the F
   - [x] Comment handling
     - *Implementation: rholang-tree-sitter/grammar.js lines 304-310 define line and block comments*
 
-- [ ] **Parser Implementation**
-  - [x] Grammar definition for Rholang subset
-    - *Implementation: rholang-tree-sitter/grammar.js defines the complete grammar for Rholang, including process calculus primitives*
-  - [x] AST node structures
-    - *Implementation: rholang-tree-sitter/grammar.js defines node structure with fields for each component, creating a structured AST*
-  - [x] Expression parsing (arithmetic, logical)
-    - *Implementation: rholang-tree-sitter/grammar.js lines 140-160 define arithmetic and logical expressions with proper precedence*
+- [x] **Parser Implementation**
+  - [x] Grammar definition for full Rholang (process calculus core + expressions)
+    - *Implementation: rholang-tree-sitter/grammar.js defines the complete grammar for Rholang, including process calculus primitives, sends/receives, let/new/for/contract/match/select, collections, method calls, quotes/evals, and all unary/binary ops*
+  - [x] AST node structures and mapping
+    - *Implementation: rholang-parser/src/ast.rs defines a comprehensive Proc enum (Par, Send, ForComprehension, Match, Select, Bundle, Let, New, Contract, SendSync, Eval, Quote, Method, UnaryExp, BinaryExp, VarRef, literals, collections, types) and supporting structs (Case, Branch, Names, NameDecl, etc.). rholang-parser/src/parser/ast_builder.rs maps parsed nodes to these AST types*
+  - [x] Expression parsing (arithmetic, logical, set/seq ops, connectives)
+    - *Implementation: rholang-tree-sitter/grammar.js lines 139-181 define precedence/associativity; rholang-parser/src/parser/parsing.rs converts nodes to BinaryExpOp/UnaryExpOp*
   - [x] Pattern matching syntax
-    - *Implementation: rholang-tree-sitter/grammar.js lines 72-79 define match expressions and line 214 defines case patterns*
-  - [ ] Error recovery and reporting
+    - *Implementation: rholang-tree-sitter/grammar.js lines 72-79 define match expressions and line 214 defines case patterns; AST Case is in rholang-parser/src/ast.rs*
+  - [x] Error recovery and reporting
+    - *Implementation: rholang-parser/src/parser/errors.rs aggregates tree-sitter ERROR/MISSING via a query, produces AnnParsingError with SourceSpan/byte ranges, supports partial trees via ParsingFailure.partial_tree; parser returns Validated with collected errors*
 
 - [ ] **AST to RholangValue Conversion**
   - [ ] AST evaluation engine
@@ -108,10 +117,10 @@ Build a high-performance, production-ready Rholang interpreter in Rust for the F
 ### 🧩 Bytecode Implementation (v0.4.5)
 **Priority: High | Timeline: 8-10 weeks**
 
-- [ ] **Crate Setup & Core Types**
-  - [ ] Set up the `rholang-bytecode` crate
-  - [ ] Define core data types for bytecode representation
-  - [ ] Build Value and Name types for Rholang values
+- [x] **Crate Setup & Core Types**
+  - [x] Implemented bytecode and core types in `rholang-vm` crate (`src/bytecode.rs`)
+  - [x] Defined core data types for bytecode representation (`Value`, `Label`, `RSpaceType`)
+  - [x] Built Value and Name representations for Rholang values
 
 - [ ] **Instruction Set Definition**
   - [ ] Stack Operations (Push, Pop, Dup, Swap, Rot)
@@ -140,9 +149,9 @@ Build a high-performance, production-ready Rholang interpreter in Rust for the F
   - [ ] Optimization analysis (dead code elimination, etc.)
 
 - [ ] **Testing & Benchmarking**
-  - [ ] Unit tests for bytecode components
-  - [ ] Integration tests for compilation pipeline
-  - [ ] Performance benchmarks
+  - [x] Unit tests for VM, compiler, bytecode, and RSpace (rholang-vm/src/* and rholang-vm/tests)
+  - [x] Integration tests for compilation pipeline (e.g., corpus tests)
+  - [x] Performance benchmarks (rholang-vm/benches)
 
 ## Phase 2: Advanced Features (Q2-Q3 2025)
 
@@ -262,7 +271,7 @@ Build a high-performance, production-ready Rholang interpreter in Rust for the F
 - **Scalability**: Support for 1M+ concurrent processes
 
 ### Compatibility Goals
-- **Rust**: Latest stable (currently 1.80+)
+- **Rust**: nightly-2025-05-08 (pinned via rust-toolchain.toml)
 - **Platforms**: Linux, macOS, Windows
 - **Architecture**: x86_64, ARM64
 - **Container**: Docker, Podman support
@@ -316,4 +325,4 @@ Build a high-performance, production-ready Rholang interpreter in Rust for the F
 
 ---
 
-*This roadmap is a living document and will be updated based on community feedback, technical discoveries, and changing requirements. Last updated: January 2025*
+*This roadmap is a living document and will be updated based on community feedback, technical discoveries, and changing requirements. Last updated: August 2025*
