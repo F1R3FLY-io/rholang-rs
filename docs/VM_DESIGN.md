@@ -133,7 +133,7 @@ If you’re looking for details, see `compiler.rs` (`gen_label`, `compile_proc`,
   - If you enhance matching or capability checks, make sure the compiler and tests reflect the new behavior.
 
 ## Async runtime notes
-- The VM entry point is async (`execute(...).await`) to play nicely with async ecosystems and possible future networked RSpace backends. The in-memory backends are synchronous today; the async API keeps our options open.
+- The VM entry point is async (`execute(...).await`) to play nicely with async ecosystems. The in-memory backends are now implemented with Tokio (async locks) so they are non-blocking and ready for concurrency.
 
 ## Output and display
 - `execute` returns a `String` for the top-of-stack value (e.g., `Int(1)`, `Bool(true)`, `List([...])`). This is mainly for tests; real integrations would likely use typed outputs.
