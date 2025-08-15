@@ -151,7 +151,7 @@ If you change instructions, RSpace capabilities, or compiler behavior, please up
 
 ## VM State Snapshots (GSLT/JSON)
 
-To support verifiable, fully abstract VM state representation, the VM exposes a canonical JSON snapshot format aligned with a formal JSON Schema.
+GSLT = Graph Structured Lambda Theory. To support verifiable, fully abstract VM state representation, the VM exposes a canonical JSON snapshot format aligned with a formal JSON Schema.
 
 - Schema: rholang-vm/vm_state_schema.json
 - Module: rholang-vm/src/state.rs
@@ -162,6 +162,9 @@ To support verifiable, fully abstract VM state representation, the VM exposes a 
 
 Canonicalization strategy:
 - All map-like structures are represented with BTreeMap and labels by their string names; rspaces are sorted by backend type. This ensures byte-for-byte identical JSON for observationally equivalent states.
+
+Full abstraction guarantee:
+- VM state is representable as a Graph Structured Lambda Theory (GSLT) object. Two VM states are observationally equivalent if and only if their canonical encodings are isomorphic; in the JSON pathway this collapses to byte-for-byte equality of the canonical serialization.
 
 Testing:
 - See rholang-vm/tests/vm_state_tests.rs for round-trip, canonicalization, and schema-negative tests.

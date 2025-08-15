@@ -46,7 +46,7 @@ Build a high-performance, production-ready Rholang interpreter in Rust for the F
 - [x] Unit tests and benches for VM, compiler, bytecode, and RSpace (see rholang-vm/tests and rholang-vm/benches)
 - [x] Design docs updated: docs/BYTECODE_DESIGN.md, docs/VM_DESIGN.md
 
-### 🧾 GSLT/JSON VM State Snapshots (v0.4.1)
+### 🧾 GSLT (Graph Structured Lambda Theory) / JSON VM State Snapshots (v0.4.1)
 - [x] Canonical JSON snapshot format with JSON Schema (rholang-vm/vm_state_schema.json)
 - [x] Snapshot module: rholang-vm/src/state.rs
   - [x] snapshot_from_context(&vm::ExecutionContext) -> VmStateSnapshot
