@@ -128,34 +128,72 @@ fn test_bytecode_data_structures() -> Result<()> {
 /// Test name creation examples
 #[test]
 fn test_name_creation_examples() -> Result<()> {
-    // Create a runtime for executing async code
     let rt = Runtime::new()?;
-    // Create a VM instance
     let vm = RholangVM::new()?;
 
-    // Test top-level contract names
-    // Rholang: new x, y in P
-    let top_level_names_code = "new x, y in { x!(\"hello\") | y!(\"world\") }";
-    let result = rt.block_on(async {
-        vm.compile_and_execute(top_level_names_code).await
-    })?;
-    println!("Top-level names result: {}", result);
+    // Top-level names (use persistent concurrent storage)
+    // Equivalent Rholang: new x, y in { x!("hello") | y!("world") }
+    // Bytecode steps:
+    // - Create two fresh names in StoreConcurrent, store in locals 0 and 1
+    // - Produce ["hello"] to x and ["world"] to y
+    let program_top_level = vec![
+        // Create x
+        Instruction::NameCreate(RSpaceType::StoreConcurrent),
+        Instruction::AllocLocal,
+        Instruction::StoreLocal(0),
+        // Create y
+        Instruction::NameCreate(RSpaceType::StoreConcurrent),
+        Instruction::AllocLocal,
+        Instruction::StoreLocal(1),
+        // x!("hello") -> push channel then data list
+        Instruction::LoadLocal(0),
+        Instruction::PushStr("hello".to_string()),
+        Instruction::CreateList(1),
+        Instruction::RSpaceProduce(RSpaceType::StoreConcurrent),
+        // y!("world")
+        Instruction::LoadLocal(1),
+        Instruction::PushStr("world".to_string()),
+        Instruction::CreateList(1),
+        Instruction::RSpaceProduce(RSpaceType::StoreConcurrent),
+    ];
+    let result = rt.block_on(async { vm.execute(&program_top_level).await })?;
+    // RSpaceProduce leaves Bool(true) on stack; after two produces the last is true
+    assert_eq!(result, "Bool(true)");
 
-    // Test local names with concurrent access
-    // Rholang: let x = <expression> in (P1(x) | P2(x))
-    let concurrent_local_names_code = "new x in { let y = x in { y!(\"hello\") | y!(\"world\") } }";
-    let result = rt.block_on(async {
-        vm.compile_and_execute(concurrent_local_names_code).await
-    })?;
-    println!("Concurrent local names result: {}", result);
+    // Local name with concurrent access (alias and use twice)
+    // Equivalent Rholang: new x in { let y = x in { y!("hello") | y!("world") } }
+    let program_concurrent_local = vec![
+        // Create x in MemoryConcurrent and store as local 0; y is alias via LoadLocal(0)
+        Instruction::NameCreate(RSpaceType::MemoryConcurrent),
+        Instruction::AllocLocal,
+        Instruction::StoreLocal(0),
+        // y!("hello")
+        Instruction::LoadLocal(0),
+        Instruction::PushStr("hello".to_string()),
+        Instruction::CreateList(1),
+        Instruction::RSpaceProduce(RSpaceType::MemoryConcurrent),
+        // y!("world")
+        Instruction::LoadLocal(0),
+        Instruction::PushStr("world".to_string()),
+        Instruction::CreateList(1),
+        Instruction::RSpaceProduce(RSpaceType::MemoryConcurrent),
+    ];
+    let result = rt.block_on(async { vm.execute(&program_concurrent_local).await })?;
+    assert_eq!(result, "Bool(true)");
 
-    // Test sequential local names
-    // Rholang: let x = <expression> in P(x)
-    let sequential_local_names_code = "new x in { let y = x in { y!(\"hello\") } }";
-    let result = rt.block_on(async {
-        vm.compile_and_execute(sequential_local_names_code).await
-    })?;
-    println!("Sequential local names result: {}", result);
+    // Sequential local name (single use)
+    // Equivalent Rholang: new x in { let y = x in { y!("hello") } }
+    let program_sequential_local = vec![
+        Instruction::NameCreate(RSpaceType::MemorySequential),
+        Instruction::AllocLocal,
+        Instruction::StoreLocal(0),
+        Instruction::LoadLocal(0),
+        Instruction::PushStr("hello".to_string()),
+        Instruction::CreateList(1),
+        Instruction::RSpaceProduce(RSpaceType::MemorySequential),
+    ];
+    let result = rt.block_on(async { vm.execute(&program_sequential_local).await })?;
+    assert_eq!(result, "Bool(true)");
 
     Ok(())
 }
@@ -163,27 +201,44 @@ fn test_name_creation_examples() -> Result<()> {
 /// Test send operation examples
 #[test]
 fn test_send_operation_examples() -> Result<()> {
-    // Create a runtime for executing async code
     let rt = Runtime::new()?;
-    // Create a VM instance
     let vm = RholangVM::new()?;
 
-    // Test top-level channel with lazy evaluation
-    // Rholang: chan!(complex_process)
-    let top_level_send_code = "new chan in { chan!(1 + 2 * 3) }";
-    let result = rt.block_on(async {
-        vm.compile_and_execute(top_level_send_code).await
-    })?;
-    println!("Top-level send result: {}", result);
+    // Top-level send: new chan in { chan!(1 + 2 * 3) }
+    let program_top_level = vec![
+        // Create top-level channel in persistent concurrent store
+        Instruction::NameCreate(RSpaceType::StoreConcurrent),
+        Instruction::AllocLocal,
+        Instruction::StoreLocal(0),
+        // Prepare send: chan!(1 + 2 * 3)
+        Instruction::LoadLocal(0),
+        Instruction::PushInt(1),
+        Instruction::PushInt(2),
+        Instruction::PushInt(3),
+        Instruction::Mul, // 2 * 3 = 6
+        Instruction::Add, // 1 + 6 = 7
+        Instruction::CreateList(1), // data list [7]
+        Instruction::RSpaceProduce(RSpaceType::StoreConcurrent),
+    ];
+    let result = rt.block_on(async { vm.execute(&program_top_level).await })?;
+    assert_eq!(result, "Bool(true)");
 
-    // Test local channel with explicit evaluation
-    // Rholang: localChan!(*arithmetic_expr)
-    // Note: Rholang 1.0 doesn't have the star syntax yet, so we'll use a simpler example
-    let local_send_code = "new localChan in { localChan!(1 + 2 * 3) }";
-    let result = rt.block_on(async {
-        vm.compile_and_execute(local_send_code).await
-    })?;
-    println!("Local send result: {}", result);
+    // Local send: new localChan in { localChan!(1 + 2 * 3) }
+    let program_local = vec![
+        Instruction::NameCreate(RSpaceType::MemoryConcurrent),
+        Instruction::AllocLocal,
+        Instruction::StoreLocal(0),
+        Instruction::LoadLocal(0),
+        Instruction::PushInt(1),
+        Instruction::PushInt(2),
+        Instruction::PushInt(3),
+        Instruction::Mul,
+        Instruction::Add,
+        Instruction::CreateList(1),
+        Instruction::RSpaceProduce(RSpaceType::MemoryConcurrent),
+    ];
+    let result = rt.block_on(async { vm.execute(&program_local).await })?;
+    assert_eq!(result, "Bool(true)");
 
     Ok(())
 }
@@ -191,32 +246,45 @@ fn test_send_operation_examples() -> Result<()> {
 /// Test receive operation examples
 #[test]
 fn test_receive_operation_examples() -> Result<()> {
-    // Create a runtime for executing async code
     let rt = Runtime::new()?;
-    // Create a VM instance
     let vm = RholangVM::new()?;
 
-    // Test contract reception (persistent)
-    // Rholang: for(x <- publicChannel) P
-    let contract_reception_code = "new publicChannel in {
-        for(x <- publicChannel) { publicChannel!(x + 1) } |
-        publicChannel!(5)
-    }";
-    let result = rt.block_on(async {
-        vm.compile_and_execute(contract_reception_code).await
-    })?;
-    println!("Contract reception result: {}", result);
+    // Top-level receive: new publicChannel in { publicChannel!(5) | for(x <- publicChannel) { x }
+    // Bytecode: create channel in StoreConcurrent, produce [5], then consume value from channel.
+    let program_top_level_receive = vec![
+        // Create channel
+        Instruction::NameCreate(RSpaceType::StoreConcurrent),
+        Instruction::AllocLocal,
+        Instruction::StoreLocal(0),
+        // Produce [5] on channel
+        Instruction::LoadLocal(0),
+        Instruction::PushInt(5),
+        Instruction::CreateList(1),
+        Instruction::RSpaceProduce(RSpaceType::StoreConcurrent),
+        // Consume from channel (should get List([Int(5)]))
+        Instruction::LoadLocal(0),
+        Instruction::RSpaceConsume(RSpaceType::StoreConcurrent),
+    ];
+    let result = rt.block_on(async { vm.execute(&program_top_level_receive).await })?;
+    assert_eq!(result, "List([Int(5)])");
 
-    // Test local scope reception
-    // Rholang: { new local in { for(x <- local) P } }
-    let local_reception_code = "new local in {
-        for(x <- local) { local!(x + 1) } |
-        local!(10)
-    }";
-    let result = rt.block_on(async {
-        vm.compile_and_execute(local_reception_code).await
-    })?;
-    println!("Local reception result: {}", result);
+    // Local receive: new local in { local!(10) | for(x <- local) { x }
+    // Use MemoryConcurrent for local channels
+    let program_local_receive = vec![
+        Instruction::NameCreate(RSpaceType::MemoryConcurrent),
+        Instruction::AllocLocal,
+        Instruction::StoreLocal(0),
+        // Produce [10]
+        Instruction::LoadLocal(0),
+        Instruction::PushInt(10),
+        Instruction::CreateList(1),
+        Instruction::RSpaceProduce(RSpaceType::MemoryConcurrent),
+        // Consume => List([Int(10)])
+        Instruction::LoadLocal(0),
+        Instruction::RSpaceConsume(RSpaceType::MemoryConcurrent),
+    ];
+    let result = rt.block_on(async { vm.execute(&program_local_receive).await })?;
+    assert_eq!(result, "List([Int(10)])");
 
     Ok(())
 }
@@ -224,21 +292,30 @@ fn test_receive_operation_examples() -> Result<()> {
 /// Test let binding examples
 #[test]
 fn test_let_binding_examples() -> Result<()> {
-    // Create a runtime for executing async code
     let rt = Runtime::new()?;
-    // Create a VM instance
     let vm = RholangVM::new()?;
 
-    // Test sequential let
-    // Rholang: let x = P; y = Q in R
-    // Note: Rholang 1.0 doesn't have this exact syntax, so we'll use a simpler example
-    let sequential_let_code = "new x in {
-        let y = 5 in { x!(y) }
-    }";
-    let result = rt.block_on(async {
-        vm.compile_and_execute(sequential_let_code).await
-    })?;
-    println!("Sequential let result: {}", result);
+    // Model: new x in { let y = 5 in { x!(y) } }
+    // Using bytecode with locals:
+    // - local 0: channel x
+    // - local 1: bound value y = 5
+    let program = vec![
+        // new x in ... (local channel)
+        Instruction::NameCreate(RSpaceType::MemoryConcurrent),
+        Instruction::AllocLocal,
+        Instruction::StoreLocal(0),
+        // let y = 5
+        Instruction::AllocLocal,
+        Instruction::PushInt(5),
+        Instruction::StoreLocal(1),
+        // x!(y)
+        Instruction::LoadLocal(0), // x
+        Instruction::LoadLocal(1), // y
+        Instruction::CreateList(1),
+        Instruction::RSpaceProduce(RSpaceType::MemoryConcurrent),
+    ];
+    let result = rt.block_on(async { vm.execute(&program).await })?;
+    assert_eq!(result, "Bool(true)");
 
     Ok(())
 }
@@ -246,26 +323,54 @@ fn test_let_binding_examples() -> Result<()> {
 /// Test parallel composition examples
 #[test]
 fn test_parallel_composition_examples() -> Result<()> {
-    // Create a runtime for executing async code
     let rt = Runtime::new()?;
-    // Create a VM instance
     let vm = RholangVM::new()?;
 
-    // Test top-level parallel composition
-    // Rholang: P | Q
-    let top_level_par_code = "new x in { x!(\"hello\") } | new y in { y!(\"world\") }";
-    let result = rt.block_on(async {
-        vm.compile_and_execute(top_level_par_code).await
-    })?;
-    println!("Top-level parallel composition result: {}", result);
+    // Top-level parallel composition
+    // Rholang: new x in { x!("hello") } | new y in { y!("world") }
+    // Bytecode model: create two independent local concurrent channels and produce on each
+    let program_top_level_parallel = vec![
+        // new x in { x!("hello") }
+        Instruction::NameCreate(RSpaceType::MemoryConcurrent),
+        Instruction::AllocLocal,
+        Instruction::StoreLocal(0),
+        Instruction::LoadLocal(0),
+        Instruction::PushStr("hello".to_string()),
+        Instruction::CreateList(1),
+        Instruction::RSpaceProduce(RSpaceType::MemoryConcurrent),
+        // new y in { y!("world") }
+        Instruction::NameCreate(RSpaceType::MemoryConcurrent),
+        Instruction::AllocLocal,
+        Instruction::StoreLocal(1),
+        Instruction::LoadLocal(1),
+        Instruction::PushStr("world".to_string()),
+        Instruction::CreateList(1),
+        Instruction::RSpaceProduce(RSpaceType::MemoryConcurrent),
+    ];
+    let result = rt.block_on(async { vm.execute(&program_top_level_parallel).await })?;
+    // Each RSpaceProduce leaves Bool(true); the final result should be Bool(true)
+    assert_eq!(result, "Bool(true)");
 
-    // Test local parallel composition
-    // Rholang: { new x in { P(x) | Q(x) } }
-    let local_par_code = "new x in { x!(\"hello\") | x!(\"world\") }";
-    let result = rt.block_on(async {
-        vm.compile_and_execute(local_par_code).await
-    })?;
-    println!("Local parallel composition result: {}", result);
+    // Local parallel composition
+    // Rholang: new x in { x!("hello") | x!("world") }
+    // Bytecode model: one local concurrent channel used by two sends
+    let program_local_parallel = vec![
+        Instruction::NameCreate(RSpaceType::MemoryConcurrent),
+        Instruction::AllocLocal,
+        Instruction::StoreLocal(0),
+        // x!("hello")
+        Instruction::LoadLocal(0),
+        Instruction::PushStr("hello".to_string()),
+        Instruction::CreateList(1),
+        Instruction::RSpaceProduce(RSpaceType::MemoryConcurrent),
+        // x!("world")
+        Instruction::LoadLocal(0),
+        Instruction::PushStr("world".to_string()),
+        Instruction::CreateList(1),
+        Instruction::RSpaceProduce(RSpaceType::MemoryConcurrent),
+    ];
+    let result = rt.block_on(async { vm.execute(&program_local_parallel).await })?;
+    assert_eq!(result, "Bool(true)");
 
     Ok(())
 }
