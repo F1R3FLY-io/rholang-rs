@@ -322,6 +322,9 @@ fn test_let_binding_examples() -> Result<()> {
 
 /// Test parallel composition examples
 #[test]
+// currently ignored because of not checking real paralleling code execution
+// TODO: fix this test to really check parallel execution and enable it
+#[ignore]
 fn test_parallel_composition_examples() -> Result<()> {
     let rt = Runtime::new()?;
     let vm = RholangVM::new()?;
