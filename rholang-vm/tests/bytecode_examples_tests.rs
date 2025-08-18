@@ -447,7 +447,7 @@ fn test_arithmetic_and_logical() -> Result<()> {
     Ok(())
 }
 
-// All not implemented yet instructions
+// All not implemented yet instructions (excluding newly implemented RSpace/Name ops)
 #[test]
 fn test_unimplemented_instructions() -> Result<()> {
     let rt = Runtime::new()?;
@@ -480,20 +480,94 @@ fn test_unimplemented_instructions() -> Result<()> {
     run_and_expect_err(&rt, &vm, vec![Instruction::LoadMethod("m".to_string())], "LoadMethod not implemented yet");
     run_and_expect_err(&rt, &vm, vec![Instruction::InvokeMethod], "InvokeMethod not implemented yet");
 
-    // RSpace/Name placeholders that remain unimplemented
-    run_and_expect_err(&rt, &vm, vec![Instruction::RSpaceMatch(RSpaceType::MemorySequential)], "RSpaceMatch not implemented yet");
-    run_and_expect_err(&rt, &vm, vec![Instruction::RSpaceSelectBegin(RSpaceType::MemoryConcurrent)], "RSpaceSelectBegin not implemented yet");
-    run_and_expect_err(&rt, &vm, vec![Instruction::RSpaceSelectAdd(RSpaceType::MemoryConcurrent)], "RSpaceSelectAdd not implemented yet");
-    run_and_expect_err(&rt, &vm, vec![Instruction::RSpaceSelectWait(RSpaceType::MemoryConcurrent)], "RSpaceSelectWait not implemented yet");
-    run_and_expect_err(&rt, &vm, vec![Instruction::PatternCompile(RSpaceType::MemorySequential)], "PatternCompile not implemented yet");
-    run_and_expect_err(&rt, &vm, vec![Instruction::PatternBind(RSpaceType::MemorySequential)], "PatternBind not implemented yet");
-    run_and_expect_err(&rt, &vm, vec![Instruction::ContinuationStore(RSpaceType::MemorySequential)], "ContinuationStore not implemented yet");
-    run_and_expect_err(&rt, &vm, vec![Instruction::ContinuationResume(RSpaceType::MemorySequential)], "ContinuationResume not implemented yet");
-    run_and_expect_err(&rt, &vm, vec![Instruction::RSpaceBundleBegin(RSpaceType::MemorySequential, rholang_vm::bytecode::BundleOp::Read)], "RSpaceBundleBegin not implemented yet");
-    run_and_expect_err(&rt, &vm, vec![Instruction::RSpaceBundleEnd(RSpaceType::MemorySequential)], "RSpaceBundleEnd not implemented yet");
 
     // BranchSuccess also unimplemented
     run_and_expect_err(&rt, &vm, vec![Instruction::BranchSuccess(Label("L".to_string()))], "BranchSuccess not implemented yet");
+
+    Ok(())
+}
+
+#[test]
+fn test_rspace_match_and_select_and_patterns_and_continuations() -> Result<()> {
+    let rt = Runtime::new()?;
+    let vm = RholangVM::new()?;
+
+    // Setup channel and data in MemorySequential
+    // new ch; ch!([42]); RSpaceMatch(ch)
+    let program_match_true = vec![
+        Instruction::NameCreate(RSpaceType::MemorySequential),
+        Instruction::AllocLocal,
+        Instruction::StoreLocal(0),
+        // produce [42] on ch
+        Instruction::LoadLocal(0),
+        Instruction::PushInt(42),
+        Instruction::CreateList(1),
+        Instruction::RSpaceProduce(RSpaceType::MemorySequential),
+        // match should return true
+        Instruction::LoadLocal(0),
+        Instruction::RSpaceMatch(RSpaceType::MemorySequential),
+    ];
+    let res = rt.block_on(async { vm.execute(&program_match_true).await })?;
+    assert_eq!(res, "Bool(true)");
+
+    // Empty channel match should be false
+    let program_match_false = vec![
+        Instruction::NameCreate(RSpaceType::MemorySequential),
+        Instruction::RSpaceMatch(RSpaceType::MemorySequential),
+    ];
+    let res = rt.block_on(async { vm.execute(&program_match_false).await })?;
+    assert_eq!(res, "Bool(false)");
+
+    // Test select: two channels, data only on second; expect tuple(Name, Value)
+    let program_select = vec![
+        Instruction::NameCreate(RSpaceType::MemoryConcurrent), // ch1
+        Instruction::AllocLocal,
+        Instruction::StoreLocal(0),
+        Instruction::NameCreate(RSpaceType::MemoryConcurrent), // ch2
+        Instruction::AllocLocal,
+        Instruction::StoreLocal(1),
+        // put data on ch2
+        Instruction::LoadLocal(1),
+        Instruction::PushStr("x".to_string()),
+        Instruction::CreateList(1),
+        Instruction::RSpaceProduce(RSpaceType::MemoryConcurrent),
+        // begin select and add ch1, ch2
+        Instruction::RSpaceSelectBegin(RSpaceType::MemoryConcurrent),
+        Instruction::LoadLocal(0),
+        Instruction::RSpaceSelectAdd(RSpaceType::MemoryConcurrent),
+        Instruction::LoadLocal(1),
+        Instruction::RSpaceSelectAdd(RSpaceType::MemoryConcurrent),
+        Instruction::RSpaceSelectWait(RSpaceType::MemoryConcurrent),
+    ];
+    let res = rt.block_on(async { vm.execute(&program_select).await })?;
+    // We expect a tuple, but we don't know the exact random name; ensure it's a Tuple
+    assert!(res.starts_with("Tuple([Name("));
+
+    // Pattern compile and bind minimal behavior
+    let program_pattern = vec![
+        Instruction::PushStr("_".to_string()),
+        Instruction::PatternCompile(RSpaceType::MemorySequential),
+        Instruction::PatternBind(RSpaceType::MemorySequential),
+    ];
+    let res = rt.block_on(async { vm.execute(&program_pattern).await })?;
+    assert_eq!(res, "Map([])");
+
+    // Continuation store/resume roundtrip
+    let program_kont = vec![
+        Instruction::PushProc("P".to_string()),
+        Instruction::ContinuationStore(RSpaceType::MemorySequential),
+        Instruction::ContinuationResume(RSpaceType::MemorySequential),
+    ];
+    let res = rt.block_on(async { vm.execute(&program_kont).await })?;
+    assert_eq!(res, "Process(\"P\")");
+
+    // Bundle begin/end should not error
+    let program_bundle = vec![
+        Instruction::RSpaceBundleBegin(RSpaceType::MemorySequential, rholang_vm::bytecode::BundleOp::Read),
+        Instruction::RSpaceBundleEnd(RSpaceType::MemorySequential),
+    ];
+    let res = rt.block_on(async { vm.execute(&program_bundle).await })?;
+    assert_eq!(res, "(no result)");
 
     Ok(())
 }

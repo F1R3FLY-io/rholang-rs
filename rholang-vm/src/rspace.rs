@@ -491,6 +491,81 @@ impl RSpace for MemoryConcurrentRSpace {
     }
 }
 
+// Store-backed RSpace minimal wrappers delegating to in-memory backends
+pub struct StoreSequentialRSpace {
+    backend: MemorySequentialRSpace,
+}
+
+impl StoreSequentialRSpace {
+    pub fn new() -> Self { Self { backend: MemorySequentialRSpace::new() } }
+}
+
+#[async_trait]
+impl RSpace for StoreSequentialRSpace {
+    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn get_type(&self) -> RSpaceType { RSpaceType::StoreSequential }
+
+    async fn put(&self, channel: ChannelName, data: Value) -> Result<()> { self.backend.put(channel, data).await }
+    async fn get(&self, channel: ChannelName) -> Result<Value> { self.backend.get(channel).await }
+    async fn get_nonblock(&self, channel: ChannelName) -> Result<Option<Value>> { self.backend.get_nonblock(channel).await }
+    async fn consume(&self, channel: ChannelName, pattern: Pattern, continuation: Continuation) -> Result<Option<ConsumeResult>> {
+        self.backend.consume(channel, pattern, continuation).await
+    }
+    async fn produce(&self, channel: ChannelName, data: Value) -> Result<()> { self.backend.produce(channel, data).await }
+    async fn peek(&self, channel: ChannelName) -> Result<Option<Value>> { self.backend.peek(channel).await }
+    async fn pattern_match(&self, channel: ChannelName, pattern: Pattern) -> Result<Option<HashMap<String, Value>>> {
+        self.backend.pattern_match(channel, pattern).await
+    }
+    async fn name_create(&self) -> Result<ChannelName> {
+        let name = format!("name_{}", uuid::Uuid::new_v4());
+        Ok(ChannelName { name, rspace_type: self.get_type() })
+    }
+    async fn name_quote(&self, process: String) -> Result<ChannelName> {
+        let name = format!("quote_{}_{}", process, uuid::Uuid::new_v4());
+        Ok(ChannelName { name, rspace_type: self.get_type() })
+    }
+    async fn name_unquote(&self, name: ChannelName) -> Result<String> {
+        Ok(format!("unquoted_{}", name.name))
+    }
+}
+
+pub struct StoreConcurrentRSpace {
+    backend: MemoryConcurrentRSpace,
+}
+
+impl StoreConcurrentRSpace {
+    pub fn new() -> Self { Self { backend: MemoryConcurrentRSpace::new() } }
+}
+
+#[async_trait]
+impl RSpace for StoreConcurrentRSpace {
+    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn get_type(&self) -> RSpaceType { RSpaceType::StoreConcurrent }
+
+    async fn put(&self, channel: ChannelName, data: Value) -> Result<()> { self.backend.put(channel, data).await }
+    async fn get(&self, channel: ChannelName) -> Result<Value> { self.backend.get(channel).await }
+    async fn get_nonblock(&self, channel: ChannelName) -> Result<Option<Value>> { self.backend.get_nonblock(channel).await }
+    async fn consume(&self, channel: ChannelName, pattern: Pattern, continuation: Continuation) -> Result<Option<ConsumeResult>> {
+        self.backend.consume(channel, pattern, continuation).await
+    }
+    async fn produce(&self, channel: ChannelName, data: Value) -> Result<()> { self.backend.produce(channel, data).await }
+    async fn peek(&self, channel: ChannelName) -> Result<Option<Value>> { self.backend.peek(channel).await }
+    async fn pattern_match(&self, channel: ChannelName, pattern: Pattern) -> Result<Option<HashMap<String, Value>>> {
+        self.backend.pattern_match(channel, pattern).await
+    }
+    async fn name_create(&self) -> Result<ChannelName> {
+        let name = format!("name_{}", uuid::Uuid::new_v4());
+        Ok(ChannelName { name, rspace_type: self.get_type() })
+    }
+    async fn name_quote(&self, process: String) -> Result<ChannelName> {
+        let name = format!("quote_{}_{}", process, uuid::Uuid::new_v4());
+        Ok(ChannelName { name, rspace_type: self.get_type() })
+    }
+    async fn name_unquote(&self, name: ChannelName) -> Result<String> {
+        Ok(format!("unquoted_{}", name.name))
+    }
+}
+
 /// Factory for creating RSpace instances
 pub struct RSpaceFactory;
 
@@ -500,8 +575,8 @@ impl RSpaceFactory {
         match rspace_type {
             RSpaceType::MemorySequential => Ok(Box::new(MemorySequentialRSpace::new())),
             RSpaceType::MemoryConcurrent => Ok(Box::new(MemoryConcurrentRSpace::new())),
-            RSpaceType::StoreSequential => bail!("Store-based RSpace not implemented yet"),
-            RSpaceType::StoreConcurrent => bail!("Store-based RSpace not implemented yet"),
+            RSpaceType::StoreSequential => Ok(Box::new(StoreSequentialRSpace::new())),
+            RSpaceType::StoreConcurrent => Ok(Box::new(StoreConcurrentRSpace::new())),
         }
     }
 }

@@ -49,9 +49,13 @@ pub struct ExecutionContext {
     /// Label to instruction index mapping
     pub labels: HashMap<Label, usize>,
     /// Cached RSpace instances by type for the duration of program execution
-    pub rspaces: HashMap<crate::bytecode::RSpaceType, Box<dyn crate::rspace::RSpace>>,
+    pub rspaces: HashMap<crate::bytecode::RSpaceType, Box<dyn crate::rspace::RSpace>>, 
     /// VM Memory Layout segments
     pub memory: VmMemory,
+    /// Temporary select set state: current RSpace type and list of channel names
+    pub select_state: Option<(crate::bytecode::RSpaceType, Vec<String>)>,
+    /// Bundle depth counter (for begin/end pairing)
+    pub bundle_depth: usize,
 }
 
 impl Default for ExecutionContext {
@@ -70,6 +74,8 @@ impl ExecutionContext {
             labels: HashMap::new(),
             rspaces: HashMap::new(),
             memory: VmMemory::default(),
+            select_state: None,
+            bundle_depth: 0,
         }
     }
 
@@ -667,21 +673,55 @@ impl VM {
                     None => context.push(Value::Nil),
                 }
             }
-            Instruction::RSpaceMatch(_rspace_type) => {
-                // This will be implemented when we have RSpace integration
-                bail!("RSpaceMatch not implemented yet");
+            Instruction::RSpaceMatch(rspace_type) => {
+                // Minimal pattern match: pop channel Name; check if any data available via pattern_match
+                let channel_name = match context.pop()? {
+                    Value::Name(s) => s,
+                    other => bail!("RSpaceMatch expects a Name channel on stack, got {:?}", other),
+                };
+                let rspace = context.get_or_create_rspace(*rspace_type)?;
+                let channel = crate::rspace::ChannelName { name: channel_name, rspace_type: *rspace_type };
+                // Use a trivial catch-all pattern for now
+                let pattern = crate::rspace::Pattern { pattern: "_".to_string(), bindings: vec![] };
+                let matched = rspace.pattern_match(channel, pattern).await?.is_some();
+                context.push(Value::Bool(matched));
             }
-            Instruction::RSpaceSelectBegin(_rspace_type) => {
-                // This will be implemented when we have RSpace integration
-                bail!("RSpaceSelectBegin not implemented yet");
+            Instruction::RSpaceSelectBegin(rspace_type) => {
+                // Initialize a new select set for the given RSpace type
+                context.select_state = Some((*rspace_type, Vec::new()));
             }
-            Instruction::RSpaceSelectAdd(_rspace_type) => {
-                // This will be implemented when we have RSpace integration
-                bail!("RSpaceSelectAdd not implemented yet");
+            Instruction::RSpaceSelectAdd(rspace_type) => {
+                // Pop a channel Name and add to current select set; require matching rspace type
+                let name = match context.pop()? {
+                    Value::Name(s) => s,
+                    other => bail!("RSpaceSelectAdd expects a Name on stack, got {:?}", other),
+                };
+                match &mut context.select_state {
+                    Some((ty, list)) if *ty == *rspace_type => list.push(name),
+                    Some((ty, _)) => bail!("RSpaceSelectAdd rspace type mismatch: have {:?}, got {:?}", ty, rspace_type),
+                    None => bail!("RSpaceSelectAdd without RSpaceSelectBegin"),
+                }
             }
-            Instruction::RSpaceSelectWait(_rspace_type) => {
-                // This will be implemented when we have RSpace integration
-                bail!("RSpaceSelectWait not implemented yet");
+            Instruction::RSpaceSelectWait(rspace_type) => {
+                // Try non-blocking selection over current select set; choose first channel with data
+                let (ty, channels) = match context.select_state.take() {
+                    Some(state) => state,
+                    None => bail!("RSpaceSelectWait without RSpaceSelectBegin"),
+                };
+                if ty != *rspace_type { bail!("RSpaceSelectWait rspace type mismatch: have {:?}, got {:?}", ty, rspace_type); }
+                let rspace = context.get_or_create_rspace(*rspace_type)?;
+                let mut selected: Option<(String, Value)> = None;
+                for ch_name in channels.iter() {
+                    let channel = crate::rspace::ChannelName { name: ch_name.clone(), rspace_type: *rspace_type };
+                    if let Some(v) = rspace.get_nonblock(channel).await? {
+                        selected = Some((ch_name.clone(), v));
+                        break;
+                    }
+                }
+                match selected {
+                    Some((ch, v)) => context.push(Value::Tuple(vec![Value::Name(ch), v])),
+                    None => context.push(Value::Nil),
+                }
             }
             Instruction::NameCreate(rspace_type) => {
                 // Create a corresponding RSpace and generate a fresh name
@@ -715,28 +755,47 @@ impl VM {
                 context.push(Value::Process(process));
             }
             Instruction::PatternCompile(_rspace_type) => {
-                // This will be implemented when we have RSpace integration
-                bail!("PatternCompile not implemented yet");
+                // Pop a pattern string and store a trivial compiled entry in pattern_cache
+                let pat = match context.pop()? {
+                    Value::String(s) => s,
+                    other => bail!("PatternCompile expects a String pattern on stack, got {:?}", other),
+                };
+                context.memory.pattern_cache.insert(pat.clone(), PatternCompiled { key: pat });
+                context.push(Value::Bool(true));
             }
             Instruction::PatternBind(_rspace_type) => {
-                // This will be implemented when we have RSpace integration
-                bail!("PatternBind not implemented yet");
+                // Minimal: return empty bindings map
+                context.push(Value::Map(vec![]));
             }
             Instruction::ContinuationStore(_rspace_type) => {
-                // This will be implemented when we have RSpace integration
-                bail!("ContinuationStore not implemented yet");
+                // Pop a process string and store continuation record, return its id
+                let proc_ref = match context.pop()? {
+                    Value::Process(s) => s,
+                    Value::String(s) => s,
+                    other => bail!("ContinuationStore expects a Process or String on stack, got {:?}", other),
+                };
+                // find next free id
+                let mut id: u32 = context.memory.continuation_table.len() as u32 + 1;
+                while context.memory.continuation_table.contains_key(&id) { id += 1; }
+                context.memory.continuation_table.insert(id, ContinuationRecord { proc_ref, env_id: None });
+                context.push(Value::Int(id as i64));
             }
             Instruction::ContinuationResume(_rspace_type) => {
-                // This will be implemented when we have RSpace integration
-                bail!("ContinuationResume not implemented yet");
+                // Pop an id and push back the stored process; remove it from table
+                let id = match context.pop()? {
+                    Value::Int(n) if n >= 0 => n as u32,
+                    other => bail!("ContinuationResume expects a non-negative Int id on stack, got {:?}", other),
+                };
+                let rec = context.memory.continuation_table.remove(&id).ok_or_else(|| anyhow!("Continuation id not found: {}", id))?;
+                context.push(Value::Process(rec.proc_ref));
             }
             Instruction::RSpaceBundleBegin(_rspace_type, _bundle_op) => {
-                // This will be implemented when we have RSpace integration
-                bail!("RSpaceBundleBegin not implemented yet");
+                // Increase bundle depth; semantics TBD
+                context.bundle_depth = context.bundle_depth.saturating_add(1);
             }
             Instruction::RSpaceBundleEnd(_rspace_type) => {
-                // This will be implemented when we have RSpace integration
-                bail!("RSpaceBundleEnd not implemented yet");
+                // Decrease bundle depth (no-op if zero)
+                if context.bundle_depth > 0 { context.bundle_depth -= 1; }
             }
 
             // Label definition (for jumps)
