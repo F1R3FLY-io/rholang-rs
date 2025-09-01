@@ -168,7 +168,9 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<bool> 
         // Names and simple RSpace
         Opcode::NAME_CREATE => {
             let kind = inst.op16();
-            let channel = format!("@{}:{}:{}", kind, process.locals.len(), vm.stack.len());
+            let id = vm.next_name_id;
+            vm.next_name_id = vm.next_name_id.wrapping_add(1).max(1);
+            let channel = format!("@{}:{}", kind, id);
             vm.stack.push(Value::Name(channel));
         }
         Opcode::TELL => {
