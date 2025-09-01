@@ -1,4 +1,4 @@
-use rholang_vm::{api::Opcode, api::Instruction, api::Value, VM};
+use rholang_vm::{api::Opcode, api::Instruction, api::Value, api::Process, VM};
 
 #[test]
 fn test_addition() {
@@ -9,6 +9,7 @@ fn test_addition() {
         Instruction::nullary(Opcode::ADD),
         Instruction::nullary(Opcode::HALT),
     ];
-    let result = vm.execute(&program).expect("execute ok");
+    let mut process = Process::new(program, "minimal");
+    let result = vm.execute(&mut process).expect("execute ok");
     assert_eq!(result, Value::Int(5));
 }

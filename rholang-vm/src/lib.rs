@@ -5,6 +5,20 @@ use anyhow::{bail, Result};
 use rholang_bytecode::core::instructions::Instruction as CoreInst;
 use rholang_bytecode::core::opcodes::Opcode;
 
+#[derive(Clone, Debug)]
+pub struct Process {
+    pub code: Vec<CoreInst>,
+    pub source_ref: String,
+    pub locals: Vec<Value>,
+    pub names: Vec<Value>,
+}
+
+impl Process {
+    pub fn new<S: Into<String>>(code: Vec<CoreInst>, source_ref: S) -> Self {
+        Self { code, source_ref: source_ref.into(), locals: Vec::new(), names: Vec::new() }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Int(i64),
@@ -27,8 +41,9 @@ pub struct VM {
 impl VM {
     pub fn new() -> Self { VM { stack: Vec::new() } }
 
-    // Executor: adds collections and keeps arithmetic minimal
-    pub fn execute(&mut self, program: &[CoreInst]) -> Result<Value> {
+    // Execute a provided Process (the only entry point)
+    pub fn execute(&mut self, process: &mut Process) -> Result<Value> {
+        let program = &process.code;
         let mut pc = 0usize;
         while pc < program.len() {
             let inst = &program[pc];
@@ -177,11 +192,12 @@ impl VM {
         }
         Ok(self.stack.last().cloned().unwrap_or(Value::Nil))
     }
+
 }
 
 // Re-export a lightweight API for users
 pub mod api {
     pub use rholang_bytecode::core::instructions::Instruction;
     pub use rholang_bytecode::core::opcodes::Opcode;
-    pub use crate::Value;
+    pub use crate::{Value, Process, VM};
 }

@@ -1,4 +1,4 @@
-use rholang_vm::{api::Instruction, api::Opcode, api::Value, VM};
+use rholang_vm::{api::Instruction, api::Opcode, api::Value, api::Process, VM};
 
 #[test]
 fn test_mul_div_mod_neg() {
@@ -14,7 +14,8 @@ fn test_mul_div_mod_neg() {
         Instruction::nullary(Opcode::MOD),
         Instruction::nullary(Opcode::HALT),
     ];
-    let out = vm.execute(&prog).expect("exec ok");
+    let mut process = Process::new(prog, "arithmetic");
+    let out = vm.execute(&mut process).expect("exec ok");
     assert_eq!(out, Value::Int(4));
 
     // NEG
@@ -24,7 +25,8 @@ fn test_mul_div_mod_neg() {
         Instruction::nullary(Opcode::NEG),
         Instruction::nullary(Opcode::HALT),
     ];
-    let out2 = vm2.execute(&prog2).expect("exec ok");
+    let mut process2 = Process::new(prog2, "arithmetic");
+    let out2 = vm2.execute(&mut process2).expect("exec ok");
     assert_eq!(out2, Value::Int(-9));
 }
 
@@ -37,7 +39,8 @@ fn test_div_mod_by_zero_errors() {
         Instruction::unary(Opcode::PUSH_INT, 0),
         Instruction::nullary(Opcode::DIV),
     ];
-    let err = vm.execute(&prog).expect_err("should error div by zero");
+    let mut process3 = Process::new(prog, "arithmetic");
+    let err = vm.execute(&mut process3).expect_err("should error div by zero");
     assert!(err.to_string().to_lowercase().contains("division by zero"));
 
     // mod by zero
@@ -47,6 +50,7 @@ fn test_div_mod_by_zero_errors() {
         Instruction::unary(Opcode::PUSH_INT, 0),
         Instruction::nullary(Opcode::MOD),
     ];
-    let err2 = vm2.execute(&prog2).expect_err("should error mod by zero");
+    let mut process4 = Process::new(prog2, "arithmetic");
+    let err2 = vm2.execute(&mut process4).expect_err("should error mod by zero");
     assert!(err2.to_string().to_lowercase().contains("modulo by zero"));
 }
