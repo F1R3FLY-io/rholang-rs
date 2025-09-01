@@ -1,4 +1,4 @@
-use rholang_vm::{api::Instruction, api::Opcode, api::Value, VM};
+use rholang_vm::{api::Instruction, api::Opcode, api::Value, api::Process, VM};
 
 #[test]
 fn test_create_list_and_concat() {
@@ -15,7 +15,8 @@ fn test_create_list_and_concat() {
         Instruction::nullary(Opcode::CONCAT),
         Instruction::nullary(Opcode::HALT),
     ];
-    let out = vm.execute(&prog).expect("exec ok");
+    let mut process = Process::new(prog, "collections");
+    let out = vm.execute(&mut process).expect("exec ok");
     assert_eq!(out, Value::List(vec![Value::Int(1), Value::Int(2), Value::Int(3)]));
 }
 
@@ -30,7 +31,8 @@ fn test_create_tuple_and_map() {
         Instruction::unary(Opcode::CREATE_TUPLE, 3),
         Instruction::nullary(Opcode::HALT),
     ];
-    let out1 = vm.execute(&prog1).expect("exec ok");
+    let mut process1 = Process::new(prog1, "collections");
+    let out1 = vm.execute(&mut process1).expect("exec ok");
     assert_eq!(out1, Value::Tuple(vec![Value::Int(1), Value::Int(2), Value::Int(3)]));
 
     // Map {(1 -> 2), (3 -> 4)}; push key then value per VM's CREATE_MAP pop order
@@ -42,7 +44,8 @@ fn test_create_tuple_and_map() {
         Instruction::unary(Opcode::CREATE_MAP, 2),
         Instruction::nullary(Opcode::HALT),
     ];
-    let out2 = vm.execute(&prog2).expect("exec ok");
+    let mut process2 = Process::new(prog2, "collections");
+    let out2 = vm.execute(&mut process2).expect("exec ok");
     assert_eq!(out2, Value::Map(vec![
         (Value::Int(1), Value::Int(2)),
         (Value::Int(3), Value::Int(4)),
