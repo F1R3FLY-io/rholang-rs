@@ -1,6 +1,6 @@
 use anyhow::Result;
 use tokio::runtime::Runtime;
-use rholang_vm::{RholangVM, bytecode::{Instruction, RSpaceType, Label}};
+use rholang_vm_old::{RholangVM, bytecode::{Instruction, RSpaceType, Label}};
 
 /// Test contract operation bytecode equivalents based on documentation
 #[test]

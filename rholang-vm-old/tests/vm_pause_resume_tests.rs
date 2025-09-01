@@ -1,6 +1,6 @@
-use rholang_vm::vm::ExecutionContext;
-use rholang_vm::state::{snapshot_from_context};
-use rholang_vm::vm::VM;
+use rholang_vm_old::vm::ExecutionContext;
+use rholang_vm_old::state::{snapshot_from_context};
+use rholang_vm_old::vm::VM;
 
 #[test]
 fn test_execution_context_pause_resume_roundtrip() {

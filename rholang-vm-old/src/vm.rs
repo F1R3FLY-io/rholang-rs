@@ -1,19 +1,17 @@
 // Rholang Virtual Machine Implementation
 // Based on the design in BYTECODE_DESIGN.md
 
-use crate::bytecode::{Instruction, Label, Value};
+use crate::bytecode::{ExtendedInstruction, Instruction, InstructionData, Opcode, Value, Label};
 use anyhow::{anyhow, bail, Result};
 use std::collections::HashMap;
 
 /// VM Memory Layout segments as per BYTECODE_DESIGN.md
-#[derive(Default, serde::Serialize, serde::Deserialize, Debug)]
+#[derive(Default, Debug)]
 pub struct VmMemory {
     /// Bytecode Segment: instructions and inline data
     pub bytecode_segment: Vec<Instruction>,
     /// Constant Pool: literals, patterns, predefined processes
     pub constant_pool: Vec<Value>,
-    /// Process Heap: dynamic processes and closures (addressed by ID)
-    pub process_heap: HashMap<u32, Value>,
     /// Continuation Table: suspended computations keyed by ID
     pub continuation_table: HashMap<u32, ContinuationRecord>,
     /// Pattern Cache: compiled pattern matchers
@@ -71,11 +69,7 @@ impl ExecutionContext {
             stack: Vec::new(),
             locals: Vec::new(),
             ip: 0,
-            labels: HashMap::new(),
-            rspaces: HashMap::new(),
             memory: VmMemory::default(),
-            select_state: None,
-            bundle_depth: 0,
         }
     }
 
@@ -104,7 +98,6 @@ impl ExecutionContext {
 
         // Restore memory segments
         self.memory.constant_pool = snapshot.memory.constant_pool.clone();
-        self.memory.process_heap = snapshot.memory.process_heap.iter().map(|(k, v)| (*k, v.clone())).collect();
         self.memory.continuation_table = snapshot.memory.continuation_table.iter().map(|(k, v)| (*k, v.clone())).collect();
         self.memory.pattern_cache = snapshot.memory.pattern_cache.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
         self.memory.name_registry = snapshot.memory.name_registry.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
@@ -180,8 +173,6 @@ impl ExecutionContext {
     /// Accessors for memory segments (minimal stubs for future use)
     pub fn constant_pool(&self) -> &Vec<Value> { &self.memory.constant_pool }
     pub fn constant_pool_mut(&mut self) -> &mut Vec<Value> { &mut self.memory.constant_pool }
-    pub fn process_heap(&self) -> &HashMap<u32, Value> { &self.memory.process_heap }
-    pub fn process_heap_mut(&mut self) -> &mut HashMap<u32, Value> { &mut self.memory.process_heap }
     pub fn continuation_table(&self) -> &HashMap<u32, ContinuationRecord> { &self.memory.continuation_table }
     pub fn continuation_table_mut(&mut self) -> &mut HashMap<u32, ContinuationRecord> { &mut self.memory.continuation_table }
     pub fn pattern_cache(&self) -> &HashMap<String, PatternCompiled> { &self.memory.pattern_cache }

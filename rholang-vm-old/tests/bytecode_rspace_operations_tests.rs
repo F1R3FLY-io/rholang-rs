@@ -1,6 +1,6 @@
 use anyhow::Result;
 use tokio::runtime::Runtime;
-use rholang_vm::{RholangVM, bytecode::{Instruction, RSpaceType, Label}};
+use rholang_vm_old::{RholangVM, bytecode::{Instruction, RSpaceType, Label}};
 
 #[test]
 fn test_name_creation_examples() -> Result<()> {

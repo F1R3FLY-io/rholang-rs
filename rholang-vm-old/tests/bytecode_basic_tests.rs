@@ -1,6 +1,6 @@
 use anyhow::Result;
 use tokio::runtime::Runtime;
-use rholang_vm::{RholangVM, bytecode::{Instruction, Label}};
+use rholang_vm_old::{RholangVM, bytecode::{Instruction, Label}};
 mod test_utils;
 use test_utils::run_and_expect_err;
 
