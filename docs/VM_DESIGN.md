@@ -1,171 +1,190 @@
-# Rholang VM Design
+# Rholang VM Design (current implementation)
 
-This is a practical guide to how the Rholang VM in `rholang-vm` is put together and how to work with it. If you’re trying to add an instruction, wire up a new RSpace backend, or figure out what the compiler is doing, this document is for you.
+This document describes the current design and implementation status of the new rholang-vm crate. It reflects the Process-based VM rebuilt on top of rholang-bytecode, the supported instruction subset, execution model, and the intended evolution path.
 
-Related code and docs:
-- Bytecode reference: `docs/BYTECODE_DESIGN.md`
-- VM engine: `rholang-vm/src/vm.rs`
-- Bytecode types/opcodes: `rholang-vm/src/bytecode.rs`
-- RSpace trait and in-memory backends: `rholang-vm/src/rspace.rs`
-- Compiler from AST to bytecode: `rholang-vm/src/compiler.rs`
-- Public entry points: `rholang-vm/src/lib.rs`
-- Examples/tests: `rholang-vm/tests/*.rs`
+The design intentionally favors clarity and composability over completeness at this stage. It is meant to guide contributors, inform integrators, and serve as a reference for tests and examples.
 
-## What the VM tries to do (in plain terms)
-- Run Rholang code that has been compiled to a small bytecode set.
-- Keep pure computation (a small stack machine) separate from effects on the tuple space (RSpace).
-- Make RSpace interactions explicit (produce, consume, match, name ops) so they’re easy to reason about and test.
-- Be fast enough for everyday development, with a clear path to more serious backends later.
 
-## Big picture
-The VM is a classic stack machine wrapped around an execution context. Pure ops (numbers, strings, lists, control flow) live on the stack. Anything touching channels or patterns goes through the RSpace interface. The compiler emits labels for control flow; the VM resolves them up front for quick jumps.
+## Goals and Scope
 
-Components at a glance:
-1. Bytecode model (`bytecode.rs`)
-   - `Value` for runtime values, `Instruction` for opcodes, `Label` for jumps, `RSpaceType` for backend selection.
-2. Execution engine (`vm.rs`)
-   - Operand stack, locals, a small constant pool, continuation table, pattern cache, name registry, and a program counter.
-   - Async entry point so we can integrate with async runtimes and future async RSpace backends.
-3. RSpace (`rspace.rs`)
-   - `RSpace` trait plus in-memory sequential and concurrent implementations.
-   - A small factory to get an instance by `RSpaceType`.
-4. Compiler (`compiler.rs`)
-   - Translates `rholang_parser` AST to bytecode: literals/ops/branches + explicit RSpace instructions for `new`, `for`, sends, etc.
-5. Public API (`lib.rs`)
-   - `RholangVM` lets you compile and execute Rholang or run raw bytecode.
+- Provide a minimal, well-factored Rholang virtual machine that executes bytecode produced and described by the rholang-bytecode crate.
+- Adopt a Process-centric execution model with a simple value stack and locals.
+- Support a subset of core opcodes for arithmetic, collections, simple pattern placeholders, locals, and a minimal in-VM RSpace approximation sufficient for tests and examples.
+- Keep tight alignment with rholang-bytecode’s Instruction/Opcode and evolve by incrementally implementing more semantics and opcodes.
 
-## Data model you’ll actually see
-- Value
-  - Int(i64), String(String), Bool(bool)
-  - Process(String) — quoted process as text
-  - Name(String) — channel identifier (string for in-memory backends)
+Out of scope for the current milestone:
+- Full control-flow (labels/jumps) semantics and a full evaluator for process expressions.
+- Real RSpace integration with storage backends and matching engine.
+- String literal infrastructure (ExtendedInstruction) and complex data pools.
+- Continuations and full contract installation semantics beyond a minimal placeholder.
+
+
+## Relationship to rholang-bytecode
+
+The rholang-vm relies on the rholang-bytecode crate for:
+- Opcode definitions (core::opcodes::Opcode).
+- 32-bit fixed-width instruction format (core::instructions::Instruction) with compact immediates (op1/op2/op16).
+- ExtendedInstruction and InstructionData definitions (when larger operands are required in the future).
+
+The VM does not define its own instruction enum. All tests and examples construct programs with rholang_bytecode::core::instructions::Instruction using the provided helpers:
+- Instruction::nullary(opcode)
+- Instruction::unary(opcode, u16)
+- Instruction::binary(opcode, u8, u8)
+
+This ensures the VM and tooling stay aligned with the bytecode specification.
+
+
+## Architecture Overview
+
+The crate is split into small focused modules:
+- value.rs — Value enum representing runtime values on the stack and in locals.
+- process.rs — Process structure: code, source_ref, locals, names. The VM executes a Process.
+- vm.rs — VM structure and the main execute loop operating on a Process.
+- opcode_exec.rs — The instruction dispatcher. One step() per instruction with concrete semantics.
+
+Re-exports are provided via rholang_vm::api to simplify imports in tests/examples:
+- api::{Instruction, Opcode} from rholang-bytecode.
+- api::{VM, Process, Value} from this crate.
+
+### Core Data Structures
+
+- Value: runtime data used by the VM
+  - Int(i64), Bool(bool), Str(String), Name(String)
   - List(Vec<Value>), Tuple(Vec<Value>), Map(Vec<(Value, Value)>)
   - Nil
-- Labels
-  - `Label { id: String }` in bytecode; resolved to instruction indices before running.
-- Continuations and patterns
-  - Continuations live in a table with: a code target, snapshot of locals, pattern info, and which RSpace type they belong to.
-  - Patterns are cached by string key; compiled via `Pattern/PatternCompile` instructions.
 
-## How execution works
-- The `ExecutionContext` holds the stack, locals, label index, rspace cache, etc.
-- Most instructions pop arguments from the stack and push results back.
-- Locals are simple slots (`AllocLocal`, `LoadLocal`, `StoreLocal`). Indices are zero-based.
-- Errors are early and explicit (type mismatches, underflow, bad indices, divide by zero, unresolved labels, RSpace failures). We bubble them up with `anyhow::Result`.
+- Process:
+  - code: Vec<Instruction> — bytecode to execute
+  - source_ref: String — optional provenance/debug tag
+  - locals: Vec<Value> — local variable slots
+  - names: Vec<Value> — placeholder vector for future name-related bookkeeping
 
-Common instruction families (not exhaustive):
-- Stack: `Push*`, `Pop`, `Dup`
-- Control flow: `Jump`, `BranchTrue`, `BranchFalse`
-- Arithmetic/compare: `Add`, `Sub`, `Mul`, `Div`, `Mod`, `Neg`, `Cmp*`
-- Bool/string/list: `Not`, `Concat`
-- Collections: `CreateList`, `CreateTuple`, `CreateMap`
-- RSpace: `RSpaceProduce`, `RSpaceConsume`, `RSpacePeek`, `RSpaceMatch`, `NameCreate`, `NameQuote`, `NameUnquote`
-- Continuations: `ContinuationStore`, `ContinuationResume`
-- Concurrency: `SpawnAsync`
-
-If you need the exact stack signatures, look at `vm.rs::execute_instruction` — the code is the source of truth and has comments for edge cases. Tests in `rholang-vm/tests` cover realistic flows.
-
-## RSpace: what you need to know
-- The trait abstracts publish/subscribe on channels with pattern matching.
-- Backends:
-  - `MemorySequentialRSpace` — single-threaded, deterministic.
-  - `MemoryConcurrentRSpace` — shared state via Arc/Mutex; use when you want to model parallelism.
-- The VM caches RSpace instances by `RSpaceType`. RSpace opcodes fetch the right one and do the work.
-- Bundle scoping (`RSpaceBundleBegin/End`) allows read/write capability checks around RSpace actions. Keep semantics aligned with `BYTECODE_DESIGN.md` if you change this.
-
-## A few concrete examples
-1) Arithmetic
-```
-PushInt(10), PushInt(3), Mod   => stack: [10,3] -> [1]
-PushInt(5), Neg                => stack: [5] -> [-5]
-```
-
-2) Strings and lists
-```
-PushStr("hello "), PushStr("world"), Concat -> String("hello world")
-PushInt(1), PushInt(2), CreateList(2), PushInt(3), PushInt(4), CreateList(2), Concat -> List([1,2,3,4])
-```
-
-3) Send / receive (sketch)
-```
-// new ch in { for(x <- ch) { ch!(x + 1) } | ch!(5) }
-NameCreate(MemorySequential) -> push Name("ch#...")
-Pattern("x"), PatternCompile(MemorySequential)
-ContinuationStore(MemorySequential), RSpaceConsume(MemorySequential)
-SpawnAsync(MemorySequential) { PushInt(5); RSpaceProduce(MemorySequential) }
-// The RSpace matches and resumes the continuation with x=5
-```
-These correspond to tests in `tests/bytecode_examples_tests.rs`.
-
-## Concurrency and determinism
-- `SpawnAsync` is how we model `P | Q`. The compiler arranges the right combination of spawns, produces/consumes, and continuations.
-- Use the sequential RSpace for deterministic runs. The concurrent backend reflects possible interleavings.
-
-## What the compiler emits
-- Literals/expressions → `Push*`, arith/compare ops, `Concat`, etc.
-- Branches → `BranchTrue`/`BranchFalse` + `Jump` with generated labels.
-- `new` → `NameCreate` of the selected RSpace type.
-- `x!(v)` → evaluate `x` and `v`, then `RSpaceProduce`.
-- `for(x <- ch) P` → pattern compile, store continuation, `RSpaceConsume` (or persistent variant), then resume when there’s a match.
-- `P | Q` → `SpawnAsync` around each branch plus whatever synchronization the semantics require.
-
-If you’re looking for details, see `compiler.rs` (`gen_label`, `compile_proc`, etc.).
-
-## Errors and diagnostics
-- We return `anyhow::Result` with descriptive messages. Typical failures:
-  - divide/mod by zero
-  - type mismatches on arithmetic/boolean ops
-  - stack underflow / bad local index
-- Tests assert on specific error messages where it helps readability.
-
-## Extending the VM
-- New instruction:
-  - Add to `bytecode.rs::Instruction`.
-  - Implement in `vm.rs::execute_instruction`.
-  - Update the compiler if it needs to emit the new opcode.
-  - Add tests (unit +, when relevant, compiler or integration).
-- New value kind:
-  - Extend `Value`, update display/serialization and semantics.
-- New RSpace backend:
-  - Implement `RSpace` for your store (e.g., LMDB, RocksDB).
-  - Register it in the factory method so `RSpaceType` can select it.
-- Patterns and bundles:
-  - If you enhance matching or capability checks, make sure the compiler and tests reflect the new behavior.
-
-## Async runtime notes
-- The VM entry point is async (`execute(...).await`) to play nicely with async ecosystems. The in-memory backends are now implemented with Tokio (async locks) so they are non-blocking and ready for concurrency.
-
-## Output and display
-- `execute` returns a `String` for the top-of-stack value (e.g., `Int(1)`, `Bool(true)`, `List([...])`). This is mainly for tests; real integrations would likely use typed outputs.
-
-## Where to look in the code
-- `vm.rs::ExecutionContext` — state layout and helpers
-- `vm.rs::VM::execute_instruction` — the bytecode dispatcher
-- `rspace.rs::RSpace` — the trait and in-memory implementations
-- `compiler.rs::RholangCompiler` — AST → bytecode
-- `docs/BYTECODE_DESIGN.md` — authoritative opcode list and abstract model
-
----
-If you change instructions, RSpace capabilities, or compiler behavior, please update this document and `BYTECODE_DESIGN.md` together. Keeping docs close to the code has saved us many round-trips during review.
+- VM:
+  - stack: Vec<Value> — value stack
+  - rspace: HashMap<(u16 kind, String channel), Vec<Value>> — minimal in-VM queue per channel
+  - cont_table: HashMap<u32, Value> — minimal continuation table for future use (tests may leverage)
+  - next_cont_id: u32 — monotonic continuation id counter
+  - next_name_id: u64 — monotonic fresh-name counter (for NAME_CREATE)
 
 
-## VM State Snapshots (GSLT/JSON)
+## Execution Model
 
-GSLT = Graph Structured Lambda Theory. To support verifiable, fully abstract VM state representation, the VM exposes a canonical JSON snapshot format aligned with a formal JSON Schema.
+- Single public entry: VM::execute(&mut self, process: &mut Process) -> Result<Value>.
+- The VM clears its stack at the start of each execution for test isolation.
+- A simple PC-based loop fetches instructions from process.code and dispatches them to opcode_exec::step().
+- step() returns a boolean indicating HALT. The VM stops on HALT or when code ends.
+- The result is the top of the stack (Value) at termination or Value::Nil if the stack is empty.
 
-- Schema: rholang-vm/vm_state_schema.json
-- Module: rholang-vm/src/state.rs
-- Public APIs:
-  - state::snapshot_from_context(&vm::ExecutionContext) -> VmStateSnapshot
-  - state::serialize_state_to_json(&vm::ExecutionContext) -> anyhow::Result<String>
-  - state::deserialize_state_from_json(&str) -> anyhow::Result<VmStateSnapshot> (two-stage validation: parse + schema)
+Error handling:
+- Type errors or stack underflow emit anyhow::Error with descriptive messages (e.g., "DIV requires Ints", "division by zero").
+- Out-of-bounds locals accesses also error (e.g., LOAD_LOCAL/STORE_LOCAL).
 
-Canonicalization strategy:
-- All map-like structures are represented with BTreeMap and labels by their string names; rspaces are sorted by backend type. This ensures byte-for-byte identical JSON for observationally equivalent states.
+Determinism and isolation:
+- The stack is reset per execution call.
+- Fresh names are generated via VM.next_name_id to avoid test cross-contamination.
+- rspace store is VM-owned and persists across executions unless reset via VM::reset_rspace() (helper for tests).
 
-Full abstraction guarantee:
-- VM state is representable as a Graph Structured Lambda Theory (GSLT) object. Two VM states are observationally equivalent if and only if their canonical encodings are isomorphic; in the JSON pathway this collapses to byte-for-byte equality of the canonical serialization.
 
-Testing:
-- See rholang-vm/tests/vm_state_tests.rs for round-trip, canonicalization, and schema-negative tests.
-- RSpace snapshot provider verifies channel data and parked continuations are populated in VmStateSnapshot.rspaces.
+## Implemented Opcode Semantics (subset)
+
+Arithmetic (Int only unless specified):
+- ADD: Int+Int -> Int; Str+Str -> Str; List+List -> List concat; else error.
+- SUB: Int-Int -> Int; else error.
+- MUL: Int*Int -> Int; else error.
+- DIV: Int/Int -> Int; error if divisor is 0 or non-Ints.
+- MOD: Int%Int -> Int; error if divisor is 0 or non-Ints.
+- NEG: -Int -> Int; else error.
+
+Stack/Push:
+- PUSH_INT (unary; i16 immediate sign-extended).
+- PUSH_BOOL (nullary+op1 used as boolean bit).
+- POP (discard top).
+
+Collections:
+- CREATE_LIST n: pop n values (rightmost first), reverse, push List.
+- CREATE_TUPLE n: pop n values (rightmost first), reverse, push Tuple.
+- CREATE_MAP n: pop n pairs (value then key), reverse, push Map of (key, value).
+- CONCAT: Str+Str or List+List — push result; else error.
+- DIFF: List-List difference with multiset semantics (each RHS occurrence removes one LHS occurrence), order-preserving.
+
+Patterns (placeholders):
+- PATTERN: push Nil (placeholder compiled pattern).
+- MATCH_TEST: pop value and pattern placeholder, push Bool(true) as a stand-in.
+- EXTRACT_BINDINGS: push empty Map.
+
+Locals:
+- ALLOC_LOCAL: push Nil into process.locals (new slot).
+- LOAD_LOCAL idx: push a clone of locals[idx]; error if OOB.
+- STORE_LOCAL idx: pop value, assign to locals[idx]; error if OOB or underflow.
+
+Minimal RSpace (in-VM queue model):
+- NAME_CREATE kind(u16 immediate): generate fresh channel name as "@{kind}:{id}", push Value::Name.
+- TELL kind: pop data then channel Name; append data to queue keyed by (kind, channel). Push Bool(true).
+- ASK kind: pop channel Name; pop head of queue (if any) and push it, else Nil.
+- PEEK kind: pop channel Name; push clone of head of queue (if any), else Nil.
+
+Notes:
+- The kind code (u16 immediate) is a test-facing convention to segregate logical RSpace types (e.g., sequential vs concurrent, in-memory vs store). It is not a stable ABI.
+- NAME_CREATE name freshness is per-VM via a monotonic counter (next_name_id), not cryptographic.
+
+
+## Not Implemented (yet) / Roadmap
+
+Near-term priorities:
+- Control flow: JUMP/BRANCH_TRUE/BRANCH_FALSE/RETURN; proper label resolution and PC management (requires either a prepass or a label table associated with the Process).
+- String support via ExtendedInstruction/InstructionData::String and a string pool.
+- Continuations: full semantics for CONT_STORE/CONT_RESUME aligned with rholang-bytecode, including environment capture.
+- ASK_NB behavior and richer selection/peek semantics.
+- Comparison (CMP_*) and logical ops (NOT/AND/OR) with well-defined type rules.
+- PUSH_NAME/NAME_QUOTE/NAME_UNQUOTE semantics aligned with NameRef in rholang-bytecode types.
+
+Medium-term:
+- Replace the in-VM RSpace mock with a proper RSpace interface and pluggable backends.
+- Full process semantics: EVAL, EVAL_BOOL, EVAL_STAR, EXEC, SPAWN_ASYNC.
+- Bundles (BUNDLE_BEGIN/BUNDLE_END) and capability propagation.
+- Method dispatch: LOAD_METHOD/INVOKE_METHOD once object model stabilizes.
+
+
+## Testing and Examples
+
+Tests live under rholang-vm/tests and use rholang-bytecode instructions via rholang_vm::api. They illustrate the semantics above:
+- minimal_vm_tests.rs — basic addition and HALT.
+- arithmetic_tests.rs — MUL/DIV/MOD/NEG and error cases.
+- collections_tests.rs — list/tuple/map creation and concat.
+- collection_diff_tests.rs — list difference.
+- rspace_operations_tests.rs — NAME_CREATE/TELL/ASK/PEEK and locals.
+
+Examples (rholang-vm/examples) demonstrate usage patterns with the Process-only API:
+- simple_arithmetic.rs — arithmetic flows over bytecode.
+- greeter_contract.rs — a simplified greeter scenario using integer payloads and RSpace queue semantics.
+
+Run:
+- Build: `cargo build -p rholang-vm`
+- Tests: `cargo test -p rholang-vm`
+- Example: `cargo run -p rholang-vm --example simple_arithmetic`
+
+
+## Extensibility and Contribution Guidelines
+
+- Favor small, focused opcode implementations in opcode_exec.rs.
+- Keep Process the single input to VM::execute; avoid adding parallel raw execute APIs. Helper builders are fine.
+- Maintain deterministic behavior for tests (reset stack; unique NAME_CREATE ids; add helpers like VM::reset_rspace() as needed).
+- Align opcode semantics to rholang-bytecode’s specification; when using immediate operands (op16), document conventions in comments and tests.
+- Update this document when expanding opcode coverage or changing execution model details.
+
+
+## Appendix: Mapping to rholang-bytecode
+
+- Instruction encoding: 32-bit fixed width. VM uses Instruction::nullary/unary/binary constructors; no VM-specific instruction type exists.
+- Opcode coverage matrix (current subset):
+  - Control: HALT, NOP (handled).
+  - Stack/Push: PUSH_INT, PUSH_BOOL, POP (handled).
+  - Arithmetic: ADD, SUB, MUL, DIV, MOD, NEG (handled).
+  - Compare/Logic: planned.
+  - Collections: CREATE_LIST, CREATE_TUPLE, CREATE_MAP, CONCAT, DIFF (handled).
+  - Process ops: planned.
+  - RSpace: NAME_CREATE, TELL, ASK, PEEK (handled minimal semantics).
+  - Pattern: PATTERN, MATCH_TEST, EXTRACT_BINDINGS (placeholder semantics).
+  - Reference/Method: planned.
+
+This matrix should be kept current alongside tests as implementation progresses.
