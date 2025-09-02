@@ -11,7 +11,7 @@ pub mod types;
 pub use self::instructions::Instruction;
 pub use self::module::{
     BytecodeModule, BytecodeModuleStats, MmapVec, OptimizationLevel, PatternPool, PatternPoolStats,
-    ProcessHeap, ProcessHeapStats, ReferenceTable, ReferenceTableStats, ReferenceType,
+    ReferenceTable, ReferenceTableStats, ReferenceType,
 };
 pub use self::constants::{
     BytecodeSerializer, ConstantPool, ProcessTemplate, SerializableConstantPool, StringInterner,
