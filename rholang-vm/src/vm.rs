@@ -1,7 +1,7 @@
 use anyhow::Result;
 use rholang_bytecode::core::instructions::Instruction as CoreInst;
 
-use crate::opcode_exec;
+use crate::execute;
 use crate::process::Process;
 use crate::value::Value;
 
@@ -29,7 +29,7 @@ impl VM {
         let mut pc = 0usize;
         while pc < process.code.len() {
             let inst = process.code[pc].clone();
-            let halted = opcode_exec::step(self, process, inst)?;
+            let halted = execute::step(self, process, inst)?;
             if halted { break; }
             pc += 1;
         }

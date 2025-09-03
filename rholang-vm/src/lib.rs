@@ -1,10 +1,10 @@
 // New minimal Rholang VM scaffold based on rholang-bytecode
-// This crate is structured into modules: value, process, vm, and opcode_exec.
+// This crate is structured into modules: value, process, vm, and execute.
 
 mod value;
 mod process;
 mod vm;
-mod opcode_exec;
+mod execute;
 
 pub use crate::vm::VM;
 

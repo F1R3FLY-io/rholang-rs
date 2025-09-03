@@ -1,5 +1,5 @@
 use anyhow::{anyhow, bail, Result};
-use rholang_bytecode::core::instructions::{Instruction as CoreInst, InstructionData};
+use rholang_bytecode::core::instructions::Instruction as CoreInst;
 use rholang_bytecode::core::opcodes::Opcode;
 
 use crate::process::Process;
@@ -19,6 +19,7 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<bool> 
             let v = inst.op1() != 0;
             vm.stack.push(Value::Bool(v));
         }
+        Opcode::PUSH_NIL => vm.stack.push(Value::Nil),
         Opcode::POP => { let _ = vm.stack.pop(); }
 
         // Arithmetic
@@ -59,7 +60,7 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<bool> 
             let (b, a) = (vm.stack.pop(), vm.stack.pop());
             match (a, b) {
                 (Some(Value::Int(a)), Some(Value::Int(b))) => {
-                    if b == 0 { bail!("modulo by zero"); }
+                    if b == 0 { bail!("mod by zero"); }
                     vm.stack.push(Value::Int(a % b))
                 }
                 _ => bail!("MOD requires Ints"),
@@ -73,26 +74,87 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<bool> 
             }
         }
 
+        // Comparisons
+        Opcode::CMP_EQ => {
+            let (b, a) = (vm.stack.pop(), vm.stack.pop());
+            vm.stack.push(Value::Bool(a == b));
+        }
+        Opcode::CMP_NEQ => {
+            let (b, a) = (vm.stack.pop(), vm.stack.pop());
+            vm.stack.push(Value::Bool(a != b));
+        }
+        Opcode::CMP_LT => {
+            let (b, a) = (vm.stack.pop(), vm.stack.pop());
+            match (a, b) {
+                (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Bool(a < b)),
+                _ => bail!("CMP_LT requires Ints"),
+            }
+        }
+        Opcode::CMP_LTE => {
+            let (b, a) = (vm.stack.pop(), vm.stack.pop());
+            match (a, b) {
+                (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Bool(a <= b)),
+                _ => bail!("CMP_LTE requires Ints"),
+            }
+        }
+        Opcode::CMP_GT => {
+            let (b, a) = (vm.stack.pop(), vm.stack.pop());
+            match (a, b) {
+                (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Bool(a > b)),
+                _ => bail!("CMP_GT requires Ints"),
+            }
+        }
+        Opcode::CMP_GTE => {
+            let (b, a) = (vm.stack.pop(), vm.stack.pop());
+            match (a, b) {
+                (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Bool(a >= b)),
+                _ => bail!("CMP_GTE requires Ints"),
+            }
+        }
+
+        // Logical
+        Opcode::AND => {
+            let (b, a) = (vm.stack.pop(), vm.stack.pop());
+            match (a, b) {
+                (Some(Value::Bool(a)), Some(Value::Bool(b))) => vm.stack.push(Value::Bool(a && b)),
+                _ => bail!("AND requires Bools"),
+            }
+        }
+        Opcode::OR => {
+            let (b, a) = (vm.stack.pop(), vm.stack.pop());
+            match (a, b) {
+                (Some(Value::Bool(a)), Some(Value::Bool(b))) => vm.stack.push(Value::Bool(a || b)),
+                _ => bail!("OR requires Bools"),
+            }
+        }
+        Opcode::NOT => {
+            let a = vm.stack.pop();
+            match a {
+                Some(Value::Bool(a)) => vm.stack.push(Value::Bool(!a)),
+                _ => bail!("NOT requires Bool"),
+            }
+        }
+
         // Collections
         Opcode::CREATE_LIST => {
             let n = inst.op16() as usize;
-            if vm.stack.len() < n { bail!("stack underflow creating list"); }
-            let mut buf = Vec::with_capacity(n);
-            for _ in 0..n { buf.push(vm.stack.pop().unwrap()); }
-            buf.reverse();
-            vm.stack.push(Value::List(buf));
+            if vm.stack.len() < n { bail!("CREATE_LIST underflow"); }
+            let mut items = Vec::with_capacity(n);
+            for _ in 0..n { items.push(vm.stack.pop().unwrap()); }
+            items.reverse();
+            vm.stack.push(Value::List(items));
         }
         Opcode::CREATE_TUPLE => {
             let n = inst.op16() as usize;
-            if vm.stack.len() < n { bail!("stack underflow creating tuple"); }
-            let mut buf = Vec::with_capacity(n);
-            for _ in 0..n { buf.push(vm.stack.pop().unwrap()); }
-            buf.reverse();
-            vm.stack.push(Value::Tuple(buf));
+            if vm.stack.len() < n { bail!("CREATE_TUPLE underflow"); }
+            let mut items = Vec::with_capacity(n);
+            for _ in 0..n { items.push(vm.stack.pop().unwrap()); }
+            items.reverse();
+            vm.stack.push(Value::Tuple(items));
         }
         Opcode::CREATE_MAP => {
             let n = inst.op16() as usize;
-            if vm.stack.len() < n * 2 { bail!("stack underflow creating map"); }
+            if vm.stack.len() < n * 2 { bail!("CREATE_MAP underflow"); }
             let mut entries = Vec::with_capacity(n);
             for _ in 0..n {
                 let v = vm.stack.pop().unwrap();
@@ -148,7 +210,6 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<bool> 
 
         // Continuations (store/resume)
         Opcode::CONT_STORE => {
-            // Pop a value (e.g., Process/String/Int) and store; push Int(id)
             let v = vm.stack.pop().ok_or_else(|| anyhow!("stack underflow on CONT_STORE"))?;
             let id = vm.next_cont_id;
             vm.next_cont_id = vm.next_cont_id.wrapping_add(1).max(1);
@@ -156,7 +217,6 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<bool> 
             vm.stack.push(Value::Int(id as i64));
         }
         Opcode::CONT_RESUME => {
-            // Pop Int(id); push stored value (or Nil if missing)
             let id = match vm.stack.pop() {
                 Some(Value::Int(n)) if n >= 0 => n as u32,
                 other => bail!("CONT_RESUME expects non-negative Int id, got {:?}", other),
@@ -196,7 +256,9 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<bool> 
             vm.stack.push(v.unwrap_or(Value::Nil));
         }
 
-        _ => { /* ignore unhandled opcodes for now */ }
+        // Unhandled opcodes default: do nothing
+        _ => {}
     }
+
     Ok(false)
 }
