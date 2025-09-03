@@ -1,6 +1,6 @@
 {
   "name": "@f1r3fly-io/tree-sitter-rholang-js",
-  "version": "1.1.3",
+  "version": "1.1.5",
   "description": "Parser for Rholang (Mercury)",
   "repository": {
     "type": "git",
@@ -25,9 +25,7 @@
     "require": "./dist/tree-sitter-rholang-js.cjs.js"
   },
   "files": [
-    "dist",
-    "tree-sitter-rholang.wasm",
-    "tree-sitter.wasm"
+    "dist"
   ],
   "keywords": [
     "incremental",
@@ -36,12 +34,12 @@
     "rholang"
   ],
   "scripts": {
-    "build": "vite build && tsc -p tsconfig.lib.json --emitDeclarationOnly && cp node_modules/web-tree-sitter/tree-sitter.wasm tree-sitter.wasm"
+    "build": "vite build && tsc -p tsconfig.lib.json --emitDeclarationOnly"
   },
   "devDependencies": {
-    "@types/node": "^24.2.0",
+    "@types/node": "^24.3.0",
     "typescript": "^5.9.2",
-    "vite": "^7.1.0"
+    "vite": "^7.1.4"
   },
   "dependencies": {
     "web-tree-sitter": "^0.25.8"
