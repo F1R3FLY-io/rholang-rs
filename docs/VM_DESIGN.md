@@ -40,7 +40,7 @@ The crate is split into small focused modules:
 - value.rs — Value enum representing runtime values on the stack and in locals.
 - process.rs — Process structure: code, source_ref, locals, names. The VM executes a Process.
 - vm.rs — VM structure and the main execute loop operating on a Process.
-- opcode_exec.rs — The instruction dispatcher. One step() per instruction with concrete semantics.
+- execute.rs — The instruction dispatcher. One step() per instruction with concrete semantics.
 
 Re-exports are provided via rholang_vm::api to simplify imports in tests/examples:
 - api::{Instruction, Opcode} from rholang-bytecode.
@@ -71,7 +71,7 @@ Re-exports are provided via rholang_vm::api to simplify imports in tests/example
 
 - Single public entry: VM::execute(&mut self, process: &mut Process) -> Result<Value>.
 - The VM clears its stack at the start of each execution for test isolation.
-- A simple PC-based loop fetches instructions from process.code and dispatches them to opcode_exec::step().
+- A simple PC-based loop fetches instructions from process.code and dispatches them to execute::step().
 - step() returns a boolean indicating HALT. The VM stops on HALT or when code ends.
 - The result is the top of the stack (Value) at termination or Value::Nil if the stack is empty.
 
@@ -166,7 +166,7 @@ Run:
 
 ## Extensibility and Contribution Guidelines
 
-- Favor small, focused opcode implementations in opcode_exec.rs.
+- Favor small, focused opcode implementations in execute.rs.
 - Keep Process the single input to VM::execute; avoid adding parallel raw execute APIs. Helper builders are fine.
 - Maintain deterministic behavior for tests (reset stack; unique NAME_CREATE ids; add helpers like VM::reset_rspace() as needed).
 - Align opcode semantics to rholang-bytecode’s specification; when using immediate operands (op16), document conventions in comments and tests.
