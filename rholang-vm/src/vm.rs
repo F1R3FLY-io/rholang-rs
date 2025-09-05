@@ -32,10 +32,13 @@ impl VM {
             match execute::step(self, process, inst)? {
                 StepResult::Next => { pc += 1; }
                 StepResult::Stop => { break; }
-                StepResult::Jump(_label) => {
-                    // TODO: implement jump resolution when label table is available.
-                    // For now, treat as Next to preserve existing control flow.
-                    pc += 1;
+                StepResult::Jump(label) => {
+                    if let Some(&target) = process.labels.get(&label) {
+                        pc = target;
+                    } else {
+                        // Label not found is an execution error
+                        anyhow::bail!("label not found: '{}' in {}", label, process.source_ref);
+                    }
                 }
             }
         }
