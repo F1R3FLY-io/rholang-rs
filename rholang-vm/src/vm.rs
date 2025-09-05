@@ -1,7 +1,7 @@
 use anyhow::Result;
 use rholang_bytecode::core::instructions::Instruction as CoreInst;
 
-use crate::execute;
+use crate::execute::{self, StepResult};
 use crate::process::Process;
 use crate::value::Value;
 
@@ -29,9 +29,15 @@ impl VM {
         let mut pc = 0usize;
         while pc < process.code.len() {
             let inst = process.code[pc].clone();
-            let halted = execute::step(self, process, inst)?;
-            if halted { break; }
-            pc += 1;
+            match execute::step(self, process, inst)? {
+                StepResult::Next => { pc += 1; }
+                StepResult::Stop => { break; }
+                StepResult::Jump(_label) => {
+                    // TODO: implement jump resolution when label table is available.
+                    // For now, treat as Next to preserve existing control flow.
+                    pc += 1;
+                }
+            }
         }
         Ok(self.stack.last().cloned().unwrap_or(Value::Nil))
     }

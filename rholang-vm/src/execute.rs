@@ -6,11 +6,17 @@ use crate::process::Process;
 use crate::value::Value;
 use crate::vm::VM;
 
-pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<bool> {
+pub enum StepResult {
+    Next,
+    Stop,
+    Jump(String),
+}
+
+pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepResult> {
     let opcode = inst.opcode()?;
     match opcode {
         Opcode::NOP => {}
-        Opcode::HALT => { return Ok(true); }
+        Opcode::HALT => { return Ok(StepResult::Stop); }
         Opcode::PUSH_INT => {
             let imm = inst.op16() as i16 as i64;
             vm.stack.push(Value::Int(imm));
@@ -260,5 +266,5 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<bool> 
         _ => {}
     }
 
-    Ok(false)
+    Ok(StepResult::Next)
 }
