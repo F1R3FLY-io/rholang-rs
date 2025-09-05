@@ -5,8 +5,10 @@ mod value;
 mod process;
 mod vm;
 mod execute;
+mod error;
 
 pub use crate::vm::VM;
+pub use crate::error::ExecError;
 
 // Re-export a lightweight API for users
 pub mod api {

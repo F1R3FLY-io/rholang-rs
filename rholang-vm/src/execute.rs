@@ -5,6 +5,7 @@ use rholang_bytecode::core::opcodes::Opcode;
 use crate::process::Process;
 use crate::value::Value;
 use crate::vm::VM;
+use crate::error::ExecError;
 
 pub enum StepResult {
     Next,
@@ -206,12 +207,12 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
         Opcode::ALLOC_LOCAL => { process.locals.push(Value::Nil); }
         Opcode::LOAD_LOCAL => {
             let idx = inst.op16() as usize;
-            if let Some(v) = process.locals.get(idx).cloned() { vm.stack.push(v); } else { bail!("LOAD_LOCAL out of bounds: {}", idx); }
+            if let Some(v) = process.locals.get(idx).cloned() { vm.stack.push(v); } else { return Err(ExecError::OpcodeParamError { opcode: "LOAD_LOCAL", message: format!("out of bounds: {}", idx) }.into()); }
         }
         Opcode::STORE_LOCAL => {
             let idx = inst.op16() as usize;
             let v = vm.stack.pop().ok_or_else(|| anyhow!("stack underflow on STORE_LOCAL"))?;
-            if idx < process.locals.len() { process.locals[idx] = v; } else { bail!("STORE_LOCAL out of bounds: {}", idx); }
+            if idx < process.locals.len() { process.locals[idx] = v; } else { return Err(ExecError::OpcodeParamError { opcode: "STORE_LOCAL", message: format!("out of bounds: {}", idx) }.into()); }
         }
 
         // Continuations (store/resume)
@@ -242,21 +243,21 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
         Opcode::TELL => {
             let kind = inst.op16();
             let data = vm.stack.pop().ok_or_else(|| anyhow!("stack underflow on TELL data"))?;
-            let chan = match vm.stack.pop() { Some(Value::Name(s)) => s, other => bail!("TELL expects Name channel, got {:?}", other), };
+            let chan = match vm.stack.pop() { Some(Value::Name(s)) => s, other => return Err(ExecError::OpcodeParamError { opcode: "TELL", message: format!("expects Name channel, got {:?}", other) }.into()), };
             let key = (kind, chan);
             vm.rspace.entry(key).or_default().push(data);
             vm.stack.push(Value::Bool(true));
         }
         Opcode::ASK => {
             let kind = inst.op16();
-            let chan = match vm.stack.pop() { Some(Value::Name(s)) => s, other => bail!("ASK expects Name channel, got {:?}", other), };
+            let chan = match vm.stack.pop() { Some(Value::Name(s)) => s, other => return Err(ExecError::OpcodeParamError { opcode: "ASK", message: format!("expects Name channel, got {:?}", other) }.into()), };
             let key = (kind, chan);
             let v = vm.rspace.get_mut(&key).and_then(|q| if q.is_empty(){None}else{Some(q.remove(0))});
             vm.stack.push(v.unwrap_or(Value::Nil));
         }
         Opcode::PEEK => {
             let kind = inst.op16();
-            let chan = match vm.stack.pop() { Some(Value::Name(s)) => s, other => bail!("PEEK expects Name channel, got {:?}", other), };
+            let chan = match vm.stack.pop() { Some(Value::Name(s)) => s, other => return Err(ExecError::OpcodeParamError { opcode: "PEEK", message: format!("expects Name channel, got {:?}", other) }.into()), };
             let key = (kind, chan);
             let v = vm.rspace.get(&key).and_then(|q| q.get(0)).cloned();
             vm.stack.push(v.unwrap_or(Value::Nil));
@@ -267,7 +268,7 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
             // Expect a label name on stack (Value::Str)
             let label = match vm.stack.pop() {
                 Some(Value::Str(s)) => s,
-                other => bail!("JUMP expects label String on stack, got {:?}", other),
+                other => return Err(ExecError::OpcodeParamError { opcode: "JUMP", message: format!("expects label String on stack, got {:?}", other) }.into()),
             };
             return Ok(StepResult::Jump(label));
         }
