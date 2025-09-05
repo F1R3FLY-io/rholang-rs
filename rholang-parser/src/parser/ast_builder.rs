@@ -7,7 +7,7 @@ use crate::ast::{
     VarRefKind,
 };
 
-pub(super) struct ASTBuilder<'ast> {
+pub struct ASTBuilder<'ast> {
     arena: Arena<Proc<'ast>>,
     // useful quasi-constants
     nil: Proc<'ast>,
@@ -49,7 +49,7 @@ impl<'ast> ASTBuilder<'ast> {
         }
     }
 
-    pub(super) fn const_nil(&self) -> &Proc<'ast> {
+    pub fn const_nil(&self) -> &Proc<'ast> {
         &self.nil
     }
 
@@ -61,7 +61,7 @@ impl<'ast> ASTBuilder<'ast> {
         &self.r#false
     }
 
-    pub(super) fn const_wild(&self) -> &Proc<'ast> {
+    pub fn const_wild(&self) -> &Proc<'ast> {
         &self.wild
     }
 
@@ -81,12 +81,12 @@ impl<'ast> ASTBuilder<'ast> {
         &self.bad
     }
 
-    pub(super) fn alloc_string_literal(&self, value: &'ast str) -> &Proc<'ast> {
+    pub fn alloc_string_literal(&self, value: &'ast str) -> &Proc<'ast> {
         self.arena
             .alloc(Proc::StringLiteral(value.trim_matches(|c| c == '"')))
     }
 
-    pub(super) fn alloc_long_literal(&self, value: i64) -> &Proc<'ast> {
+    pub fn alloc_long_literal(&self, value: i64) -> &Proc<'ast> {
         match value {
             0 => &self.zero,
             1 => &self.one,
@@ -102,7 +102,7 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::SimpleType(value))
     }
 
-    pub(super) fn alloc_list(&self, procs: &[AnnProc<'ast>]) -> &Proc<'ast> {
+    pub fn alloc_list(&self, procs: &[AnnProc<'ast>]) -> &Proc<'ast> {
         if procs.is_empty() {
             return self.const_empty_list();
         }
@@ -112,7 +112,7 @@ impl<'ast> ASTBuilder<'ast> {
         }))
     }
 
-    pub(super) fn alloc_list_with_remainder(
+    pub fn alloc_list_with_remainder(
         &self,
         procs: &[AnnProc<'ast>],
         remainder: Var<'ast>,
@@ -123,14 +123,14 @@ impl<'ast> ASTBuilder<'ast> {
         }))
     }
 
-    pub(super) fn alloc_set(&self, procs: &[AnnProc<'ast>]) -> &Proc<'ast> {
+    pub fn alloc_set(&self, procs: &[AnnProc<'ast>]) -> &Proc<'ast> {
         self.arena.alloc(Proc::Collection(Collection::Set {
             elements: procs.to_vec(),
             remainder: None,
         }))
     }
 
-    pub(super) fn alloc_set_with_remainder(
+    pub fn alloc_set_with_remainder(
         &self,
         procs: &[AnnProc<'ast>],
         remainder: Var<'ast>,
@@ -150,7 +150,7 @@ impl<'ast> ASTBuilder<'ast> {
         slice.chunks_exact(2).map(|kv| (kv[0], kv[1])).collect()
     }
 
-    pub(super) fn alloc_map(&self, pairs: &[AnnProc<'ast>]) -> &Proc<'ast> {
+    pub fn alloc_map(&self, pairs: &[AnnProc<'ast>]) -> &Proc<'ast> {
         if pairs.is_empty() {
             return self.const_empty_map();
         }
@@ -160,7 +160,7 @@ impl<'ast> ASTBuilder<'ast> {
         }))
     }
 
-    pub(super) fn alloc_map_with_remainder(
+    pub fn alloc_map_with_remainder(
         &self,
         pairs: &[AnnProc<'ast>],
         remainder: Var<'ast>,
@@ -171,11 +171,11 @@ impl<'ast> ASTBuilder<'ast> {
         }))
     }
 
-    pub(super) fn alloc_var(&self, id: Id<'ast>) -> &Proc<'ast> {
+    pub fn alloc_var(&self, id: Id<'ast>) -> &Proc<'ast> {
         self.arena.alloc(Proc::ProcVar(Var::Id(id)))
     }
 
-    pub(super) fn alloc_par(&self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &Proc<'ast> {
+    pub fn alloc_par(&self, left: AnnProc<'ast>, right: AnnProc<'ast>) -> &Proc<'ast> {
         self.arena.alloc(Proc::Par { left, right })
     }
 
@@ -204,7 +204,7 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub(super) fn alloc_send(
+    pub fn alloc_send(
         &self,
         send_type: SendType,
         channel: AnnName<'ast>,
@@ -217,7 +217,7 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub(super) fn alloc_for<Rs, Bs>(&self, receipts: Rs, proc: AnnProc<'ast>) -> &Proc<'ast>
+    pub fn alloc_for<Rs, Bs>(&self, receipts: Rs, proc: AnnProc<'ast>) -> &Proc<'ast>
     where
         Rs: IntoIterator<Item = Bs>,
         Bs: IntoIterator<Item = Bind<'ast>>,
@@ -231,7 +231,7 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub(super) fn alloc_match(
+    pub fn alloc_match(
         &self,
         expression: AnnProc<'ast>,
         cases: &[AnnProc<'ast>],
@@ -252,7 +252,7 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::Bundle { bundle_type, proc })
     }
 
-    pub(super) fn alloc_let<Ls>(
+    pub fn alloc_let<Ls>(
         &self,
         bindings: Ls,
         body: AnnProc<'ast>,
@@ -268,11 +268,11 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub(super) fn alloc_new(&self, proc: AnnProc<'ast>, decls: Vec<NameDecl<'ast>>) -> &Proc<'ast> {
+    pub fn alloc_new(&self, proc: AnnProc<'ast>, decls: Vec<NameDecl<'ast>>) -> &Proc<'ast> {
         self.arena.alloc(Proc::New { decls, proc })
     }
 
-    pub(super) fn alloc_contract(
+    pub fn alloc_contract(
         &self,
         name: AnnName<'ast>,
         formals: Names<'ast>,
@@ -310,7 +310,7 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub(super) fn alloc_eval(&self, name: AnnName<'ast>) -> &Proc<'ast> {
+    pub fn alloc_eval(&self, name: AnnName<'ast>) -> &Proc<'ast> {
         self.arena.alloc(Proc::Eval { name })
     }
 
@@ -331,7 +331,7 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub(super) fn alloc_binary_exp(
+    pub fn alloc_binary_exp(
         &self,
         op: BinaryExpOp,
         left: AnnProc<'ast>,

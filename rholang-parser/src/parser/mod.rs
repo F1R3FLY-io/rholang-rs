@@ -6,8 +6,10 @@ use validated::Validated;
 
 use crate::{
     ast::AnnProc,
-    parser::{ast_builder::ASTBuilder, errors::ParsingFailure},
+    parser::errors::ParsingFailure,
 };
+
+pub use ast_builder::ASTBuilder;
 
 pub struct RholangParser<'a> {
     ast_builder: ASTBuilder<'a>,
@@ -31,6 +33,11 @@ impl<'a> RholangParser<'a> {
             .named_children(&mut walker)
             .map(|node| parsing::node_to_ast(&node, &self.ast_builder, code))
             .collect()
+    }
+
+    // Expose AST builder for accessing const_nil
+    pub fn ast_builder(&self) -> &ASTBuilder<'a> {
+        &self.ast_builder
     }
 }
 
