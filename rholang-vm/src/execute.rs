@@ -272,6 +272,43 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
             };
             return Ok(StepResult::Jump(label));
         }
+        Opcode::BRANCH_TRUE => {
+            // Expect condition bool then label string on stack (label on top like typical assembly push order?)
+            // We choose: pop condition first then label beneath? We'll require label on stack (Str) and condition (Bool) on top.
+            let cond = match vm.stack.pop() {
+                Some(Value::Bool(b)) => b,
+                other => return Err(ExecError::OpcodeParamError { opcode: "BRANCH_TRUE", message: format!("expects Bool condition on stack, got {:?}", other) }.into()),
+            };
+            let label = match vm.stack.pop() {
+                Some(Value::Str(s)) => s,
+                other => return Err(ExecError::OpcodeParamError { opcode: "BRANCH_TRUE", message: format!("expects label String under condition, got {:?}", other) }.into()),
+            };
+            if cond { return Ok(StepResult::Jump(label)); }
+        }
+        Opcode::BRANCH_FALSE => {
+            let cond = match vm.stack.pop() {
+                Some(Value::Bool(b)) => b,
+                other => return Err(ExecError::OpcodeParamError { opcode: "BRANCH_FALSE", message: format!("expects Bool condition on stack, got {:?}", other) }.into()),
+            };
+            let label = match vm.stack.pop() {
+                Some(Value::Str(s)) => s,
+                other => return Err(ExecError::OpcodeParamError { opcode: "BRANCH_FALSE", message: format!("expects label String under condition, got {:?}", other) }.into()),
+            };
+            if !cond { return Ok(StepResult::Jump(label)); }
+        }
+        Opcode::BRANCH_SUCCESS => {
+            // For now, treat success as presence of Bool(true) on stack top; consume it and branch if true.
+            let status = match vm.stack.pop() {
+                Some(Value::Bool(b)) => b,
+                Some(v) => { vm.stack.push(v); false },
+                None => false,
+            };
+            let label = match vm.stack.pop() {
+                Some(Value::Str(s)) => s,
+                other => return Err(ExecError::OpcodeParamError { opcode: "BRANCH_SUCCESS", message: format!("expects label String under status/stack, got {:?}", other) }.into()),
+            };
+            if status { return Ok(StepResult::Jump(label)); }
+        }
 
         // Unhandled opcodes default: do nothing
         _ => {}
