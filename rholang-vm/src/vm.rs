@@ -4,6 +4,7 @@ use rholang_bytecode::core::instructions::Instruction as CoreInst;
 use crate::execute::{self, StepResult};
 use crate::process::Process;
 use crate::value::Value;
+use crate::error::ExecError;
 
 pub struct VM {
     pub(crate) stack: Vec<Value>,
@@ -37,7 +38,7 @@ impl VM {
                         pc = target;
                     } else {
                         // Label not found is an execution error
-                        anyhow::bail!("label not found: '{}' in {}", label, process.source_ref);
+                        return Err(ExecError::LabelNotFound { label, source: process.source_ref.clone() }.into());
                     }
                 }
             }
