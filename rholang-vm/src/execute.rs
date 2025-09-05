@@ -262,6 +262,16 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
             vm.stack.push(v.unwrap_or(Value::Nil));
         }
 
+        // Control flow
+        Opcode::JUMP => {
+            // Expect a label name on stack (Value::Str)
+            let label = match vm.stack.pop() {
+                Some(Value::Str(s)) => s,
+                other => bail!("JUMP expects label String on stack, got {:?}", other),
+            };
+            return Ok(StepResult::Jump(label));
+        }
+
         // Unhandled opcodes default: do nothing
         _ => {}
     }
