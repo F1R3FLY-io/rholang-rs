@@ -17,6 +17,30 @@ pub struct SourcePos {
     pub col: usize,
 }
 
+impl SourcePos {
+    pub fn span_of(self, chars: usize) -> SourceSpan {
+        let end = SourcePos {
+            line: self.line,
+            col: self.col + chars,
+        };
+        SourceSpan { start: self, end }
+    }
+
+    pub fn at_line(line: usize) -> SourcePos {
+        SourcePos {
+            line: line.max(1),
+            col: 1,
+        }
+    }
+
+    pub fn at_col(col: usize) -> SourcePos {
+        SourcePos {
+            line: 1,
+            col: col.max(1),
+        }
+    }
+}
+
 impl Display for SourcePos {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Display::fmt(&self.line, f)?;
@@ -35,11 +59,29 @@ impl From<tree_sitter::Point> for SourcePos {
     }
 }
 
+impl Default for SourcePos {
+    fn default() -> Self {
+        Self { line: 1, col: 1 }
+    }
+}
+
 /// a span in the source code (exclusive)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SourceSpan {
     pub start: SourcePos,
     pub end: SourcePos,
+}
+
+impl SourceSpan {
+    pub fn empty_at(start: SourcePos) -> Self {
+        Self { start, end: start }
+    }
+}
+
+impl Default for SourceSpan {
+    fn default() -> Self {
+        Self::empty_at(SourcePos::default())
+    }
 }
 
 impl From<tree_sitter::Range> for SourceSpan {

@@ -342,9 +342,7 @@ Fail(
             ),
             errors: [
                 AnnParsingError {
-                    error: UnexpectedVar(
-                        "request",
-                    ),
+                    error: UnexpectedVar,
                     span: SourceSpan {
                         start: SourcePos {
                             line: 12,
@@ -355,11 +353,10 @@ Fail(
                             col: 17,
                         },
                     },
+                    byte_range: 352..359,
                 },
                 AnnParsingError {
-                    error: UnexpectedVar(
-                        "with",
-                    ),
+                    error: UnexpectedVar,
                     span: SourceSpan {
                         start: SourcePos {
                             line: 12,
@@ -370,6 +367,7 @@ Fail(
                             col: 22,
                         },
                     },
+                    byte_range: 360..364,
                 },
                 AnnParsingError {
                     error: UnexpectedMatchAfter {
@@ -386,11 +384,10 @@ Fail(
                             col: 56,
                         },
                     },
+                    byte_range: 425..442,
                 },
                 AnnParsingError {
-                    error: UnexpectedVar(
-                        "set",
-                    ),
+                    error: UnexpectedVar,
                     span: SourceSpan {
                         start: SourcePos {
                             line: 16,
@@ -401,6 +398,7 @@ Fail(
                             col: 10,
                         },
                     },
+                    byte_range: 457..460,
                 },
                 AnnParsingError {
                     error: UnexpectedMatchAfter {
@@ -417,6 +415,7 @@ Fail(
                             col: 51,
                         },
                     },
+                    byte_range: 511..528,
                 },
                 AnnParsingError {
                     error: MissingToken(
@@ -432,6 +431,7 @@ Fail(
                             col: 2,
                         },
                     },
+                    byte_range: 542..542,
                 },
                 AnnParsingError {
                     error: SyntaxError {
@@ -447,6 +447,7 @@ Fail(
                             col: 17,
                         },
                     },
+                    byte_range: 380..381,
                 },
             ],
         },

@@ -1436,9 +1436,7 @@ Fail(
             ),
             errors: [
                 AnnParsingError {
-                    error: UnexpectedVar(
-                        "Map",
-                    ),
+                    error: UnexpectedVar,
                     span: SourceSpan {
                         start: SourcePos {
                             line: 12,
@@ -1449,6 +1447,7 @@ Fail(
                             col: 18,
                         },
                     },
+                    byte_range: 303..306,
                 },
             ],
         },

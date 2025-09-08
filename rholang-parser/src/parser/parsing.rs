@@ -737,15 +737,12 @@ fn apply_cont<'tree, 'ast>(
 
                     let underflow = !match k {
                         K::ConsumeBinaryExp { op, span } => {
-                            proc_stack.replace_top2(|left, right| AnnProc {
-                                proc: ast_builder.alloc_binary_exp(op, left, right),
-                                span,
+                            proc_stack.replace_top2(|left, right| {
+                                ast_builder.alloc_binary_exp(op, left, right).ann(span)
                             })
                         }
-                        K::ConsumeBundle { span, typ } => proc_stack.replace_top(|proc| AnnProc {
-                            proc: ast_builder.alloc_bundle(typ, proc),
-                            span,
-                        }),
+                        K::ConsumeBundle { span, typ } => proc_stack
+                            .replace_top(|proc| ast_builder.alloc_bundle(typ, proc).ann(span)),
                         K::ConsumeContract {
                             arity,
                             has_cont,
@@ -755,14 +752,12 @@ fn apply_cont<'tree, 'ast>(
                             let body = name_body_formals[1];
                             let args = Names::from_slice(&name_body_formals[2..], has_cont)
                                 .expect("expected a list of names");
-                            AnnProc {
-                                proc: ast_builder.alloc_contract(name, args, body),
-                                span,
-                            }
+                            ast_builder.alloc_contract(name, args, body).ann(span)
                         }),
-                        K::ConsumeEval { span } => proc_stack.replace_top(|proc| AnnProc {
-                            proc: ast_builder.alloc_eval(proc.try_into().expect("expected a name")),
-                            span,
+                        K::ConsumeEval { span } => proc_stack.replace_top(|proc| {
+                            ast_builder
+                                .alloc_eval(proc.try_into().expect("expected a name"))
+                                .ann(span)
                         }),
                         K::ConsumeForComprehension {
                             desc,
@@ -771,21 +766,18 @@ fn apply_cont<'tree, 'ast>(
                         } => proc_stack.replace_top_slice(total_len + 1, |body_procs| {
                             let body = body_procs[0];
                             let procs = &body_procs[1..];
-                            AnnProc {
-                                proc: ast_builder.alloc_for(ReceiptIter::new(&desc, procs), body),
-                                span,
-                            }
+                            ast_builder
+                                .alloc_for(ReceiptIter::new(&desc, procs), body)
+                                .ann(span)
                         }),
-                        K::ConsumeIfThen { span } => {
-                            proc_stack.replace_top2(|cond, if_true| AnnProc {
-                                proc: ast_builder.alloc_if_then(cond, if_true),
-                                span,
-                            })
-                        }
+                        K::ConsumeIfThen { span } => proc_stack.replace_top2(|cond, if_true| {
+                            ast_builder.alloc_if_then(cond, if_true).ann(span)
+                        }),
                         K::ConsumeIfThenElse { span } => {
-                            proc_stack.replace_top3(|cond, if_true, if_false| AnnProc {
-                                proc: ast_builder.alloc_if_then_else(cond, if_true, if_false),
-                                span,
+                            proc_stack.replace_top3(|cond, if_true, if_false| {
+                                ast_builder
+                                    .alloc_if_then_else(cond, if_true, if_false)
+                                    .ann(span)
                             })
                         }
                         K::ConsumeLet {
@@ -795,14 +787,13 @@ fn apply_cont<'tree, 'ast>(
                             total_len,
                         } => proc_stack.replace_top_slice(total_len + 1, |body_procs| {
                             let body = body_procs[0];
-                            AnnProc {
-                                proc: ast_builder.alloc_let(
+                            ast_builder
+                                .alloc_let(
                                     LetDeclIter::new(&let_decls, &body_procs[1..]),
                                     body,
                                     concurrent,
-                                ),
-                                span,
-                            }
+                                )
+                                .ann(span)
                         }),
                         K::ConsumeList {
                             arity,
@@ -820,7 +811,7 @@ fn apply_cont<'tree, 'ast>(
                             } else {
                                 ast_builder.alloc_list(elems)
                             };
-                            AnnProc { proc: list, span }
+                            list.ann(span)
                         }),
                         K::ConsumeMap {
                             arity,
@@ -829,54 +820,38 @@ fn apply_cont<'tree, 'ast>(
                         } => {
                             let n = arity * 2 + if has_remainder { 1 } else { 0 };
                             proc_stack.replace_top_slice(n, |elems| {
-                                if has_remainder {
-                                    AnnProc {
-                                        proc: ast_builder.alloc_map_with_remainder(
-                                            &elems[1..],
-                                            elems[0].try_into().expect("expected a var"),
-                                        ),
-                                        span,
-                                    }
+                                let map = if has_remainder {
+                                    ast_builder.alloc_map_with_remainder(
+                                        &elems[1..],
+                                        elems[0].try_into().expect("expected a var"),
+                                    )
                                 } else {
-                                    AnnProc {
-                                        proc: ast_builder.alloc_map(elems),
-                                        span,
-                                    }
-                                }
+                                    ast_builder.alloc_map(elems)
+                                };
+                                map.ann(span)
                             })
                         }
                         K::ConsumeMatch { span, arity } => {
                             proc_stack.replace_top_slice(arity * 2 + 1, |expr_cases| {
                                 let expr = expr_cases[0];
                                 let cases = &expr_cases[1..];
-                                AnnProc {
-                                    proc: ast_builder.alloc_match(expr, cases),
-                                    span,
-                                }
+                                ast_builder.alloc_match(expr, cases).ann(span)
                             })
                         }
                         K::ConsumeMethod { span, id, arity } => {
                             proc_stack.replace_top_slice(arity + 1, |recv_args| {
                                 let recv = recv_args[0];
                                 let args = &recv_args[1..];
-                                AnnProc {
-                                    proc: ast_builder.alloc_method(id, recv, args),
-                                    span,
-                                }
+                                ast_builder.alloc_method(id, recv, args).ann(span)
                             })
                         }
-                        K::ConsumeNew { decls, span } => proc_stack.replace_top(|body| AnnProc {
-                            proc: ast_builder.alloc_new(body, decls),
-                            span,
+                        K::ConsumeNew { decls, span } => proc_stack
+                            .replace_top(|body| ast_builder.alloc_new(body, decls).ann(span)),
+                        K::ConsumePar { span } => proc_stack.replace_top2(|left, right| {
+                            ast_builder.alloc_par(left, right).ann(span)
                         }),
-                        K::ConsumePar { span } => proc_stack.replace_top2(|left, right| AnnProc {
-                            proc: ast_builder.alloc_par(left, right),
-                            span,
-                        }),
-                        K::ConsumeQuote { span } => proc_stack.replace_top(|top| AnnProc {
-                            proc: ast_builder.alloc_quote(top.proc),
-                            span,
-                        }),
+                        K::ConsumeQuote { span } => proc_stack
+                            .replace_top(|top| ast_builder.alloc_quote(top.proc).ann(span)),
                         K::ConsumeSend {
                             send_type,
                             arity,
@@ -884,18 +859,14 @@ fn apply_cont<'tree, 'ast>(
                         } => proc_stack.replace_top_slice(arity + 1, |name_args| {
                             let channel = name_args[0].try_into().expect("expected a name");
                             let inputs = &name_args[1..];
-                            AnnProc {
-                                proc: ast_builder.alloc_send(send_type, channel, inputs),
-                                span,
-                            }
+                            ast_builder.alloc_send(send_type, channel, inputs).ann(span)
                         }),
                         K::ConsumeSendSync { span, arity } => {
                             proc_stack.replace_top_slice(arity + 1, |name_inputs| {
                                 let channel = name_inputs[0].try_into().expect("expected a name");
-                                AnnProc {
-                                    proc: ast_builder.alloc_send_sync(channel, &name_inputs[1..]),
-                                    span,
-                                }
+                                ast_builder
+                                    .alloc_send_sync(channel, &name_inputs[1..])
+                                    .ann(span)
                             })
                         }
                         K::ConsumeSendSyncWithCont { span, arity } => {
@@ -907,11 +878,9 @@ fn apply_cont<'tree, 'ast>(
                                 let (last, messages) =
                                     name_inputs_cont[1..].split_last().unwrap_unchecked();
                                 let cont = *last;
-                                AnnProc {
-                                    proc: ast_builder
-                                        .alloc_send_sync_with_cont(channel, messages, cont),
-                                    span,
-                                }
+                                ast_builder
+                                    .alloc_send_sync_with_cont(channel, messages, cont)
+                                    .ann(span)
                             })
                         }
                         K::ConsumeSet {
@@ -930,18 +899,14 @@ fn apply_cont<'tree, 'ast>(
                             } else {
                                 ast_builder.alloc_set(elems)
                             };
-                            AnnProc { proc: set, span }
+                            set.ann(span)
                         }),
-                        K::ConsumeTuple { arity, span } => {
-                            proc_stack.replace_top_slice(arity, |elems| AnnProc {
-                                proc: ast_builder.alloc_tuple(elems),
-                                span,
-                            })
-                        }
-                        K::ConsumeUnaryExp { op, span } => proc_stack.replace_top(|top| AnnProc {
-                            proc: ast_builder.alloc_unary_exp(op, top.proc),
-                            span,
-                        }),
+                        K::ConsumeTuple { arity, span } => proc_stack
+                            .replace_top_slice(arity, |elems| {
+                                ast_builder.alloc_tuple(elems).ann(span)
+                            }),
+                        K::ConsumeUnaryExp { op, span } => proc_stack
+                            .replace_top(|top| ast_builder.alloc_unary_exp(op, top).ann(span)),
                         _ => unreachable!("Eval continuations are handled in another branch"),
                     };
 
@@ -1197,7 +1162,7 @@ impl<'a> ProcStack<'a> {
     }
 
     fn push(&mut self, proc: &'a Proc<'a>, span: SourceSpan) {
-        self.stack.push(AnnProc { proc, span });
+        self.stack.push(proc.ann(span));
     }
 
     fn to_proc(self) -> AnnProc<'a> {
