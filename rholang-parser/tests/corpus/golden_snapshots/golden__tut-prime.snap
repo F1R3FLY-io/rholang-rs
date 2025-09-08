@@ -722,37 +722,73 @@ Good(
                                                         pattern: AnnProc {
                                                             proc: UnaryExp {
                                                                 op: Negation,
-                                                                arg: Par {
-                                                                    left: AnnProc {
-                                                                        proc: UnaryExp {
-                                                                            op: Negation,
-                                                                            arg: Nil,
-                                                                        },
-                                                                        span: SourceSpan {
-                                                                            start: SourcePos {
-                                                                                line: 17,
-                                                                                col: 9,
+                                                                arg: AnnProc {
+                                                                    proc: Par {
+                                                                        left: AnnProc {
+                                                                            proc: UnaryExp {
+                                                                                op: Negation,
+                                                                                arg: AnnProc {
+                                                                                    proc: Nil,
+                                                                                    span: SourceSpan {
+                                                                                        start: SourcePos {
+                                                                                            line: 17,
+                                                                                            col: 10,
+                                                                                        },
+                                                                                        end: SourcePos {
+                                                                                            line: 17,
+                                                                                            col: 13,
+                                                                                        },
+                                                                                    },
+                                                                                },
                                                                             },
-                                                                            end: SourcePos {
-                                                                                line: 17,
-                                                                                col: 13,
+                                                                            span: SourceSpan {
+                                                                                start: SourcePos {
+                                                                                    line: 17,
+                                                                                    col: 9,
+                                                                                },
+                                                                                end: SourcePos {
+                                                                                    line: 17,
+                                                                                    col: 13,
+                                                                                },
+                                                                            },
+                                                                        },
+                                                                        right: AnnProc {
+                                                                            proc: UnaryExp {
+                                                                                op: Negation,
+                                                                                arg: AnnProc {
+                                                                                    proc: Nil,
+                                                                                    span: SourceSpan {
+                                                                                        start: SourcePos {
+                                                                                            line: 17,
+                                                                                            col: 17,
+                                                                                        },
+                                                                                        end: SourcePos {
+                                                                                            line: 17,
+                                                                                            col: 20,
+                                                                                        },
+                                                                                    },
+                                                                                },
+                                                                            },
+                                                                            span: SourceSpan {
+                                                                                start: SourcePos {
+                                                                                    line: 17,
+                                                                                    col: 16,
+                                                                                },
+                                                                                end: SourcePos {
+                                                                                    line: 17,
+                                                                                    col: 20,
+                                                                                },
                                                                             },
                                                                         },
                                                                     },
-                                                                    right: AnnProc {
-                                                                        proc: UnaryExp {
-                                                                            op: Negation,
-                                                                            arg: Nil,
+                                                                    span: SourceSpan {
+                                                                        start: SourcePos {
+                                                                            line: 17,
+                                                                            col: 9,
                                                                         },
-                                                                        span: SourceSpan {
-                                                                            start: SourcePos {
-                                                                                line: 17,
-                                                                                col: 16,
-                                                                            },
-                                                                            end: SourcePos {
-                                                                                line: 17,
-                                                                                col: 20,
-                                                                            },
+                                                                        end: SourcePos {
+                                                                            line: 17,
+                                                                            col: 20,
                                                                         },
                                                                     },
                                                                 },

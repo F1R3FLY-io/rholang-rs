@@ -78,7 +78,7 @@ pub enum Proc<'ast> {
 
     SendSync {
         channel: AnnName<'ast>,
-        messages: ProcList<'ast>,
+        inputs: ProcList<'ast>,
         cont: SyncSendCont<'ast>,
     },
 
@@ -97,7 +97,7 @@ pub enum Proc<'ast> {
 
     UnaryExp {
         op: UnaryExpOp,
-        arg: &'ast Proc<'ast>,
+        arg: AnnProc<'ast>,
     },
     BinaryExp {
         op: BinaryExpOp,
@@ -112,6 +112,12 @@ pub enum Proc<'ast> {
     },
 
     Bad, // bad process usually represents a parsing error
+}
+
+impl<'a> Proc<'a> {
+    pub fn ann(&'a self, span: SourceSpan) -> AnnProc<'a> {
+        AnnProc { proc: self, span }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -192,6 +198,12 @@ impl<'a> TryFrom<&Proc<'a>> for Name<'a> {
     }
 }
 
+impl<'a> From<Id<'a>> for Name<'a> {
+    fn from(value: Id<'a>) -> Self {
+        Name::ProcVar(Var::Id(value))
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct AnnName<'ast> {
     pub name: Name<'ast>,
@@ -206,6 +218,15 @@ impl<'a> TryFrom<AnnProc<'a>> for AnnName<'a> {
             name,
             span: value.span,
         })
+    }
+}
+
+impl<'a> From<Id<'a>> for AnnName<'a> {
+    fn from(value: Id<'a>) -> Self {
+        Self {
+            name: value.into(),
+            span: value.pos.span_of(value.name.chars().count()),
+        }
     }
 }
 
