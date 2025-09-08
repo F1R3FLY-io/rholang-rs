@@ -424,9 +424,7 @@ Fail(
             ),
             errors: [
                 AnnParsingError {
-                    error: UnexpectedVar(
-                        "with",
-                    ),
+                    error: UnexpectedVar,
                     span: SourceSpan {
                         start: SourcePos {
                             line: 3,
@@ -437,6 +435,7 @@ Fail(
                             col: 24,
                         },
                     },
+                    byte_range: 95..99,
                 },
                 AnnParsingError {
                     error: UnexpectedMatchAfter {
@@ -453,6 +452,7 @@ Fail(
                             col: 60,
                         },
                     },
+                    byte_range: 165..184,
                 },
                 AnnParsingError {
                     error: UnexpectedMatchAfter {
@@ -469,6 +469,7 @@ Fail(
                             col: 54,
                         },
                     },
+                    byte_range: 256..275,
                 },
                 AnnParsingError {
                     error: MissingToken(
@@ -484,6 +485,7 @@ Fail(
                             col: 2,
                         },
                     },
+                    byte_range: 289..289,
                 },
                 AnnParsingError {
                     error: Unexpected(
@@ -499,6 +501,7 @@ Fail(
                             col: 15,
                         },
                     },
+                    byte_range: 113..114,
                 },
                 AnnParsingError {
                     error: SyntaxError {
@@ -514,6 +517,7 @@ Fail(
                             col: 20,
                         },
                     },
+                    byte_range: 118..119,
                 },
             ],
         },

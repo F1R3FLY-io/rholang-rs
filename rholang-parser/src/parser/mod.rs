@@ -1,4 +1,4 @@
-mod ast_builder;
+pub(crate) mod ast_builder;
 pub mod errors;
 mod parsing;
 
