@@ -56,6 +56,26 @@ test-all:
 test-shell:
 	cargo test -p shell
 
+# Run tests for the VM crate
+.PHONY: test-vm
+test-vm:
+	cargo test -p rholang-vm
+
+# Run all VM tests including ignored ones
+.PHONY: test-vm-all
+test-vm-all:
+	cargo test -p rholang-vm -- --include-ignored
+
+# Run a specific VM integration test binary (e.g., BIN=bytecode_examples_tests)
+.PHONY: test-vm-bin
+test-vm-bin:
+	@if [ -z "$(BIN)" ]; then \
+		echo "Usage: make test-vm-bin BIN=<integration_test_name> [ARGS='-- --nocapture']"; \
+		echo "Example: make test-vm-bin BIN=bytecode_examples_tests ARGS='-- --nocapture'"; \
+		exit 1; \
+	fi; \
+	cargo test -p rholang-vm --test $(BIN) $(ARGS)
+
 # Check code quality
 .PHONY: check
 check:
@@ -165,6 +185,9 @@ help:
 	@echo "  test            Run all tests"
 	@echo "  test-all        Run all tests including ignored tests"
 	@echo "  test-shell      Run tests for the shell crate"
+	@echo "  test-vm         Run tests for the rholang-vm crate"
+	@echo "  test-vm-all     Run VM tests including ignored tests"
+	@echo "  test-vm-bin     Run a specific VM integration test binary (BIN=...)"
 	@echo "  check           Check code quality"
 	@echo "  fix             Fix code quality issues"
 	@echo "  coverage        Run source-only test coverage (excluding tests)"
