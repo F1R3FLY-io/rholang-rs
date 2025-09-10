@@ -7,10 +7,12 @@ edition = "2024"
 [lib]
 name = "librho"
 crate-type = ["cdylib", "rlib"]
-edition = "2024"
 
 [dependencies]
 by_address = "1.2.1"
 indexmap = "2.11.0"
 rholang-parser = { path = "../rholang-parser" }
 smallvec = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }
