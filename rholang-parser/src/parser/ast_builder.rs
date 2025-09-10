@@ -347,4 +347,23 @@ impl<'ast> ASTBuilder<'ast> {
     pub(crate) fn alloc_var_ref(&self, kind: VarRefKind, var: Id<'ast>) -> &Proc<'ast> {
         self.arena.alloc(Proc::VarRef { kind, var })
     }
+
+    #[allow(dead_code)]
+    pub(crate) fn chain<G>(
+        &'ast self,
+        first: &'ast Proc<'ast>,
+        mut generator: G,
+    ) -> impl Iterator<Item = &'ast Proc<'ast>> + 'ast
+    where
+        G: FnMut(&'ast Proc<'ast>) -> Option<Proc<'ast>> + 'ast,
+    {
+        let mut last = first;
+
+        std::iter::from_fn(move || {
+            generator(last).map(|next| {
+                last = self.arena.alloc(next);
+                last
+            })
+        })
+    }
 }
