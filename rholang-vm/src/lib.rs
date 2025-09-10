@@ -6,6 +6,7 @@ mod process;
 mod vm;
 mod execute;
 mod error;
+mod rspace;
 
 pub use crate::vm::VM;
 pub use crate::error::ExecError;
