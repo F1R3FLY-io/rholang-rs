@@ -484,9 +484,7 @@ impl BytecodeSerializer {
 
         to_bytes::<RkyvError>(&serializable)
             .map(|aligned_vec| aligned_vec.to_vec())
-            .map_err(|e| {
-                BytecodeError::SerializationError(format!("serialization failed: {e}"))
-            })
+            .map_err(|e| BytecodeError::SerializationError(format!("serialization failed: {e}")))
     }
 
     /// Validate and deserialize a constant pool from bytes

@@ -76,28 +76,28 @@ fn test_rspace_type_properties() {
     assert!(RSpaceType::StoreConc.is_concurrent());
 }
 
-#[test] 
+#[test]
 fn test_instruction_zero_copy() {
     use rholang_bytecode::core::instructions::Instruction;
     use rholang_bytecode::core::opcodes::Opcode;
-    
+
     // Create instruction
     let inst = Instruction::nullary(Opcode::NOP);
-    
+
     // Multiple accesses should not allocate
     let bytes1 = inst.to_bytes();
     let bytes2 = inst.to_bytes();
-    
+
     assert_eq!(bytes1, bytes2);
-    
+
     // Verify no allocation on instruction access by checking pointer equality
     let opcode1 = inst.opcode().unwrap();
     let opcode2 = inst.opcode().unwrap();
     assert_eq!(opcode1, opcode2);
-    
+
     // Verify operand access is zero-copy
     let op1 = inst.op1();
-    let op2 = inst.op1(); 
+    let op2 = inst.op1();
     assert_eq!(op1, op2);
 }
 
@@ -107,15 +107,15 @@ fn test_type_ref_arc_sharing() {
     let process = ProcessRef::new(1, 0, 100, RSpaceType::MemSeq);
     let _type_ref1 = TypeRef::Process(process.clone());
     let _type_ref2 = TypeRef::Process(process.clone());
-    
+
     // Both TypeRefs should share the same underlying ProcessRef
     assert_eq!(process.ref_count(), 3); // process + type_ref1 + type_ref2
-    
+
     // Test with NameRef
     let name = NameRef::unforgeable([0u8; 32], 42);
     let name_ref1 = TypeRef::Name(name.clone());
     let name_ref2 = TypeRef::Name(name.clone());
-    
+
     // Verify sharing through behavior equivalence
     match (&name_ref1, &name_ref2) {
         (TypeRef::Name(n1), TypeRef::Name(n2)) => {
@@ -129,18 +129,18 @@ fn test_type_ref_arc_sharing() {
 fn test_tagged_pointer_zero_copy() {
     let value = 42u64;
     let tagged = TaggedPtr::new(&value as *const u64, 3);
-    
+
     // Multiple accesses should not allocate or copy
     let tag1 = tagged.tag();
     let tag2 = tagged.tag();
     assert_eq!(tag1, tag2);
     assert_eq!(tag1, 3);
-    
+
     let ptr1 = tagged.as_ptr();
     let ptr2 = tagged.as_ptr();
     assert_eq!(ptr1, ptr2);
     assert_eq!(ptr1, &value as *const u64);
-    
+
     // Verify safe access
     let val1 = tagged.get(3).unwrap();
     let val2 = tagged.get(3).unwrap();
