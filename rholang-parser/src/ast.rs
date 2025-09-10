@@ -3,9 +3,9 @@ use std::{
     ops::Deref,
 };
 
-use smallvec::SmallVec;
+use smallvec::{SmallVec, smallvec};
 
-use crate::{SourcePos, SourceSpan};
+use crate::{SourcePos, SourceSpan, traverse::PreorderDfsIter};
 
 pub type ProcList<'a> = SmallVec<[AnnProc<'a>; 1]>;
 
@@ -124,6 +124,12 @@ impl<'a> Proc<'a> {
 pub struct AnnProc<'ast> {
     pub proc: &'ast Proc<'ast>,
     pub span: SourceSpan,
+}
+
+impl<'a> AnnProc<'a> {
+    pub fn iter_preorder_dfs(&'a self) -> impl Iterator<Item = &'a Self> {
+        PreorderDfsIter::<16>::new(self)
+    }
 }
 
 // process variables and names
@@ -294,6 +300,14 @@ impl<'a> Names<'a> {
                 names,
                 remainder: None,
             })
+        }
+    }
+
+    #[allow(dead_code)]
+    pub(super) fn single(name: AnnName<'a>) -> Self {
+        Names {
+            names: smallvec![name],
+            remainder: None,
         }
     }
 
