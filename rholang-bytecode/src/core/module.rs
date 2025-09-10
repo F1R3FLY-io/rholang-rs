@@ -14,7 +14,7 @@ use std::sync::Arc;
 pub struct MmapVec<T> {
     /// Instructions stored in contiguous memory for cache efficiency
     data: Arc<RwLock<Vec<T>>>,
-    
+
     /// Capacity for pre-allocation optimization
     capacity: usize,
 }
@@ -40,8 +40,8 @@ impl<T> MmapVec<T> {
     }
 
     /// Get item by index (zero-copy access)
-    pub fn get(&self, index: usize) -> Option<T> 
-    where 
+    pub fn get(&self, index: usize) -> Option<T>
+    where
         T: Clone,
     {
         self.data.read().get(index).cloned()
@@ -83,16 +83,15 @@ impl<T> Default for MmapVec<T> {
     }
 }
 
-
 /// Reference table for zero-copy operation metadata
 #[derive(Debug)]
 pub struct ReferenceTable {
     /// Reference metadata indexed by reference ID
     references: RwLock<HashMap<u64, ReferenceMetadata>>,
-    
+
     /// Next available reference ID
     next_ref_id: parking_lot::Mutex<u64>,
-    
+
     /// Type-specific reference pools for optimization
     type_pools: RwLock<HashMap<ReferenceType, Vec<u64>>>,
 }
@@ -124,7 +123,12 @@ impl ReferenceTable {
         }
     }
 
-    pub fn create_reference(&self, ref_type: ReferenceType, size_hint: usize, is_shared: bool) -> u64 {
+    pub fn create_reference(
+        &self,
+        ref_type: ReferenceType,
+        size_hint: usize,
+        is_shared: bool,
+    ) -> u64 {
         let ref_id = {
             let mut next_id = self.next_ref_id.lock();
             let current = *next_id;
@@ -182,7 +186,8 @@ impl ReferenceTable {
     }
 
     pub fn get_references_by_type(&self, ref_type: ReferenceType) -> Vec<u64> {
-        self.type_pools.read()
+        self.type_pools
+            .read()
             .get(&ref_type)
             .cloned()
             .unwrap_or_default()
@@ -191,7 +196,7 @@ impl ReferenceTable {
     pub fn stats(&self) -> ReferenceTableStats {
         let references = self.references.read();
         let pools = self.type_pools.read();
-        
+
         let mut type_counts = HashMap::new();
         for metadata in references.values() {
             *type_counts.entry(metadata.ref_type).or_insert(0) += 1;
@@ -224,13 +229,13 @@ pub struct ReferenceTableStats {
 pub struct PatternPool {
     /// Compiled patterns indexed by ID
     patterns: RwLock<HashMap<u64, Arc<CompiledPattern>>>,
-    
+
     /// Pattern hash to ID mapping for deduplication
     pattern_hashes: RwLock<HashMap<u64, u64>>,
-    
+
     /// Next available pattern ID
     next_pattern_id: parking_lot::Mutex<u64>,
-    
+
     /// Pattern access frequency for optimization
     access_counts: RwLock<HashMap<u64, usize>>,
 }
@@ -248,7 +253,7 @@ impl PatternPool {
     /// Add a pattern to the pool with deduplication
     pub fn add_pattern(&self, pattern: CompiledPattern) -> u64 {
         let hash = self.calculate_pattern_hash(&pattern);
-        
+
         // Check if pattern already exists
         {
             let hashes = self.pattern_hashes.read();
@@ -292,7 +297,7 @@ impl PatternPool {
     pub fn get_pattern(&self, pattern_id: u64) -> Option<Arc<CompiledPattern>> {
         let patterns = self.patterns.read();
         let pattern = patterns.get(&pattern_id).cloned();
-        
+
         if pattern.is_some() {
             // Update access count
             let mut access_counts = self.access_counts.write();
@@ -300,7 +305,7 @@ impl PatternPool {
                 *count += 1;
             }
         }
-        
+
         pattern
     }
 
@@ -315,11 +320,11 @@ impl PatternPool {
             // Remove from access counts
             let mut access_counts = self.access_counts.write();
             access_counts.remove(&pattern_id);
-            
+
             // Note: We don't remove from pattern_hashes as the hash calculation
             // would require the pattern data. In a future implementation, this
             // could be optimized with reverse mapping.
-            
+
             true
         } else {
             false
@@ -330,7 +335,7 @@ impl PatternPool {
     pub fn stats(&self) -> PatternPoolStats {
         let patterns = self.patterns.read();
         let access_counts = self.access_counts.read();
-        
+
         let total_access_count: usize = access_counts.values().sum();
         let avg_access_count = if !patterns.is_empty() {
             total_access_count as f64 / patterns.len() as f64
@@ -352,7 +357,10 @@ impl PatternPool {
         // TODO!
         // Simple hash based on pattern ID and bytecode length
         // In a future implementation, this would hash the actual bytecode content
-        pattern.id.wrapping_mul(31).wrapping_add(pattern.bytecode.len() as u64)
+        pattern
+            .id
+            .wrapping_mul(31)
+            .wrapping_add(pattern.bytecode.len() as u64)
     }
 }
 
@@ -376,22 +384,22 @@ pub struct PatternPoolStats {
 pub struct BytecodeModule {
     /// Memory-mapped instructions
     pub instructions: MmapVec<Instruction>,
-    
+
     /// Constant pool for literals and templates
     pub constant_pool: ConstantPool,
-    
+
     /// Pattern pool for efficient pattern storage
     pub pattern_pool: PatternPool,
-    
+
     /// Reference table for zero-copy metadata
     pub reference_table: ReferenceTable,
-    
+
     /// String interning for deduplication
     pub string_interning: StringInterner,
-    
+
     /// Extended instructions with associated data
     extended_instructions: RwLock<Vec<ExtendedInstruction>>,
-    
+
     /// Module metadata
     metadata: BytecodeModuleMetadata,
 }
@@ -459,10 +467,10 @@ impl BytecodeModule {
             extended_instructions.push(extended.clone());
             extended_instructions.len() - 1
         };
-        
+
         // Also add the base instruction
         self.instructions.push(extended.instruction);
-        
+
         index
     }
 
@@ -482,7 +490,7 @@ impl BytecodeModule {
     /// Execute optimization passes on the module
     pub fn optimize(&mut self, level: OptimizationLevel) -> Result<()> {
         self.metadata.optimization_level = level;
-        
+
         match level {
             OptimizationLevel::None => {
                 // No optimization
@@ -498,7 +506,7 @@ impl BytecodeModule {
                 self.optimize_instruction_layout()?;
             }
         }
-        
+
         Ok(())
     }
 
@@ -578,24 +586,23 @@ mod tests {
         assert_eq!(vec.get(2), None);
     }
 
-
     #[test]
     fn test_reference_table() {
         let table = ReferenceTable::new();
-        
+
         let ref1 = table.create_reference(ReferenceType::Process, 64, false);
         let ref2 = table.create_reference(ReferenceType::String, 32, true);
-        
+
         // Test access
         let metadata = table.access_reference(ref1);
         assert!(metadata.is_some());
         assert_eq!(metadata.unwrap().access_count, 1);
-        
+
         // Test type-based queries
         let process_refs = table.get_references_by_type(ReferenceType::Process);
         assert_eq!(process_refs.len(), 1);
         assert_eq!(process_refs[0], ref1);
-        
+
         // Test removal
         assert!(table.remove_reference(ref2));
         assert!(!table.remove_reference(ref2)); // Should fail second time
@@ -604,35 +611,35 @@ mod tests {
     #[test]
     fn test_pattern_pool_deduplication() {
         use crate::core::types::{BindingInfo, TypeConstraint};
-        
+
         let pool = PatternPool::new();
-        
+
         // Create identical patterns
         let bindings = vec![BindingInfo {
             name: Arc::from("x"),
             position: 0,
             type_constraint: Some(TypeConstraint::Integer),
         }];
-        
+
         let pattern1 = CompiledPattern {
             id: 1,
             bytecode: vec![0x01, 0x02].into(),
             bindings: bindings.clone().into(),
         };
-        
+
         let pattern2 = CompiledPattern {
             id: 1, // Same ID - should deduplicate
             bytecode: vec![0x01, 0x02].into(),
             bindings: bindings.into(),
         };
-        
+
         let id1 = pool.add_pattern(pattern1);
         let id2 = pool.add_pattern(pattern2);
-        
+
         // Should be deduplicated (same ID returned)
         assert_eq!(id1, id2);
         assert_eq!(pool.stats().pattern_count, 1);
-        
+
         // Test access
         let retrieved = pool.get_pattern(id1);
         assert!(retrieved.is_some());
@@ -642,26 +649,26 @@ mod tests {
     #[test]
     fn test_bytecode_module_integration() {
         let module = BytecodeModule::new();
-        
+
         // Add some instructions
         let inst1 = Instruction::nullary(Opcode::NOP);
         let inst2 = Instruction::unary(Opcode::PUSH_INT, 42);
-        
+
         let idx1 = module.add_instruction(inst1);
         let idx2 = module.add_instruction(inst2);
-        
+
         assert_eq!(idx1, 0);
         assert_eq!(idx2, 1);
         assert_eq!(module.instruction_count(), 2);
-        
+
         // Verify retrieval
         let retrieved1 = module.get_instruction(0);
         assert!(retrieved1.is_some());
         assert_eq!(retrieved1.unwrap().opcode().unwrap(), Opcode::NOP);
-        
+
         // Test validation
         assert!(module.validate().is_ok());
-        
+
         // Test statistics
         let stats = module.stats();
         assert_eq!(stats.instruction_count, 2);
@@ -671,33 +678,36 @@ mod tests {
     #[test]
     fn test_module_with_capacity() {
         let module = BytecodeModule::with_capacity(1000);
-        
+
         // Should start empty but with reserved capacity
         assert_eq!(module.instruction_count(), 0);
-        
+
         // Add instructions up to capacity
         for i in 0..100 {
             let inst = Instruction::unary(Opcode::PUSH_INT, i as u16);
             module.add_instruction(inst);
         }
-        
+
         assert_eq!(module.instruction_count(), 100);
-        
+
         // Test optimization (only None level works for now)
         let mut mutable_module = module; // Move to make it mutable
         assert!(mutable_module.optimize(OptimizationLevel::None).is_ok());
-        assert_eq!(mutable_module.metadata.optimization_level, OptimizationLevel::None);
+        assert_eq!(
+            mutable_module.metadata.optimization_level,
+            OptimizationLevel::None
+        );
     }
 
     #[test]
     fn test_comprehensive_stats() {
         let mut module = BytecodeModule::new();
-        
+
         // Add some content to all components
         module.add_instruction(Instruction::nullary(Opcode::NOP));
         module.constant_pool.add_integer(42);
         module.string_interning.intern("test");
-        
+
         let stats = module.stats();
         assert_eq!(stats.instruction_count, 1);
         assert_eq!(stats.constant_pool_stats.integer_count, 1);

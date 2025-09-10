@@ -166,10 +166,28 @@ impl ExtendedInstruction {
     }
 }
 
+#[derive(Debug, Clone)]
+struct UnresolvedJump {
+    instruction_index: usize,
+    label_id: usize,
+    /// Type of jump instruction
+    #[allow(dead_code)] // Reserved for future optimizations
+    jump_type: JumpType,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum JumpType {
+    Absolute,           // JUMP
+    ConditionalTrue,    // BRANCH_TRUE
+    ConditionalFalse,   // BRANCH_FALSE
+    ConditionalSuccess, // BRANCH_SUCCESS
+}
+
 /// Instruction builder for convenient construction
 pub struct InstructionBuilder {
     instructions: Vec<ExtendedInstruction>,
     labels: Vec<Option<usize>>,
+    unresolved_jumps: Vec<UnresolvedJump>,
     current_offset: usize,
 }
 
@@ -184,6 +202,7 @@ impl InstructionBuilder {
         Self {
             instructions: Vec::new(),
             labels: Vec::new(),
+            unresolved_jumps: Vec::new(),
             current_offset: 0,
         }
     }
@@ -221,14 +240,114 @@ impl InstructionBuilder {
 
     /// Emit a jump to a label
     pub fn emit_jump(&mut self, label_id: usize) -> &mut Self {
-        let instruction = Instruction::unary(Opcode::JUMP, label_id as u16);
-        self.emit(instruction)
+        let instruction = Instruction::unary(Opcode::JUMP, 0); // Placeholder operand
+        let instruction_index = self.instructions.len();
+        self.emit(instruction);
+
+        self.unresolved_jumps.push(UnresolvedJump {
+            instruction_index,
+            label_id,
+            jump_type: JumpType::Absolute,
+        });
+
+        self
+    }
+
+    pub fn emit_branch_true(&mut self, label_id: usize) -> &mut Self {
+        let instruction = Instruction::unary(Opcode::BRANCH_TRUE, 0);
+        let instruction_index = self.instructions.len();
+        self.emit(instruction);
+
+        self.unresolved_jumps.push(UnresolvedJump {
+            instruction_index,
+            label_id,
+            jump_type: JumpType::ConditionalTrue,
+        });
+
+        self
+    }
+
+    pub fn emit_branch_false(&mut self, label_id: usize) -> &mut Self {
+        let instruction = Instruction::unary(Opcode::BRANCH_FALSE, 0);
+        let instruction_index = self.instructions.len();
+        self.emit(instruction);
+
+        self.unresolved_jumps.push(UnresolvedJump {
+            instruction_index,
+            label_id,
+            jump_type: JumpType::ConditionalFalse,
+        });
+
+        self
+    }
+
+    pub fn emit_branch_success(&mut self, label_id: usize) -> &mut Self {
+        let instruction = Instruction::unary(Opcode::BRANCH_SUCCESS, 0);
+        let instruction_index = self.instructions.len();
+        self.emit(instruction);
+
+        self.unresolved_jumps.push(UnresolvedJump {
+            instruction_index,
+            label_id,
+            jump_type: JumpType::ConditionalSuccess,
+        });
+
+        self
     }
 
     /// Build the final instruction sequence
-    pub fn build(self) -> Vec<ExtendedInstruction> {
-        // TODO: Resolve label references
-        self.instructions
+    pub fn build(mut self) -> Result<Vec<ExtendedInstruction>> {
+        // Resolve all label references
+        self.resolve_labels()?;
+        Ok(self.instructions)
+    }
+
+    /// Resolve all label references in jump instructions
+    fn resolve_labels(&mut self) -> Result<()> {
+        for unresolved in &self.unresolved_jumps {
+            // Get the target address for this label
+            let label_position = self
+                .labels
+                .get(unresolved.label_id)
+                .ok_or(BytecodeError::InvalidLabel {
+                    label_id: unresolved.label_id,
+                })?
+                .ok_or_else(|| BytecodeError::UnresolvedLabel {
+                    label_id: unresolved.label_id,
+                })?;
+
+            // Calculate the jump offset
+            let jump_instruction_position = unresolved.instruction_index * 4; // 4 bytes per instruction
+            let offset = label_position as i32 - jump_instruction_position as i32;
+
+            // Check if offset fits in 16-bit signed range
+            if offset < i16::MIN as i32 || offset > i16::MAX as i32 {
+                return Err(BytecodeError::JumpOutOfRange {
+                    offset,
+                    max_range: i16::MAX as i32,
+                });
+            }
+
+            // Update the instruction with the resolved offset
+            if let Some(extended_instruction) =
+                self.instructions.get_mut(unresolved.instruction_index)
+            {
+                // Update the operand with the calculated offset
+                let offset_u16 = offset as u16;
+                let bytes = offset_u16.to_le_bytes();
+                extended_instruction.instruction.operands[0] = bytes[0];
+                extended_instruction.instruction.operands[1] = bytes[1];
+
+                // Add label data for extended instruction
+                extended_instruction.data = Some(InstructionData::Label(offset));
+            } else {
+                return Err(BytecodeError::InvalidInstruction {
+                    offset: jump_instruction_position,
+                });
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -285,7 +404,182 @@ mod tests {
             .place_label(label)
             .emit(Instruction::nullary(Opcode::HALT));
 
-        let instructions = builder.build();
+        let instructions = builder.build().unwrap();
         assert_eq!(instructions.len(), 3);
+    }
+
+    #[test]
+    fn test_label_resolution_forward_jump() {
+        let mut builder = InstructionBuilder::new();
+        let forward_label = builder.create_label();
+
+        // Jump forward to a label that hasn't been placed yet
+        builder
+            .emit(Instruction::nullary(Opcode::NOP)) // Position 0
+            .emit_jump(forward_label) // Position 4
+            .emit(Instruction::nullary(Opcode::NOP)) // Position 8
+            .place_label(forward_label) // Position 12
+            .emit(Instruction::nullary(Opcode::HALT)); // Position 12
+
+        let instructions = builder.build().unwrap();
+        assert_eq!(instructions.len(), 4);
+
+        // Check that jump instruction has correct offset
+        let jump_instruction = &instructions[1];
+        assert_eq!(jump_instruction.instruction.opcode().unwrap(), Opcode::JUMP);
+
+        // Offset should be 12 - 4 = 8 bytes (forward jump)
+        assert_eq!(jump_instruction.instruction.op16() as i16, 8);
+
+        // Check that extended data contains the label offset
+        if let Some(InstructionData::Label(offset)) = &jump_instruction.data {
+            assert_eq!(*offset, 8);
+        } else {
+            panic!("Expected label data");
+        }
+    }
+
+    #[test]
+    fn test_label_resolution_backward_jump() {
+        let mut builder = InstructionBuilder::new();
+        let backward_label = builder.create_label();
+
+        // Place label first, then jump back to it
+        builder
+            .place_label(backward_label) // Position 0
+            .emit(Instruction::nullary(Opcode::NOP)) // Position 0
+            .emit(Instruction::nullary(Opcode::NOP)) // Position 4
+            .emit_jump(backward_label) // Position 8
+            .emit(Instruction::nullary(Opcode::HALT)); // Position 12
+
+        let instructions = builder.build().unwrap();
+        assert_eq!(instructions.len(), 4);
+
+        // Check that jump instruction has correct offset
+        let jump_instruction = &instructions[2];
+        assert_eq!(jump_instruction.instruction.opcode().unwrap(), Opcode::JUMP);
+
+        // Offset should be 0 - 8 = -8 bytes (backward jump)
+        assert_eq!(jump_instruction.instruction.op16() as i16, -8);
+
+        // Check that extended data contains the label offset
+        if let Some(InstructionData::Label(offset)) = &jump_instruction.data {
+            assert_eq!(*offset, -8);
+        } else {
+            panic!("Expected label data");
+        }
+    }
+
+    #[test]
+    fn test_all_branch_types() {
+        let mut builder = InstructionBuilder::new();
+        let label1 = builder.create_label();
+        let label2 = builder.create_label();
+        let label3 = builder.create_label();
+        let label4 = builder.create_label();
+
+        builder
+            .emit_jump(label1) // Position 0
+            .emit_branch_true(label2) // Position 4
+            .emit_branch_false(label3) // Position 8
+            .emit_branch_success(label4) // Position 12
+            .place_label(label1) // Position 16
+            .place_label(label2) // Position 16
+            .place_label(label3) // Position 16
+            .place_label(label4) // Position 16
+            .emit(Instruction::nullary(Opcode::HALT)); // Position 16
+
+        let instructions = builder.build().unwrap();
+        assert_eq!(instructions.len(), 5);
+
+        assert_eq!(instructions[0].instruction.opcode().unwrap(), Opcode::JUMP);
+        assert_eq!(
+            instructions[1].instruction.opcode().unwrap(),
+            Opcode::BRANCH_TRUE
+        );
+        assert_eq!(
+            instructions[2].instruction.opcode().unwrap(),
+            Opcode::BRANCH_FALSE
+        );
+        assert_eq!(
+            instructions[3].instruction.opcode().unwrap(),
+            Opcode::BRANCH_SUCCESS
+        );
+        assert_eq!(instructions[4].instruction.opcode().unwrap(), Opcode::HALT);
+
+        // All jumps should have offset 16 (from their respective positions)
+        assert_eq!(instructions[0].instruction.op16() as i16, 16);
+        assert_eq!(instructions[1].instruction.op16() as i16, 12);
+        assert_eq!(instructions[2].instruction.op16() as i16, 8);
+        assert_eq!(instructions[3].instruction.op16() as i16, 4);
+    }
+
+    #[test]
+    fn test_unresolved_label_error() {
+        let mut builder = InstructionBuilder::new();
+
+        let unplaced_label = builder.create_label();
+        builder.emit_jump(unplaced_label);
+
+        let result = builder.build();
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            BytecodeError::UnresolvedLabel { label_id } => {
+                assert_eq!(label_id, unplaced_label);
+            }
+            _ => panic!("Expected UnresolvedLabel error"),
+        }
+    }
+
+    #[test]
+    fn test_invalid_label_error() {
+        let mut builder = InstructionBuilder::new();
+
+        // Reference a label ID that was never created
+        let invalid_label = 999;
+        builder.emit_jump(invalid_label);
+
+        let result = builder.build();
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            BytecodeError::InvalidLabel { label_id } => {
+                assert_eq!(label_id, invalid_label);
+            }
+            _ => panic!("Expected InvalidLabel error"),
+        }
+    }
+
+    #[test]
+    fn test_complex_control_flow() {
+        let mut builder = InstructionBuilder::new();
+        let loop_start = builder.create_label();
+        let loop_end = builder.create_label();
+        let condition_true = builder.create_label();
+
+        // Simulate: while (condition) { body }
+        builder
+            .place_label(loop_start) // Position 0
+            .emit(Instruction::nullary(Opcode::PUSH_BOOL)) // Position 0 - push condition
+            .emit_branch_false(loop_end) // Position 4 - exit if false
+            .emit_branch_true(condition_true) // Position 8 - body if true
+            .place_label(condition_true) // Position 12
+            .emit(Instruction::nullary(Opcode::NOP)) // Position 12 - loop body
+            .emit_jump(loop_start) // Position 16 - back to start
+            .place_label(loop_end) // Position 20
+            .emit(Instruction::nullary(Opcode::HALT)); // Position 20
+
+        let instructions = builder.build().unwrap();
+        assert_eq!(instructions.len(), 6);
+
+        // branch_false at position 4 jumps to position 20: offset = 16
+        assert_eq!(instructions[1].instruction.op16() as i16, 16);
+
+        // branch_true at position 8 jumps to position 12: offset = 4
+        assert_eq!(instructions[2].instruction.op16() as i16, 4);
+
+        // jump at position 16 jumps to position 0: offset = -16
+        assert_eq!(instructions[4].instruction.op16() as i16, -16);
     }
 }

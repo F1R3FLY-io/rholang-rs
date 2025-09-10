@@ -46,6 +46,15 @@ pub enum BytecodeError {
 
     #[error("Invalid RSpace type: {0}")]
     InvalidRSpaceType(u8),
+
+    #[error("Invalid label ID: {label_id}")]
+    InvalidLabel { label_id: usize },
+
+    #[error("Unresolved label ID: {label_id}")]
+    UnresolvedLabel { label_id: usize },
+
+    #[error("Jump offset {offset} out of range (max: {max_range})")]
+    JumpOutOfRange { offset: i32, max_range: i32 },
 }
 
 /// Convenient Result type
