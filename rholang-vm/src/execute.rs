@@ -26,6 +26,18 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
             let v = inst.op1() != 0;
             vm.stack.push(Value::Bool(v));
         }
+        Opcode::PUSH_STR => {
+            let idx = inst.op16() as usize;
+            match process.names.get(idx) {
+                Some(Value::Str(s)) => vm.stack.push(Value::Str(s.clone())),
+                Some(other) => {
+                    return Err(ExecError::OpcodeParamError { opcode: "PUSH_STR", message: format!("names[{}] not a String: {:?}", idx, other) }.into());
+                }
+                None => {
+                    return Err(ExecError::OpcodeParamError { opcode: "PUSH_STR", message: format!("names index out of bounds: {}", idx) }.into());
+                }
+            }
+        }
         Opcode::PUSH_NIL => vm.stack.push(Value::Nil),
         Opcode::POP => { let _ = vm.stack.pop(); }
 
@@ -83,39 +95,45 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
 
         // Comparisons
         Opcode::CMP_EQ => {
-            let (b, a) = (vm.stack.pop(), vm.stack.pop());
+            let b = vm.stack.pop().ok_or_else(|| anyhow!("stack underflow on CMP_EQ"))?;
+            let a = vm.stack.pop().ok_or_else(|| anyhow!("stack underflow on CMP_EQ"))?;
             vm.stack.push(Value::Bool(a == b));
         }
         Opcode::CMP_NEQ => {
-            let (b, a) = (vm.stack.pop(), vm.stack.pop());
+            let b = vm.stack.pop().ok_or_else(|| anyhow!("stack underflow on CMP_NEQ"))?;
+            let a = vm.stack.pop().ok_or_else(|| anyhow!("stack underflow on CMP_NEQ"))?;
             vm.stack.push(Value::Bool(a != b));
         }
         Opcode::CMP_LT => {
-            let (b, a) = (vm.stack.pop(), vm.stack.pop());
+            let b = vm.stack.pop().ok_or_else(|| anyhow!("stack underflow on CMP_LT rhs"))?;
+            let a = vm.stack.pop().ok_or_else(|| anyhow!("stack underflow on CMP_LT lhs"))?;
             match (a, b) {
-                (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Bool(a < b)),
-                _ => bail!("CMP_LT requires Ints"),
+                (Value::Int(a), Value::Int(b)) => vm.stack.push(Value::Bool(a < b)),
+                (a, b) => bail!("CMP_LT requires Ints, got {:?} and {:?}", a, b),
             }
         }
         Opcode::CMP_LTE => {
-            let (b, a) = (vm.stack.pop(), vm.stack.pop());
+            let b = vm.stack.pop().ok_or_else(|| anyhow!("stack underflow on CMP_LTE rhs"))?;
+            let a = vm.stack.pop().ok_or_else(|| anyhow!("stack underflow on CMP_LTE lhs"))?;
             match (a, b) {
-                (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Bool(a <= b)),
-                _ => bail!("CMP_LTE requires Ints"),
+                (Value::Int(a), Value::Int(b)) => vm.stack.push(Value::Bool(a <= b)),
+                (a, b) => bail!("CMP_LTE requires Ints, got {:?} and {:?}", a, b),
             }
         }
         Opcode::CMP_GT => {
-            let (b, a) = (vm.stack.pop(), vm.stack.pop());
+            let b = vm.stack.pop().ok_or_else(|| anyhow!("stack underflow on CMP_GT rhs"))?;
+            let a = vm.stack.pop().ok_or_else(|| anyhow!("stack underflow on CMP_GT lhs"))?;
             match (a, b) {
-                (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Bool(a > b)),
-                _ => bail!("CMP_GT requires Ints"),
+                (Value::Int(a), Value::Int(b)) => vm.stack.push(Value::Bool(a > b)),
+                (a, b) => bail!("CMP_GT requires Ints, got {:?} and {:?}", a, b),
             }
         }
         Opcode::CMP_GTE => {
-            let (b, a) = (vm.stack.pop(), vm.stack.pop());
+            let b = vm.stack.pop().ok_or_else(|| anyhow!("stack underflow on CMP_GTE rhs"))?;
+            let a = vm.stack.pop().ok_or_else(|| anyhow!("stack underflow on CMP_GTE lhs"))?;
             match (a, b) {
-                (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Bool(a >= b)),
-                _ => bail!("CMP_GTE requires Ints"),
+                (Value::Int(a), Value::Int(b)) => vm.stack.push(Value::Bool(a >= b)),
+                (a, b) => bail!("CMP_GTE requires Ints, got {:?} and {:?}", a, b),
             }
         }
 
@@ -244,22 +262,19 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
             let kind = inst.op16();
             let data = vm.stack.pop().ok_or_else(|| anyhow!("stack underflow on TELL data"))?;
             let chan = match vm.stack.pop() { Some(Value::Name(s)) => s, other => return Err(ExecError::OpcodeParamError { opcode: "TELL", message: format!("expects Name channel, got {:?}", other) }.into()), };
-            let key = (kind, chan);
-            vm.rspace.entry(key).or_default().push(data);
+            vm.rspace.tell(kind, chan, data)?;
             vm.stack.push(Value::Bool(true));
         }
         Opcode::ASK => {
             let kind = inst.op16();
             let chan = match vm.stack.pop() { Some(Value::Name(s)) => s, other => return Err(ExecError::OpcodeParamError { opcode: "ASK", message: format!("expects Name channel, got {:?}", other) }.into()), };
-            let key = (kind, chan);
-            let v = vm.rspace.get_mut(&key).and_then(|q| if q.is_empty(){None}else{Some(q.remove(0))});
+            let v = vm.rspace.ask(kind, chan)?;
             vm.stack.push(v.unwrap_or(Value::Nil));
         }
         Opcode::PEEK => {
             let kind = inst.op16();
             let chan = match vm.stack.pop() { Some(Value::Name(s)) => s, other => return Err(ExecError::OpcodeParamError { opcode: "PEEK", message: format!("expects Name channel, got {:?}", other) }.into()), };
-            let key = (kind, chan);
-            let v = vm.rspace.get(&key).and_then(|q| q.get(0)).cloned();
+            let v = vm.rspace.peek(kind, chan)?;
             vm.stack.push(v.unwrap_or(Value::Nil));
         }
 
@@ -297,15 +312,14 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
             if !cond { return Ok(StepResult::Jump(label)); }
         }
         Opcode::BRANCH_SUCCESS => {
-            // For now, treat success as presence of Bool(true) on stack top; consume it and branch if true.
+            // Strict semantics: expect Bool status on top and label String beneath, mirroring BRANCH_TRUE/BRANCH_FALSE.
             let status = match vm.stack.pop() {
                 Some(Value::Bool(b)) => b,
-                Some(v) => { vm.stack.push(v); false },
-                None => false,
+                other => return Err(ExecError::OpcodeParamError { opcode: "BRANCH_SUCCESS", message: format!("expects Bool status on stack, got {:?}", other) }.into()),
             };
             let label = match vm.stack.pop() {
                 Some(Value::Str(s)) => s,
-                other => return Err(ExecError::OpcodeParamError { opcode: "BRANCH_SUCCESS", message: format!("expects label String under status/stack, got {:?}", other) }.into()),
+                other => return Err(ExecError::OpcodeParamError { opcode: "BRANCH_SUCCESS", message: format!("expects label String under status, got {:?}", other) }.into()),
             };
             if status { return Ok(StepResult::Jump(label)); }
         }
