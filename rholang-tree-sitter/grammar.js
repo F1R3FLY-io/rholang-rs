@@ -18,6 +18,26 @@ module.exports = grammar({
 
     inline: $ => [$.name, $.quotable],
 
+    reserved: {
+        global: $ => [
+            "new",
+            "if",
+            "else",
+            "let",
+            "match",
+            "select",
+            "contract",
+            "for",
+            "or",
+            "and",
+            "matches",
+            "not",
+            "bundle",
+            "true",
+            "false"
+        ],
+    },
+
     rules: {
         // Starting point of the grammar
         source_file: $ => repeat($._proc),
