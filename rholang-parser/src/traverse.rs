@@ -242,10 +242,10 @@ mod tests {
 
     #[test]
     fn if_then_else_full() {
-        // if (true) then "yes" else "no"
+        // if (true) "yes" else "no"
         let cond = Proc::BoolLiteral(true).ann(SourcePos::at_col(5).span_of(5));
-        let if_true = Proc::StringLiteral("yes").ann(SourcePos::at_col(16).span_of(5));
-        let if_false = Proc::StringLiteral("no").ann(SourcePos::at_col(27).span_of(4));
+        let if_true = Proc::StringLiteral("yes").ann(SourcePos::at_col(11).span_of(5));
+        let if_false = Proc::StringLiteral("no").ann(SourcePos::at_col(22).span_of(4));
         let if_then_else = Proc::IfThenElse {
             condition: cond,
             if_true,
