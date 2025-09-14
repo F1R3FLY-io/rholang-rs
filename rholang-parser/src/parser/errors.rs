@@ -12,6 +12,7 @@ pub enum ParsingError {
     MissingToken(&'static str),
     Unexpected(char),
     UnexpectedVar,
+    UnexpectedQuote,
     UnexpectedMatchAfter {
         rule: &'static str,
         offender: &'static str,
@@ -121,6 +122,7 @@ const ERROR_VAR: u32 = 0;
 const MISSING_NODE: u32 = 1;
 const ERROR_PAR: u32 = 2;
 const AFTER_PAR: u32 = 3;
+const ERROR_QUOTE: u32 = 4;
 
 pub(super) fn query_errors(of: &tree_sitter::Node, source: &str, into: &mut Vec<AnnParsingError>) {
     use tree_sitter::StreamingIterator;
@@ -132,6 +134,7 @@ pub(super) fn query_errors(of: &tree_sitter::Node, source: &str, into: &mut Vec<
             "(ERROR (var) @error-var)
             (MISSING) @missing-node 
             ((ERROR (par (_) (_)) ) @error-par . (_) @after-par)
+            (ERROR (quote)) @error-quote
             (ERROR) @fallback",
         )
         .expect("failed to compile error query")
@@ -166,6 +169,10 @@ pub(super) fn query_errors(of: &tree_sitter::Node, source: &str, into: &mut Vec<
                 }
                 AFTER_PAR => {
                     into.push(AnnParsingError::from_unexpected_match(node, "par"));
+                }
+                ERROR_QUOTE => {
+                    claimed_error_ranges.insert(node.byte_range());
+                    into.push(AnnParsingError::new(ParsingError::UnexpectedQuote, &node));
                 }
                 _ => {
                     if node.parent().is_some_and(|p| p.is_error()) {
