@@ -167,7 +167,6 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
             | Proc::SimpleType(_)
             | Proc::ProcVar(_)
             | Proc::Eval { .. }
-            | Proc::Quote { proc: _ }
             | Proc::VarRef { .. }
             | Proc::Bad => {}
         }

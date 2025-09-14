@@ -598,10 +598,6 @@
         },
         {
           "type": "SYMBOL",
-          "name": "quote"
-        },
-        {
-          "type": "SYMBOL",
           "name": "sub"
         },
         {
@@ -1080,52 +1076,6 @@
           }
         ]
       }
-    },
-    "quote": {
-      "type": "PREC",
-      "value": 12,
-      "content": {
-        "type": "SEQ",
-        "members": [
-          {
-            "type": "STRING",
-            "value": "@"
-          },
-          {
-            "type": "SYMBOL",
-            "name": "quotable"
-          }
-        ]
-      }
-    },
-    "quotable": {
-      "type": "CHOICE",
-      "members": [
-        {
-          "type": "SYMBOL",
-          "name": "var_ref"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "eval"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "disjunction"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "conjunction"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "negation"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "_ground_expression"
-        }
-      ]
     },
     "var_ref": {
       "type": "PREC",
@@ -2417,6 +2367,52 @@
         {
           "type": "SYMBOL",
           "name": "var"
+        }
+      ]
+    },
+    "quote": {
+      "type": "PREC",
+      "value": 12,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "STRING",
+            "value": "@"
+          },
+          {
+            "type": "SYMBOL",
+            "name": "quotable"
+          }
+        ]
+      }
+    },
+    "quotable": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "var_ref"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "eval"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "disjunction"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "conjunction"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "negation"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_ground_expression"
         }
       ]
     },

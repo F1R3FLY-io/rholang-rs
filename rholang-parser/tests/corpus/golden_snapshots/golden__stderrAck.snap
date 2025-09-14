@@ -50,29 +50,17 @@ Good(
                     proc: Par {
                         left: AnnProc {
                             proc: Send {
-                                channel: AnnName {
-                                    name: ProcVar(
-                                        Id(
-                                            Id {
-                                                name: "stderrAck",
-                                                pos: SourcePos {
-                                                    line: 2,
-                                                    col: 3,
-                                                },
+                                channel: NameVar(
+                                    Id(
+                                        Id {
+                                            name: "stderrAck",
+                                            pos: SourcePos {
+                                                line: 2,
+                                                col: 3,
                                             },
-                                        ),
+                                        },
                                     ),
-                                    span: SourceSpan {
-                                        start: SourcePos {
-                                            line: 2,
-                                            col: 3,
-                                        },
-                                        end: SourcePos {
-                                            line: 2,
-                                            col: 12,
-                                        },
-                                    },
-                                },
+                                ),
                                 send_type: Single,
                                 inputs: [
                                     AnnProc {
@@ -92,29 +80,17 @@ Good(
                                     },
                                     AnnProc {
                                         proc: Eval {
-                                            name: AnnName {
-                                                name: ProcVar(
-                                                    Id(
-                                                        Id {
-                                                            name: "ack",
-                                                            pos: SourcePos {
-                                                                line: 2,
-                                                                col: 32,
-                                                            },
+                                            name: NameVar(
+                                                Id(
+                                                    Id {
+                                                        name: "ack",
+                                                        pos: SourcePos {
+                                                            line: 2,
+                                                            col: 32,
                                                         },
-                                                    ),
+                                                    },
                                                 ),
-                                                span: SourceSpan {
-                                                    start: SourcePos {
-                                                        line: 2,
-                                                        col: 32,
-                                                    },
-                                                    end: SourcePos {
-                                                        line: 2,
-                                                        col: 35,
-                                                    },
-                                                },
-                                            },
+                                            ),
                                         },
                                         span: SourceSpan {
                                             start: SourcePos {
@@ -147,77 +123,41 @@ Good(
                                         Linear {
                                             lhs: Names {
                                                 names: [
-                                                    AnnName {
-                                                        name: ProcVar(
-                                                            Wildcard,
-                                                        ),
-                                                        span: SourceSpan {
-                                                            start: SourcePos {
-                                                                line: 3,
-                                                                col: 8,
-                                                            },
-                                                            end: SourcePos {
-                                                                line: 3,
-                                                                col: 9,
-                                                            },
-                                                        },
-                                                    },
+                                                    NameVar(
+                                                        Wildcard,
+                                                    ),
                                                 ],
                                                 remainder: None,
                                             },
                                             rhs: Simple {
-                                                name: AnnName {
-                                                    name: ProcVar(
-                                                        Id(
-                                                            Id {
-                                                                name: "ack",
-                                                                pos: SourcePos {
-                                                                    line: 3,
-                                                                    col: 13,
-                                                                },
+                                                name: NameVar(
+                                                    Id(
+                                                        Id {
+                                                            name: "ack",
+                                                            pos: SourcePos {
+                                                                line: 3,
+                                                                col: 13,
                                                             },
-                                                        ),
+                                                        },
                                                     ),
-                                                    span: SourceSpan {
-                                                        start: SourcePos {
-                                                            line: 3,
-                                                            col: 13,
-                                                        },
-                                                        end: SourcePos {
-                                                            line: 3,
-                                                            col: 16,
-                                                        },
-                                                    },
-                                                },
+                                                ),
                                             },
                                         },
                                     ],
                                 ],
                                 proc: AnnProc {
                                     proc: Send {
-                                        channel: AnnName {
-                                            name: ProcVar(
-                                                Id(
-                                                    Id {
-                                                        name: "stderr",
-                                                        pos: SourcePos {
-                                                            line: 4,
-                                                            col: 5,
-                                                        },
+                                        channel: NameVar(
+                                            Id(
+                                                Id {
+                                                    name: "stderr",
+                                                    pos: SourcePos {
+                                                        line: 4,
+                                                        col: 5,
                                                     },
-                                                ),
+                                                },
                                             ),
-                                            span: SourceSpan {
-                                                start: SourcePos {
-                                                    line: 4,
-                                                    col: 5,
-                                                },
-                                                end: SourcePos {
-                                                    line: 4,
-                                                    col: 11,
-                                                },
-                                            },
-                                        },
+                                        ),
                                         send_type: Single,
                                         inputs: [
                                             AnnProc {
