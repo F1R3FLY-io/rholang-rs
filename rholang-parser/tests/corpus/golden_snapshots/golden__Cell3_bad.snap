@@ -337,6 +337,20 @@ Fail(
                     byte_range: 95..99,
                 },
                 AnnParsingError {
+                    error: UnexpectedQuote,
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 4,
+                            col: 8,
+                        },
+                        end: SourcePos {
+                            line: 4,
+                            col: 12,
+                        },
+                    },
+                    byte_range: 107..111,
+                },
+                AnnParsingError {
                     error: UnexpectedMatchAfter {
                         rule: "par",
                         offender: "case",
@@ -352,6 +366,20 @@ Fail(
                         },
                     },
                     byte_range: 165..283,
+                },
+                AnnParsingError {
+                    error: UnexpectedQuote,
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 7,
+                            col: 8,
+                        },
+                        end: SourcePos {
+                            line: 7,
+                            col: 12,
+                        },
+                    },
+                    byte_range: 200..204,
                 },
                 AnnParsingError {
                     error: UnexpectedMatchAfter {
@@ -385,22 +413,6 @@ Fail(
                         },
                     },
                     byte_range: 289..289,
-                },
-                AnnParsingError {
-                    error: SyntaxError {
-                        sexp: "(ERROR (quote (var)))",
-                    },
-                    span: SourceSpan {
-                        start: SourcePos {
-                            line: 4,
-                            col: 8,
-                        },
-                        end: SourcePos {
-                            line: 4,
-                            col: 12,
-                        },
-                    },
-                    byte_range: 107..111,
                 },
                 AnnParsingError {
                     error: Unexpected(
@@ -449,22 +461,6 @@ Fail(
                         },
                     },
                     byte_range: 191..192,
-                },
-                AnnParsingError {
-                    error: SyntaxError {
-                        sexp: "(ERROR (quote (var)))",
-                    },
-                    span: SourceSpan {
-                        start: SourcePos {
-                            line: 7,
-                            col: 8,
-                        },
-                        end: SourcePos {
-                            line: 7,
-                            col: 12,
-                        },
-                    },
-                    byte_range: 200..204,
                 },
             ],
         },
