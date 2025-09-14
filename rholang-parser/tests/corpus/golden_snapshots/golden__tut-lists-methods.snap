@@ -32,29 +32,17 @@ Good(
                                             proc: Par {
                                                 left: AnnProc {
                                                     proc: Send {
-                                                        channel: AnnName {
-                                                            name: ProcVar(
-                                                                Id(
-                                                                    Id {
-                                                                        name: "stdout",
-                                                                        pos: SourcePos {
-                                                                            line: 4,
-                                                                            col: 3,
-                                                                        },
+                                                        channel: NameVar(
+                                                            Id(
+                                                                Id {
+                                                                    name: "stdout",
+                                                                    pos: SourcePos {
+                                                                        line: 4,
+                                                                        col: 3,
                                                                     },
-                                                                ),
+                                                                },
                                                             ),
-                                                            span: SourceSpan {
-                                                                start: SourcePos {
-                                                                    line: 4,
-                                                                    col: 3,
-                                                                },
-                                                                end: SourcePos {
-                                                                    line: 4,
-                                                                    col: 9,
-                                                                },
-                                                            },
-                                                        },
+                                                        ),
                                                         send_type: Single,
                                                         inputs: [
                                                             AnnProc {
@@ -189,29 +177,17 @@ Good(
                                                 },
                                                 right: AnnProc {
                                                     proc: Send {
-                                                        channel: AnnName {
-                                                            name: ProcVar(
-                                                                Id(
-                                                                    Id {
-                                                                        name: "stdout",
-                                                                        pos: SourcePos {
-                                                                            line: 9,
-                                                                            col: 3,
-                                                                        },
+                                                        channel: NameVar(
+                                                            Id(
+                                                                Id {
+                                                                    name: "stdout",
+                                                                    pos: SourcePos {
+                                                                        line: 9,
+                                                                        col: 3,
                                                                     },
-                                                                ),
+                                                                },
                                                             ),
-                                                            span: SourceSpan {
-                                                                start: SourcePos {
-                                                                    line: 9,
-                                                                    col: 3,
-                                                                },
-                                                                end: SourcePos {
-                                                                    line: 9,
-                                                                    col: 9,
-                                                                },
-                                                            },
-                                                        },
+                                                        ),
                                                         send_type: Single,
                                                         inputs: [
                                                             AnnProc {
@@ -373,29 +349,17 @@ Good(
                                         },
                                         right: AnnProc {
                                             proc: Send {
-                                                channel: AnnName {
-                                                    name: ProcVar(
-                                                        Id(
-                                                            Id {
-                                                                name: "stdout",
-                                                                pos: SourcePos {
-                                                                    line: 12,
-                                                                    col: 3,
-                                                                },
+                                                channel: NameVar(
+                                                    Id(
+                                                        Id {
+                                                            name: "stdout",
+                                                            pos: SourcePos {
+                                                                line: 12,
+                                                                col: 3,
                                                             },
-                                                        ),
+                                                        },
                                                     ),
-                                                    span: SourceSpan {
-                                                        start: SourcePos {
-                                                            line: 12,
-                                                            col: 3,
-                                                        },
-                                                        end: SourcePos {
-                                                            line: 12,
-                                                            col: 9,
-                                                        },
-                                                    },
-                                                },
+                                                ),
                                                 send_type: Single,
                                                 inputs: [
                                                     AnnProc {
@@ -526,29 +490,17 @@ Good(
                                 },
                                 right: AnnProc {
                                     proc: Send {
-                                        channel: AnnName {
-                                            name: ProcVar(
-                                                Id(
-                                                    Id {
-                                                        name: "stdout",
-                                                        pos: SourcePos {
-                                                            line: 15,
-                                                            col: 3,
-                                                        },
+                                        channel: NameVar(
+                                            Id(
+                                                Id {
+                                                    name: "stdout",
+                                                    pos: SourcePos {
+                                                        line: 15,
+                                                        col: 3,
                                                     },
-                                                ),
+                                                },
                                             ),
-                                            span: SourceSpan {
-                                                start: SourcePos {
-                                                    line: 15,
-                                                    col: 3,
-                                                },
-                                                end: SourcePos {
-                                                    line: 15,
-                                                    col: 9,
-                                                },
-                                            },
-                                        },
+                                        ),
                                         send_type: Single,
                                         inputs: [
                                             AnnProc {
@@ -691,29 +643,17 @@ Good(
                         },
                         right: AnnProc {
                             proc: Send {
-                                channel: AnnName {
-                                    name: ProcVar(
-                                        Id(
-                                            Id {
-                                                name: "stdout",
-                                                pos: SourcePos {
-                                                    line: 18,
-                                                    col: 3,
-                                                },
+                                channel: NameVar(
+                                    Id(
+                                        Id {
+                                            name: "stdout",
+                                            pos: SourcePos {
+                                                line: 18,
+                                                col: 3,
                                             },
-                                        ),
+                                        },
                                     ),
-                                    span: SourceSpan {
-                                        start: SourcePos {
-                                            line: 18,
-                                            col: 3,
-                                        },
-                                        end: SourcePos {
-                                            line: 18,
-                                            col: 9,
-                                        },
-                                    },
-                                },
+                                ),
                                 send_type: Single,
                                 inputs: [
                                     AnnProc {

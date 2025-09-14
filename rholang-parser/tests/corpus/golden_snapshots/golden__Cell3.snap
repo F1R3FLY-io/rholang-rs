@@ -8,77 +8,41 @@ Fail(
             partial_tree: Some(
                 AnnProc {
                     proc: Contract {
-                        name: AnnName {
-                            name: ProcVar(
-                                Id(
-                                    Id {
-                                        name: "Cell",
-                                        pos: SourcePos {
-                                            line: 10,
-                                            col: 10,
-                                        },
+                        name: NameVar(
+                            Id(
+                                Id {
+                                    name: "Cell",
+                                    pos: SourcePos {
+                                        line: 10,
+                                        col: 10,
                                     },
-                                ),
+                                },
                             ),
-                            span: SourceSpan {
-                                start: SourcePos {
-                                    line: 10,
-                                    col: 10,
-                                },
-                                end: SourcePos {
-                                    line: 10,
-                                    col: 14,
-                                },
-                            },
-                        },
+                        ),
                         formals: Names {
                             names: [
-                                AnnName {
-                                    name: ProcVar(
-                                        Id(
-                                            Id {
-                                                name: "client",
-                                                pos: SourcePos {
-                                                    line: 10,
-                                                    col: 16,
-                                                },
+                                NameVar(
+                                    Id(
+                                        Id {
+                                            name: "client",
+                                            pos: SourcePos {
+                                                line: 10,
+                                                col: 16,
                                             },
-                                        ),
+                                        },
                                     ),
-                                    span: SourceSpan {
-                                        start: SourcePos {
-                                            line: 10,
-                                            col: 16,
-                                        },
-                                        end: SourcePos {
-                                            line: 10,
-                                            col: 22,
-                                        },
-                                    },
-                                },
-                                AnnName {
-                                    name: ProcVar(
-                                        Id(
-                                            Id {
-                                                name: "state",
-                                                pos: SourcePos {
-                                                    line: 10,
-                                                    col: 24,
-                                                },
+                                ),
+                                NameVar(
+                                    Id(
+                                        Id {
+                                            name: "state",
+                                            pos: SourcePos {
+                                                line: 10,
+                                                col: 24,
                                             },
-                                        ),
+                                        },
                                     ),
-                                    span: SourceSpan {
-                                        start: SourcePos {
-                                            line: 10,
-                                            col: 24,
-                                        },
-                                        end: SourcePos {
-                                            line: 10,
-                                            col: 29,
-                                        },
-                                    },
-                                },
+                                ),
                             ],
                             remainder: None,
                         },
@@ -89,56 +53,32 @@ Fail(
                                         Linear {
                                             lhs: Names {
                                                 names: [
-                                                    AnnName {
-                                                        name: ProcVar(
-                                                            Id(
-                                                                Id {
-                                                                    name: "request",
-                                                                    pos: SourcePos {
-                                                                        line: 11,
-                                                                        col: 8,
-                                                                    },
-                                                                },
-                                                            ),
-                                                        ),
-                                                        span: SourceSpan {
-                                                            start: SourcePos {
-                                                                line: 11,
-                                                                col: 8,
-                                                            },
-                                                            end: SourcePos {
-                                                                line: 11,
-                                                                col: 15,
-                                                            },
-                                                        },
-                                                    },
-                                                ],
-                                                remainder: None,
-                                            },
-                                            rhs: Simple {
-                                                name: AnnName {
-                                                    name: ProcVar(
+                                                    NameVar(
                                                         Id(
                                                             Id {
-                                                                name: "client",
+                                                                name: "request",
                                                                 pos: SourcePos {
                                                                     line: 11,
-                                                                    col: 19,
+                                                                    col: 8,
                                                                 },
                                                             },
                                                         ),
                                                     ),
-                                                    span: SourceSpan {
-                                                        start: SourcePos {
-                                                            line: 11,
-                                                            col: 19,
+                                                ],
+                                                remainder: None,
+                                            },
+                                            rhs: Simple {
+                                                name: NameVar(
+                                                    Id(
+                                                        Id {
+                                                            name: "client",
+                                                            pos: SourcePos {
+                                                                line: 11,
+                                                                col: 19,
+                                                            },
                                                         },
-                                                        end: SourcePos {
-                                                            line: 11,
-                                                            col: 25,
-                                                        },
-                                                    },
-                                                },
+                                                    ),
+                                                ),
                                             },
                                         },
                                     ],
@@ -146,56 +86,32 @@ Fail(
                                         Linear {
                                             lhs: Names {
                                                 names: [
-                                                    AnnName {
-                                                        name: ProcVar(
-                                                            Id(
-                                                                Id {
-                                                                    name: "v",
-                                                                    pos: SourcePos {
-                                                                        line: 11,
-                                                                        col: 27,
-                                                                    },
-                                                                },
-                                                            ),
-                                                        ),
-                                                        span: SourceSpan {
-                                                            start: SourcePos {
-                                                                line: 11,
-                                                                col: 27,
-                                                            },
-                                                            end: SourcePos {
-                                                                line: 11,
-                                                                col: 28,
-                                                            },
-                                                        },
-                                                    },
-                                                ],
-                                                remainder: None,
-                                            },
-                                            rhs: Simple {
-                                                name: AnnName {
-                                                    name: ProcVar(
+                                                    NameVar(
                                                         Id(
                                                             Id {
-                                                                name: "state",
+                                                                name: "v",
                                                                 pos: SourcePos {
                                                                     line: 11,
-                                                                    col: 32,
+                                                                    col: 27,
                                                                 },
                                                             },
                                                         ),
                                                     ),
-                                                    span: SourceSpan {
-                                                        start: SourcePos {
-                                                            line: 11,
-                                                            col: 32,
+                                                ],
+                                                remainder: None,
+                                            },
+                                            rhs: Simple {
+                                                name: NameVar(
+                                                    Id(
+                                                        Id {
+                                                            name: "state",
+                                                            pos: SourcePos {
+                                                                line: 11,
+                                                                col: 32,
+                                                            },
                                                         },
-                                                        end: SourcePos {
-                                                            line: 11,
-                                                            col: 37,
-                                                        },
-                                                    },
-                                                },
+                                                    ),
+                                                ),
                                             },
                                         },
                                     ],
