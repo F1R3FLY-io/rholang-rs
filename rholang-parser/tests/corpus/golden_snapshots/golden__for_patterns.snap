@@ -42,29 +42,17 @@ Good(
                                             proc: Par {
                                                 left: AnnProc {
                                                     proc: Send {
-                                                        channel: AnnName {
-                                                            name: ProcVar(
-                                                                Id(
-                                                                    Id {
-                                                                        name: "people",
-                                                                        pos: SourcePos {
-                                                                            line: 2,
-                                                                            col: 5,
-                                                                        },
+                                                        channel: NameVar(
+                                                            Id(
+                                                                Id {
+                                                                    name: "people",
+                                                                    pos: SourcePos {
+                                                                        line: 2,
+                                                                        col: 5,
                                                                     },
-                                                                ),
+                                                                },
                                                             ),
-                                                            span: SourceSpan {
-                                                                start: SourcePos {
-                                                                    line: 2,
-                                                                    col: 5,
-                                                                },
-                                                                end: SourcePos {
-                                                                    line: 2,
-                                                                    col: 11,
-                                                                },
-                                                            },
-                                                        },
+                                                        ),
                                                         send_type: Single,
                                                         inputs: [
                                                             AnnProc {
@@ -75,23 +63,23 @@ Good(
                                                                                 proc: Par {
                                                                                     left: AnnProc {
                                                                                         proc: Send {
-                                                                                            channel: AnnName {
-                                                                                                name: Quote(
-                                                                                                    StringLiteral(
+                                                                                            channel: Quote(
+                                                                                                AnnProc {
+                                                                                                    proc: StringLiteral(
                                                                                                         "name",
                                                                                                     ),
-                                                                                                ),
-                                                                                                span: SourceSpan {
-                                                                                                    start: SourcePos {
-                                                                                                        line: 2,
-                                                                                                        col: 13,
-                                                                                                    },
-                                                                                                    end: SourcePos {
-                                                                                                        line: 2,
-                                                                                                        col: 20,
+                                                                                                    span: SourceSpan {
+                                                                                                        start: SourcePos {
+                                                                                                            line: 2,
+                                                                                                            col: 14,
+                                                                                                        },
+                                                                                                        end: SourcePos {
+                                                                                                            line: 2,
+                                                                                                            col: 20,
+                                                                                                        },
                                                                                                     },
                                                                                                 },
-                                                                                            },
+                                                                                            ),
                                                                                             send_type: Single,
                                                                                             inputs: [
                                                                                                 AnnProc {
@@ -124,23 +112,23 @@ Good(
                                                                                     },
                                                                                     right: AnnProc {
                                                                                         proc: Send {
-                                                                                            channel: AnnName {
-                                                                                                name: Quote(
-                                                                                                    StringLiteral(
+                                                                                            channel: Quote(
+                                                                                                AnnProc {
+                                                                                                    proc: StringLiteral(
                                                                                                         "age",
                                                                                                     ),
-                                                                                                ),
-                                                                                                span: SourceSpan {
-                                                                                                    start: SourcePos {
-                                                                                                        line: 2,
-                                                                                                        col: 31,
-                                                                                                    },
-                                                                                                    end: SourcePos {
-                                                                                                        line: 2,
-                                                                                                        col: 37,
+                                                                                                    span: SourceSpan {
+                                                                                                        start: SourcePos {
+                                                                                                            line: 2,
+                                                                                                            col: 32,
+                                                                                                        },
+                                                                                                        end: SourcePos {
+                                                                                                            line: 2,
+                                                                                                            col: 37,
+                                                                                                        },
                                                                                                     },
                                                                                                 },
-                                                                                            },
+                                                                                            ),
                                                                                             send_type: Single,
                                                                                             inputs: [
                                                                                                 AnnProc {
@@ -185,23 +173,23 @@ Good(
                                                                             },
                                                                             right: AnnProc {
                                                                                 proc: Send {
-                                                                                    channel: AnnName {
-                                                                                        name: Quote(
-                                                                                            StringLiteral(
+                                                                                    channel: Quote(
+                                                                                        AnnProc {
+                                                                                            proc: StringLiteral(
                                                                                                 "eyes",
                                                                                             ),
-                                                                                        ),
-                                                                                        span: SourceSpan {
-                                                                                            start: SourcePos {
-                                                                                                line: 2,
-                                                                                                col: 45,
-                                                                                            },
-                                                                                            end: SourcePos {
-                                                                                                line: 2,
-                                                                                                col: 52,
+                                                                                            span: SourceSpan {
+                                                                                                start: SourcePos {
+                                                                                                    line: 2,
+                                                                                                    col: 46,
+                                                                                                },
+                                                                                                end: SourcePos {
+                                                                                                    line: 2,
+                                                                                                    col: 52,
+                                                                                                },
                                                                                             },
                                                                                         },
-                                                                                    },
+                                                                                    ),
                                                                                     send_type: Single,
                                                                                     inputs: [
                                                                                         AnnProc {
@@ -246,23 +234,23 @@ Good(
                                                                     },
                                                                     right: AnnProc {
                                                                         proc: Send {
-                                                                            channel: AnnName {
-                                                                                name: Quote(
-                                                                                    StringLiteral(
+                                                                            channel: Quote(
+                                                                                AnnProc {
+                                                                                    proc: StringLiteral(
                                                                                         "seq",
                                                                                     ),
-                                                                                ),
-                                                                                span: SourceSpan {
-                                                                                    start: SourcePos {
-                                                                                        line: 2,
-                                                                                        col: 64,
-                                                                                    },
-                                                                                    end: SourcePos {
-                                                                                        line: 2,
-                                                                                        col: 70,
+                                                                                    span: SourceSpan {
+                                                                                        start: SourcePos {
+                                                                                            line: 2,
+                                                                                            col: 65,
+                                                                                        },
+                                                                                        end: SourcePos {
+                                                                                            line: 2,
+                                                                                            col: 70,
+                                                                                        },
                                                                                     },
                                                                                 },
-                                                                            },
+                                                                            ),
                                                                             send_type: Single,
                                                                             inputs: [
                                                                                 AnnProc {
@@ -320,29 +308,17 @@ Good(
                                                 },
                                                 right: AnnProc {
                                                     proc: Send {
-                                                        channel: AnnName {
-                                                            name: ProcVar(
-                                                                Id(
-                                                                    Id {
-                                                                        name: "people",
-                                                                        pos: SourcePos {
-                                                                            line: 3,
-                                                                            col: 5,
-                                                                        },
+                                                        channel: NameVar(
+                                                            Id(
+                                                                Id {
+                                                                    name: "people",
+                                                                    pos: SourcePos {
+                                                                        line: 3,
+                                                                        col: 5,
                                                                     },
-                                                                ),
+                                                                },
                                                             ),
-                                                            span: SourceSpan {
-                                                                start: SourcePos {
-                                                                    line: 3,
-                                                                    col: 5,
-                                                                },
-                                                                end: SourcePos {
-                                                                    line: 3,
-                                                                    col: 11,
-                                                                },
-                                                            },
-                                                        },
+                                                        ),
                                                         send_type: Single,
                                                         inputs: [
                                                             AnnProc {
@@ -353,23 +329,23 @@ Good(
                                                                                 proc: Par {
                                                                                     left: AnnProc {
                                                                                         proc: Send {
-                                                                                            channel: AnnName {
-                                                                                                name: Quote(
-                                                                                                    StringLiteral(
+                                                                                            channel: Quote(
+                                                                                                AnnProc {
+                                                                                                    proc: StringLiteral(
                                                                                                         "name",
                                                                                                     ),
-                                                                                                ),
-                                                                                                span: SourceSpan {
-                                                                                                    start: SourcePos {
-                                                                                                        line: 3,
-                                                                                                        col: 13,
-                                                                                                    },
-                                                                                                    end: SourcePos {
-                                                                                                        line: 3,
-                                                                                                        col: 20,
+                                                                                                    span: SourceSpan {
+                                                                                                        start: SourcePos {
+                                                                                                            line: 3,
+                                                                                                            col: 14,
+                                                                                                        },
+                                                                                                        end: SourcePos {
+                                                                                                            line: 3,
+                                                                                                            col: 20,
+                                                                                                        },
                                                                                                     },
                                                                                                 },
-                                                                                            },
+                                                                                            ),
                                                                                             send_type: Single,
                                                                                             inputs: [
                                                                                                 AnnProc {
@@ -402,23 +378,23 @@ Good(
                                                                                     },
                                                                                     right: AnnProc {
                                                                                         proc: Send {
-                                                                                            channel: AnnName {
-                                                                                                name: Quote(
-                                                                                                    StringLiteral(
+                                                                                            channel: Quote(
+                                                                                                AnnProc {
+                                                                                                    proc: StringLiteral(
                                                                                                         "age",
                                                                                                     ),
-                                                                                                ),
-                                                                                                span: SourceSpan {
-                                                                                                    start: SourcePos {
-                                                                                                        line: 3,
-                                                                                                        col: 33,
-                                                                                                    },
-                                                                                                    end: SourcePos {
-                                                                                                        line: 3,
-                                                                                                        col: 39,
+                                                                                                    span: SourceSpan {
+                                                                                                        start: SourcePos {
+                                                                                                            line: 3,
+                                                                                                            col: 34,
+                                                                                                        },
+                                                                                                        end: SourcePos {
+                                                                                                            line: 3,
+                                                                                                            col: 39,
+                                                                                                        },
                                                                                                     },
                                                                                                 },
-                                                                                            },
+                                                                                            ),
                                                                                             send_type: Single,
                                                                                             inputs: [
                                                                                                 AnnProc {
@@ -463,23 +439,23 @@ Good(
                                                                             },
                                                                             right: AnnProc {
                                                                                 proc: Send {
-                                                                                    channel: AnnName {
-                                                                                        name: Quote(
-                                                                                            StringLiteral(
+                                                                                    channel: Quote(
+                                                                                        AnnProc {
+                                                                                            proc: StringLiteral(
                                                                                                 "eyes",
                                                                                             ),
-                                                                                        ),
-                                                                                        span: SourceSpan {
-                                                                                            start: SourcePos {
-                                                                                                line: 3,
-                                                                                                col: 47,
-                                                                                            },
-                                                                                            end: SourcePos {
-                                                                                                line: 3,
-                                                                                                col: 54,
+                                                                                            span: SourceSpan {
+                                                                                                start: SourcePos {
+                                                                                                    line: 3,
+                                                                                                    col: 48,
+                                                                                                },
+                                                                                                end: SourcePos {
+                                                                                                    line: 3,
+                                                                                                    col: 54,
+                                                                                                },
                                                                                             },
                                                                                         },
-                                                                                    },
+                                                                                    ),
                                                                                     send_type: Single,
                                                                                     inputs: [
                                                                                         AnnProc {
@@ -524,23 +500,23 @@ Good(
                                                                     },
                                                                     right: AnnProc {
                                                                         proc: Send {
-                                                                            channel: AnnName {
-                                                                                name: Quote(
-                                                                                    StringLiteral(
+                                                                            channel: Quote(
+                                                                                AnnProc {
+                                                                                    proc: StringLiteral(
                                                                                         "seq",
                                                                                     ),
-                                                                                ),
-                                                                                span: SourceSpan {
-                                                                                    start: SourcePos {
-                                                                                        line: 3,
-                                                                                        col: 67,
-                                                                                    },
-                                                                                    end: SourcePos {
-                                                                                        line: 3,
-                                                                                        col: 73,
+                                                                                    span: SourceSpan {
+                                                                                        start: SourcePos {
+                                                                                            line: 3,
+                                                                                            col: 68,
+                                                                                        },
+                                                                                        end: SourcePos {
+                                                                                            line: 3,
+                                                                                            col: 73,
+                                                                                        },
                                                                                     },
                                                                                 },
-                                                                            },
+                                                                            ),
                                                                             send_type: Single,
                                                                             inputs: [
                                                                                 AnnProc {
@@ -610,29 +586,17 @@ Good(
                                         },
                                         right: AnnProc {
                                             proc: Send {
-                                                channel: AnnName {
-                                                    name: ProcVar(
-                                                        Id(
-                                                            Id {
-                                                                name: "people",
-                                                                pos: SourcePos {
-                                                                    line: 4,
-                                                                    col: 5,
-                                                                },
+                                                channel: NameVar(
+                                                    Id(
+                                                        Id {
+                                                            name: "people",
+                                                            pos: SourcePos {
+                                                                line: 4,
+                                                                col: 5,
                                                             },
-                                                        ),
+                                                        },
                                                     ),
-                                                    span: SourceSpan {
-                                                        start: SourcePos {
-                                                            line: 4,
-                                                            col: 5,
-                                                        },
-                                                        end: SourcePos {
-                                                            line: 4,
-                                                            col: 11,
-                                                        },
-                                                    },
-                                                },
+                                                ),
                                                 send_type: Single,
                                                 inputs: [
                                                     AnnProc {
@@ -643,23 +607,23 @@ Good(
                                                                         proc: Par {
                                                                             left: AnnProc {
                                                                                 proc: Send {
-                                                                                    channel: AnnName {
-                                                                                        name: Quote(
-                                                                                            StringLiteral(
+                                                                                    channel: Quote(
+                                                                                        AnnProc {
+                                                                                            proc: StringLiteral(
                                                                                                 "name",
                                                                                             ),
-                                                                                        ),
-                                                                                        span: SourceSpan {
-                                                                                            start: SourcePos {
-                                                                                                line: 4,
-                                                                                                col: 13,
-                                                                                            },
-                                                                                            end: SourcePos {
-                                                                                                line: 4,
-                                                                                                col: 20,
+                                                                                            span: SourceSpan {
+                                                                                                start: SourcePos {
+                                                                                                    line: 4,
+                                                                                                    col: 14,
+                                                                                                },
+                                                                                                end: SourcePos {
+                                                                                                    line: 4,
+                                                                                                    col: 20,
+                                                                                                },
                                                                                             },
                                                                                         },
-                                                                                    },
+                                                                                    ),
                                                                                     send_type: Single,
                                                                                     inputs: [
                                                                                         AnnProc {
@@ -692,23 +656,23 @@ Good(
                                                                             },
                                                                             right: AnnProc {
                                                                                 proc: Send {
-                                                                                    channel: AnnName {
-                                                                                        name: Quote(
-                                                                                            StringLiteral(
+                                                                                    channel: Quote(
+                                                                                        AnnProc {
+                                                                                            proc: StringLiteral(
                                                                                                 "age",
                                                                                             ),
-                                                                                        ),
-                                                                                        span: SourceSpan {
-                                                                                            start: SourcePos {
-                                                                                                line: 4,
-                                                                                                col: 32,
-                                                                                            },
-                                                                                            end: SourcePos {
-                                                                                                line: 4,
-                                                                                                col: 38,
+                                                                                            span: SourceSpan {
+                                                                                                start: SourcePos {
+                                                                                                    line: 4,
+                                                                                                    col: 33,
+                                                                                                },
+                                                                                                end: SourcePos {
+                                                                                                    line: 4,
+                                                                                                    col: 38,
+                                                                                                },
                                                                                             },
                                                                                         },
-                                                                                    },
+                                                                                    ),
                                                                                     send_type: Single,
                                                                                     inputs: [
                                                                                         AnnProc {
@@ -753,23 +717,23 @@ Good(
                                                                     },
                                                                     right: AnnProc {
                                                                         proc: Send {
-                                                                            channel: AnnName {
-                                                                                name: Quote(
-                                                                                    StringLiteral(
+                                                                            channel: Quote(
+                                                                                AnnProc {
+                                                                                    proc: StringLiteral(
                                                                                         "eyes",
                                                                                     ),
-                                                                                ),
-                                                                                span: SourceSpan {
-                                                                                    start: SourcePos {
-                                                                                        line: 4,
-                                                                                        col: 46,
-                                                                                    },
-                                                                                    end: SourcePos {
-                                                                                        line: 4,
-                                                                                        col: 53,
+                                                                                    span: SourceSpan {
+                                                                                        start: SourcePos {
+                                                                                            line: 4,
+                                                                                            col: 47,
+                                                                                        },
+                                                                                        end: SourcePos {
+                                                                                            line: 4,
+                                                                                            col: 53,
+                                                                                        },
                                                                                     },
                                                                                 },
-                                                                            },
+                                                                            ),
                                                                             send_type: Single,
                                                                             inputs: [
                                                                                 AnnProc {
@@ -814,23 +778,23 @@ Good(
                                                             },
                                                             right: AnnProc {
                                                                 proc: Send {
-                                                                    channel: AnnName {
-                                                                        name: Quote(
-                                                                            StringLiteral(
+                                                                    channel: Quote(
+                                                                        AnnProc {
+                                                                            proc: StringLiteral(
                                                                                 "seq",
                                                                             ),
-                                                                        ),
-                                                                        span: SourceSpan {
-                                                                            start: SourcePos {
-                                                                                line: 4,
-                                                                                col: 66,
-                                                                            },
-                                                                            end: SourcePos {
-                                                                                line: 4,
-                                                                                col: 72,
+                                                                            span: SourceSpan {
+                                                                                start: SourcePos {
+                                                                                    line: 4,
+                                                                                    col: 67,
+                                                                                },
+                                                                                end: SourcePos {
+                                                                                    line: 4,
+                                                                                    col: 72,
+                                                                                },
                                                                             },
                                                                         },
-                                                                    },
+                                                                    ),
                                                                     send_type: Single,
                                                                     inputs: [
                                                                         AnnProc {
@@ -900,29 +864,17 @@ Good(
                                 },
                                 right: AnnProc {
                                     proc: Send {
-                                        channel: AnnName {
-                                            name: ProcVar(
-                                                Id(
-                                                    Id {
-                                                        name: "people",
-                                                        pos: SourcePos {
-                                                            line: 5,
-                                                            col: 5,
-                                                        },
+                                        channel: NameVar(
+                                            Id(
+                                                Id {
+                                                    name: "people",
+                                                    pos: SourcePos {
+                                                        line: 5,
+                                                        col: 5,
                                                     },
-                                                ),
+                                                },
                                             ),
-                                            span: SourceSpan {
-                                                start: SourcePos {
-                                                    line: 5,
-                                                    col: 5,
-                                                },
-                                                end: SourcePos {
-                                                    line: 5,
-                                                    col: 11,
-                                                },
-                                            },
-                                        },
+                                        ),
                                         send_type: Single,
                                         inputs: [
                                             AnnProc {
@@ -933,23 +885,23 @@ Good(
                                                                 proc: Par {
                                                                     left: AnnProc {
                                                                         proc: Send {
-                                                                            channel: AnnName {
-                                                                                name: Quote(
-                                                                                    StringLiteral(
+                                                                            channel: Quote(
+                                                                                AnnProc {
+                                                                                    proc: StringLiteral(
                                                                                         "name",
                                                                                     ),
-                                                                                ),
-                                                                                span: SourceSpan {
-                                                                                    start: SourcePos {
-                                                                                        line: 5,
-                                                                                        col: 13,
-                                                                                    },
-                                                                                    end: SourcePos {
-                                                                                        line: 5,
-                                                                                        col: 20,
+                                                                                    span: SourceSpan {
+                                                                                        start: SourcePos {
+                                                                                            line: 5,
+                                                                                            col: 14,
+                                                                                        },
+                                                                                        end: SourcePos {
+                                                                                            line: 5,
+                                                                                            col: 20,
+                                                                                        },
                                                                                     },
                                                                                 },
-                                                                            },
+                                                                            ),
                                                                             send_type: Single,
                                                                             inputs: [
                                                                                 AnnProc {
@@ -982,23 +934,23 @@ Good(
                                                                     },
                                                                     right: AnnProc {
                                                                         proc: Send {
-                                                                            channel: AnnName {
-                                                                                name: Quote(
-                                                                                    StringLiteral(
+                                                                            channel: Quote(
+                                                                                AnnProc {
+                                                                                    proc: StringLiteral(
                                                                                         "age",
                                                                                     ),
-                                                                                ),
-                                                                                span: SourceSpan {
-                                                                                    start: SourcePos {
-                                                                                        line: 5,
-                                                                                        col: 32,
-                                                                                    },
-                                                                                    end: SourcePos {
-                                                                                        line: 5,
-                                                                                        col: 38,
+                                                                                    span: SourceSpan {
+                                                                                        start: SourcePos {
+                                                                                            line: 5,
+                                                                                            col: 33,
+                                                                                        },
+                                                                                        end: SourcePos {
+                                                                                            line: 5,
+                                                                                            col: 38,
+                                                                                        },
                                                                                     },
                                                                                 },
-                                                                            },
+                                                                            ),
                                                                             send_type: Single,
                                                                             inputs: [
                                                                                 AnnProc {
@@ -1043,23 +995,23 @@ Good(
                                                             },
                                                             right: AnnProc {
                                                                 proc: Send {
-                                                                    channel: AnnName {
-                                                                        name: Quote(
-                                                                            StringLiteral(
+                                                                    channel: Quote(
+                                                                        AnnProc {
+                                                                            proc: StringLiteral(
                                                                                 "eyes",
                                                                             ),
-                                                                        ),
-                                                                        span: SourceSpan {
-                                                                            start: SourcePos {
-                                                                                line: 5,
-                                                                                col: 46,
-                                                                            },
-                                                                            end: SourcePos {
-                                                                                line: 5,
-                                                                                col: 53,
+                                                                            span: SourceSpan {
+                                                                                start: SourcePos {
+                                                                                    line: 5,
+                                                                                    col: 47,
+                                                                                },
+                                                                                end: SourcePos {
+                                                                                    line: 5,
+                                                                                    col: 53,
+                                                                                },
                                                                             },
                                                                         },
-                                                                    },
+                                                                    ),
                                                                     send_type: Single,
                                                                     inputs: [
                                                                         AnnProc {
@@ -1104,23 +1056,23 @@ Good(
                                                     },
                                                     right: AnnProc {
                                                         proc: Send {
-                                                            channel: AnnName {
-                                                                name: Quote(
-                                                                    StringLiteral(
+                                                            channel: Quote(
+                                                                AnnProc {
+                                                                    proc: StringLiteral(
                                                                         "seq",
                                                                     ),
-                                                                ),
-                                                                span: SourceSpan {
-                                                                    start: SourcePos {
-                                                                        line: 5,
-                                                                        col: 65,
-                                                                    },
-                                                                    end: SourcePos {
-                                                                        line: 5,
-                                                                        col: 71,
+                                                                    span: SourceSpan {
+                                                                        start: SourcePos {
+                                                                            line: 5,
+                                                                            col: 66,
+                                                                        },
+                                                                        end: SourcePos {
+                                                                            line: 5,
+                                                                            col: 71,
+                                                                        },
                                                                     },
                                                                 },
-                                                            },
+                                                            ),
                                                             send_type: Single,
                                                             inputs: [
                                                                 AnnProc {
@@ -1195,28 +1147,28 @@ Good(
                                         Repeated {
                                             lhs: Names {
                                                 names: [
-                                                    AnnName {
-                                                        name: Quote(
-                                                            Par {
+                                                    Quote(
+                                                        AnnProc {
+                                                            proc: Par {
                                                                 left: AnnProc {
                                                                     proc: Send {
-                                                                        channel: AnnName {
-                                                                            name: Quote(
-                                                                                StringLiteral(
+                                                                        channel: Quote(
+                                                                            AnnProc {
+                                                                                proc: StringLiteral(
                                                                                     "seq",
                                                                                 ),
-                                                                            ),
-                                                                            span: SourceSpan {
-                                                                                start: SourcePos {
-                                                                                    line: 6,
-                                                                                    col: 12,
-                                                                                },
-                                                                                end: SourcePos {
-                                                                                    line: 6,
-                                                                                    col: 18,
+                                                                                span: SourceSpan {
+                                                                                    start: SourcePos {
+                                                                                        line: 6,
+                                                                                        col: 13,
+                                                                                    },
+                                                                                    end: SourcePos {
+                                                                                        line: 6,
+                                                                                        col: 18,
+                                                                                    },
                                                                                 },
                                                                             },
-                                                                        },
+                                                                        ),
                                                                         send_type: Single,
                                                                         inputs: [
                                                                             AnnProc {
@@ -1279,23 +1231,23 @@ Good(
                                                                                     proc: Par {
                                                                                         left: AnnProc {
                                                                                             proc: Send {
-                                                                                                channel: AnnName {
-                                                                                                    name: Quote(
-                                                                                                        StringLiteral(
+                                                                                                channel: Quote(
+                                                                                                    AnnProc {
+                                                                                                        proc: StringLiteral(
                                                                                                             "name",
                                                                                                         ),
-                                                                                                    ),
-                                                                                                    span: SourceSpan {
-                                                                                                        start: SourcePos {
-                                                                                                            line: 6,
-                                                                                                            col: 34,
-                                                                                                        },
-                                                                                                        end: SourcePos {
-                                                                                                            line: 6,
-                                                                                                            col: 41,
+                                                                                                        span: SourceSpan {
+                                                                                                            start: SourcePos {
+                                                                                                                line: 6,
+                                                                                                                col: 35,
+                                                                                                            },
+                                                                                                            end: SourcePos {
+                                                                                                                line: 6,
+                                                                                                                col: 41,
+                                                                                                            },
                                                                                                         },
                                                                                                     },
-                                                                                                },
+                                                                                                ),
                                                                                                 send_type: Single,
                                                                                                 inputs: [
                                                                                                     AnnProc {
@@ -1336,23 +1288,23 @@ Good(
                                                                                         },
                                                                                         right: AnnProc {
                                                                                             proc: Send {
-                                                                                                channel: AnnName {
-                                                                                                    name: Quote(
-                                                                                                        StringLiteral(
+                                                                                                channel: Quote(
+                                                                                                    AnnProc {
+                                                                                                        proc: StringLiteral(
                                                                                                             "age",
                                                                                                         ),
-                                                                                                    ),
-                                                                                                    span: SourceSpan {
-                                                                                                        start: SourcePos {
-                                                                                                            line: 6,
-                                                                                                            col: 51,
-                                                                                                        },
-                                                                                                        end: SourcePos {
-                                                                                                            line: 6,
-                                                                                                            col: 57,
+                                                                                                        span: SourceSpan {
+                                                                                                            start: SourcePos {
+                                                                                                                line: 6,
+                                                                                                                col: 52,
+                                                                                                            },
+                                                                                                            end: SourcePos {
+                                                                                                                line: 6,
+                                                                                                                col: 57,
+                                                                                                            },
                                                                                                         },
                                                                                                     },
-                                                                                                },
+                                                                                                ),
                                                                                                 send_type: Single,
                                                                                                 inputs: [
                                                                                                     AnnProc {
@@ -1443,44 +1395,32 @@ Good(
                                                                     },
                                                                 },
                                                             },
-                                                        ),
-                                                        span: SourceSpan {
-                                                            start: SourcePos {
-                                                                line: 6,
-                                                                col: 10,
-                                                            },
-                                                            end: SourcePos {
-                                                                line: 6,
-                                                                col: 70,
-                                                            },
-                                                        },
-                                                    },
-                                                ],
-                                                remainder: None,
-                                            },
-                                            rhs: AnnName {
-                                                name: ProcVar(
-                                                    Id(
-                                                        Id {
-                                                            name: "people",
-                                                            pos: SourcePos {
-                                                                line: 6,
-                                                                col: 74,
+                                                            span: SourceSpan {
+                                                                start: SourcePos {
+                                                                    line: 6,
+                                                                    col: 12,
+                                                                },
+                                                                end: SourcePos {
+                                                                    line: 6,
+                                                                    col: 69,
+                                                                },
                                                             },
                                                         },
                                                     ),
-                                                ),
-                                                span: SourceSpan {
-                                                    start: SourcePos {
-                                                        line: 6,
-                                                        col: 74,
-                                                    },
-                                                    end: SourcePos {
-                                                        line: 6,
-                                                        col: 80,
-                                                    },
-                                                },
+                                                ],
+                                                remainder: None,
                                             },
+                                            rhs: NameVar(
+                                                Id(
+                                                    Id {
+                                                        name: "people",
+                                                        pos: SourcePos {
+                                                            line: 6,
+                                                            col: 74,
+                                                        },
+                                                    },
+                                                ),
+                                            ),
                                         },
                                     ],
                                 ],
@@ -1543,29 +1483,17 @@ Good(
                                                 },
                                                 if_true: AnnProc {
                                                     proc: Send {
-                                                        channel: AnnName {
-                                                            name: ProcVar(
-                                                                Id(
-                                                                    Id {
-                                                                        name: "stdout",
-                                                                        pos: SourcePos {
-                                                                            line: 8,
-                                                                            col: 9,
-                                                                        },
+                                                        channel: NameVar(
+                                                            Id(
+                                                                Id {
+                                                                    name: "stdout",
+                                                                    pos: SourcePos {
+                                                                        line: 8,
+                                                                        col: 9,
                                                                     },
-                                                                ),
+                                                                },
                                                             ),
-                                                            span: SourceSpan {
-                                                                start: SourcePos {
-                                                                    line: 8,
-                                                                    col: 9,
-                                                                },
-                                                                end: SourcePos {
-                                                                    line: 8,
-                                                                    col: 15,
-                                                                },
-                                                            },
-                                                        },
+                                                        ),
                                                         send_type: Single,
                                                         inputs: [
                                                             AnnProc {
@@ -1661,29 +1589,17 @@ Good(
                                         },
                                         right: AnnProc {
                                             proc: Send {
-                                                channel: AnnName {
-                                                    name: ProcVar(
-                                                        Id(
-                                                            Id {
-                                                                name: "people",
-                                                                pos: SourcePos {
-                                                                    line: 10,
-                                                                    col: 7,
-                                                                },
+                                                channel: NameVar(
+                                                    Id(
+                                                        Id {
+                                                            name: "people",
+                                                            pos: SourcePos {
+                                                                line: 10,
+                                                                col: 7,
                                                             },
-                                                        ),
+                                                        },
                                                     ),
-                                                    span: SourceSpan {
-                                                        start: SourcePos {
-                                                            line: 10,
-                                                            col: 7,
-                                                        },
-                                                        end: SourcePos {
-                                                            line: 10,
-                                                            col: 13,
-                                                        },
-                                                    },
-                                                },
+                                                ),
                                                 send_type: Single,
                                                 inputs: [
                                                     AnnProc {
@@ -1713,23 +1629,23 @@ Good(
                                                             },
                                                             right: AnnProc {
                                                                 proc: Send {
-                                                                    channel: AnnName {
-                                                                        name: Quote(
-                                                                            StringLiteral(
+                                                                    channel: Quote(
+                                                                        AnnProc {
+                                                                            proc: StringLiteral(
                                                                                 "seq",
                                                                             ),
-                                                                        ),
-                                                                        span: SourceSpan {
-                                                                            start: SourcePos {
-                                                                                line: 10,
-                                                                                col: 21,
-                                                                            },
-                                                                            end: SourcePos {
-                                                                                line: 10,
-                                                                                col: 27,
+                                                                            span: SourceSpan {
+                                                                                start: SourcePos {
+                                                                                    line: 10,
+                                                                                    col: 22,
+                                                                                },
+                                                                                end: SourcePos {
+                                                                                    line: 10,
+                                                                                    col: 27,
+                                                                                },
                                                                             },
                                                                         },
-                                                                    },
+                                                                    ),
                                                                     send_type: Single,
                                                                     inputs: [
                                                                         AnnProc {

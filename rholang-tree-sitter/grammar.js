@@ -151,7 +151,6 @@ module.exports = grammar({
             $.neq,
             $.not,
             $.or,
-            $.quote,
             $.sub,
             $.var_ref
         ),
@@ -185,14 +184,6 @@ module.exports = grammar({
             field('args', alias($._proc_list, $.args)))
         ),
         eval: $ => prec(12, seq('*', $.name)),
-        quote: $ => prec(12, seq('@', $.quotable)),
-        quotable: $ => choice(
-            $.var_ref,
-            $.eval,
-            $.disjunction,
-            $.conjunction,
-            $.negation,
-            $._ground_expression),
         var_ref: $ => prec(13, seq(field('kind', $.var_ref_kind), field('var', $.var))),
         var_ref_kind: $ => choice('=', '=*'),
         disjunction: $ => prec.left(13, seq($._proc, '\\/', $._proc)),
@@ -316,6 +307,14 @@ module.exports = grammar({
         // process variables and names
         name: $ => choice($._proc_var, $.quote),
         _proc_var: $ => choice($.wildcard, $.var),
+        quote: $ => prec(12, seq('@', $.quotable)),
+        quotable: $ => choice(
+            $.var_ref,
+            $.eval,
+            $.disjunction,
+            $.conjunction,
+            $.negation,
+            $._ground_expression),
         wildcard: $ => '_',
         var: $ => token(/[a-zA-Z]([a-zA-Z0-9_'])*|_([a-zA-Z0-9_'])+/),
 

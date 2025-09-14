@@ -24,29 +24,17 @@ Good(
                 ],
                 proc: AnnProc {
                     proc: Send {
-                        channel: AnnName {
-                            name: ProcVar(
-                                Id(
-                                    Id {
-                                        name: "stderr",
-                                        pos: SourcePos {
-                                            line: 2,
-                                            col: 3,
-                                        },
+                        channel: NameVar(
+                            Id(
+                                Id {
+                                    name: "stderr",
+                                    pos: SourcePos {
+                                        line: 2,
+                                        col: 3,
                                     },
-                                ),
+                                },
                             ),
-                            span: SourceSpan {
-                                start: SourcePos {
-                                    line: 2,
-                                    col: 3,
-                                },
-                                end: SourcePos {
-                                    line: 2,
-                                    col: 9,
-                                },
-                            },
-                        },
+                        ),
                         send_type: Single,
                         inputs: [
                             AnnProc {

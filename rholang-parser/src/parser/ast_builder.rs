@@ -2,9 +2,8 @@ use smallvec::ToSmallVec;
 use typed_arena::Arena;
 
 use crate::ast::{
-    AnnName, AnnProc, BinaryExpOp, Bind, BundleType, Case, Collection, Id, KeyValuePair,
-    LetBinding, NameDecl, Names, Proc, SendType, SimpleType, SyncSendCont, UnaryExpOp, Var,
-    VarRefKind,
+    AnnProc, BinaryExpOp, Bind, BundleType, Case, Collection, Id, KeyValuePair, LetBinding, Name,
+    NameDecl, Names, Proc, SendType, SimpleType, SyncSendCont, UnaryExpOp, Var, VarRefKind,
 };
 
 pub(crate) struct ASTBuilder<'ast> {
@@ -207,7 +206,7 @@ impl<'ast> ASTBuilder<'ast> {
     pub(crate) fn alloc_send(
         &self,
         send_type: SendType,
-        channel: AnnName<'ast>,
+        channel: Name<'ast>,
         inputs: &[AnnProc<'ast>],
     ) -> &Proc<'ast> {
         self.arena.alloc(Proc::Send {
@@ -274,7 +273,7 @@ impl<'ast> ASTBuilder<'ast> {
 
     pub(crate) fn alloc_contract(
         &self,
-        name: AnnName<'ast>,
+        name: Name<'ast>,
         formals: Names<'ast>,
         body: AnnProc<'ast>,
     ) -> &Proc<'ast> {
@@ -287,7 +286,7 @@ impl<'ast> ASTBuilder<'ast> {
 
     pub(crate) fn alloc_send_sync(
         &self,
-        channel: AnnName<'ast>,
+        channel: Name<'ast>,
         messages: &[AnnProc<'ast>],
     ) -> &Proc<'ast> {
         self.arena.alloc(Proc::SendSync {
@@ -299,7 +298,7 @@ impl<'ast> ASTBuilder<'ast> {
 
     pub(crate) fn alloc_send_sync_with_cont(
         &self,
-        channel: AnnName<'ast>,
+        channel: Name<'ast>,
         messages: &[AnnProc<'ast>],
         cont: AnnProc<'ast>,
     ) -> &Proc<'ast> {
@@ -310,12 +309,8 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub(crate) fn alloc_eval(&self, name: AnnName<'ast>) -> &Proc<'ast> {
+    pub(crate) fn alloc_eval(&self, name: Name<'ast>) -> &Proc<'ast> {
         self.arena.alloc(Proc::Eval { name })
-    }
-
-    pub(crate) fn alloc_quote(&self, proc: &'ast Proc<'ast>) -> &Proc<'ast> {
-        self.arena.alloc(Proc::Quote { proc })
     }
 
     pub(crate) fn alloc_method(

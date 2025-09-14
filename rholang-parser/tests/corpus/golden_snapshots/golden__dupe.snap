@@ -22,34 +22,22 @@ Good(
                     proc: Par {
                         left: AnnProc {
                             proc: Contract {
-                                name: AnnName {
-                                    name: ProcVar(
-                                        Id(
-                                            Id {
-                                                name: "dupe",
-                                                pos: SourcePos {
-                                                    line: 2,
-                                                    col: 12,
-                                                },
+                                name: NameVar(
+                                    Id(
+                                        Id {
+                                            name: "dupe",
+                                            pos: SourcePos {
+                                                line: 2,
+                                                col: 12,
                                             },
-                                        ),
+                                        },
                                     ),
-                                    span: SourceSpan {
-                                        start: SourcePos {
-                                            line: 2,
-                                            col: 12,
-                                        },
-                                        end: SourcePos {
-                                            line: 2,
-                                            col: 16,
-                                        },
-                                    },
-                                },
+                                ),
                                 formals: Names {
                                     names: [
-                                        AnnName {
-                                            name: Quote(
-                                                ProcVar(
+                                        Quote(
+                                            AnnProc {
+                                                proc: ProcVar(
                                                     Id(
                                                         Id {
                                                             name: "depth",
@@ -60,18 +48,18 @@ Good(
                                                         },
                                                     ),
                                                 ),
-                                            ),
-                                            span: SourceSpan {
-                                                start: SourcePos {
-                                                    line: 2,
-                                                    col: 17,
-                                                },
-                                                end: SourcePos {
-                                                    line: 2,
-                                                    col: 23,
+                                                span: SourceSpan {
+                                                    start: SourcePos {
+                                                        line: 2,
+                                                        col: 18,
+                                                    },
+                                                    end: SourcePos {
+                                                        line: 2,
+                                                        col: 23,
+                                                    },
                                                 },
                                             },
-                                        },
+                                        ),
                                     ],
                                     remainder: None,
                                 },
@@ -164,29 +152,17 @@ Good(
                                                                                                                 proc: Par {
                                                                                                                     left: AnnProc {
                                                                                                                         proc: Send {
-                                                                                                                            channel: AnnName {
-                                                                                                                                name: ProcVar(
-                                                                                                                                    Id(
-                                                                                                                                        Id {
-                                                                                                                                            name: "dupe",
-                                                                                                                                            pos: SourcePos {
-                                                                                                                                                line: 6,
-                                                                                                                                                col: 7,
-                                                                                                                                            },
+                                                                                                                            channel: NameVar(
+                                                                                                                                Id(
+                                                                                                                                    Id {
+                                                                                                                                        name: "dupe",
+                                                                                                                                        pos: SourcePos {
+                                                                                                                                            line: 6,
+                                                                                                                                            col: 7,
                                                                                                                                         },
-                                                                                                                                    ),
+                                                                                                                                    },
                                                                                                                                 ),
-                                                                                                                                span: SourceSpan {
-                                                                                                                                    start: SourcePos {
-                                                                                                                                        line: 6,
-                                                                                                                                        col: 7,
-                                                                                                                                    },
-                                                                                                                                    end: SourcePos {
-                                                                                                                                        line: 6,
-                                                                                                                                        col: 11,
-                                                                                                                                    },
-                                                                                                                                },
-                                                                                                                            },
+                                                                                                                            ),
                                                                                                                             send_type: Single,
                                                                                                                             inputs: [
                                                                                                                                 AnnProc {
@@ -257,29 +233,17 @@ Good(
                                                                                                                     },
                                                                                                                     right: AnnProc {
                                                                                                                         proc: Send {
-                                                                                                                            channel: AnnName {
-                                                                                                                                name: ProcVar(
-                                                                                                                                    Id(
-                                                                                                                                        Id {
-                                                                                                                                            name: "dupe",
-                                                                                                                                            pos: SourcePos {
-                                                                                                                                                line: 6,
-                                                                                                                                                col: 26,
-                                                                                                                                            },
+                                                                                                                            channel: NameVar(
+                                                                                                                                Id(
+                                                                                                                                    Id {
+                                                                                                                                        name: "dupe",
+                                                                                                                                        pos: SourcePos {
+                                                                                                                                            line: 6,
+                                                                                                                                            col: 26,
                                                                                                                                         },
-                                                                                                                                    ),
+                                                                                                                                    },
                                                                                                                                 ),
-                                                                                                                                span: SourceSpan {
-                                                                                                                                    start: SourcePos {
-                                                                                                                                        line: 6,
-                                                                                                                                        col: 26,
-                                                                                                                                    },
-                                                                                                                                    end: SourcePos {
-                                                                                                                                        line: 6,
-                                                                                                                                        col: 30,
-                                                                                                                                    },
-                                                                                                                                },
-                                                                                                                            },
+                                                                                                                            ),
                                                                                                                             send_type: Single,
                                                                                                                             inputs: [
                                                                                                                                 AnnProc {
@@ -362,29 +326,17 @@ Good(
                                                                                                             },
                                                                                                             right: AnnProc {
                                                                                                                 proc: Send {
-                                                                                                                    channel: AnnName {
-                                                                                                                        name: ProcVar(
-                                                                                                                            Id(
-                                                                                                                                Id {
-                                                                                                                                    name: "dupe",
-                                                                                                                                    pos: SourcePos {
-                                                                                                                                        line: 6,
-                                                                                                                                        col: 45,
-                                                                                                                                    },
+                                                                                                                    channel: NameVar(
+                                                                                                                        Id(
+                                                                                                                            Id {
+                                                                                                                                name: "dupe",
+                                                                                                                                pos: SourcePos {
+                                                                                                                                    line: 6,
+                                                                                                                                    col: 45,
                                                                                                                                 },
-                                                                                                                            ),
+                                                                                                                            },
                                                                                                                         ),
-                                                                                                                        span: SourceSpan {
-                                                                                                                            start: SourcePos {
-                                                                                                                                line: 6,
-                                                                                                                                col: 45,
-                                                                                                                            },
-                                                                                                                            end: SourcePos {
-                                                                                                                                line: 6,
-                                                                                                                                col: 49,
-                                                                                                                            },
-                                                                                                                        },
-                                                                                                                    },
+                                                                                                                    ),
                                                                                                                     send_type: Single,
                                                                                                                     inputs: [
                                                                                                                         AnnProc {
@@ -467,29 +419,17 @@ Good(
                                                                                                     },
                                                                                                     right: AnnProc {
                                                                                                         proc: Send {
-                                                                                                            channel: AnnName {
-                                                                                                                name: ProcVar(
-                                                                                                                    Id(
-                                                                                                                        Id {
-                                                                                                                            name: "dupe",
-                                                                                                                            pos: SourcePos {
-                                                                                                                                line: 6,
-                                                                                                                                col: 64,
-                                                                                                                            },
+                                                                                                            channel: NameVar(
+                                                                                                                Id(
+                                                                                                                    Id {
+                                                                                                                        name: "dupe",
+                                                                                                                        pos: SourcePos {
+                                                                                                                            line: 6,
+                                                                                                                            col: 64,
                                                                                                                         },
-                                                                                                                    ),
+                                                                                                                    },
                                                                                                                 ),
-                                                                                                                span: SourceSpan {
-                                                                                                                    start: SourcePos {
-                                                                                                                        line: 6,
-                                                                                                                        col: 64,
-                                                                                                                    },
-                                                                                                                    end: SourcePos {
-                                                                                                                        line: 6,
-                                                                                                                        col: 68,
-                                                                                                                    },
-                                                                                                                },
-                                                                                                            },
+                                                                                                            ),
                                                                                                             send_type: Single,
                                                                                                             inputs: [
                                                                                                                 AnnProc {
@@ -572,29 +512,17 @@ Good(
                                                                                             },
                                                                                             right: AnnProc {
                                                                                                 proc: Send {
-                                                                                                    channel: AnnName {
-                                                                                                        name: ProcVar(
-                                                                                                            Id(
-                                                                                                                Id {
-                                                                                                                    name: "dupe",
-                                                                                                                    pos: SourcePos {
-                                                                                                                        line: 6,
-                                                                                                                        col: 83,
-                                                                                                                    },
+                                                                                                    channel: NameVar(
+                                                                                                        Id(
+                                                                                                            Id {
+                                                                                                                name: "dupe",
+                                                                                                                pos: SourcePos {
+                                                                                                                    line: 6,
+                                                                                                                    col: 83,
                                                                                                                 },
-                                                                                                            ),
+                                                                                                            },
                                                                                                         ),
-                                                                                                        span: SourceSpan {
-                                                                                                            start: SourcePos {
-                                                                                                                line: 6,
-                                                                                                                col: 83,
-                                                                                                            },
-                                                                                                            end: SourcePos {
-                                                                                                                line: 6,
-                                                                                                                col: 87,
-                                                                                                            },
-                                                                                                        },
-                                                                                                    },
+                                                                                                    ),
                                                                                                     send_type: Single,
                                                                                                     inputs: [
                                                                                                         AnnProc {
@@ -677,29 +605,17 @@ Good(
                                                                                     },
                                                                                     right: AnnProc {
                                                                                         proc: Send {
-                                                                                            channel: AnnName {
-                                                                                                name: ProcVar(
-                                                                                                    Id(
-                                                                                                        Id {
-                                                                                                            name: "dupe",
-                                                                                                            pos: SourcePos {
-                                                                                                                line: 6,
-                                                                                                                col: 102,
-                                                                                                            },
+                                                                                            channel: NameVar(
+                                                                                                Id(
+                                                                                                    Id {
+                                                                                                        name: "dupe",
+                                                                                                        pos: SourcePos {
+                                                                                                            line: 6,
+                                                                                                            col: 102,
                                                                                                         },
-                                                                                                    ),
+                                                                                                    },
                                                                                                 ),
-                                                                                                span: SourceSpan {
-                                                                                                    start: SourcePos {
-                                                                                                        line: 6,
-                                                                                                        col: 102,
-                                                                                                    },
-                                                                                                    end: SourcePos {
-                                                                                                        line: 6,
-                                                                                                        col: 106,
-                                                                                                    },
-                                                                                                },
-                                                                                            },
+                                                                                            ),
                                                                                             send_type: Single,
                                                                                             inputs: [
                                                                                                 AnnProc {
@@ -782,29 +698,17 @@ Good(
                                                                             },
                                                                             right: AnnProc {
                                                                                 proc: Send {
-                                                                                    channel: AnnName {
-                                                                                        name: ProcVar(
-                                                                                            Id(
-                                                                                                Id {
-                                                                                                    name: "dupe",
-                                                                                                    pos: SourcePos {
-                                                                                                        line: 6,
-                                                                                                        col: 121,
-                                                                                                    },
+                                                                                    channel: NameVar(
+                                                                                        Id(
+                                                                                            Id {
+                                                                                                name: "dupe",
+                                                                                                pos: SourcePos {
+                                                                                                    line: 6,
+                                                                                                    col: 121,
                                                                                                 },
-                                                                                            ),
+                                                                                            },
                                                                                         ),
-                                                                                        span: SourceSpan {
-                                                                                            start: SourcePos {
-                                                                                                line: 6,
-                                                                                                col: 121,
-                                                                                            },
-                                                                                            end: SourcePos {
-                                                                                                line: 6,
-                                                                                                col: 125,
-                                                                                            },
-                                                                                        },
-                                                                                    },
+                                                                                    ),
                                                                                     send_type: Single,
                                                                                     inputs: [
                                                                                         AnnProc {
@@ -887,29 +791,17 @@ Good(
                                                                     },
                                                                     right: AnnProc {
                                                                         proc: Send {
-                                                                            channel: AnnName {
-                                                                                name: ProcVar(
-                                                                                    Id(
-                                                                                        Id {
-                                                                                            name: "dupe",
-                                                                                            pos: SourcePos {
-                                                                                                line: 6,
-                                                                                                col: 140,
-                                                                                            },
+                                                                            channel: NameVar(
+                                                                                Id(
+                                                                                    Id {
+                                                                                        name: "dupe",
+                                                                                        pos: SourcePos {
+                                                                                            line: 6,
+                                                                                            col: 140,
                                                                                         },
-                                                                                    ),
+                                                                                    },
                                                                                 ),
-                                                                                span: SourceSpan {
-                                                                                    start: SourcePos {
-                                                                                        line: 6,
-                                                                                        col: 140,
-                                                                                    },
-                                                                                    end: SourcePos {
-                                                                                        line: 6,
-                                                                                        col: 144,
-                                                                                    },
-                                                                                },
-                                                                            },
+                                                                            ),
                                                                             send_type: Single,
                                                                             inputs: [
                                                                                 AnnProc {
@@ -992,29 +884,17 @@ Good(
                                                             },
                                                             right: AnnProc {
                                                                 proc: Send {
-                                                                    channel: AnnName {
-                                                                        name: ProcVar(
-                                                                            Id(
-                                                                                Id {
-                                                                                    name: "dupe",
-                                                                                    pos: SourcePos {
-                                                                                        line: 6,
-                                                                                        col: 159,
-                                                                                    },
+                                                                    channel: NameVar(
+                                                                        Id(
+                                                                            Id {
+                                                                                name: "dupe",
+                                                                                pos: SourcePos {
+                                                                                    line: 6,
+                                                                                    col: 159,
                                                                                 },
-                                                                            ),
+                                                                            },
                                                                         ),
-                                                                        span: SourceSpan {
-                                                                            start: SourcePos {
-                                                                                line: 6,
-                                                                                col: 159,
-                                                                            },
-                                                                            end: SourcePos {
-                                                                                line: 6,
-                                                                                col: 163,
-                                                                            },
-                                                                        },
-                                                                    },
+                                                                    ),
                                                                     send_type: Single,
                                                                     inputs: [
                                                                         AnnProc {
@@ -1097,29 +977,17 @@ Good(
                                                     },
                                                     right: AnnProc {
                                                         proc: Send {
-                                                            channel: AnnName {
-                                                                name: ProcVar(
-                                                                    Id(
-                                                                        Id {
-                                                                            name: "dupe",
-                                                                            pos: SourcePos {
-                                                                                line: 6,
-                                                                                col: 178,
-                                                                            },
+                                                            channel: NameVar(
+                                                                Id(
+                                                                    Id {
+                                                                        name: "dupe",
+                                                                        pos: SourcePos {
+                                                                            line: 6,
+                                                                            col: 178,
                                                                         },
-                                                                    ),
+                                                                    },
                                                                 ),
-                                                                span: SourceSpan {
-                                                                    start: SourcePos {
-                                                                        line: 6,
-                                                                        col: 178,
-                                                                    },
-                                                                    end: SourcePos {
-                                                                        line: 6,
-                                                                        col: 182,
-                                                                    },
-                                                                },
-                                                            },
+                                                            ),
                                                             send_type: Single,
                                                             inputs: [
                                                                 AnnProc {
@@ -1227,29 +1095,17 @@ Good(
                         },
                         right: AnnProc {
                             proc: Send {
-                                channel: AnnName {
-                                    name: ProcVar(
-                                        Id(
-                                            Id {
-                                                name: "dupe",
-                                                pos: SourcePos {
-                                                    line: 8,
-                                                    col: 7,
-                                                },
+                                channel: NameVar(
+                                    Id(
+                                        Id {
+                                            name: "dupe",
+                                            pos: SourcePos {
+                                                line: 8,
+                                                col: 7,
                                             },
-                                        ),
+                                        },
                                     ),
-                                    span: SourceSpan {
-                                        start: SourcePos {
-                                            line: 8,
-                                            col: 7,
-                                        },
-                                        end: SourcePos {
-                                            line: 8,
-                                            col: 11,
-                                        },
-                                    },
-                                },
+                                ),
                                 send_type: Single,
                                 inputs: [
                                     AnnProc {
