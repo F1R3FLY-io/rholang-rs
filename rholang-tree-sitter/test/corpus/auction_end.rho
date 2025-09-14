@@ -1,0 +1,42 @@
+================
+Quote precedence
+================
+
+new anyone, unused_rtn in {
+    for (auction_contract <- rtn) {
+        @auction_contract.get("auction_end")!([anyone, unused_rtn])
+    }
+}
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var))
+      (name_decl
+        (var)))
+    proc: (block
+      (input
+        receipts: (receipts
+          (receipt
+            (linear_bind
+              names: (names
+                (var))
+              input: (simple_source
+                (var)))))
+        proc: (block
+          (send
+            channel: (quote
+              (method
+                receiver: (var)
+                name: (var)
+                args: (args
+                  (string_literal))))
+            send_type: (send_single)
+            inputs: (inputs
+              (collection
+                (list
+                  (var)
+                  (var))))))))))
