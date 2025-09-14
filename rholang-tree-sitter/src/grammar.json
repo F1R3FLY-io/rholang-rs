@@ -2382,39 +2382,10 @@
           },
           {
             "type": "SYMBOL",
-            "name": "quotable"
+            "name": "_proc"
           }
         ]
       }
-    },
-    "quotable": {
-      "type": "CHOICE",
-      "members": [
-        {
-          "type": "SYMBOL",
-          "name": "var_ref"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "eval"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "disjunction"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "conjunction"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "negation"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "_ground_expression"
-        }
-      ]
     },
     "wildcard": {
       "type": "STRING",
@@ -2566,8 +2537,7 @@
   "precedences": [],
   "externals": [],
   "inline": [
-    "name",
-    "quotable"
+    "name"
   ],
   "supertypes": [
     "_let_decls",

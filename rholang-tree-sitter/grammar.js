@@ -16,7 +16,7 @@ module.exports = grammar({
         $._proc_var,
         $._literal],
 
-    inline: $ => [$.name, $.quotable],
+    inline: $ => [$.name],
 
     reserved: {
         global: $ => [
@@ -307,14 +307,7 @@ module.exports = grammar({
         // process variables and names
         name: $ => choice($._proc_var, $.quote),
         _proc_var: $ => choice($.wildcard, $.var),
-        quote: $ => prec(12, seq('@', $.quotable)),
-        quotable: $ => choice(
-            $.var_ref,
-            $.eval,
-            $.disjunction,
-            $.conjunction,
-            $.negation,
-            $._ground_expression),
+        quote: $ => prec(12, seq('@', $._proc)),
         wildcard: $ => '_',
         var: $ => token(/[a-zA-Z]([a-zA-Z0-9_'])*|_([a-zA-Z0-9_'])+/),
 
