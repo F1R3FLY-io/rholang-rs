@@ -756,11 +756,8 @@ fn apply_cont<'tree, 'ast>(
                             |name_body_formals, mask| {
                                 let name = into_name(name_body_formals[0], mask[0]);
                                 let body = name_body_formals[1];
-                                let args = Names::from_iter(
-                                    NamesIter::new(&name_body_formals[2..], &mask[2..]),
-                                    has_cont,
-                                )
-                                .expect("expected a list of names");
+                                let args =
+                                    into_names(&name_body_formals[2..], &mask[2..], has_cont);
                                 ast_builder.alloc_contract(name, args, body).ann(span)
                             },
                         ),
@@ -820,10 +817,7 @@ fn apply_cont<'tree, 'ast>(
                                 assert!(!elems.is_empty());
                                 // SAFETY: We have checked above that there is at least one element
                                 let (last, init) = elems.split_last().unwrap_unchecked();
-                                ast_builder.alloc_list_with_remainder(
-                                    init,
-                                    (*last).try_into().expect("expected a var"),
-                                )
+                                ast_builder.alloc_list_with_remainder(init, into_remainder(*last))
                             } else {
                                 ast_builder.alloc_list(elems)
                             };
@@ -839,7 +833,7 @@ fn apply_cont<'tree, 'ast>(
                                 let map = if has_remainder {
                                     ast_builder.alloc_map_with_remainder(
                                         &elems[1..],
-                                        elems[0].try_into().expect("expected a var"),
+                                        into_remainder(elems[0]),
                                     )
                                 } else {
                                     ast_builder.alloc_map(elems)
@@ -909,10 +903,7 @@ fn apply_cont<'tree, 'ast>(
                                 assert!(!elems.is_empty());
                                 // SAFETY: We have checked above that there is at least one element
                                 let (last, init) = elems.split_last().unwrap_unchecked();
-                                ast_builder.alloc_set_with_remainder(
-                                    init,
-                                    (*last).try_into().expect("expected a var"),
-                                )
+                                ast_builder.alloc_set_with_remainder(init, into_remainder(*last))
                             } else {
                                 ast_builder.alloc_set(elems)
                             };
@@ -1483,10 +1474,6 @@ impl BindDesc {
     }
 
     fn to_bind<'a>(self, procs: &[AnnProc<'a>], mask: &BitSlice) -> Bind<'a> {
-        fn to_names<'a>(slice: &[AnnProc<'a>], mask: &BitSlice, cont: bool) -> Names<'a> {
-            Names::from_iter(NamesIter::new(slice, mask), cont).expect("expected a list of names")
-        }
-
         assert_eq!(procs.len(), self.len());
         unsafe {
             // SAFETY: We check above that the slice contains exactly |self.len()| elements which is
@@ -1515,18 +1502,18 @@ impl BindDesc {
                     };
 
                     let lhs_start = source.len() - 1;
-                    let lhs = to_names(&rest[lhs_start..], &qs[lhs_start..], cont_present);
+                    let lhs = into_names(&rest[lhs_start..], &qs[lhs_start..], cont_present);
 
                     Bind::Linear { lhs, rhs }
                 }
 
                 BindDesc::Repeated { cont_present, .. } => Bind::Repeated {
-                    lhs: to_names(rest, qs, cont_present),
+                    lhs: into_names(rest, qs, cont_present),
                     rhs: channel_name,
                 },
 
                 BindDesc::Peek { cont_present, .. } => Bind::Peek {
-                    lhs: to_names(rest, qs, cont_present),
+                    lhs: into_names(rest, qs, cont_present),
                     rhs: channel_name,
                 },
             }
@@ -1687,10 +1674,7 @@ impl<'slice, 'a> LetBindingIter<'slice, 'a> {
                 let (rem, init) = lhs.split_last().unwrap_unchecked();
                 LetBindingIter {
                     iter: init.iter().zip(mask.iter()).zip(rhs.iter()),
-                    tail: Some((
-                        (*rem).try_into().expect("expected a var"),
-                        &rhs[(lhs.len() - 1)..],
-                    )),
+                    tail: Some((into_remainder(*rem), &rhs[(lhs.len() - 1)..])),
                 }
             } else {
                 LetBindingIter {
@@ -1809,6 +1793,21 @@ fn into_name(ann_proc: AnnProc, quoted: bool) -> Name {
             _ => panic!("invalid proc variant for into_name"),
         }
     }
+}
+
+#[inline]
+fn into_remainder(ann_proc: AnnProc) -> Var {
+    ann_proc
+        .try_into()
+        .expect("invalid remainder (not a proc_var)")
+}
+
+fn into_names<'slice, 'a>(
+    procs: &'slice [AnnProc<'a>],
+    mask: &'slice BitSlice,
+    with_remainder: bool,
+) -> Names<'a> {
+    Names::from_iter(NamesIter::new(procs, mask), with_remainder).unwrap()
 }
 
 pub struct NamesIter<'slice, 'a> {
