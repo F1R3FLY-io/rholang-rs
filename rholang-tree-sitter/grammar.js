@@ -225,7 +225,7 @@ module.exports = grammar({
         case: $ => seq(field('pattern', $._proc), '=>', field('proc', $._proc)),
 
         // branch in select expression
-        branch: $ => seq(field('pattern', conc1($.linear_bind)), '=>', field('proc', choice($.send, $._proc_expression))),
+        branch: $ => seq(field('pattern', semiSep1($.linear_bind)), '=>', field('proc', choice($.send, $._proc_expression))),
 
         // for comprehensions
         receipts: $ => semiSep1($.receipt),
