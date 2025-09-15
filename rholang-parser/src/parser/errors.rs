@@ -131,10 +131,10 @@ pub(super) fn query_errors(of: &tree_sitter::Node, source: &str, into: &mut Vec<
         let rholang_language = rholang_tree_sitter::LANGUAGE.into();
         tree_sitter::Query::new(
             &rholang_language,
-            "(ERROR (var) @error-var)
+            "(ERROR . (var) @error-var)
             (MISSING) @missing-node 
             ((ERROR (par (_) (_)) ) @error-par . (_) @after-par)
-            (ERROR (quote)) @error-quote
+            (ERROR . (quote)) @error-quote
             (ERROR) @fallback",
         )
         .expect("failed to compile error query")

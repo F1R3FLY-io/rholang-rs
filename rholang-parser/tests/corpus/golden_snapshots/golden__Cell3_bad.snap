@@ -5,323 +5,22 @@ expression: result
 Fail(
     [
         ParsingFailure {
-            partial_tree: Some(
-                AnnProc {
-                    proc: Contract {
-                        name: NameVar(
-                            Id(
-                                Id {
-                                    name: "Cell",
-                                    pos: SourcePos {
-                                        line: 1,
-                                        col: 10,
-                                    },
-                                },
-                            ),
-                        ),
-                        formals: Names {
-                            names: [
-                                NameVar(
-                                    Id(
-                                        Id {
-                                            name: "client",
-                                            pos: SourcePos {
-                                                line: 1,
-                                                col: 16,
-                                            },
-                                        },
-                                    ),
-                                ),
-                                NameVar(
-                                    Id(
-                                        Id {
-                                            name: "state",
-                                            pos: SourcePos {
-                                                line: 1,
-                                                col: 24,
-                                            },
-                                        },
-                                    ),
-                                ),
-                            ],
-                            remainder: None,
-                        },
-                        body: AnnProc {
-                            proc: ForComprehension {
-                                receipts: [
-                                    [
-                                        Linear {
-                                            lhs: Names {
-                                                names: [
-                                                    NameVar(
-                                                        Id(
-                                                            Id {
-                                                                name: "request",
-                                                                pos: SourcePos {
-                                                                    line: 2,
-                                                                    col: 8,
-                                                                },
-                                                            },
-                                                        ),
-                                                    ),
-                                                ],
-                                                remainder: None,
-                                            },
-                                            rhs: Simple {
-                                                name: NameVar(
-                                                    Id(
-                                                        Id {
-                                                            name: "client",
-                                                            pos: SourcePos {
-                                                                line: 2,
-                                                                col: 19,
-                                                            },
-                                                        },
-                                                    ),
-                                                ),
-                                            },
-                                        },
-                                    ],
-                                    [
-                                        Linear {
-                                            lhs: Names {
-                                                names: [
-                                                    NameVar(
-                                                        Id(
-                                                            Id {
-                                                                name: "v",
-                                                                pos: SourcePos {
-                                                                    line: 2,
-                                                                    col: 27,
-                                                                },
-                                                            },
-                                                        ),
-                                                    ),
-                                                ],
-                                                remainder: None,
-                                            },
-                                            rhs: Simple {
-                                                name: NameVar(
-                                                    Id(
-                                                        Id {
-                                                            name: "state",
-                                                            pos: SourcePos {
-                                                                line: 2,
-                                                                col: 32,
-                                                            },
-                                                        },
-                                                    ),
-                                                ),
-                                            },
-                                        },
-                                    ],
-                                ],
-                                proc: AnnProc {
-                                    proc: Match {
-                                        expression: AnnProc {
-                                            proc: BinaryExp {
-                                                op: Mult,
-                                                left: AnnProc {
-                                                    proc: Eval {
-                                                        name: NameVar(
-                                                            Id(
-                                                                Id {
-                                                                    name: "request",
-                                                                    pos: SourcePos {
-                                                                        line: 3,
-                                                                        col: 12,
-                                                                    },
-                                                                },
-                                                            ),
-                                                        ),
-                                                    },
-                                                    span: SourceSpan {
-                                                        start: SourcePos {
-                                                            line: 3,
-                                                            col: 11,
-                                                        },
-                                                        end: SourcePos {
-                                                            line: 3,
-                                                            col: 19,
-                                                        },
-                                                    },
-                                                },
-                                                right: AnnProc {
-                                                    proc: Bad,
-                                                    span: SourceSpan {
-                                                        start: SourcePos {
-                                                            line: 3,
-                                                            col: 20,
-                                                        },
-                                                        end: SourcePos {
-                                                            line: 3,
-                                                            col: 24,
-                                                        },
-                                                    },
-                                                },
-                                            },
-                                            span: SourceSpan {
-                                                start: SourcePos {
-                                                    line: 3,
-                                                    col: 11,
-                                                },
-                                                end: SourcePos {
-                                                    line: 4,
-                                                    col: 20,
-                                                },
-                                            },
-                                        },
-                                        cases: [
-                                            Case {
-                                                pattern: AnnProc {
-                                                    proc: BinaryExp {
-                                                        op: Mult,
-                                                        left: AnnProc {
-                                                            proc: Collection(
-                                                                Tuple(
-                                                                    [
-                                                                        AnnProc {
-                                                                            proc: Eval {
-                                                                                name: NameVar(
-                                                                                    Id(
-                                                                                        Id {
-                                                                                            name: "client",
-                                                                                            pos: SourcePos {
-                                                                                                line: 5,
-                                                                                                col: 44,
-                                                                                            },
-                                                                                        },
-                                                                                    ),
-                                                                                ),
-                                                                            },
-                                                                            span: SourceSpan {
-                                                                                start: SourcePos {
-                                                                                    line: 5,
-                                                                                    col: 43,
-                                                                                },
-                                                                                end: SourcePos {
-                                                                                    line: 5,
-                                                                                    col: 50,
-                                                                                },
-                                                                            },
-                                                                        },
-                                                                        AnnProc {
-                                                                            proc: Eval {
-                                                                                name: NameVar(
-                                                                                    Id(
-                                                                                        Id {
-                                                                                            name: "state",
-                                                                                            pos: SourcePos {
-                                                                                                line: 5,
-                                                                                                col: 53,
-                                                                                            },
-                                                                                        },
-                                                                                    ),
-                                                                                ),
-                                                                            },
-                                                                            span: SourceSpan {
-                                                                                start: SourcePos {
-                                                                                    line: 5,
-                                                                                    col: 52,
-                                                                                },
-                                                                                end: SourcePos {
-                                                                                    line: 5,
-                                                                                    col: 58,
-                                                                                },
-                                                                            },
-                                                                        },
-                                                                    ],
-                                                                ),
-                                                            ),
-                                                            span: SourceSpan {
-                                                                start: SourcePos {
-                                                                    line: 5,
-                                                                    col: 41,
-                                                                },
-                                                                end: SourcePos {
-                                                                    line: 5,
-                                                                    col: 60,
-                                                                },
-                                                            },
-                                                        },
-                                                        right: AnnProc {
-                                                            proc: Bad,
-                                                            span: SourceSpan {
-                                                                start: SourcePos {
-                                                                    line: 6,
-                                                                    col: 7,
-                                                                },
-                                                                end: SourcePos {
-                                                                    line: 6,
-                                                                    col: 8,
-                                                                },
-                                                            },
-                                                        },
-                                                    },
-                                                    span: SourceSpan {
-                                                        start: SourcePos {
-                                                            line: 5,
-                                                            col: 41,
-                                                        },
-                                                        end: SourcePos {
-                                                            line: 7,
-                                                            col: 24,
-                                                        },
-                                                    },
-                                                },
-                                                proc: AnnProc {
-                                                    proc: Bad,
-                                                    span: SourceSpan {
-                                                        start: SourcePos {
-                                                            line: 8,
-                                                            col: 9,
-                                                        },
-                                                        end: SourcePos {
-                                                            line: 8,
-                                                            col: 35,
-                                                        },
-                                                    },
-                                                },
-                                            },
-                                        ],
-                                    },
-                                    span: SourceSpan {
-                                        start: SourcePos {
-                                            line: 3,
-                                            col: 5,
-                                        },
-                                        end: SourcePos {
-                                            line: 10,
-                                            col: 4,
-                                        },
-                                    },
-                                },
-                            },
-                            span: SourceSpan {
-                                start: SourcePos {
-                                    line: 2,
-                                    col: 3,
-                                },
-                                end: SourcePos {
-                                    line: 11,
-                                    col: 2,
-                                },
-                            },
-                        },
-                    },
+            partial_tree: None,
+            errors: [
+                AnnParsingError {
+                    error: UnexpectedVar,
                     span: SourceSpan {
                         start: SourcePos {
                             line: 1,
-                            col: 1,
+                            col: 10,
                         },
                         end: SourcePos {
-                            line: 11,
-                            col: 2,
+                            line: 1,
+                            col: 14,
                         },
                     },
+                    byte_range: 9..13,
                 },
-            ),
-            errors: [
                 AnnParsingError {
                     error: UnexpectedVar,
                     span: SourceSpan {
@@ -337,23 +36,23 @@ Fail(
                     byte_range: 95..99,
                 },
                 AnnParsingError {
-                    error: UnexpectedQuote,
+                    error: UnexpectedVar,
                     span: SourceSpan {
                         start: SourcePos {
                             line: 4,
-                            col: 8,
+                            col: 9,
                         },
                         end: SourcePos {
                             line: 4,
                             col: 12,
                         },
                     },
-                    byte_range: 107..111,
+                    byte_range: 108..111,
                 },
                 AnnParsingError {
                     error: UnexpectedMatchAfter {
                         rule: "par",
-                        offender: "case",
+                        offender: "tuple",
                     },
                     span: SourceSpan {
                         start: SourcePos {
@@ -361,25 +60,25 @@ Fail(
                             col: 41,
                         },
                         end: SourcePos {
-                            line: 9,
-                            col: 8,
+                            line: 5,
+                            col: 60,
                         },
                     },
-                    byte_range: 165..283,
+                    byte_range: 165..184,
                 },
                 AnnParsingError {
-                    error: UnexpectedQuote,
+                    error: UnexpectedVar,
                     span: SourceSpan {
                         start: SourcePos {
                             line: 7,
-                            col: 8,
+                            col: 9,
                         },
                         end: SourcePos {
                             line: 7,
                             col: 12,
                         },
                     },
-                    byte_range: 200..204,
+                    byte_range: 201..204,
                 },
                 AnnParsingError {
                     error: UnexpectedMatchAfter {
@@ -399,22 +98,6 @@ Fail(
                     byte_range: 256..275,
                 },
                 AnnParsingError {
-                    error: MissingToken(
-                        "}",
-                    ),
-                    span: SourceSpan {
-                        start: SourcePos {
-                            line: 11,
-                            col: 2,
-                        },
-                        end: SourcePos {
-                            line: 11,
-                            col: 2,
-                        },
-                    },
-                    byte_range: 289..289,
-                },
-                AnnParsingError {
                     error: Unexpected(
                         '#',
                     ),
@@ -429,38 +112,6 @@ Fail(
                         },
                     },
                     byte_range: 113..114,
-                },
-                AnnParsingError {
-                    error: SyntaxError {
-                        sexp: "(ERROR)",
-                    },
-                    span: SourceSpan {
-                        start: SourcePos {
-                            line: 4,
-                            col: 21,
-                        },
-                        end: SourcePos {
-                            line: 4,
-                            col: 23,
-                        },
-                    },
-                    byte_range: 120..122,
-                },
-                AnnParsingError {
-                    error: SyntaxError {
-                        sexp: "(ERROR)",
-                    },
-                    span: SourceSpan {
-                        start: SourcePos {
-                            line: 6,
-                            col: 7,
-                        },
-                        end: SourcePos {
-                            line: 6,
-                            col: 8,
-                        },
-                    },
-                    byte_range: 191..192,
                 },
             ],
         },
