@@ -21,19 +21,55 @@ pub struct StringInterner {
 
     /// Next available ID
     next_id: parking_lot::Mutex<u32>,
+
+    /// Maximum string length allowed (1MB)
+    max_string_length: usize,
+
+    /// Maximum total number of strings allowed
+    max_total_strings: usize,
 }
 
 impl StringInterner {
+    /// Default maximum string length (1MB)
+    pub const DEFAULT_MAX_STRING_LENGTH: usize = 1024 * 1024;
+
+    /// Default maximum total strings (100,000)
+    pub const DEFAULT_MAX_TOTAL_STRINGS: usize = 100_000;
+
     pub fn new() -> Self {
+        Self::with_limits(
+            Self::DEFAULT_MAX_STRING_LENGTH,
+            Self::DEFAULT_MAX_TOTAL_STRINGS,
+        )
+    }
+
+    pub fn with_limits(max_string_length: usize, max_total_strings: usize) -> Self {
         Self {
             string_to_id: RwLock::new(AHashMap::new()),
             id_to_string: RwLock::new(Vec::new()),
             next_id: parking_lot::Mutex::new(0),
+            max_string_length,
+            max_total_strings,
         }
     }
 
     /// Intern a string and return its ID and StringRef
-    pub fn intern(&self, s: &str) -> StringRef {
+    pub fn intern(&self, s: &str) -> Result<StringRef, BytecodeError> {
+        if s.len() > self.max_string_length {
+            return Err(BytecodeError::ResourceExhaustion {
+                resource_type: "string_length".to_string(),
+                limit: self.max_string_length,
+                current: s.len(),
+            });
+        }
+        
+        if self.count() >= self.max_total_strings {
+            return Err(BytecodeError::ResourceExhaustion {
+                resource_type: "string_count".to_string(),
+                limit: self.max_total_strings,
+                current: self.count(),
+            });
+        }
         // Try to find existing string first (read lock only)
         {
             let string_map = self.string_to_id.read();
@@ -42,7 +78,7 @@ impl StringInterner {
                     let id_map = self.id_to_string.read();
                     id_map[id as usize].clone()
                 };
-                return StringRef { id, data };
+                return Ok(StringRef { id, data });
             }
         }
 
@@ -56,7 +92,7 @@ impl StringInterner {
                 let id_map = self.id_to_string.read();
                 id_map[id as usize].clone()
             };
-            return StringRef { id, data };
+            return Ok(StringRef { id, data });
         }
 
         // Get next ID
@@ -74,10 +110,10 @@ impl StringInterner {
             id_map.push(string_arc.clone());
         }
 
-        StringRef {
+        Ok(StringRef {
             id,
             data: string_arc,
-        }
+        })
     }
 
     /// Resolve an ID back to string content
@@ -188,8 +224,17 @@ impl ConstantPool {
 
     /// Get integer by index
     pub fn get_integer(&self, index: u32) -> Result<&i64, BytecodeError> {
+        let index_usize = index as usize;
+        
+        if index_usize >= self.integers.len() {
+            return Err(BytecodeError::InvalidConstantIndex {
+                index,
+                pool_type: "integer".to_string(),
+            });
+        }
+
         self.integers
-            .get(index as usize)
+            .get(index_usize)
             .ok_or_else(|| BytecodeError::InvalidConstantIndex {
                 index,
                 pool_type: "integer".to_string(),
@@ -197,9 +242,9 @@ impl ConstantPool {
     }
 
     /// Add a string to the constant pool with interning
-    pub fn add_string(&mut self, s: &str) -> u32 {
-        let string_ref = self.string_interner.intern(s);
-        string_ref.id
+    pub fn add_string(&mut self, s: &str) -> Result<u32, BytecodeError> {
+        let string_ref = self.string_interner.intern(s)?;
+        Ok(string_ref.id)
     }
 
     /// Get string by index
@@ -228,12 +273,21 @@ impl ConstantPool {
 
     /// Get process template by index
     pub fn get_process_template(&self, index: u32) -> Result<&ProcessTemplate, BytecodeError> {
-        self.process_templates.get(index as usize).ok_or_else(|| {
-            BytecodeError::InvalidConstantIndex {
+        let index_usize = index as usize;
+
+        if index_usize >= self.process_templates.len() {
+            return Err(BytecodeError::InvalidConstantIndex {
                 index,
                 pool_type: "process_template".to_string(),
-            }
-        })
+            });
+        }
+
+        self.process_templates
+            .get(index_usize)
+            .ok_or_else(|| BytecodeError::InvalidConstantIndex {
+                index,
+                pool_type: "process_template".to_string(),
+            })
     }
 
     /// Add a compiled pattern to the constant pool
@@ -252,12 +306,21 @@ impl ConstantPool {
 
     /// Get compiled pattern by index (zero-copy access)
     pub fn get_pattern(&self, index: u32) -> Result<&CompiledPattern, BytecodeError> {
-        self.compiled_patterns.get(index as usize).ok_or_else(|| {
-            BytecodeError::InvalidConstantIndex {
+        let index_usize = index as usize;
+        
+        if index_usize >= self.compiled_patterns.len() {
+            return Err(BytecodeError::InvalidConstantIndex {
                 index,
                 pool_type: "pattern".to_string(),
-            }
-        })
+            });
+        }
+
+        self.compiled_patterns
+            .get(index_usize)
+            .ok_or_else(|| BytecodeError::InvalidConstantIndex {
+                index,
+                pool_type: "pattern".to_string(),
+            })
     }
 
     /// Get statistics about the constant pool
@@ -403,7 +466,7 @@ impl TryFrom<SerializableConstantPool> for ConstantPool {
 
         // Add strings
         for string in serializable.strings {
-            pool.add_string(&string);
+            pool.add_string(&string)?;
         }
 
         // Add process templates
@@ -489,12 +552,134 @@ impl BytecodeSerializer {
 
     /// Validate and deserialize a constant pool from bytes
     pub fn deserialize_pool(bytes: &[u8]) -> Result<ConstantPool, BytecodeError> {
+        if bytes.len() < 8 {
+            return Err(BytecodeError::SerializationError(
+                "Input data too small to be valid serialized pool".to_string(),
+            ));
+        }
+
+        // Limit maximum size to prevent memory exhaustion (100MB)
+        const MAX_SERIALIZED_SIZE: usize = 100 * 1024 * 1024;
+        if bytes.len() > MAX_SERIALIZED_SIZE {
+            return Err(BytecodeError::ResourceExhaustion {
+                resource_type: "serialized_data_size".to_string(),
+                limit: MAX_SERIALIZED_SIZE,
+                current: bytes.len(),
+            });
+        }
+
         let serializable: SerializableConstantPool =
             from_bytes::<SerializableConstantPool, RkyvError>(bytes).map_err(|e| {
                 BytecodeError::SerializationError(format!("deserialization failed: {e}"))
             })?;
 
+        // Validate the deserialized data before converting
+        Self::validate_serializable_pool(&serializable)?;
+
         ConstantPool::try_from(serializable)
+    }
+
+    /// Validate serializable pool data for consistency and safety
+    fn validate_serializable_pool(pool: &SerializableConstantPool) -> Result<(), BytecodeError> {
+        const MAX_INTEGERS: usize = 1_000_000;
+        const MAX_STRINGS: usize = 100_000;
+        const MAX_TEMPLATES: usize = 10_000;
+        const MAX_PATTERNS: usize = 10_000;
+
+        if pool.integers.len() > MAX_INTEGERS {
+            return Err(BytecodeError::ResourceExhaustion {
+                resource_type: "integer_count".to_string(),
+                limit: MAX_INTEGERS,
+                current: pool.integers.len(),
+            });
+        }
+
+        if pool.strings.len() > MAX_STRINGS {
+            return Err(BytecodeError::ResourceExhaustion {
+                resource_type: "string_count".to_string(),
+                limit: MAX_STRINGS,
+                current: pool.strings.len(),
+            });
+        }
+
+        if pool.process_templates.len() > MAX_TEMPLATES {
+            return Err(BytecodeError::ResourceExhaustion {
+                resource_type: "template_count".to_string(),
+                limit: MAX_TEMPLATES,
+                current: pool.process_templates.len(),
+            });
+        }
+
+        if pool.compiled_patterns.len() > MAX_PATTERNS {
+            return Err(BytecodeError::ResourceExhaustion {
+                resource_type: "pattern_count".to_string(),
+                limit: MAX_PATTERNS,
+                current: pool.compiled_patterns.len(),
+            });
+        }
+
+        // Validate individual strings
+        for (i, string) in pool.strings.iter().enumerate() {
+            if string.len() > StringInterner::DEFAULT_MAX_STRING_LENGTH {
+                return Err(BytecodeError::ValidationError(format!(
+                    "String at index {i} exceeds maximum length: {}",
+                    string.len()
+                )));
+            }
+        }
+
+        // Validate process templates
+        for (i, template) in pool.process_templates.iter().enumerate() {
+            if template.bytecode.len() > 10 * 1024 * 1024 {
+                // 10MB max bytecode per template
+                return Err(BytecodeError::ValidationError(format!(
+                    "Process template at index {i} has bytecode exceeding 10MB"
+                )));
+            }
+
+            if template.rspace_hint > 3 {
+                return Err(BytecodeError::InvalidRSpaceType(template.rspace_hint));
+            }
+        }
+
+        // Validate patterns
+        for (i, pattern) in pool.compiled_patterns.iter().enumerate() {
+            if pattern.bytecode.len() > 1024 * 1024 {
+                // 1MB max bytecode per pattern
+                return Err(BytecodeError::ValidationError(format!(
+                    "Pattern at index {i} has bytecode exceeding 1MB"
+                )));
+            }
+
+            if pattern.bindings.len() > 1000 {
+                // Max 1000 bindings per pattern
+                return Err(BytecodeError::ValidationError(format!(
+                    "Pattern at index {i} has too many bindings: {}",
+                    pattern.bindings.len()
+                )));
+            }
+
+            // Validate individual bindings
+            for (j, binding) in pattern.bindings.iter().enumerate() {
+                if binding.name.len() > 255 {
+                    // Max 255 characters for binding names
+                    return Err(BytecodeError::ValidationError(format!(
+                        "Binding {j} in pattern {i} has name exceeding 255 characters"
+                    )));
+                }
+
+                if let Some(type_constraint) = binding.type_constraint {
+                    if type_constraint > 6 {
+                        // We have 7 type constraints (0-6)
+                        return Err(BytecodeError::ValidationError(format!(
+                            "Invalid type constraint {type_constraint} in binding {j} of pattern {i}"
+                        )));
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Zero-copy access to archived constant pool
@@ -523,9 +708,9 @@ mod tests {
     fn test_string_interner() {
         let interner = StringInterner::new();
 
-        let ref1 = interner.intern("hello");
-        let ref2 = interner.intern("world");
-        let ref3 = interner.intern("hello"); // Should reuse existing
+        let ref1 = interner.intern("hello").unwrap();
+        let ref2 = interner.intern("world").unwrap();
+        let ref3 = interner.intern("hello").unwrap(); // Should reuse existing
 
         assert_eq!(ref1.id, ref3.id);
         assert_ne!(ref1.id, ref2.id);
@@ -536,7 +721,7 @@ mod tests {
     #[test]
     fn test_string_interner_resolution() {
         let interner = StringInterner::new();
-        let string_ref = interner.intern("test_string");
+        let string_ref = interner.intern("test_string").unwrap();
 
         let resolved = interner.resolve(string_ref.id).unwrap();
         assert_eq!(resolved.as_ref(), "test_string");
@@ -561,9 +746,9 @@ mod tests {
     fn test_constant_pool_strings() {
         let mut pool = ConstantPool::new();
 
-        let idx1 = pool.add_string("hello");
-        let idx2 = pool.add_string("world");
-        let idx3 = pool.add_string("hello"); // Should deduplicate
+        let idx1 = pool.add_string("hello").unwrap();
+        let idx2 = pool.add_string("world").unwrap();
+        let idx3 = pool.add_string("hello").unwrap(); // Should deduplicate
 
         assert_eq!(idx1, idx3);
         assert_ne!(idx1, idx2);
@@ -594,8 +779,8 @@ mod tests {
 
         pool.add_integer(42);
         pool.add_integer(100);
-        pool.add_string("hello");
-        pool.add_string("world");
+        pool.add_string("hello").unwrap();
+        pool.add_string("world").unwrap();
 
         let stats = pool.stats();
         assert_eq!(stats.integer_count, 2);
@@ -627,7 +812,7 @@ mod tests {
         for i in 0..10 {
             let interner_clone = Arc::clone(&interner);
             handles.push(thread::spawn(move || {
-                interner_clone.intern(&format!("string_{}", i % 3))
+                interner_clone.intern(&format!("string_{}", i % 3)).unwrap()
             }));
         }
 
@@ -646,9 +831,9 @@ mod tests {
         // Add various data to test serialization
         pool.add_integer(42);
         pool.add_integer(-123);
-        pool.add_string("hello");
-        pool.add_string("world");
-        pool.add_string("rholang");
+        pool.add_string("hello").unwrap();
+        pool.add_string("world").unwrap();
+        pool.add_string("rholang").unwrap();
 
         let template = ProcessTemplate::new(
             1,
@@ -744,8 +929,8 @@ mod tests {
         // Add duplicates that should be deduplicated
         let idx1 = pool.add_integer(42);
         let idx2 = pool.add_integer(42); // Should reuse
-        let idx3 = pool.add_string("test");
-        let idx4 = pool.add_string("test"); // Should reuse
+        let idx3 = pool.add_string("test").unwrap();
+        let idx4 = pool.add_string("test").unwrap(); // Should reuse
 
         assert_eq!(idx1, idx2);
         assert_eq!(idx3, idx4);
@@ -765,11 +950,11 @@ mod tests {
     fn test_serializer_reuse() {
         let mut pool1 = ConstantPool::new();
         pool1.add_integer(1);
-        pool1.add_string("first");
+        pool1.add_string("first").unwrap();
 
         let mut pool2 = ConstantPool::new();
         pool2.add_integer(2);
-        pool2.add_string("second");
+        pool2.add_string("second").unwrap();
 
         // Reuse the same serializer
         let mut serializer = BytecodeSerializer::new();
@@ -796,7 +981,7 @@ mod tests {
         // Add test data
         for i in 0..100 {
             pool.add_integer(i);
-            pool.add_string(&format!("string_{i}"));
+            pool.add_string(&format!("string_{i}")).unwrap();
         }
 
         let mut serializer = BytecodeSerializer::with_capacity(1024 * 1024); // 1MB buffer
@@ -814,5 +999,36 @@ mod tests {
                 assert_eq!(string.as_ref(), format!("string_{i}"));
             }
         }
+    }
+
+    #[test]
+    fn test_string_interner_limits() {
+        // Test string length limit
+        let interner = StringInterner::with_limits(10, 100);
+        let long_string = "a".repeat(20);
+        let result = interner.intern(&long_string);
+        assert!(result.is_err());
+
+        // Test string count limit
+        let interner = StringInterner::with_limits(1000, 2);
+        let _ref1 = interner.intern("string1").unwrap();
+        let _ref2 = interner.intern("string2").unwrap();
+        let result = interner.intern("string3");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_deserialization_validation() {
+        // Test with empty/invalid data
+        let result = BytecodeSerializer::deserialize_pool(&[]);
+        assert!(result.is_err());
+
+        let result = BytecodeSerializer::deserialize_pool(&[1, 2, 3]);
+        assert!(result.is_err());
+
+        // Test with oversized data (simulated)
+        let large_data = vec![0u8; 200 * 1024 * 1024]; // 200MB
+        let result = BytecodeSerializer::deserialize_pool(&large_data);
+        assert!(result.is_err());
     }
 }

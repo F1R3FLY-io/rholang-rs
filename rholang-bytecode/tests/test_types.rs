@@ -30,10 +30,14 @@ fn test_zero_copy_name_ref() {
 #[test]
 fn test_environment_lexical_scoping() {
     let parent = Environment::new();
-    parent.bind(0, TypeRef::Integer(IntegerRef::Small(10)));
+    parent
+        .bind(0, TypeRef::Integer(IntegerRef::Small(10)))
+        .unwrap();
 
     let child = Environment::with_parent(parent.clone());
-    child.bind(1, TypeRef::Integer(IntegerRef::Small(20)));
+    child
+        .bind(1, TypeRef::Integer(IntegerRef::Small(20)))
+        .unwrap();
 
     // Child can access parent's bindings
     assert!(matches!(child.lookup(0), Some(TypeRef::Integer(_))));

@@ -214,6 +214,9 @@ pub struct Environment {
 }
 
 impl Environment {
+    /// Maximum number of bindings allowed in an environment
+    pub const MAX_BINDINGS: usize = 65536;
+
     pub fn new() -> Arc<Self> {
         Arc::new(Self {
             bindings: Arc::new(RwLock::new(Vec::new())),
@@ -228,12 +231,37 @@ impl Environment {
         })
     }
 
-    pub fn bind(&self, index: usize, value: TypeRef) {
-        let mut bindings = self.bindings.write();
-        if index >= bindings.len() {
-            bindings.resize(index + 1, TypeRef::Nil);
+    pub fn bind(&self, index: usize, value: TypeRef) -> Result<(), crate::error::BytecodeError> {
+        // Validate index bounds
+        if index >= Self::MAX_BINDINGS {
+            return Err(crate::error::BytecodeError::ResourceExhaustion {
+                resource_type: "environment_bindings".to_string(),
+                limit: Self::MAX_BINDINGS,
+                current: index,
+            });
         }
-        bindings[index] = value;
+
+        let mut bindings = self.bindings.write();
+
+        if index >= bindings.len() && index >= Self::MAX_BINDINGS {
+            return Err(crate::error::BytecodeError::ResourceExhaustion {
+                resource_type: "environment_bindings".to_string(),
+                limit: Self::MAX_BINDINGS,
+                current: index,
+            });
+        }
+
+        if index >= bindings.len() {
+            // Limit growth to prevent excessive memory allocation
+            let new_size = (index + 1).min(Self::MAX_BINDINGS);
+            bindings.resize(new_size, TypeRef::Nil);
+        }
+
+        if index < bindings.len() {
+            bindings[index] = value;
+        }
+
+        Ok(())
     }
 
     pub fn lookup(&self, index: usize) -> Option<TypeRef> {
@@ -513,9 +541,23 @@ mod tests {
         let env = Environment::new();
         let value = TypeRef::Integer(IntegerRef::Small(42));
 
-        env.bind(0, value.clone());
+        env.bind(0, value.clone()).unwrap();
         assert!(matches!(env.lookup(0), Some(TypeRef::Integer(_))));
         assert!(env.lookup(1).is_none());
+    }
+
+    #[test]
+    fn test_environment_bounds_checking() {
+        let env = Environment::new();
+        let value = TypeRef::Integer(IntegerRef::Small(42));
+
+        // Test that exceeding MAX_BINDINGS fails
+        let result = env.bind(Environment::MAX_BINDINGS, value);
+        assert!(result.is_err());
+
+        // Test that binding within bounds works
+        let result = env.bind(100, TypeRef::Boolean(true));
+        assert!(result.is_ok());
     }
 
     #[test]

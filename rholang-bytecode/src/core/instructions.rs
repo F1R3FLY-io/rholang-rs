@@ -86,12 +86,92 @@ impl Instruction {
                 }
             }
             1 => {
-                // 16-bit operand uses both bytes, so no check needed
+                // 16-bit operand uses both bytes, validate range for specific opcodes
+                let operand_value = self.op16();
+                self.validate_operand_range(opcode, operand_value)?;
             }
             2 => {
-                // Both bytes used for two 8-bit operands
+                // Both bytes used for two 8-bit operands, validate individually
+                self.validate_operand_range(opcode, self.op1() as u16)?;
+                self.validate_operand_range(opcode, self.op2() as u16)?;
             }
             _ => unreachable!("Invalid operand count"),
+        }
+
+        Ok(())
+    }
+
+    /// Validate that operand values are within reasonable bounds for the opcode
+    fn validate_operand_range(&self, opcode: Opcode, operand: u16) -> Result<()> {
+        match opcode {
+            Opcode::PUSH_INT | Opcode::PUSH_STR | Opcode::PUSH_PROC | Opcode::PUSH_NAME => {
+                // Constant pool indices should be reasonable (max 65536 constants)
+                // No additional validation needed as u16 already limits this
+            }
+
+            // Variable operations - validate local variable indices
+            Opcode::LOAD_LOCAL | Opcode::STORE_LOCAL | Opcode::ALLOC_LOCAL => {
+                // Local variable indices should be reasonable (max 1024 locals)
+                const MAX_LOCAL_VARS: u16 = 1024;
+                if operand >= MAX_LOCAL_VARS {
+                    return Err(BytecodeError::ValidationError(format!(
+                        "Local variable index {operand} exceeds maximum {MAX_LOCAL_VARS}"
+                    )));
+                }
+            }
+
+            // Environment operations - validate environment indices
+            Opcode::LOAD_ENV | Opcode::STORE_ENV => {
+                // Environment indices should be reasonable (max 256 environment slots)
+                const MAX_ENV_SLOTS: u16 = 256;
+                if operand >= MAX_ENV_SLOTS {
+                    return Err(BytecodeError::ValidationError(format!(
+                        "Environment index {operand} exceeds maximum {MAX_ENV_SLOTS}"
+                    )));
+                }
+            }
+
+            // Jump operations - operands are offsets, validated elsewhere
+            Opcode::JUMP | Opcode::BRANCH_TRUE | Opcode::BRANCH_FALSE | Opcode::BRANCH_SUCCESS => {
+                // Jump offsets are validated during label resolution
+            }
+
+            // Collection operations - validate size limits
+            Opcode::CREATE_LIST | Opcode::CREATE_TUPLE | Opcode::CREATE_MAP => {
+                // Collection sizes should be reasonable (max 65536 elements)
+                // No additional validation needed as u16 already limits this
+            }
+
+            // Process operations - validate reasonable limits
+            Opcode::SPAWN_ASYNC => {
+                // Process spawn count should be reasonable
+                const MAX_SPAWN_COUNT: u16 = 10000;
+                if operand >= MAX_SPAWN_COUNT {
+                    return Err(BytecodeError::ValidationError(format!(
+                        "Spawn count {operand} exceeds maximum {MAX_SPAWN_COUNT}"
+                    )));
+                }
+            }
+
+            // RSpace operations with 2 operands need both validated
+            Opcode::TELL | Opcode::ASK | Opcode::ASK_NB | Opcode::PEEK => {
+                // These are validated as pairs in the 2-operand case above
+            }
+
+            // Method operations
+            Opcode::LOAD_METHOD | Opcode::INVOKE_METHOD => {
+                // Method indices should be reasonable (max 65536 methods)
+                // No additional validation needed as u16 already limits this
+            }
+
+            // Pattern operations
+            Opcode::PATTERN => {
+                // Pattern indices should be reasonable (max 65536 patterns)
+                // No additional validation needed as u16 already limits this
+            }
+
+            // Other operations don't need operand validation
+            _ => {}
         }
 
         Ok(())
@@ -299,6 +379,17 @@ impl InstructionBuilder {
     pub fn build(mut self) -> Result<Vec<ExtendedInstruction>> {
         // Resolve all label references
         self.resolve_labels()?;
+
+        // Apply instruction compression optimizations
+        self.compress_patterns();
+
+        Ok(self.instructions)
+    }
+
+    /// Build without optimizations (for debugging or when optimization is disabled)
+    pub fn build_unoptimized(mut self) -> Result<Vec<ExtendedInstruction>> {
+        // Resolve all label references
+        self.resolve_labels()?;
         Ok(self.instructions)
     }
 
@@ -317,8 +408,29 @@ impl InstructionBuilder {
                 })?;
 
             // Calculate the jump offset
-            let jump_instruction_position = unresolved.instruction_index * 4; // 4 bytes per instruction
-            let offset = label_position as i32 - jump_instruction_position as i32;
+            let jump_instruction_position = unresolved
+                .instruction_index
+                .checked_mul(4)
+                .ok_or(BytecodeError::JumpOutOfRange {
+                    offset: 0,
+                    max_range: i16::MAX as i32,
+                })?;
+
+            let offset = if label_position >= jump_instruction_position {
+                let diff = label_position - jump_instruction_position;
+                i32::try_from(diff).map_err(|_| BytecodeError::JumpOutOfRange {
+                    offset: diff as i32, // This cast is for error reporting only
+                    max_range: i16::MAX as i32,
+                })?
+            } else {
+                let diff = jump_instruction_position - label_position;
+                let signed_diff =
+                    i32::try_from(diff).map_err(|_| BytecodeError::JumpOutOfRange {
+                        offset: -(diff as i32), // This cast is for error reporting only
+                        max_range: i16::MAX as i32,
+                    })?;
+                -signed_diff
+            };
 
             // Check if offset fits in 16-bit signed range
             if offset < i16::MIN as i32 || offset > i16::MAX as i32 {
@@ -349,6 +461,149 @@ impl InstructionBuilder {
 
         Ok(())
     }
+
+    /// Compress common instruction patterns for better performance
+    fn compress_patterns(&mut self) {
+        let mut i = 0;
+        let mut compressed_instructions = Vec::new();
+
+        while i < self.instructions.len() {
+            // Look for common patterns and compress them
+            if let Some(compressed_count) = self.try_compress_push_pop_sequence(i) {
+                // Skip the original instructions as they were compressed
+                i += compressed_count;
+            } else if let Some(compressed_count) = self.try_compress_variable_sequence(i) {
+                i += compressed_count;
+            } else {
+                // No compression possible
+                compressed_instructions.push(self.instructions[i].clone());
+                i += 1;
+            }
+        }
+
+        // Replace with compressed instructions if we achieved any compression
+        if compressed_instructions.len() < self.instructions.len() {
+            self.instructions = compressed_instructions;
+        }
+    }
+
+    /// Try to compress push-pop sequences (returns number of instructions consumed)
+    fn try_compress_push_pop_sequence(&mut self, start: usize) -> Option<usize> {
+        if start + 1 >= self.instructions.len() {
+            return None;
+        }
+
+        let first = &self.instructions[start];
+        let second = &self.instructions[start + 1];
+
+        // Pattern: PUSH_X followed by POP -> NOP (can be eliminated entirely)
+        if let (Ok(first_op), Ok(second_op)) =
+            (first.instruction.opcode(), second.instruction.opcode())
+        {
+            if matches!(
+                first_op,
+                Opcode::PUSH_INT
+                    | Opcode::PUSH_STR
+                    | Opcode::PUSH_BOOL
+                    | Opcode::PUSH_PROC
+                    | Opcode::PUSH_NAME
+                    | Opcode::PUSH_NIL
+            ) && matches!(second_op, Opcode::POP)
+            {
+                // This pair can be eliminated (push followed immediately by pop)
+                return Some(2);
+            }
+        }
+
+        None
+    }
+
+    /// Try to compress variable access sequences
+    fn try_compress_variable_sequence(&mut self, start: usize) -> Option<usize> {
+        if start + 1 >= self.instructions.len() {
+            return None;
+        }
+
+        let first = &self.instructions[start];
+        let second = &self.instructions[start + 1];
+
+        if let (Ok(first_op), Ok(second_op)) =
+            (first.instruction.opcode(), second.instruction.opcode())
+        {
+            // Pattern: LOAD_LOCAL followed by STORE_LOCAL to same location -> NOP
+            if matches!(first_op, Opcode::LOAD_LOCAL) && matches!(second_op, Opcode::STORE_LOCAL) {
+                let first_operand = first.instruction.op16();
+                let second_operand = second.instruction.op16();
+
+                if first_operand == second_operand {
+                    // Load and store to same location - this is a no-op
+                    return Some(2);
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Emit optimized sequence for pushing multiple constants
+    pub fn emit_push_sequence(&mut self, values: &[u16]) -> &mut Self {
+        // For now, emit individually (future optimization could batch these)
+        for &value in values {
+            self.emit(Instruction::unary(Opcode::PUSH_INT, value));
+        }
+        self
+    }
+
+    /// Get compression statistics
+    pub fn compression_stats(&self) -> CompressionStats {
+        let mut push_pop_pairs = 0;
+        let mut redundant_loads = 0;
+
+        for i in 0..self.instructions.len().saturating_sub(1) {
+            if let (Ok(first_op), Ok(second_op)) = (
+                self.instructions[i].instruction.opcode(),
+                self.instructions[i + 1].instruction.opcode(),
+            ) {
+                if matches!(
+                    first_op,
+                    Opcode::PUSH_INT
+                        | Opcode::PUSH_STR
+                        | Opcode::PUSH_BOOL
+                        | Opcode::PUSH_PROC
+                        | Opcode::PUSH_NAME
+                        | Opcode::PUSH_NIL
+                ) && matches!(second_op, Opcode::POP)
+                {
+                    push_pop_pairs += 1;
+                }
+
+                if matches!(first_op, Opcode::LOAD_LOCAL)
+                    && matches!(second_op, Opcode::STORE_LOCAL)
+                {
+                    let first_operand = self.instructions[i].instruction.op16();
+                    let second_operand = self.instructions[i + 1].instruction.op16();
+                    if first_operand == second_operand {
+                        redundant_loads += 1;
+                    }
+                }
+            }
+        }
+
+        CompressionStats {
+            total_instructions: self.instructions.len(),
+            push_pop_pairs,
+            redundant_loads,
+            potential_savings: push_pop_pairs * 2 + redundant_loads * 2,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CompressionStats {
+    pub total_instructions: usize,
+    pub push_pop_pairs: usize,
+    pub redundant_loads: usize,
+    pub potential_savings: usize,
 }
 
 #[cfg(test)]
@@ -581,5 +836,71 @@ mod tests {
 
         // jump at position 16 jumps to position 0: offset = -16
         assert_eq!(instructions[4].instruction.op16() as i16, -16);
+    }
+
+    #[test]
+    fn test_instruction_compression() {
+        let mut builder = InstructionBuilder::new();
+
+        // Create a sequence with push-pop pairs that should be optimized
+        builder
+            .emit(Instruction::unary(Opcode::PUSH_INT, 42))
+            .emit(Instruction::nullary(Opcode::POP))
+            .emit(Instruction::unary(Opcode::LOAD_LOCAL, 5))
+            .emit(Instruction::unary(Opcode::STORE_LOCAL, 5))
+            .emit(Instruction::nullary(Opcode::HALT));
+
+        // Get compression stats before optimization
+        let stats_before = builder.compression_stats();
+        assert_eq!(stats_before.push_pop_pairs, 1);
+        assert_eq!(stats_before.redundant_loads, 1);
+        assert_eq!(stats_before.potential_savings, 4); // 2 pairs * 2 instructions each
+
+        let instructions = builder.build().unwrap();
+
+        // After compression, we should have fewer instructions
+        // Original: PUSH_INT, POP, LOAD_LOCAL, STORE_LOCAL, HALT (5 instructions)
+        // Optimized: HALT (1 instruction) - both pairs eliminated
+        assert_eq!(instructions.len(), 1);
+        assert_eq!(instructions[0].instruction.opcode().unwrap(), Opcode::HALT);
+    }
+
+    #[test]
+    fn test_compression_stats() {
+        let mut builder = InstructionBuilder::new();
+
+        // Add various patterns
+        builder
+            .emit(Instruction::unary(Opcode::PUSH_STR, 1))
+            .emit(Instruction::nullary(Opcode::POP))
+            .emit(Instruction::unary(Opcode::PUSH_BOOL, 1))
+            .emit(Instruction::nullary(Opcode::NOP))
+            .emit(Instruction::unary(Opcode::LOAD_LOCAL, 10))
+            .emit(Instruction::unary(Opcode::STORE_LOCAL, 10));
+
+        let stats = builder.compression_stats();
+        assert_eq!(stats.total_instructions, 6);
+        assert_eq!(stats.push_pop_pairs, 1); // PUSH_STR + POP
+        assert_eq!(stats.redundant_loads, 1); // LOAD_LOCAL + STORE_LOCAL same location
+        assert_eq!(stats.potential_savings, 4);
+    }
+
+    #[test]
+    fn test_emit_push_sequence() {
+        let mut builder = InstructionBuilder::new();
+        let values = [10, 20, 30];
+
+        builder.emit_push_sequence(&values);
+
+        let instructions = builder.instructions;
+        assert_eq!(instructions.len(), 3);
+
+        for (i, &expected_value) in values.iter().enumerate() {
+            assert_eq!(
+                instructions[i].instruction.opcode().unwrap(),
+                Opcode::PUSH_INT
+            );
+            assert_eq!(instructions[i].instruction.op16(), expected_value);
+        }
     }
 }

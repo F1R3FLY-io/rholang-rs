@@ -706,7 +706,7 @@ mod tests {
         // Add some content to all components
         module.add_instruction(Instruction::nullary(Opcode::NOP));
         module.constant_pool.add_integer(42);
-        module.string_interning.intern("test");
+        module.string_interning.intern("test").unwrap();
 
         let stats = module.stats();
         assert_eq!(stats.instruction_count, 1);
