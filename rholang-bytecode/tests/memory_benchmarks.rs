@@ -104,8 +104,14 @@ fn test_zero_copy_string_interning_memory() {
     // All references to same string should have same ID (zero-copy)
     let first_ref = &refs[0];
     let last_ref = &refs[2997]; // Last "shared_string" reference
-    assert_eq!(first_ref.id, last_ref.id);
-    assert_eq!(Arc::as_ptr(&first_ref.data), Arc::as_ptr(&last_ref.data));
+    assert_eq!(
+        first_ref.as_ref().unwrap().id,
+        last_ref.as_ref().unwrap().id
+    );
+    assert_eq!(
+        Arc::as_ptr(&first_ref.as_ref().unwrap().data),
+        Arc::as_ptr(&last_ref.as_ref().unwrap().data)
+    );
 
     let memory_increase = tracker.memory_increase();
     println!("Memory for 3000 string refs (3 unique): {memory_increase} bytes");

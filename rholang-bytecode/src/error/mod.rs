@@ -55,6 +55,13 @@ pub enum BytecodeError {
 
     #[error("Jump offset {offset} out of range (max: {max_range})")]
     JumpOutOfRange { offset: i32, max_range: i32 },
+
+    #[error("Resource exhaustion: {resource_type} limit {limit} exceeded (current: {current})")]
+    ResourceExhaustion {
+        resource_type: String,
+        limit: usize,
+        current: usize,
+    },
 }
 
 /// Convenient Result type
