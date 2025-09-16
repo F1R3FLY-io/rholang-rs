@@ -1,4 +1,4 @@
-use std::iter;
+use std::iter::{self, FusedIterator};
 
 use smallvec::SmallVec;
 
@@ -105,12 +105,11 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
                 self.stack.push(body);
             }
 
-            Proc::Contract { body, .. } => {
-                self.stack.push(body);
-            }
-
-            Proc::New { proc, .. } | Proc::Bundle { proc, .. } => {
-                self.stack.push(proc);
+            Proc::Contract { body: inner, .. }
+            | Proc::New { proc: inner, .. }
+            | Proc::Bundle { proc: inner, .. }
+            | Proc::UnaryExp { arg: inner, .. } => {
+                self.stack.push(inner);
             }
 
             Proc::Send { inputs, .. } | Proc::SendSync { inputs, .. } => {
@@ -149,10 +148,6 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
                 }
             },
 
-            Proc::UnaryExp { arg, .. } => {
-                self.stack.push(arg);
-            }
-
             Proc::Select { branches } => {
                 self.stack.extend(select_branches(branches).rev());
             }
@@ -174,6 +169,8 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
         Some(node)
     }
 }
+
+impl<'a, const S: usize> FusedIterator for PreorderDfsIter<'a, S> {}
 
 #[cfg(test)]
 mod tests {
