@@ -163,6 +163,15 @@ pub enum Var<'ast> {
     Id(Id<'ast>),
 }
 
+impl Var<'_> {
+    pub fn get_position(self) -> Option<SourcePos> {
+        match self {
+            Var::Wildcard => None,
+            Var::Id(id) => Some(id.pos),
+        }
+    }
+}
+
 impl<'a> TryFrom<&Proc<'a>> for Var<'a> {
     type Error = String;
 
