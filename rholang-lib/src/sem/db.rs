@@ -1,33 +1,38 @@
-use std::{iter::Map, ops::Index};
+use std::ops::Index;
 
 use by_address::ByAddress;
 use indexmap::IndexMap;
-use rholang_parser::ast;
 
-use crate::sem::{PID, ProcRef, SemanticDb};
+use super::*;
 
 const DEFAULT_REV_CAPACITY: usize = 64;
+
+pub type Iter<'db, 'a> = std::iter::Map<
+    indexmap::map::Iter<'a, ByAddress<ProcRef<'db>>, PID>,
+    fn((&ByAddress<ProcRef<'db>>, &PID)) -> (PID, ProcRef<'db>),
+>;
 
 impl<'a> SemanticDb<'a> {
     pub fn new() -> Self {
         Self {
             rev: IndexMap::with_capacity(DEFAULT_REV_CAPACITY),
+            diagnostics: Vec::new(),
+            has_errors: false,
         }
     }
 
     /// Builds an index for all processes in preorder DFS.
     /// Returns the PID of the root.
     pub fn build_index(&mut self, root: ProcRef<'a>) -> PID {
-        let start_id = self
-            .rev
-            .len()
-            .try_into()
-            .expect("Too many elements in the index");
-        let result = PID(start_id);
+        let start_id = self.rev.len();
+        let result = PID(start_id as u32); // SAFETY: we never allow to add more than u32 elements to the index
 
         root.iter_preorder_dfs().enumerate().for_each(|(i, proc)| {
             let key = ByAddress(proc);
-            self.rev.insert(key, PID(start_id + i as u32));
+            let next = (start_id + i)
+                .try_into()
+                .expect("Too many elements in the index");
+            self.rev.insert(key, PID(next));
         });
 
         result
@@ -40,7 +45,9 @@ impl<'a> SemanticDb<'a> {
 
     /// Returns the PID corresponding to a given ProcRef, if it exists in the DB
     pub fn lookup(&self, proc: ProcRef<'a>) -> Option<PID> {
-        self.rev.get(&ByAddress(proc)).copied()
+        self.rev
+            .get_index_of(&ByAddress(proc))
+            .map(|i| PID(i as u32)) // SAFETY: we never allow to add more than u32 elements to the index
     }
 
     /// Iterate over all PIDs in indexing order
@@ -49,36 +56,76 @@ impl<'a> SemanticDb<'a> {
     }
 
     /// Iterate over all (PID, ProcRef) pairs in indexing order.
-    pub fn iter(&self) -> impl DoubleEndedIterator<Item = (PID, ProcRef<'a>)> + ExactSizeIterator {
+    pub fn iter(&self) -> Iter<'a, '_> {
         self.rev.iter().map(|(proc, pid)| (*pid, **proc))
+    }
+
+    pub fn emit_diagnostic(&mut self, diagnostic: Diagnostic) {
+        self.diagnostics.push(diagnostic);
+        if let DiagnosticKind::Error(_) = diagnostic.kind {
+            self.has_errors = true;
+        }
+    }
+
+    pub fn error(&mut self, pid: PID, kind: ErrorKind, pos: Option<SourcePos>) {
+        self.emit_diagnostic(Diagnostic::error(pid, kind, pos));
+    }
+
+    pub fn warning(&mut self, pid: PID, kind: WarningKind, pos: Option<SourcePos>) {
+        self.emit_diagnostic(Diagnostic::warning(pid, kind, pos));
+    }
+
+    pub fn has_errors(&self) -> bool {
+        self.has_errors
+    }
+
+    pub fn errors(&self) -> impl Iterator<Item = &Diagnostic> {
+        self.diagnostics
+            .iter()
+            .filter(|d| matches!(d.kind, DiagnosticKind::Error(_)))
+    }
+
+    pub fn diagnostics(&self) -> &[Diagnostic] {
+        &self.diagnostics
     }
 }
 
 /// Enable `db[pid]` syntax to access the process by PID.
 impl<'a> Index<PID> for SemanticDb<'a> {
-    type Output = ast::AnnProc<'a>;
+    type Output = ProcRef<'a>;
 
     fn index(&self, id: PID) -> &Self::Output {
-        self.get(id).expect("PID out of bounds")
+        self.rev
+            .get_index(id.0 as usize)
+            .map(|(proc, _)| proc)
+            .expect("PID out of bounds")
+    }
+}
+
+/// Enable `db[ref]` syntax to access process' PID.
+impl<'a> Index<ProcRef<'a>> for SemanticDb<'a> {
+    type Output = PID;
+
+    fn index(&self, index: ProcRef<'a>) -> &Self::Output {
+        self.rev
+            .get(&ByAddress(index))
+            .expect("process not found in the DB")
     }
 }
 
 /// Allow `for (pid, proc) in &db` syntax
-impl<'a> IntoIterator for &'a SemanticDb<'a> {
-    type Item = (PID, ProcRef<'a>);
-    // ugly but works on stable
-    type IntoIter = Map<
-        indexmap::map::Iter<'a, ByAddress<ProcRef<'a>>, PID>,
-        fn((&ByAddress<ProcRef<'a>>, &PID)) -> (PID, ProcRef<'a>),
-    >;
+impl<'db, 'a> IntoIterator for &'a SemanticDb<'db> {
+    type Item = (PID, ProcRef<'db>);
+    type IntoIter = Iter<'db, 'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.rev.iter().map(|(proc, pid)| (*pid, **proc))
+        self.iter()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use ast::Proc::*;
     use pretty_assertions::{assert_eq, assert_matches};
     use rholang_parser::{RholangParser, SourcePos, SourceSpan};
     use smallvec::smallvec;
@@ -88,20 +135,20 @@ mod tests {
     #[test]
     fn test_build_index_single_node() {
         let mut db = SemanticDb::new();
-        let root = ast::Proc::Nil.ann(SourcePos::default().span_of(3));
+        let root = Nil.ann(SourcePos::default().span_of(3));
 
         let root_pid = db.build_index(&root);
 
         // Test Index<PID>
-        assert_matches!(db[root_pid].proc, ast::Proc::Nil);
+        assert_matches!(db[root_pid].proc, Nil);
     }
 
     #[test]
     fn test_build_index_multiple_nodes() {
         // Create a simple tree: Nil | ()
-        let left = ast::Proc::Nil.ann(SourcePos::default().span_of(3));
-        let right = ast::Proc::Unit.ann(SourcePos::at_col(7).span_of(2));
-        let par_proc = ast::Proc::Par { left, right };
+        let left = Nil.ann(SourcePos::default().span_of(3));
+        let right = Unit.ann(SourcePos::at_col(7).span_of(2));
+        let par_proc = Par { left, right };
         let root = par_proc.ann(SourceSpan {
             start: SourcePos::default(),
             end: right.span.end,
@@ -112,17 +159,17 @@ mod tests {
 
         // Check root PID
         let root_proc = db[root_pid].proc;
-        assert_matches!(root_proc, ast::Proc::Par { .. });
-        if let ast::Proc::Par { left: l, right: r } = root_proc {
-            assert_matches!(l.proc, ast::Proc::Nil);
-            assert_matches!(r.proc, ast::Proc::Unit);
+        assert_matches!(root_proc, Par { .. });
+        if let Par { left: l, right: r } = root_proc {
+            assert_matches!(l.proc, Nil);
+            assert_matches!(r.proc, Unit);
 
             // Reverse lookup should find PID for each node
             let left_pid = db.lookup(l).unwrap();
             let right_pid = db.lookup(r).unwrap();
 
-            assert_eq!(db[left_pid], left);
-            assert_eq!(db[right_pid], right);
+            assert_eq!(*db[left_pid], left);
+            assert_eq!(*db[right_pid], right);
         }
     }
 
@@ -131,10 +178,10 @@ mod tests {
         // Construct a small tree:
         // if (true) chan!(Nil) else ()
 
-        let condition = ast::Proc::BoolLiteral(true).ann(SourcePos::at_col(5).span_of(5));
+        let condition = BoolLiteral(true).ann(SourcePos::at_col(5).span_of(5));
 
-        let send_inputs = smallvec![ast::Proc::Nil.ann(SourcePos::at_col(17).span_of(3))];
-        let send_proc = ast::Proc::Send {
+        let send_inputs = smallvec![Nil.ann(SourcePos::at_col(17).span_of(3))];
+        let send_proc = Send {
             channel: ast::Id {
                 name: "chan",
                 pos: SourcePos::at_col(11),
@@ -145,9 +192,9 @@ mod tests {
         };
         let if_true = send_proc.ann(SourcePos::at_col(11).span_of(10));
 
-        let if_false = ast::Proc::Unit.ann(SourcePos::at_col(27).span_of(2));
+        let if_false = Unit.ann(SourcePos::at_col(27).span_of(2));
 
-        let if_then_else_proc = ast::Proc::IfThenElse {
+        let if_then_else_proc = IfThenElse {
             condition,
             if_true,
             if_false: Some(if_false),
@@ -168,30 +215,30 @@ mod tests {
 
         // Check root PID
         let root_proc = db[root_pid].proc;
-        assert_matches!(root_proc, ast::Proc::IfThenElse { .. });
-        if let ast::Proc::IfThenElse {
+        assert_matches!(root_proc, IfThenElse { .. });
+        if let IfThenElse {
             condition: c,
             if_true: t,
             if_false: Some(f),
         } = root_proc
         {
-            assert_matches!(c.proc, ast::Proc::BoolLiteral(true));
-            assert_matches!(f.proc, ast::Proc::Unit);
+            assert_matches!(c.proc, BoolLiteral(true));
+            assert_matches!(f.proc, Unit);
 
             // Reverse lookup should find PID for each node
             let condition_pid = db.lookup(c).unwrap();
             let if_true_pid = db.lookup(t).unwrap();
             let if_false_pid = db.lookup(f).unwrap();
 
-            assert_eq!(db[condition_pid], condition);
-            assert_eq!(db[if_true_pid], if_true);
-            assert_eq!(db[if_false_pid], if_false);
+            assert_eq!(*db[condition_pid], condition);
+            assert_eq!(*db[if_true_pid], if_true);
+            assert_eq!(*db[if_false_pid], if_false);
 
             // this should also work for nested nodes
-            assert_matches!(t.proc, ast::Proc::Send { .. });
-            if let ast::Proc::Send { inputs, .. } = t.proc {
+            assert_matches!(t.proc, Send { .. });
+            if let Send { inputs, .. } = t.proc {
                 let input_pid = db.lookup(&inputs[0]).unwrap();
-                assert_eq!(*db[input_pid].proc, ast::Proc::Nil);
+                assert_eq!(*db[input_pid].proc, Nil);
             }
         }
     }
@@ -221,7 +268,7 @@ mod tests {
 
         // Forward and reverse consistency:
         for pid in pids {
-            let proc_fwd = &db[pid];
+            let proc_fwd = db[pid];
             let proc_back = db.lookup(proc_fwd).unwrap();
             assert_eq!(pid, proc_back, "Forward and reverse lookup must agree");
         }
@@ -263,9 +310,9 @@ mod tests {
 
         // Reverse lookup (we assume DFS preorder, it's internal knowledge, if it changes, change the test)
         let (_, first_proc) = all.next().unwrap();
-        assert_matches!(first_proc.proc, ast::Proc::Let { .. });
+        assert_matches!(first_proc.proc, Let { .. });
 
         let (_, last_proc) = all.next_back().unwrap();
-        assert_matches!(last_proc.proc, ast::Proc::LongLiteral(42));
+        assert_matches!(last_proc.proc, LongLiteral(42));
     }
 }
