@@ -10,6 +10,9 @@ members = [
 ]
 
 [workspace.dependencies]
+# Used by: librho
+ahash = "0.8.12"
+
 # Used by: shell, rholang-parser, rholang-jni-bridge
 anyhow = "1.0.98"
 
@@ -18,6 +21,8 @@ async-trait = "0.1.88"
 
 # General purpose, used mostly by librho
 bitvec = "1.0.1"
+indexmap = "2.11.0"
+intmap = "3.1.2"
 
 # Used by: rholang-shell
 tokio = { version = "1.45.1", features = ["rt", "rt-multi-thread", "full"] }
@@ -40,7 +45,7 @@ bracket-parser = "0.1.0"
 # Library for benchmarking
 divan = "0.1.21"
 
-# Used by: rholang-parser
+# Used by: rholang-parser, librho
 smallvec = { version = "1.15.1", features = ["union", "const_generics", "const_new", "may_dangle"] }
 
 # Used by: rholang-parser, rholang-tree-sitter
