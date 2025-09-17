@@ -1,0 +1,63 @@
+use std::{cell::RefCell, ops::Index};
+
+use indexmap::IndexSet;
+
+use super::Symbol;
+
+pub(super) struct Interner {
+    rev: RefCell<IndexSet<String, ahash::RandomState>>,
+}
+
+const DEFAULT_INTERNER_CAPACITY: usize = 32;
+
+impl Interner {
+    pub(super) fn new() -> Self {
+        Self {
+            rev: RefCell::new(IndexSet::with_capacity_and_hasher(
+                DEFAULT_INTERNER_CAPACITY,
+                stable_hasher(),
+            )),
+        }
+    }
+
+    pub(super) fn intern(&self, name: &str) -> Symbol {
+        // First try immutable borrow to check for existing symbol
+        if let Some(sym) = self.rev.borrow().get_index_of(name) {
+            Symbol(sym as u32) // SAFETY: we never allow length of the symbol table to exceed |u32|
+        } else {
+            // Only borrow mutably if we need to insert
+            let mut rev = self.rev.borrow_mut();
+            let new_sym = rev
+                .len()
+                .try_into()
+                .expect("too many symbols in the symbol table");
+            rev.insert(name.to_string());
+            Symbol(new_sym)
+        }
+    }
+
+    pub(super) fn resolve(&self, sym: Symbol) -> Option<&str> {
+        // SAFETY: safe because `intern` only holds a mutable borrow when inserting,
+        // and here we only call `resolve` after `intern` has returned.
+        // There is never an active mutable borrow while using this reference.
+        let rev = unsafe { self.rev.try_borrow_unguarded().unwrap() };
+        rev.get_index(sym.0 as usize).map(|s| s.as_str())
+    }
+}
+
+impl Index<Symbol> for Interner {
+    type Output = str;
+
+    fn index(&self, sym: Symbol) -> &Self::Output {
+        self.resolve(sym).expect("symbol not interned")
+    }
+}
+
+const SEED0: u64 = 0x0FED_CBA9_8765_4321;
+const SEED1: u64 = 0x0BAD_F00D_F00D_BAAD;
+const SEED2: u64 = 0xCAFEBABE_DEADC0DE;
+const SEED3: u64 = 0x1234_5678_9ABC_DEF0;
+
+fn stable_hasher() -> ahash::RandomState {
+    ahash::RandomState::with_seeds(SEED0, SEED1, SEED2, SEED3)
+}
