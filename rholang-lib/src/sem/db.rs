@@ -24,6 +24,7 @@ impl<'a> SemanticDb<'a> {
             binder_is_name: BitVec::with_capacity(DEFAULT_BINDERS_CAPACITY),
             binders: Vec::with_capacity(DEFAULT_BINDERS_CAPACITY),
             proc_to_scope: IntMap::with_capacity(DEFAULT_SCOPES_CAPACITY),
+            var_to_binder: BTreeMap::new(),
         }
     }
 
@@ -143,6 +144,7 @@ impl<'a> SemanticDb<'a> {
     ///
     /// Returns `true` if the scope was newly inserted, or `false` if a scope
     /// for this process already existed.
+    #[must_use]
     pub(super) fn add_scope(&mut self, proc: PID, scope: ScopeInfo) -> bool {
         self.proc_to_scope.insert_checked(proc, scope)
     }
@@ -187,7 +189,8 @@ impl<'a> SemanticDb<'a> {
         let rng = scope.as_range();
         assert!(
             rng.end <= (self.next_binder as usize),
-            "Scope spans beyond the range of binders"
+            "Scope spans beyond the range of binders: {rng:#?} ends beyond {}",
+            self.next_binder
         );
         unsafe { self.binders.get_unchecked(rng) }
     }
@@ -199,6 +202,39 @@ impl<'a> SemanticDb<'a> {
         scope: &ScopeInfo,
     ) -> impl Iterator<Item = (BinderId, &Binder)> + ExactSizeIterator {
         scope.binder_range().map(|bid| (bid, &self[bid]))
+    }
+
+    fn assert_binder_ib(&self, binder: BinderId) {
+        assert!(binder < self.next_binder(), "unassigned BinderId: {binder}");
+    }
+    /// Maps a variable occurrence ([`SymbolOccurence`]) to its binder
+    /// # Panics
+    ///
+    /// Panics if `binder` is not within the allocated range of binders.
+    #[must_use]
+    pub(super) fn map_symbol_to_binder(
+        &mut self,
+        sym: Symbol,
+        pos: SourcePos,
+        binder: BinderId,
+    ) -> bool {
+        self.assert_binder_ib(binder);
+        let key = SymbolOccurence {
+            symbol: sym,
+            position: pos,
+        };
+        let old = self.var_to_binder.insert(key, binder);
+        old.is_none()
+    }
+
+    /// Performs a vary fast check if the given binder is name-bound
+    pub fn is_name(&self, binder: BinderId) -> bool {
+        self.binder_is_name[binder.0 as usize]
+    }
+
+    /// Query the binder for a given variable occurrence
+    pub fn binder_of(&self, occurence: SymbolOccurence) -> Option<BinderId> {
+        self.var_to_binder.get(&occurence).copied()
     }
 }
 
@@ -230,7 +266,7 @@ impl<'a> Index<BinderId> for SemanticDb<'a> {
     type Output = Binder;
 
     fn index(&self, id: BinderId) -> &Self::Output {
-        assert!(id.0 < self.next_binder, "unassigned BinderId");
+        self.assert_binder_ib(id);
         unsafe { self.binders.get_unchecked(id.0 as usize) }
     }
 }
