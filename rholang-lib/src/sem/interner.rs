@@ -15,7 +15,7 @@ impl Interner {
         Self {
             rev: RefCell::new(IndexSet::with_capacity_and_hasher(
                 DEFAULT_INTERNER_CAPACITY,
-                stable_hasher(),
+                super::stable_hasher(),
             )),
         }
     }
@@ -51,13 +51,4 @@ impl Index<Symbol> for Interner {
     fn index(&self, sym: Symbol) -> &Self::Output {
         self.resolve(sym).expect("symbol not interned")
     }
-}
-
-const SEED0: u64 = 0x0FED_CBA9_8765_4321;
-const SEED1: u64 = 0x0BAD_F00D_F00D_BAAD;
-const SEED2: u64 = 0xCAFEBABE_DEADC0DE;
-const SEED3: u64 = 0x1234_5678_9ABC_DEF0;
-
-fn stable_hasher() -> ahash::RandomState {
-    ahash::RandomState::with_seeds(SEED0, SEED1, SEED2, SEED3)
 }
