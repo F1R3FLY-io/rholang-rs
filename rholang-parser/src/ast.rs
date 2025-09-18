@@ -540,7 +540,7 @@ impl Display for NameDecl<'_> {
         f.write_char('\'')?;
         if let Some(uri) = &self.uri {
             f.write_char('(')?;
-            self.uri.fmt(f)?;
+            Display::fmt(uri, f)?;
             f.write_char(')')?;
         }
 
