@@ -270,3 +270,11 @@ pub enum ErrorKind {
     BadCode,
 }
 
+const SEED0: u64 = 0x0FED_CBA9_8765_4321;
+const SEED1: u64 = 0x0BAD_F00D_F00D_BAAD;
+const SEED2: u64 = 0xCAFEBABE_DEADC0DE;
+const SEED3: u64 = 0x1234_5678_9ABC_DEF0;
+
+fn stable_hasher() -> ahash::RandomState {
+    ahash::RandomState::with_seeds(SEED0, SEED1, SEED2, SEED3)
+}
