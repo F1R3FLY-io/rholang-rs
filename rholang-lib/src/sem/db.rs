@@ -204,8 +204,13 @@ impl<'a> SemanticDb<'a> {
         scope.binder_range().map(|bid| (bid, &self[bid]))
     }
 
+    #[inline]
     fn assert_binder_ib(&self, binder: BinderId) {
-        assert!(binder < self.next_binder(), "unassigned BinderId: {binder}");
+        assert!(
+            binder < self.next_binder(),
+            "binder {binder} not within the allocated range of binders: 0..{}",
+            self.next_binder
+        );
     }
     /// Maps a variable occurrence ([`SymbolOccurence`]) to its binder
     /// # Panics
@@ -254,10 +259,10 @@ impl<'a> Index<PID> for SemanticDb<'a> {
 impl<'a> Index<ProcRef<'a>> for SemanticDb<'a> {
     type Output = PID;
 
-    fn index(&self, index: ProcRef<'a>) -> &Self::Output {
+    fn index(&self, proc: ProcRef<'a>) -> &Self::Output {
         self.rev
-            .get(&ByAddress(index))
-            .expect("process not present in the semantic db")
+            .get(&ByAddress(proc))
+            .unwrap_or_else(|| panic!("process not present in the semantic db:\n-- \n{proc:#?}"))
     }
 }
 
