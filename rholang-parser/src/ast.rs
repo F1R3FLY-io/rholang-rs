@@ -1,5 +1,5 @@
 use std::{
-    fmt::{Display, Write},
+    fmt::{Debug, Display, Write},
     ops::Deref,
 };
 
@@ -514,7 +514,8 @@ impl Display for Id<'_> {
         f.write_char('\'')?;
         f.write_str(self.name)?;
         f.write_char('\'')?;
-        Ok(())
+        f.write_char(':')?;
+        Display::fmt(&self.pos, f)
     }
 }
 
@@ -522,8 +523,7 @@ impl Display for Uri<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_char('`')?;
         f.write_str(self.0)?;
-        f.write_char('`')?;
-        Ok(())
+        f.write_char('`')
     }
 }
 
@@ -535,13 +535,16 @@ impl Display for SimpleType {
 
 impl Display for NameDecl<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.id, f)?;
+        f.write_char('\'')?;
+        f.write_str(self.id.name)?;
+        f.write_char('\'')?;
         if let Some(uri) = &self.uri {
             f.write_char('(')?;
-            Display::fmt(uri, f)?;
+            self.uri.fmt(f)?;
             f.write_char(')')?;
         }
 
-        Ok(())
+        f.write_char(':')?;
+        Display::fmt(&self.id.pos, f)
     }
 }

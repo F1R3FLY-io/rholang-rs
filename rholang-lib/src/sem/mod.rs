@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::BTreeMap, fmt::Display};
 
 use bitvec::prelude::*;
 use by_address::ByAddress;
@@ -34,9 +34,57 @@ impl IntKey for PID {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Symbol(u32);
 
+/// Symbol occurence in the source code (used to mark variables)
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SymbolOccurence {
+    pub symbol: Symbol,
+    pub position: SourcePos,
+}
+
 /// ID of a binder (variable or name)
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BinderId(u32);
+
+impl BinderId {
+    #[inline(always)]
+    pub fn checked_sub(self, rhs: Self) -> Option<Self> {
+        self.0.checked_sub(rhs.0).map(BinderId)
+    }
+
+    pub fn saturating_sub(self, rhs: Self) -> Self {
+        BinderId(self.0.saturating_sub(rhs.0))
+    }
+}
+
+impl std::ops::Add for BinderId {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0 + rhs.0)
+    }
+}
+
+impl std::ops::Add<u32> for BinderId {
+    type Output = Self;
+
+    fn add(self, rhs: u32) -> Self::Output {
+        Self(self.0 + rhs)
+    }
+}
+
+impl std::ops::Sub for BinderId {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self(self.0 - rhs.0)
+    }
+}
+
+impl Display for BinderId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 #[derive(Copy, Clone, Debug)]
 pub struct Binder {
@@ -81,8 +129,30 @@ impl ScopeInfo {
     }
 
     #[inline(always)]
+    fn binder_end(&self) -> BinderId {
+        self.binder_start + self.num_binders
+    }
+
+    #[inline(always)]
+    fn checked_idx_inside(&self, bid: BinderId) -> usize {
+        bid.checked_sub(self.binder_start)
+            .expect("binder outside scope")
+            .0 as usize
+    }
+
+    #[inline(always)]
+    fn checked_idx_outside(&self, bid: BinderId) -> usize {
+        let offset_from_end = self
+            .binder_start
+            .checked_sub(bid)
+            .expect("binder too far")
+            .0 as usize;
+        self.captures.len() - offset_from_end
+    }
+
+    #[inline(always)]
     pub fn contains(&self, bid: BinderId) -> bool {
-        self.binder_start.0 <= bid.0 && bid.0 < self.binder_start.0 + self.num_binders
+        self.binder_start <= bid && bid < self.binder_end()
     }
 
     #[inline(always)]
@@ -113,6 +183,18 @@ impl ScopeInfo {
     pub fn num_captures(&self) -> usize {
         self.captures.count_ones()
     }
+
+    #[inline]
+    pub fn mark_used(&mut self, bid: BinderId) {
+        let idx = self.checked_idx_inside(bid);
+        self.uses.set(idx, true);
+    }
+
+    #[inline]
+    pub fn mark_captured(&mut self, bid: BinderId) {
+        let idx = self.checked_idx_outside(bid);
+        self.captures.set(idx, true);
+    }
 }
 
 pub struct SemanticDb<'a> {
@@ -126,6 +208,8 @@ pub struct SemanticDb<'a> {
     binder_is_name: BitVec,                // fast BinderId -> name or proc
     binders: Vec<Binder>,                  // semantic info about each binding
     proc_to_scope: IntMap<PID, ScopeInfo>, // PID -> semantic info about the scope
+
+    var_to_binder: BTreeMap<SymbolOccurence, BinderId>, // var -> where it is bound
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -174,11 +258,15 @@ pub enum WarningKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorKind {
+    UnboundVariable,
     DuplicateVarDef {
         symbol: Symbol,
         old_position: SourcePos,
     },
+    NameInProcPosition(BinderId),
     RemainderOutsidePattern,
     ConnectiveOutsidePattern,
+    WildcardOutsidePattern,
     BadCode,
 }
+
