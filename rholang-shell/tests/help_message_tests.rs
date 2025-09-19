@@ -60,7 +60,7 @@ fn test_help_message_content() {
         "Help message should describe .reset command"
     );
     assert!(
-        message.contains("Exit the shell"),
+        message.contains("Exit the rholang-shell"),
         "Help message should describe .quit command"
     );
 }
