@@ -112,7 +112,13 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
                 self.stack.push(inner);
             }
 
-            Proc::Send { inputs, .. } | Proc::SendSync { inputs, .. } => {
+            Proc::Send { inputs, .. } => {
+                self.stack.extend(inputs.iter().rev());
+            }
+            Proc::SendSync { inputs, cont, .. } => {
+                if let SyncSendCont::NonEmpty(proc) = cont {
+                    self.stack.push(proc);
+                }
                 self.stack.extend(inputs.iter().rev());
             }
 
