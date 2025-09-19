@@ -248,6 +248,16 @@ impl<'a> SemanticDb<'a> {
     pub fn binder_of(&self, occurence: SymbolOccurence) -> Option<BinderId> {
         self.var_to_binder.get(&occurence).copied()
     }
+
+    /// Query the binder for a given [`rholang_parser::ast::Id`]
+    pub fn binder_of_id(&self, id: rholang_parser::ast::Id) -> Option<BinderId> {
+        let sym = self.intern(id.name);
+        let occurence = SymbolOccurence {
+            symbol: sym,
+            position: id.pos,
+        };
+        self.binder_of(occurence)
+    }
 }
 
 /// Enable `db[pid]` syntax to access the process by PID.
