@@ -258,6 +258,7 @@ new helloworld, stdout(`rho:io:stdout`) in {
 
 ## Resources
 
+- [Rholang Execution Design (Process-Oriented Bytecode)](docs/RHOLANG_EXECUTION_DESIGN.md)
 - [Rholang Official Documentation](https://rholang.org/)
 - [F1r3fly Project](https://github.com/F1R3FLY-io/f1r3fly)
 - [RChain Cooperative](https://rchain.coop/)
