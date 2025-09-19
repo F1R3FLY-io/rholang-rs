@@ -41,6 +41,15 @@ pub struct SymbolOccurence {
     pub position: SourcePos,
 }
 
+impl From<Binder> for SymbolOccurence {
+    fn from(value: Binder) -> Self {
+        Self {
+            symbol: value.name,
+            position: value.source_position,
+        }
+    }
+}
+
 /// ID of a binder (variable or name)
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BinderId(u32);
@@ -249,24 +258,17 @@ pub enum InfoKind {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WarningKind {
-    ShadowedVar {
-        symbol: Symbol,
-        old_position: SourcePos,
-    },
+    ShadowedVar { original: SymbolOccurence },
     UnusedVariable,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorKind {
     UnboundVariable,
-    DuplicateVarDef {
-        symbol: Symbol,
-        old_position: SourcePos,
-    },
-    NameInProcPosition(BinderId),
-    RemainderOutsidePattern,
+    DuplicateVarDef { original: SymbolOccurence },
+    NameInProcPosition(BinderId, Symbol),
+    ProcInNamePosition(BinderId, Symbol),
     ConnectiveOutsidePattern,
-    WildcardOutsidePattern,
     BadCode,
 }
 
