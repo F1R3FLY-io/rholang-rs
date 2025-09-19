@@ -120,7 +120,7 @@ fn test_process_special_command_quit() -> Result<()> {
 
     assert!(should_exit); // Should signal to exit
     let output = String::from_utf8(stdout.into_inner())?;
-    assert!(output.contains("Exiting shell"));
+    assert!(output.contains("Exiting rholang-shell"));
 
     Ok(())
 }

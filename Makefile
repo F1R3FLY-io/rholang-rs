@@ -14,12 +14,12 @@ build:
 release:
 	cargo build --release
 
-# Run the shell binary
+# Run the rholang-shell binary
 .PHONY: run
 run:
 	cargo run -p shell
 
-# Run the shell binary with file history feature
+# Run the rholang-shell binary with file history feature
 .PHONY: run-with-history
 run-with-history:
 	cargo run -p shell --features with-file-history

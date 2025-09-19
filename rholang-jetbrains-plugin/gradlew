@@ -22,15 +22,15 @@
 #
 #   Important for running:
 #
-#   (1) You need a POSIX-compliant shell to run this script. If your /bin/sh is
-#       noncompliant, but you have some other compliant shell such as ksh or
-#       bash, then to run this script, type that shell name before the whole
+#   (1) You need a POSIX-compliant rholang-shell to run this script. If your /bin/sh is
+#       noncompliant, but you have some other compliant rholang-shell such as ksh or
+#       bash, then to run this script, type that rholang-shell name before the whole
 #       command line, like:
 #
 #           ksh Gradle
 #
 #       Busybox and similar reduced shells will NOT work, because this script
-#       requires all of these POSIX shell features:
+#       requires all of these POSIX rholang-shell features:
 #         * functions;
 #         * expansions «$var», «${var}», «${var:-default}», «${var+SET}»,
 #           «${var#prefix}», «${var%suffix}», and «$( cmd )»;
@@ -39,9 +39,9 @@
 #
 #   Important for patching:
 #
-#   (2) This script targets any POSIX shell, not just bash.
+#   (2) This script targets any POSIX rholang-shell, not just bash.
 #
-#       The "bash" shell, and others, support extensions over POSIX, but this
+#       The "bash" rholang-shell, and others, support extensions over POSIX, but this
 #       script does not use them. For example, in POSIX, «$RANDOM» is not
 #       available and «[[ ... ]]» tests are not available.
 #
@@ -193,7 +193,7 @@ DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
 
 # Collect all arguments for the java command;
 #   * $DEFAULT_JVM_OPTS, $JAVA_OPTS, and $GRADLE_OPTS can contain fragments of
-#     shell script including quotes and variable substitutions, so put them in
+#     rholang-shell script including quotes and variable substitutions, so put them in
 #     double quotes to make sure that they get re-expanded; and
 #   * put everything else in single quotes, so that it's not re-expanded.
 
@@ -218,9 +218,9 @@ fi
 #   readarray ARGS < <( xargs -n1 <<<"$var" ) &&
 #   set -- "${ARGS[@]}" "$@"
 #
-# but POSIX shell has neither arrays nor command substitution, so instead we
+# but POSIX rholang-shell has neither arrays nor command substitution, so instead we
 # post-process each arg (as a line of input to sed) to backslash-escape any
-# character that might be a shell metacharacter, then use eval to reverse
+# character that might be a rholang-shell metacharacter, then use eval to reverse
 # that process (while maintaining the separation between arguments), and wrap
 # the whole thing up as a single "set" statement.
 #

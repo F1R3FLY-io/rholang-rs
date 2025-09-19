@@ -119,7 +119,7 @@ impl InterpretationResult {
 }
 
 /// Trait for interpreter providers
-/// This trait defines the interface for interpreters that can be used with the shell
+/// This trait defines the interface for interpreters that can be used with the rholang-shell
 #[async_trait]
 pub trait InterpreterProvider {
     /// Interpret a string of code and return the result

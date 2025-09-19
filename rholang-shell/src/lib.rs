@@ -24,7 +24,7 @@ pub fn help_message() -> String {
         + "\n  .reset or Ctrl+C - Interrupt current input (in multiline mode: clear buffer)"
         + "\n  .ps - List all running processes"
         + "\n  .kill <index> - Kill a running process by index"
-        + "\n  .quit - Exit the shell"
+        + "\n  .quit - Exit the rholang-shell"
 }
 
 const DEFAULT_PROMPT: &str = ">>> ";
@@ -104,7 +104,7 @@ pub fn process_special_command<W: Write, I: InterpreterProvider>(
             writeln!(stdout, "{mode_msg}")?;
         }
         ".quit" => {
-            writeln!(stdout, "Exiting shell...")?;
+            writeln!(stdout, "Exiting rholang-shell...")?;
             return Ok(true); // Signal to exit
         }
         ".list" => {
@@ -235,7 +235,7 @@ pub fn handle_interrupt<W: Write, I: InterpreterProvider>(
     Ok(())
 }
 
-/// Run the shell with the provided interpreter provider
+/// Run the rholang-shell with the provided interpreter provider
 pub async fn run_shell<I: InterpreterProvider>(args: Args, interpreter: I) -> Result<()> {
     writeln!(std::io::stdout(), "{}", help_message())?;
 
