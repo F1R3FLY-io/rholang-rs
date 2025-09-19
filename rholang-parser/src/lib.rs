@@ -102,3 +102,19 @@ impl Display for SourceSpan {
         Ok(())
     }
 }
+
+// helper function for literals
+fn trim_byte(s: &str, a: u8) -> &str {
+    let bytes = s.as_bytes();
+    let mut start = 0;
+    let mut end = bytes.len();
+
+    if start < end && bytes[0] == a {
+        start += 1;
+    }
+    if start < end && bytes[end - 1] == a {
+        end -= 1;
+    }
+
+    &s[start..end]
+}
