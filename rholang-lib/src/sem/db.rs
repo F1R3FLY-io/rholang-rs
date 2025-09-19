@@ -44,6 +44,13 @@ impl<'a> SemanticDb<'a> {
         self.interner.resolve(sym)
     }
 
+    /// Resolves a [`Symbol`] back to the original string, which becomes owned by the caller.
+    ///
+    /// Returns `None` if the symbol was never interned in this database.
+    pub fn resolve_symbol_owned(&self, sym: Symbol) -> Option<String> {
+        self.interner.resolve_owned(sym)
+    }
+
     pub(super) fn fresh_binder(&mut self, binder: Binder) -> BinderId {
         let id = self.next_binder();
         let is_proc = binder.kind == BinderKind::Proc;
