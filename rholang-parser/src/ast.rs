@@ -385,7 +385,7 @@ impl Deref for Uri<'_> {
 
 impl<'a> From<&'a str> for Uri<'a> {
     fn from(value: &'a str) -> Self {
-        Uri(value.trim_matches(|c| c == '`'))
+        Uri(super::trim_byte(value, b'`'))
     }
 }
 
