@@ -43,6 +43,14 @@ impl Interner {
         let rev = unsafe { self.rev.try_borrow_unguarded().unwrap() };
         rev.get_index(sym.0 as usize).map(|s| s.as_str())
     }
+
+    pub(super) fn resolve_owned(&self, sym: Symbol) -> Option<String> {
+        // No need to use Ref trickery
+        self.rev
+            .borrow()
+            .get_index(sym.0 as usize)
+            .map(|s| s.clone())
+    }
 }
 
 impl Index<Symbol> for Interner {
