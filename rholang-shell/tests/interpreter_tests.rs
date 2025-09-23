@@ -1,7 +1,7 @@
 use anyhow::Result;
 use rstest::rstest;
 
-use shell::providers::{FakeInterpreterProvider, InterpretationResult, InterpreterProvider};
+use rholang_shell::providers::{FakeInterpreterProvider, InterpretationResult, InterpreterProvider};
 
 #[tokio::test]
 async fn test_fake_interpreter_returns_input() -> Result<()> {
