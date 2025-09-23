@@ -204,11 +204,26 @@ impl<'a> SemanticDb<'a> {
 
     /// Returns an iterator over the binders introduced by the given scope,
     /// along with their [`BinderId`]s.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the scope’s binder range is out of bounds of the database.
     pub fn binders_full(
         &self,
         scope: &ScopeInfo,
     ) -> impl Iterator<Item = (BinderId, &Binder)> + ExactSizeIterator {
-        scope.binder_range().map(|bid| (bid, &self[bid]))
+        let binders = self.binders(scope);
+        scope.binder_range().zip(binders)
+    }
+
+    /// Returns an iterator over the free binders introduced by the given scope, along with their
+    /// [`BinderId`]s.
+    ///
+    /// # Panics
+    ///
+    /// The iterator will panic if any of its `next` binders is out of bounds of the database.
+    pub fn free_binders_of(&self, scope: &ScopeInfo) -> impl Iterator<Item = (BinderId, &Binder)> {
+        scope.free().map(|bid| (bid, &self[bid]))
     }
 
     #[inline]
