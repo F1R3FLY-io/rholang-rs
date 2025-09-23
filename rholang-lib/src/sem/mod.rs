@@ -1,7 +1,8 @@
-use std::{collections::BTreeMap, fmt::Display};
+use std::{collections::BTreeMap, fmt::Display, u32};
 
 use bitvec::prelude::*;
 use by_address::ByAddress;
+use fixedbitset::FixedBitSet as BitSet;
 use indexmap::IndexMap;
 use intmap::{IntKey, IntMap};
 use rholang_parser::{SourcePos, ast};
@@ -118,18 +119,43 @@ pub struct ScopeInfo {
     binder_start: BinderId, // The first binder introduced in this scope.
     num_binders: u32,       // Number of binders introduced by this scope.
     uses: BitVec,           // Tracks which binders of *this scope* are actually used.
-    captures: BitVec,       // Tracks which *outer binders* are captured from enclosing scopes.
+    free: BitVec,           // Track binders that are free (only in patterns)
+    captures: BitSet,       // Tracks which *outer binders* are captured from enclosing scopes.
 }
 
 impl ScopeInfo {
-    pub fn new(binder_start: BinderId, num_binders: usize, total_binders: usize) -> Self {
+    pub const TOP: ScopeInfo = Self {
+        binder_start: BinderId(u32::MAX),
+        num_binders: 0,
+        uses: BitVec::EMPTY,
+        free: BitVec::EMPTY,
+        captures: BitSet::new(),
+    };
+
+    fn valid_range(num: usize) -> u32 {
+        num.try_into()
+            .expect("didn't expect more than 4 billions of binders")
+    }
+
+    pub fn new(binder_start: BinderId, num_binders: usize) -> Self {
+        let start = binder_start.0 as usize;
+        Self::valid_range(start + num_binders);
         Self {
             binder_start,
-            num_binders: num_binders
-                .try_into()
-                .expect("didn't expect more than 4 billions of binders"),
+            num_binders: Self::valid_range(num_binders),
             uses: bitvec![0; num_binders],
-            captures: bitvec![0; total_binders],
+            free: bitvec![0; num_binders],
+            captures: BitSet::with_capacity(start),
+        }
+    }
+
+    pub fn empty(binder_start: BinderId) -> Self {
+        Self {
+            binder_start,
+            num_binders: 0,
+            uses: BitVec::EMPTY,
+            free: BitVec::EMPTY,
+            captures: BitSet::with_capacity(binder_start.0 as usize),
         }
     }
 
@@ -147,16 +173,6 @@ impl ScopeInfo {
         bid.checked_sub(self.binder_start)
             .expect("binder outside scope")
             .0 as usize
-    }
-
-    #[inline(always)]
-    fn checked_idx_outside(&self, bid: BinderId) -> usize {
-        let offset_from_end = self
-            .binder_start
-            .checked_sub(bid)
-            .expect("binder too far")
-            .0 as usize;
-        self.captures.len() - offset_from_end
     }
 
     #[inline(always)]
@@ -182,7 +198,7 @@ impl ScopeInfo {
     }
 
     pub fn is_ground(&self) -> bool {
-        self.captures.not_any()
+        self.captures.is_clear()
     }
 
     pub fn is_constant(&self) -> bool {
@@ -190,7 +206,7 @@ impl ScopeInfo {
     }
 
     pub fn num_captures(&self) -> usize {
-        self.captures.count_ones()
+        self.captures.count_ones(..)
     }
 
     #[inline]
@@ -201,8 +217,22 @@ impl ScopeInfo {
 
     #[inline]
     pub fn mark_captured(&mut self, bid: BinderId) {
-        let idx = self.checked_idx_outside(bid);
-        self.captures.set(idx, true);
+        assert!(bid < self.binder_start, "binder {bid} too far!");
+        self.captures.set(bid.0 as usize, true);
+    }
+
+    pub fn captures(&self) -> impl DoubleEndedIterator<Item = BinderId> {
+        self.captures.ones().map(|i| BinderId(i as u32)) // SAFETY: fixed bit size will never exceed self.binder_start
+    }
+
+    pub fn num_free(&self) -> usize {
+        self.free.count_ones()
+    }
+
+    pub fn free(&self) -> impl Iterator<Item = BinderId> {
+        self.free
+            .iter_ones()
+            .map(|i| self.binder_start + (i as u32))
     }
 }
 
