@@ -48,11 +48,10 @@ async fn test_rholang_parser_interpreter_provider_valid_code() -> Result<()> {
     let result = provider.interpret(input).await;
     match result {
         InterpretationResult::Success(output) => {
-            // The get_pretty_tree method doesn't include "Parse tree:" prefix
-            // Just check that the output is not empty and contains some expected content
+            // Output should be the pretty Debug of the Validated AST like in golden tests
             assert!(!output.is_empty());
-            // Check for a string that should be in the output
-            assert!(output.contains("source"));
+            // Check that it looks like a successful parse (Validated::Good(...))
+            assert!(output.starts_with("Good("), "Unexpected output: {}", output);
         }
         InterpretationResult::Error(err) => {
             panic!("Expected success, got error: {}", err);
