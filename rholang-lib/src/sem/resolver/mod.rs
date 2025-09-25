@@ -1,0 +1,288 @@
+use std::marker::PhantomData;
+
+use super::*;
+use smallvec::SmallVec;
+
+mod pattern;
+mod proc;
+
+struct BindingStack {
+    scopes: SmallVec<[ScopeInfo; 4]>,
+    env: Env,
+}
+
+impl BindingStack {
+    fn new() -> Self {
+        Self {
+            scopes: SmallVec::new(),
+            env: Env::new(),
+        }
+    }
+
+    #[must_use]
+    fn push(&mut self, scope: ScopeInfo, db: &SemanticDb, shadowed: &mut Vec<Shadowed>) {
+        self.push_symbols(db.binders_full(&scope), shadowed);
+        self.scopes.push(scope);
+    }
+
+    #[must_use]
+    fn pop(&mut self) -> ScopeInfo {
+        let scope = self.scopes.pop().expect("pop from empty scope stack");
+        self.env.shrink(scope.num_binders());
+        scope
+    }
+
+    #[must_use]
+    fn push_free(&mut self, scope: ScopeInfo, db: &SemanticDb, shadowed: &mut Vec<Shadowed>) {
+        self.push_symbols(db.free_binders_of(&scope), shadowed);
+        self.scopes.push(scope);
+    }
+
+    #[must_use]
+    fn pop_free(&mut self) -> ScopeInfo {
+        let scope = self.scopes.pop().expect("pop from empty scope stack");
+        self.env.shrink(scope.num_free());
+        scope
+    }
+
+    fn push_symbols<'x, L>(&mut self, locals: L, shadowed: &mut Vec<Shadowed>)
+    where
+        L: Iterator<Item = (BinderId, &'x Binder)> + ExactSizeIterator,
+    {
+        self.env.reserve(locals.len());
+        locals.for_each(|(id, binder)| {
+            if let Some(old_binder) = self.env.lookup(binder.name) {
+                shadowed.push(Shadowed {
+                    new: id,
+                    old: old_binder,
+                });
+            }
+            self.env.push(binder.name, id);
+        });
+    }
+
+    fn lookup(&self, sym: Symbol) -> Option<BinderId> {
+        self.env.lookup(sym)
+    }
+
+    fn current_mut(&mut self) -> Option<&mut ScopeInfo> {
+        self.scopes.last_mut()
+    }
+
+    fn capturing_mut(&mut self, bid: BinderId) -> Option<&mut ScopeInfo> {
+        self.scopes.iter_mut().rfind(|scope| scope.contains(bid))
+    }
+}
+
+struct Env {
+    locals: SmallVec<[(Symbol, BinderId); 8]>,
+}
+
+impl Env {
+    fn new() -> Self {
+        Self {
+            locals: SmallVec::new(),
+        }
+    }
+
+    fn reserve(&mut self, n: usize) {
+        self.locals.reserve_exact(n);
+    }
+
+    fn push(&mut self, sym: Symbol, id: BinderId) {
+        self.locals.push((sym, id));
+    }
+
+    #[inline(always)]
+    fn shrink(&mut self, n: usize) {
+        let new_len = self
+            .locals
+            .len()
+            .checked_sub(n)
+            .expect("shrinking more locals than are present");
+        self.locals.truncate(new_len);
+    }
+
+    fn lookup(&self, sym: Symbol) -> Option<BinderId> {
+        self.locals
+            .iter()
+            .rfind(|(s, _)| *s == sym)
+            .map(|(_, bid)| *bid)
+    }
+
+    #[inline(always)]
+    fn len(&self) -> usize {
+        self.locals.len()
+    }
+}
+
+struct Shadowed {
+    new: BinderId,
+    old: BinderId,
+}
+
+/// Controls how to treat shadowed variables when lexical scope is dropped
+trait ShadowedStrategy {
+    fn warn_shadowed(db: &mut SemanticDb, current: PID, shadowed: &[Shadowed]);
+}
+
+/// Disallow shadowing within the same process ([`ErrorKind::DuplicateVarDef`]); allow shadowing accross processes
+enum DisallowDups {}
+
+/// allow shadowing accross scope, emit a warning ([`WarningKind::ShadowedVar`])
+enum OnlyWarn {}
+
+impl ShadowedStrategy for DisallowDups {
+    fn warn_shadowed(db: &mut SemanticDb, current: PID, shadowed: &[Shadowed]) {
+        use super::{ErrorKind, WarningKind};
+
+        for shadow in shadowed {
+            let new_binder = db[shadow.new];
+            let old_binder = db[shadow.old];
+            if old_binder.scope == current {
+                db.error(
+                    current,
+                    ErrorKind::DuplicateVarDef {
+                        original: old_binder.into(),
+                    },
+                    Some(new_binder.source_position),
+                );
+            } else {
+                db.warning(
+                    current,
+                    WarningKind::ShadowedVar {
+                        original: old_binder.into(),
+                    },
+                    Some(new_binder.source_position),
+                );
+            }
+        }
+    }
+}
+
+impl ShadowedStrategy for OnlyWarn {
+    fn warn_shadowed(db: &mut SemanticDb, current: PID, shadowed: &[Shadowed]) {
+        use super::WarningKind;
+
+        for shadow in shadowed {
+            let new_binder = db[shadow.new];
+            let old_binder = db[shadow.old];
+            db.warning(
+                current,
+                WarningKind::ShadowedVar {
+                    original: old_binder.into(),
+                },
+                Some(new_binder.source_position),
+            );
+        }
+    }
+}
+
+/// Controls what happens on exiting lexical scope
+trait PoppingStrategy {
+    fn pop(stack: &mut BindingStack) -> ScopeInfo;
+}
+
+/// All binders are removed from the [`Env`]
+enum PopAll {}
+
+/// Only free binders are removed from the [`Env`]
+enum PopFree {}
+
+impl PoppingStrategy for PopAll {
+    #[inline(always)]
+    fn pop(stack: &mut BindingStack) -> ScopeInfo {
+        stack.pop()
+    }
+}
+
+impl PoppingStrategy for PopFree {
+    #[inline(always)]
+    fn pop(stack: &mut BindingStack) -> ScopeInfo {
+        stack.pop_free()
+    }
+}
+
+struct LexicallyScoped<'s, 'd, 'a, S = DisallowDups, P = PopAll>
+where
+    S: ShadowedStrategy,
+    P: PoppingStrategy,
+{
+    stack: &'s mut BindingStack,
+    db: &'d mut SemanticDb<'a>,
+    scope: PID,
+    shadowed: Vec<Shadowed>,
+    _ss: PhantomData<S>,
+    _ps: PhantomData<P>,
+}
+
+impl<'s, 'd, 'a> LexicallyScoped<'s, 'd, 'a> {
+    fn new<F>(
+        db: &'d mut SemanticDb<'a>,
+        stack: &'s mut BindingStack,
+        scope: PID,
+        locals: ScopeInfo,
+        body: F,
+    ) -> Self
+    where
+        F: FnOnce(&mut SemanticDb<'a>, &mut BindingStack),
+    {
+        let mut shadowed = Vec::new();
+        stack.push(locals, db, &mut shadowed);
+
+        body(db, stack); // run the guarded recursion
+
+        Self {
+            stack,
+            db,
+            scope,
+            shadowed,
+            _ss: PhantomData,
+            _ps: PhantomData,
+        }
+    }
+}
+
+impl<'s, 'd, 'a> LexicallyScoped<'s, 'd, 'a, OnlyWarn, PopFree> {
+    fn free<F>(
+        db: &'d mut SemanticDb<'a>,
+        stack: &'s mut BindingStack,
+        scope: PID,
+        pattern: ScopeInfo,
+        body: F,
+    ) -> Self
+    where
+        F: FnOnce(&mut SemanticDb<'a>, &mut BindingStack),
+    {
+        let mut shadowed = Vec::new();
+        stack.push_free(pattern, db, &mut shadowed);
+
+        body(db, stack); // run the guarded recursion
+
+        Self {
+            stack,
+            db,
+            scope,
+            shadowed,
+            _ss: PhantomData,
+            _ps: PhantomData,
+        }
+    }
+}
+
+impl<S, P> Drop for LexicallyScoped<'_, '_, '_, S, P>
+where
+    S: ShadowedStrategy,
+    P: PoppingStrategy,
+{
+    fn drop(&mut self) {
+        S::warn_shadowed(self.db, self.scope, &self.shadowed);
+
+        let popped_scope = P::pop(self.stack);
+        assert!(
+            self.db.add_scope(self.scope, popped_scope),
+            "bug: scope {} already visited!!!",
+            self.scope
+        );
+    }
+}
