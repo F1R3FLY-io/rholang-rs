@@ -222,7 +222,10 @@ impl<'a> SemanticDb<'a> {
     /// # Panics
     ///
     /// The iterator will panic if any of its `next` binders is out of bounds of the database.
-    pub fn free_binders_of(&self, scope: &ScopeInfo) -> impl Iterator<Item = (BinderId, &Binder)> {
+    pub fn free_binders_of(
+        &self,
+        scope: &ScopeInfo,
+    ) -> impl Iterator<Item = (BinderId, &Binder)> + ExactSizeIterator {
         scope.free().map(|bid| (bid, &self[bid]))
     }
 
@@ -234,7 +237,9 @@ impl<'a> SemanticDb<'a> {
             self.next_binder
         );
     }
+
     /// Maps a variable occurrence ([`SymbolOccurence`]) to its binder
+    ///
     /// # Panics
     ///
     /// Panics if `binder` is not within the allocated range of binders.
@@ -242,15 +247,27 @@ impl<'a> SemanticDb<'a> {
     pub(super) fn map_symbol_to_binder(
         &mut self,
         sym: Symbol,
-        pos: SourcePos,
         binder: BinderId,
+        pos: SourcePos,
     ) -> bool {
         self.assert_binder_ib(binder);
         let key = SymbolOccurence {
             symbol: sym,
             position: pos,
         };
-        let old = self.var_to_binder.insert(key, binder);
+        let old = self.var_to_binder.insert(key, VarBinding::Bound(binder));
+        old.is_none()
+    }
+
+    /// Maps a variable occurrence ([`SymbolOccurence`]) as a free variable.
+    /// This is used only in patterns
+    #[must_use]
+    pub(super) fn map_symbol_as_free(&mut self, sym: Symbol, index: usize, pos: SourcePos) -> bool {
+        let key = SymbolOccurence {
+            symbol: sym,
+            position: pos,
+        };
+        let old = self.var_to_binder.insert(key, VarBinding::Free { index });
         old.is_none()
     }
 
@@ -260,12 +277,12 @@ impl<'a> SemanticDb<'a> {
     }
 
     /// Query the binder for a given variable occurrence
-    pub fn binder_of(&self, occurence: SymbolOccurence) -> Option<BinderId> {
+    pub fn binder_of(&self, occurence: SymbolOccurence) -> Option<VarBinding> {
         self.var_to_binder.get(&occurence).copied()
     }
 
     /// Query the binder for a given [`rholang_parser::ast::Id`]
-    pub fn binder_of_id(&self, id: rholang_parser::ast::Id) -> Option<BinderId> {
+    pub fn binder_of_id(&self, id: rholang_parser::ast::Id) -> Option<VarBinding> {
         let sym = self.intern(id.name);
         let occurence = SymbolOccurence {
             symbol: sym,
