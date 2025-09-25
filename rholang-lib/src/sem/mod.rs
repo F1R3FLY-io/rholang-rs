@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fmt::Display, u32};
+use std::{collections::BTreeMap, fmt::Display, iter::FusedIterator, u32};
 
 use bitvec::prelude::*;
 use by_address::ByAddress;
@@ -9,6 +9,7 @@ use rholang_parser::{SourcePos, ast};
 
 pub mod db;
 mod interner;
+mod resolver;
 
 pub type ProcRef<'a> = &'a ast::AnnProc<'a>;
 
@@ -125,7 +126,7 @@ pub struct ScopeInfo {
 
 impl ScopeInfo {
     pub const TOP: ScopeInfo = Self {
-        binder_start: BinderId(u32::MAX),
+        binder_start: BinderId(0),
         num_binders: 0,
         uses: BitVec::EMPTY,
         free: BitVec::EMPTY,
@@ -138,24 +139,22 @@ impl ScopeInfo {
     }
 
     pub fn new(binder_start: BinderId, num_binders: usize) -> Self {
-        let start = binder_start.0 as usize;
-        Self::valid_range(start + num_binders);
-        Self {
+        Self::from_parts(
             binder_start,
-            num_binders: Self::valid_range(num_binders),
-            uses: bitvec![0; num_binders],
-            free: bitvec![0; num_binders],
-            captures: BitSet::with_capacity(start),
-        }
+            bitvec![0; num_binders],
+            BitSet::with_capacity(binder_start.0 as usize),
+        )
     }
 
-    pub fn empty(binder_start: BinderId) -> Self {
+    pub fn from_parts(binder_start: BinderId, free: BitVec, captures: BitSet) -> Self {
+        let num_binders = free.len();
+        Self::valid_range(binder_start.0 as usize + num_binders);
         Self {
             binder_start,
-            num_binders: 0,
-            uses: BitVec::EMPTY,
-            free: BitVec::EMPTY,
-            captures: BitSet::with_capacity(binder_start.0 as usize),
+            num_binders: num_binders as u32,
+            uses: bitvec![0; num_binders],
+            free,
+            captures,
         }
     }
 
@@ -211,8 +210,16 @@ impl ScopeInfo {
 
     #[inline]
     pub fn mark_used(&mut self, bid: BinderId) {
-        let idx = self.checked_idx_inside(bid);
-        self.uses.set(idx, true);
+        unsafe {
+            self.mark_used_unchecked(self.checked_idx_inside(bid));
+        }
+    }
+
+    #[inline(always)]
+    pub unsafe fn mark_used_unchecked(&mut self, idx: usize) {
+        unsafe {
+            self.uses.set_unchecked(idx, true);
+        }
     }
 
     #[inline]
@@ -221,19 +228,30 @@ impl ScopeInfo {
         self.captures.set(bid.0 as usize, true);
     }
 
-    pub fn captures(&self) -> impl DoubleEndedIterator<Item = BinderId> {
-        self.captures.ones().map(|i| BinderId(i as u32)) // SAFETY: fixed bit size will never exceed self.binder_start
+    pub fn captures(&self) -> impl DoubleEndedIterator<Item = BinderId> + ExactSizeIterator {
+        // SAFETY: fixed bit size will never exceed self.binder_start
+        let iter = self.captures.ones().map(|i| BinderId(i as u32));
+        WithLen::new(iter, self.num_captures())
     }
 
     pub fn num_free(&self) -> usize {
         self.free.count_ones()
     }
 
-    pub fn free(&self) -> impl Iterator<Item = BinderId> {
+    pub fn free(&self) -> impl Iterator<Item = BinderId> + ExactSizeIterator {
         self.free
             .iter_ones()
             .map(|i| self.binder_start + (i as u32))
     }
+}
+
+/// Describes occurence of a symbol
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum VarBinding {
+    /// resolved variable
+    Bound(BinderId),
+    /// unresolved variable in a pattern; `index` points to its parent binders
+    Free { index: usize },
 }
 
 pub struct SemanticDb<'a> {
@@ -248,7 +266,7 @@ pub struct SemanticDb<'a> {
     binders: Vec<Binder>,                  // semantic info about each binding
     proc_to_scope: IntMap<PID, ScopeInfo>, // PID -> semantic info about the scope
 
-    var_to_binder: BTreeMap<SymbolOccurence, BinderId>, // var -> where it is bound
+    var_to_binder: BTreeMap<SymbolOccurence, VarBinding>, // var -> where it is bound
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -310,3 +328,52 @@ const SEED3: u64 = 0x1234_5678_9ABC_DEF0;
 fn stable_hasher() -> ahash::RandomState {
     ahash::RandomState::with_seeds(SEED0, SEED1, SEED2, SEED3)
 }
+
+struct WithLen<I> {
+    iter: I,
+    len: usize,
+}
+
+impl<I> WithLen<I> {
+    pub fn new(iter: I, len: usize) -> Self {
+        Self { iter, len }
+    }
+}
+
+impl<I> Iterator for WithLen<I>
+where
+    I: Iterator,
+{
+    type Item = I::Item;
+
+    #[inline(always)]
+    fn next(&mut self) -> Option<Self::Item> {
+        let item = self.iter.next();
+        if item.is_some() {
+            self.len -= 1;
+        }
+        item
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.len, Some(self.len))
+    }
+}
+
+impl<I> DoubleEndedIterator for WithLen<I>
+where
+    I: DoubleEndedIterator,
+{
+    #[inline(always)]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let item = self.iter.next_back();
+        if item.is_some() {
+            self.len -= 1;
+        }
+        item
+    }
+}
+
+impl<I> ExactSizeIterator for WithLen<I> where I: Iterator {}
+
+impl<I> FusedIterator for WithLen<I> where I: FusedIterator {}
