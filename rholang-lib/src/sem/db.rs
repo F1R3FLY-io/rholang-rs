@@ -147,12 +147,26 @@ impl<'a> SemanticDb<'a> {
         &self.diagnostics
     }
 
+    #[inline]
+    fn assert_scope_ib(&self, rng: &std::ops::Range<usize>) {
+        assert!(
+            rng.end <= (self.next_binder as usize),
+            "Scope spans beyond the range of binders: {rng:#?} ends beyond {}",
+            self.next_binder
+        );
+    }
+
     /// Adds scope information for the given process.
     ///
     /// Returns `true` if the scope was newly inserted, or `false` if a scope
     /// for this process already existed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the scope’s binder range is out of bounds of the database.
     #[must_use]
     pub(super) fn add_scope(&mut self, proc: PID, scope: ScopeInfo) -> bool {
+        self.assert_scope_ib(&scope.as_range());
         self.proc_to_scope.insert_checked(proc, scope)
     }
 
@@ -168,7 +182,8 @@ impl<'a> SemanticDb<'a> {
     /// This is the safe counterpart of [`Self::binders`], which will panic if the
     /// scope is invalid.
     pub fn binders_of(&self, proc: PID) -> Option<&[Binder]> {
-        self.get_scope(proc).map(|scope| self.binders(scope))
+        self.get_scope(proc)
+            .map(|scope| unsafe { self.binders.get_unchecked(scope.as_range()) })
     }
 
     /// Returns an iterator over all scopes.
@@ -194,11 +209,7 @@ impl<'a> SemanticDb<'a> {
     /// `None` instead of panicking.
     pub fn binders(&self, scope: &ScopeInfo) -> &[Binder] {
         let rng = scope.as_range();
-        assert!(
-            rng.end <= (self.next_binder as usize),
-            "Scope spans beyond the range of binders: {rng:#?} ends beyond {}",
-            self.next_binder
-        );
+        self.assert_scope_ib(&rng);
         unsafe { self.binders.get_unchecked(rng) }
     }
 
@@ -244,30 +255,17 @@ impl<'a> SemanticDb<'a> {
     ///
     /// Panics if `binder` is not within the allocated range of binders.
     #[must_use]
-    pub(super) fn map_symbol_to_binder(
-        &mut self,
-        sym: Symbol,
-        binder: BinderId,
-        pos: SourcePos,
-    ) -> bool {
+    pub(super) fn map_symbol_to_binder(&mut self, occ: SymbolOccurence, binder: BinderId) -> bool {
         self.assert_binder_ib(binder);
-        let key = SymbolOccurence {
-            symbol: sym,
-            position: pos,
-        };
-        let old = self.var_to_binder.insert(key, VarBinding::Bound(binder));
+        let old = self.var_to_binder.insert(occ, VarBinding::Bound(binder));
         old.is_none()
     }
 
     /// Maps a variable occurrence ([`SymbolOccurence`]) as a free variable.
     /// This is used only in patterns
     #[must_use]
-    pub(super) fn map_symbol_as_free(&mut self, sym: Symbol, index: usize, pos: SourcePos) -> bool {
-        let key = SymbolOccurence {
-            symbol: sym,
-            position: pos,
-        };
-        let old = self.var_to_binder.insert(key, VarBinding::Free { index });
+    pub(super) fn map_symbol_as_free(&mut self, occ: SymbolOccurence, index: usize) -> bool {
+        let old = self.var_to_binder.insert(occ, VarBinding::Free { index });
         old.is_none()
     }
 

@@ -125,14 +125,6 @@ pub struct ScopeInfo {
 }
 
 impl ScopeInfo {
-    pub const TOP: ScopeInfo = Self {
-        binder_start: BinderId(0),
-        num_binders: 0,
-        uses: BitVec::EMPTY,
-        free: BitVec::EMPTY,
-        captures: BitSet::new(),
-    };
-
     fn valid_range(num: usize) -> u32 {
         num.try_into()
             .expect("didn't expect more than 4 billions of binders")
@@ -144,6 +136,22 @@ impl ScopeInfo {
             bitvec![0; num_binders],
             BitSet::with_capacity(binder_start.0 as usize),
         )
+    }
+
+    pub fn ground(binder_start: BinderId) -> Self {
+        Self::from_parts(binder_start, BitVec::EMPTY, BitSet::new())
+    }
+
+    pub fn free_var(binder_start: BinderId) -> Self {
+        Self::from_parts(binder_start, bitvec![1], BitSet::new())
+    }
+
+    pub fn var_ref(binder_start: BinderId, ref_binder: BinderId) -> ScopeInfo {
+        let captures = BitSet::with_capacity(binder_start.0 as usize);
+        let mut res = Self::from_parts(binder_start, BitVec::EMPTY, captures);
+        res.mark_captured(ref_binder);
+
+        res
     }
 
     pub fn from_parts(binder_start: BinderId, free: BitVec, captures: BitSet) -> Self {
@@ -197,11 +205,7 @@ impl ScopeInfo {
     }
 
     pub fn is_ground(&self) -> bool {
-        self.captures.is_clear()
-    }
-
-    pub fn is_constant(&self) -> bool {
-        self.uses.not_any()
+        self.captures.is_clear() && self.free.not_any()
     }
 
     pub fn num_captures(&self) -> usize {
@@ -222,10 +226,21 @@ impl ScopeInfo {
         }
     }
 
+    pub fn set_uses(&mut self, uses: BitVec) {
+        assert_eq!(self.num_binders(), uses.len());
+        self.uses = uses;
+    }
+
     #[inline]
     pub fn mark_captured(&mut self, bid: BinderId) {
         assert!(bid < self.binder_start, "binder {bid} too far!");
-        self.captures.set(bid.0 as usize, true);
+        if self.captures.len() <= bid.0 as usize {
+            self.captures.grow(self.binder_start.0 as usize);
+        }
+        unsafe {
+            // SAFETY: only accepts ids < binder_start. The line above preallocates if empty
+            self.captures.set_unchecked(bid.0 as usize, true);
+        }
     }
 
     pub fn captures(&self) -> impl DoubleEndedIterator<Item = BinderId> + ExactSizeIterator {
@@ -308,6 +323,7 @@ pub enum InfoKind {}
 pub enum WarningKind {
     ShadowedVar { original: SymbolOccurence },
     UnusedVariable,
+    PatternIsExpression,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -317,7 +333,18 @@ pub enum ErrorKind {
     NameInProcPosition(BinderId, Symbol),
     ProcInNamePosition(BinderId, Symbol),
     ConnectiveOutsidePattern,
+    BundleInsidePattern,
     BadCode,
+}
+
+impl ErrorKind {
+    pub fn kind_mismatch(binder: BinderId, sym: Symbol, expects_name: bool) -> Self {
+        if expects_name {
+            ErrorKind::ProcInNamePosition(binder, sym)
+        } else {
+            ErrorKind::NameInProcPosition(binder, sym)
+        }
+    }
 }
 
 const SEED0: u64 = 0x0FED_CBA9_8765_4321;
