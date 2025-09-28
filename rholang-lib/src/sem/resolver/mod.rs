@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, ops::Range};
 
 use super::*;
 use smallvec::SmallVec;
@@ -74,6 +74,47 @@ impl BindingStack {
     }
 }
 
+fn resolve_var(
+    db: &mut SemanticDb,
+    stack: &mut BindingStack,
+    var: ast::Id,
+) -> Option<(SymbolOccurence, BinderId)> {
+    let sym = db.intern(var.name);
+    // Step 1: try to resolve against lexical scopes
+    if let Some(binder) = stack.lookup(sym) {
+        let current = stack
+            .current_mut()
+            .unwrap_or_else(|| panic!("bug: variable {var} fell off lexical scope!!!"));
+        if current.contains(binder) {
+            // Case A: binder belongs to *this* scope
+            current.mark_used(binder);
+        } else {
+            // Case B: binder belongs to an *outer* scope
+            current.mark_captured(binder);
+            if let Some(owner) = stack.capturing_mut(binder) {
+                owner.mark_used(binder);
+            } else {
+                panic!("bug: dangling variable {var} (no owning scope found)");
+            }
+        }
+
+        // Step 2: record in semantic db
+        let occ = SymbolOccurence {
+            symbol: sym,
+            position: var.pos,
+        };
+        assert!(
+            db.map_symbol_to_binder(occ, binder),
+            "bug: variable {var} already bound!!!"
+        );
+
+        Some((occ, binder))
+    } else {
+        // Case C: not found anywhere
+        None
+    }
+}
+
 struct Env {
     locals: SmallVec<[(Symbol, BinderId); 8]>,
 }
@@ -113,6 +154,23 @@ impl Env {
     #[inline(always)]
     fn len(&self) -> usize {
         self.locals.len()
+    }
+
+    fn forget(&mut self, range: Range<usize>) {
+        let len = self.len();
+
+        if range.start >= len {
+            // nothing to remove
+            return;
+        }
+
+        if range.end >= len {
+            // range goes to or past the end → truncate
+            self.locals.truncate(range.start);
+        } else {
+            // otherwise, drain and discard
+            self.locals.drain(range);
+        }
     }
 }
 
@@ -216,21 +274,28 @@ where
     _ps: PhantomData<P>,
 }
 
+impl<'a, S, P> LexicallyScoped<'_, '_, 'a, S, P>
+where
+    S: ShadowedStrategy,
+    P: PoppingStrategy,
+{
+    pub fn with<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut SemanticDb<'a>, &mut BindingStack) -> R,
+    {
+        f(self.db, self.stack)
+    }
+}
+
 impl<'s, 'd, 'a> LexicallyScoped<'s, 'd, 'a> {
-    fn new<F>(
+    fn new(
         db: &'d mut SemanticDb<'a>,
         stack: &'s mut BindingStack,
         scope: PID,
         locals: ScopeInfo,
-        body: F,
-    ) -> Self
-    where
-        F: FnOnce(&mut SemanticDb<'a>, &mut BindingStack),
-    {
+    ) -> Self {
         let mut shadowed = Vec::new();
         stack.push(locals, db, &mut shadowed);
-
-        body(db, stack); // run the guarded recursion
 
         Self {
             stack,
@@ -244,20 +309,14 @@ impl<'s, 'd, 'a> LexicallyScoped<'s, 'd, 'a> {
 }
 
 impl<'s, 'd, 'a> LexicallyScoped<'s, 'd, 'a, OnlyWarn, PopFree> {
-    fn free<F>(
+    fn free(
         db: &'d mut SemanticDb<'a>,
         stack: &'s mut BindingStack,
         scope: PID,
         pattern: ScopeInfo,
-        body: F,
-    ) -> Self
-    where
-        F: FnOnce(&mut SemanticDb<'a>, &mut BindingStack),
-    {
+    ) -> Self {
         let mut shadowed = Vec::new();
         stack.push_free(pattern, db, &mut shadowed);
-
-        body(db, stack); // run the guarded recursion
 
         Self {
             stack,

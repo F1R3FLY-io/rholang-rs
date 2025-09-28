@@ -296,6 +296,11 @@ pub enum UnaryExpOp {
     Neg,
     Negation,
 }
+impl UnaryExpOp {
+    pub fn is_connective(self) -> bool {
+        self == UnaryExpOp::Negation
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum BinaryExpOp {
@@ -318,6 +323,15 @@ pub enum BinaryExpOp {
     Mod,
     Disjunction,
     Conjunction,
+}
+
+impl BinaryExpOp {
+    pub fn is_connective(self) -> bool {
+        match self {
+            BinaryExpOp::Conjunction | BinaryExpOp::Disjunction => true,
+            _ => false,
+        }
+    }
 }
 
 // for-comprehensions
