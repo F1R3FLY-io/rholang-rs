@@ -9,6 +9,7 @@ use intmap::{IntKey, IntMap};
 use rholang_parser::{SourcePos, SourceSpan, ast};
 
 pub mod db;
+pub mod elaborator;
 mod interner;
 pub mod pipeline;
 mod resolver;
@@ -68,7 +69,7 @@ impl IntKey for PID {
 }
 
 /// Interned strings
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Symbol(u32);
 
 impl Symbol {
