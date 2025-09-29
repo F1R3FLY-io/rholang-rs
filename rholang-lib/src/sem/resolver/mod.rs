@@ -74,10 +74,12 @@ impl BindingStack {
     }
 }
 
-fn resolve_var(
-    db: &mut SemanticDb,
-    stack: &mut BindingStack,
+fn resolve_var<'a>(
     var: ast::Id,
+    expects_name: bool,
+    site: ProcRef<'a>,
+    db: &mut SemanticDb<'a>,
+    stack: &mut BindingStack,
 ) -> Option<(SymbolOccurence, BinderId)> {
     let sym = db.intern(var.name);
     // Step 1: try to resolve against lexical scopes
@@ -104,7 +106,7 @@ fn resolve_var(
             position: var.pos,
         };
         assert!(
-            db.map_symbol_to_binder(occ, binder),
+            db.map_symbol_to_binder(occ, binder, expects_name, site),
             "bug: variable {var} already bound!!!"
         );
 

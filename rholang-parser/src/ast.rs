@@ -436,6 +436,17 @@ pub enum Collection<'ast> {
     },
 }
 
+impl<'a> Collection<'a> {
+    pub fn remainder(&self) -> Option<Var<'a>> {
+        match self {
+            Collection::List { remainder, .. }
+            | Collection::Set { remainder, .. }
+            | Collection::Map { remainder, .. } => *remainder,
+            Collection::Tuple(_) => None,
+        }
+    }
+}
+
 // sends
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

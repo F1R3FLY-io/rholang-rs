@@ -249,14 +249,39 @@ impl<'a> SemanticDb<'a> {
         );
     }
 
+    fn check_kind(
+        &mut self,
+        occ: SymbolOccurence,
+        binder: BinderId,
+        expects_name: bool,
+        site: ProcRef<'a>,
+    ) {
+        let is_name_binder = self.is_name(binder);
+
+        if is_name_binder != expects_name {
+            self.error(
+                self[site],
+                ErrorKind::kind_mismatch(binder, occ.symbol, expects_name),
+                Some(occ.position),
+            );
+        }
+    }
+
     /// Maps a variable occurrence ([`SymbolOccurence`]) to its binder
     ///
     /// # Panics
     ///
     /// Panics if `binder` is not within the allocated range of binders.
     #[must_use]
-    pub(super) fn map_symbol_to_binder(&mut self, occ: SymbolOccurence, binder: BinderId) -> bool {
+    pub(super) fn map_symbol_to_binder(
+        &mut self,
+        occ: SymbolOccurence,
+        binder: BinderId,
+        expects_name: bool,
+        site: ProcRef<'a>,
+    ) -> bool {
         self.assert_binder_ib(binder);
+        self.check_kind(occ, binder, expects_name, site);
         let old = self.var_to_binder.insert(occ, VarBinding::Bound(binder));
         old.is_none()
     }
