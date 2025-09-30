@@ -220,6 +220,13 @@ pub struct Names<'ast> {
     pub remainder: Option<Var<'ast>>,
 }
 
+pub enum NamesKind<'a> {
+    Empty,
+    SingleName(&'a Name<'a>),
+    SingleRemainder(Var<'a>),
+    Multiple,
+}
+
 impl Clone for Names<'_> {
     fn clone(&self) -> Self {
         let mut dest_names = SmallVec::with_capacity(self.names.len());
@@ -251,7 +258,7 @@ impl Clone for Names<'_> {
 }
 
 impl<'a> Names<'a> {
-    pub(super) fn from_iter<I>(iterable: I, with_remainder: bool) -> Result<Names<'a>, String>
+    pub fn from_iter<I>(iterable: I, with_remainder: bool) -> Result<Names<'a>, String>
     where
         I: IntoIterator<Item = Name<'a>, IntoIter: DoubleEndedIterator>,
     {
@@ -271,8 +278,7 @@ impl<'a> Names<'a> {
         })
     }
 
-    #[allow(dead_code)]
-    pub(super) fn single(name: Name<'a>) -> Self {
+    pub fn single(name: Name<'a>) -> Self {
         Names {
             names: smallvec![name],
             remainder: None,
@@ -285,6 +291,22 @@ impl<'a> Names<'a> {
 
     pub fn only_remainder(&self) -> bool {
         self.names.is_empty() && self.remainder.is_some()
+    }
+
+    pub fn is_single_name(&self) -> bool {
+        self.names.len() == 1 && self.remainder.is_none()
+    }
+
+    pub fn kind(&'a self) -> NamesKind<'a> {
+        if self.is_empty() {
+            NamesKind::Empty
+        } else if self.only_remainder() {
+            NamesKind::SingleRemainder(self.remainder.unwrap())
+        } else if self.is_single_name() {
+            NamesKind::SingleName(&self.names[0])
+        } else {
+            NamesKind::Multiple
+        }
     }
 }
 
