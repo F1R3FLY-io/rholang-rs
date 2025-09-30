@@ -254,13 +254,13 @@ impl<'a> SemanticDb<'a> {
         occ: SymbolOccurence,
         binder: BinderId,
         expects_name: bool,
-        site: ProcRef<'a>,
+        site: PID,
     ) {
         let is_name_binder = self.is_name(binder);
 
         if is_name_binder != expects_name {
             self.error(
-                self[site],
+                site,
                 ErrorKind::kind_mismatch(binder, occ.symbol, expects_name),
                 Some(occ.position),
             );
@@ -278,7 +278,7 @@ impl<'a> SemanticDb<'a> {
         occ: SymbolOccurence,
         binder: BinderId,
         expects_name: bool,
-        site: ProcRef<'a>,
+        site: PID,
     ) -> bool {
         self.assert_binder_ib(binder);
         self.check_kind(occ, binder, expects_name, site);
