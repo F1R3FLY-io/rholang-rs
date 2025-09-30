@@ -77,7 +77,7 @@ impl BindingStack {
 fn resolve_var<'a>(
     var: ast::Id,
     expects_name: bool,
-    site: ProcRef<'a>,
+    site: PID,
     db: &mut SemanticDb<'a>,
     stack: &mut BindingStack,
 ) -> Option<(SymbolOccurence, BinderId)> {
