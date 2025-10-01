@@ -5,7 +5,7 @@ use by_address::ByAddress;
 use fixedbitset::FixedBitSet as BitSet;
 use indexmap::IndexMap;
 use intmap::{IntKey, IntMap};
-use rholang_parser::{SourcePos, ast};
+use rholang_parser::{SourcePos, SourceSpan, ast};
 
 pub mod db;
 mod interner;
@@ -258,6 +258,59 @@ impl ScopeInfo {
             .iter_ones()
             .map(|i| self.binder_start + (i as u32))
     }
+
+    fn absorb(&mut self, rhs: ScopeInfo) {
+        assert_eq!(
+            self.binder_end(),
+            rhs.binder_start,
+            "scopes not contiguous: left {}..{}, right {}..{}",
+            self.binder_start,
+            self.binder_end(),
+            rhs.binder_start,
+            rhs.binder_end()
+        );
+
+        // Merge captures first
+        self.captures.union_with(&rhs.captures);
+
+        // Convert captures from rhs that fall into self's binder range into uses
+        let binder_range = self.as_range();
+        let overlap_start = binder_range.start;
+        let overlaps = self
+            .captures
+            .maximum() // that’s a clever tradeoff since it compiles down to a SIMD scan of the last non-empty block.
+            .is_some_and(|last| overlap_start <= last);
+        if overlaps {
+            let overlap_end = binder_range.end.min(self.captures.len());
+
+            // REMARK: Since FixedBitSet stores its bits as a Vec<Block>, we can operate
+            // block-by-block instead of bit-by-bit. This can reduce iteration overhead
+            // significantly, especially if scopes become wide.
+            //
+            // Idea for rewrite if this ever becomes a performance problem
+            // - Compute the block range that overlaps with binder_range.
+            // - For each overlapping block:
+            // - - Mask the part of the block that belongs to the overlap.
+            // - - Convert those set bits into uses (shifted indices).
+            // - - Clear them in captures.
+            for i in self.captures.ones().rev() {
+                // Otherwise if there are any set bits at or beyond binder_range.end, they’ll also be converted into uses.
+                if i >= overlap_end {
+                    continue;
+                }
+                if i < overlap_start {
+                    break;
+                }
+                self.uses.set(i - overlap_start, true);
+            }
+            self.captures.set_range(overlap_start..overlap_end, false);
+        }
+
+        // Merge other metadata
+        self.free.extend_from_bitslice(&rhs.free);
+        self.uses.extend_from_bitslice(&rhs.uses);
+        self.num_binders += rhs.num_binders;
+    }
 }
 
 /// Describes occurence of a symbol
@@ -323,7 +376,7 @@ pub enum InfoKind {}
 pub enum WarningKind {
     ShadowedVar { original: SymbolOccurence },
     UnusedVariable,
-    PatternIsExpression,
+    TopLevelPatternExpr { span: SourceSpan },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
