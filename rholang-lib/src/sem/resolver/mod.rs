@@ -19,10 +19,13 @@ impl BindingStack {
         }
     }
 
-    #[must_use]
     fn push(&mut self, scope: ScopeInfo, db: &SemanticDb, shadowed: &mut Vec<Shadowed>) {
         self.push_symbols(db.binders_full(&scope), shadowed);
         self.scopes.push(scope);
+    }
+
+    fn push_emtpy(&mut self, db: &SemanticDb) {
+        self.scopes.push(ScopeInfo::ground(db.next_binder()));
     }
 
     #[must_use]
@@ -32,7 +35,6 @@ impl BindingStack {
         scope
     }
 
-    #[must_use]
     fn push_free(&mut self, scope: ScopeInfo, db: &SemanticDb, shadowed: &mut Vec<Shadowed>) {
         self.push_symbols(db.free_binders_of(&scope), shadowed);
         self.scopes.push(scope);
@@ -43,6 +45,15 @@ impl BindingStack {
         let scope = self.scopes.pop().expect("pop from empty scope stack");
         self.env.shrink(scope.num_free());
         scope
+    }
+
+    fn absorb_free(&mut self, scope: ScopeInfo, db: &SemanticDb, shadowed: &mut Vec<Shadowed>) {
+        self.push_symbols(db.free_binders_of(&scope), shadowed);
+        if let Some(top) = self.scopes.last_mut() {
+            top.absorb(scope);
+        } else {
+            self.scopes.push(scope);
+        }
     }
 
     fn push_symbols<'x, L>(&mut self, locals: L, shadowed: &mut Vec<Shadowed>)
@@ -113,6 +124,36 @@ fn resolve_var<'a>(
         Some((occ, binder))
     } else {
         // Case C: not found anywhere
+        None
+    }
+}
+
+fn resolve_var_ref<'a>(
+    var: ast::Id,
+    kind: ast::VarRefKind,
+    pattern: PID,
+    db: &mut SemanticDb<'a>,
+    stack: &mut BindingStack,
+) -> Option<(SymbolOccurence, BinderId)> {
+    let sym = db.intern(var.name);
+
+    if let Some(binder) = stack.lookup(sym) {
+        let scope = stack
+            .capturing_mut(binder)
+            .unwrap_or_else(|| panic!("bug: dangling variable {var} (no owning scope found)"));
+        scope.mark_used(binder);
+
+        let occ = SymbolOccurence {
+            symbol: sym,
+            position: var.pos,
+        };
+        assert!(
+            db.map_symbol_to_binder(occ, binder, kind == ast::VarRefKind::Name, pattern),
+            "bug: variable {var} already bound!!!"
+        );
+
+        Some((occ, binder))
+    } else {
         None
     }
 }
@@ -276,16 +317,36 @@ where
     _ps: PhantomData<P>,
 }
 
-impl<'a, S, P> LexicallyScoped<'_, '_, 'a, S, P>
+impl<'s, 'd, 'a, S, P> LexicallyScoped<'s, 'd, 'a, S, P>
 where
     S: ShadowedStrategy,
     P: PoppingStrategy,
 {
-    pub fn with<F, R>(&mut self, f: F) -> R
+    #[must_use]
+    fn empty(db: &'d mut SemanticDb<'a>, stack: &'s mut BindingStack, scope: PID) -> Self {
+        stack.push_emtpy(db);
+        Self {
+            stack,
+            db,
+            scope,
+            shadowed: Vec::new(),
+            _ss: PhantomData,
+            _ps: PhantomData,
+        }
+    }
+
+    fn with<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce(&mut SemanticDb<'a>, &mut BindingStack) -> R,
     {
         f(self.db, self.stack)
+    }
+
+    fn with_shadowed<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut SemanticDb<'a>, &mut BindingStack, &mut Vec<Shadowed>) -> R,
+    {
+        f(self.db, self.stack, &mut self.shadowed)
     }
 }
 
