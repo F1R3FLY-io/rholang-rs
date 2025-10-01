@@ -450,6 +450,14 @@ impl<'a> Iterator for FreeIter<'a> {
     }
 }
 
+impl<'a> DoubleEndedIterator for FreeIter<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.inner
+            .next_back()
+            .map(|i| BinderId(self.binder_start + i as u32))
+    }
+}
+
 impl<'a> ExactSizeIterator for FreeIter<'a> {}
 impl<'a> FusedIterator for FreeIter<'a> {}
 
