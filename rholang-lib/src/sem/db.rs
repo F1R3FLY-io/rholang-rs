@@ -186,6 +186,19 @@ impl<'a> SemanticDb<'a> {
             .map(|scope| unsafe { self.binders.get_unchecked(scope.as_range()) })
     }
 
+    /// Checks if the given process has unresolved variables
+    pub fn has_free(&self, proc: PID) -> bool {
+        self.get_scope(proc)
+            .is_some_and(|scope| scope.num_free() != 0)
+    }
+
+    /// Returns an iterator over the free binders introduced by the given process
+    pub fn free_of(&self, proc: PID) -> FreeIter {
+        self.get_scope(proc)
+            .map(|scope| scope.free())
+            .unwrap_or_default()
+    }
+
     /// Returns an iterator over all scopes.
     ///
     /// The iteration order is unspecified.
