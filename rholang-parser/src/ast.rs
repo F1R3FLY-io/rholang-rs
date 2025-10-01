@@ -361,11 +361,52 @@ impl BinaryExpOp {
 pub type Receipts<'a> = SmallVec<[Receipt<'a>; 1]>;
 pub type Receipt<'a> = SmallVec<[Bind<'a>; 1]>;
 
+pub fn source_names<'a>(
+    receipt: &'a [Bind<'a>],
+) -> impl DoubleEndedIterator<Item = &'a Name<'a>> + ExactSizeIterator {
+    receipt.iter().map(|bind| bind.source_name())
+}
+
+pub fn inputs<'a>(receipt: &'a [Bind<'a>]) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
+    receipt.iter().filter_map(|bind| bind.input()).flatten()
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Bind<'ast> {
     Linear { lhs: Names<'ast>, rhs: Source<'ast> },
     Repeated { lhs: Names<'ast>, rhs: Name<'ast> },
     Peek { lhs: Names<'ast>, rhs: Name<'ast> },
+}
+
+impl<'a> Bind<'a> {
+    pub fn source_name(&self) -> &Name<'a> {
+        match self {
+            Bind::Linear { lhs: _, rhs } => match rhs {
+                Source::Simple { name }
+                | Source::ReceiveSend { name }
+                | Source::SendReceive { name, .. } => name,
+            },
+            Bind::Repeated { lhs: _, rhs } | Bind::Peek { lhs: _, rhs } => rhs,
+        }
+    }
+
+    pub fn input(&self) -> Option<&[AnnProc<'a>]> {
+        match self {
+            Bind::Linear { lhs: _, rhs } => match rhs {
+                Source::Simple { .. } | Source::ReceiveSend { .. } => None,
+                Source::SendReceive { name: _, inputs } => Some(inputs),
+            },
+            Bind::Repeated { .. } | Bind::Peek { .. } => None,
+        }
+    }
+
+    pub fn names(&self) -> &Names<'a> {
+        match self {
+            Bind::Linear { lhs, rhs: _ }
+            | Bind::Repeated { lhs, rhs: _ }
+            | Bind::Peek { lhs, rhs: _ } => lhs,
+        }
+    }
 }
 
 // source definitions
