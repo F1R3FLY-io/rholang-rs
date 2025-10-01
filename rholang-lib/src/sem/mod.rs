@@ -253,10 +253,8 @@ impl ScopeInfo {
         self.free.count_ones()
     }
 
-    pub fn free(&self) -> impl Iterator<Item = BinderId> + ExactSizeIterator {
-        self.free
-            .iter_ones()
-            .map(|i| self.binder_start + (i as u32))
+    pub fn free(&self) -> FreeIter {
+        FreeIter::new(&self.free, self.binder_start.0)
     }
 
     fn absorb(&mut self, rhs: ScopeInfo) {
@@ -387,6 +385,7 @@ pub enum ErrorKind {
     ProcInNamePosition(BinderId, Symbol),
     ConnectiveOutsidePattern,
     BundleInsidePattern,
+    FreeVariable(SymbolOccurence),
     BadCode,
 }
 
@@ -408,6 +407,51 @@ const SEED3: u64 = 0x1234_5678_9ABC_DEF0;
 fn stable_hasher() -> ahash::RandomState {
     ahash::RandomState::with_seeds(SEED0, SEED1, SEED2, SEED3)
 }
+
+pub struct FreeIter<'a> {
+    inner: bitvec::slice::IterOnes<'a, usize, Lsb0>,
+    binder_start: u32,
+}
+
+impl<'a> FreeIter<'a> {
+    pub fn new(free: &'a BitVec, binder_start: u32) -> Self {
+        Self {
+            inner: free.iter_ones(),
+            binder_start,
+        }
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            inner: bitvec::slice::IterOnes::default(),
+            binder_start: u32::MAX,
+        }
+    }
+}
+
+impl Default for FreeIter<'_> {
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
+impl<'a> Iterator for FreeIter<'a> {
+    type Item = BinderId;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner
+            .next()
+            .map(|i| BinderId(self.binder_start + i as u32))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
+    }
+}
+
+impl<'a> ExactSizeIterator for FreeIter<'a> {}
+impl<'a> FusedIterator for FreeIter<'a> {}
 
 struct WithLen<I> {
     iter: I,
