@@ -533,15 +533,18 @@ pub enum BundleType {
 pub type LetBindings<'a> = SmallVec<[LetBinding<'a>; 1]>;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum LetBinding<'ast> {
-    Single {
-        lhs: Name<'ast>,
-        rhs: AnnProc<'ast>,
-    },
-    Multiple {
-        lhs: Var<'ast>,
-        rhs: Vec<AnnProc<'ast>>,
-    },
+pub struct LetBinding<'ast> {
+    pub lhs: Names<'ast>,
+    pub rhs: ProcList<'ast>,
+}
+
+impl<'a> LetBinding<'a> {
+    pub fn single(lhs: Name<'a>, rhs: AnnProc<'a>) -> Self {
+        Self {
+            lhs: Names::single(lhs),
+            rhs: smallvec![rhs],
+        }
+    }
 }
 
 // new name declaration
