@@ -208,7 +208,7 @@ module.exports = grammar({
 
         linear_decls: $ => semiSep1($.decl),
         conc_decls: $ => prec(-1, conc1($.decl)),
-        decl: $ => seq(field('names', $.names), '=', field('procs', alias(commaSep1($._proc), $.procs))),
+        decl: $ => seq(field('names', $.names), '<-', field('procs', alias(commaSep1($._proc), $.procs))),
 
         // bundles
         _bundle: $ => choice(

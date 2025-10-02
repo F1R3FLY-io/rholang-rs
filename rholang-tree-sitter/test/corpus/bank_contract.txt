@@ -27,7 +27,7 @@ new
         for (name2, old <- balances) {
           match name == name2 {
             true => {
-              let newBalance = old + amount in {
+              let @newBalance <- old + amount in {
                 balances!(name, newBalance) |
                 ack!("Deposited " ++ amount.toString() ++ " into " ++ name)
               }
@@ -45,7 +45,7 @@ new
             true => {
               match old >= amount {
                 true => {
-                  let newBalance = old - amount in {
+                  let @newBalance <- old - amount in {
                     balances!(name, newBalance) |
                     ack!("Withdrew " ++ amount.toString() ++ " from " ++ name)
                   }
@@ -199,7 +199,8 @@ new
                                             decls: (linear_decls
                                               (decl
                                                 names: (names
-                                                  (var))
+                                                  (quote
+                                                    (var)))
                                                 procs: (procs
                                                   (add
                                                     (var)
@@ -273,7 +274,8 @@ new
                                                   decls: (linear_decls
                                                     (decl
                                                       names: (names
-                                                        (var))
+                                                        (quote
+                                                          (var)))
                                                       procs: (procs
                                                         (sub
                                                           (var)
