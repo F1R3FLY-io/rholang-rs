@@ -22,7 +22,7 @@ in {
     for (@currentBoardMembers <- boardMembers) {
       if (currentBoardMembers.contains(creator)) {
         for (@currentProposals <- proposals) {
-          let newProposal = { 
+          let @newProposal <- { 
             "creator": creator, 
             "amount": amount, 
             "recipient": recipient, 
@@ -43,9 +43,9 @@ in {
     for (@currentBoardMembers <- boardMembers) {
       if (currentBoardMembers.contains(member)) {
         for (@currentProposals <- proposals) {
-          let proposal = currentProposals.get(proposalIndex);
-              updatedProposal = proposal.set("approvals", proposal.get("approvals").add(member));
-              updatedProposals = currentProposals.set(proposalIndex, updatedProposal) in {
+          let @proposal <- currentProposals.get(proposalIndex);
+              @updatedProposal <- proposal.set("approvals", proposal.get("approvals").add(member));
+              @updatedProposals <- currentProposals.set(proposalIndex, updatedProposal) in {
             proposals!(updatedProposals) |
             ret!("Proposal approved by " ++ member)
           }
@@ -60,12 +60,12 @@ in {
   contract executeProposal(@proposalIndex, ret) = {
     for (@currentBoardMembers <- boardMembers) {
       for (@currentProposals <- proposals) {
-        let proposal = currentProposals.get(proposalIndex);
-            approvalCount = proposal.get("approvals").size() in {
+        let @proposal <- currentProposals.get(proposalIndex);
+            @approvalCount <- proposal.get("approvals").size() in {
           if (approvalCount > currentBoardMembers.size() / 2) {
             for (@balance <- treasuryBalance) {
               if (balance >= proposal.get("amount")) {
-                let updatedBalance = balance - proposal.get("amount") in {
+                let @updatedBalance <- balance - proposal.get("amount") in {
                   treasuryBalance!(updatedBalance) |
                   stdout!("Executed proposal: Transferred " ++ proposal.get("amount").toString() ++ " to " ++ proposal.get("recipient")) |
                   ret!("Proposal executed successfully.")
