@@ -27,7 +27,7 @@ new
         for (name2, old <- balances) {
           match name == name2 {
             true => {
-              let @newBalance <- old + amount in {
+              let newBalance = old + amount in {
                 balances!(name, newBalance) |
                 ack!("Deposited " ++ amount.toString() ++ " into " ++ name)
               }
@@ -45,7 +45,7 @@ new
             true => {
               match old >= amount {
                 true => {
-                  let @newBalance <- old - amount in {
+                  let newBalance = old - amount in {
                     balances!(name, newBalance) |
                     ack!("Withdrew " ++ amount.toString() ++ " from " ++ name)
                   }
@@ -197,14 +197,11 @@ new
                                         proc: (block
                                           (let
                                             decls: (linear_decls
-                                              (decl
-                                                names: (names
-                                                  (quote
-                                                    (var)))
-                                                procs: (procs
-                                                  (add
-                                                    (var)
-                                                    (var)))))
+                                              (let_var_decl
+                                                (var)
+                                                (add
+                                                  (var)
+                                                  (var))))
                                             proc: (block
                                               (par
                                                 (send
@@ -272,14 +269,11 @@ new
                                               proc: (block
                                                 (let
                                                   decls: (linear_decls
-                                                    (decl
-                                                      names: (names
-                                                        (quote
-                                                          (var)))
-                                                      procs: (procs
-                                                        (sub
-                                                          (var)
-                                                          (var)))))
+                                                    (let_var_decl
+                                                      (var)
+                                                      (sub
+                                                        (var)
+                                                        (var))))
                                                   proc: (block
                                                     (par
                                                       (send
