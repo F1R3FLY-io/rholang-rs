@@ -548,25 +548,42 @@ pub(super) fn node_to_ast<'ast>(
 
                     for decl_node in decls_node.named_children(&mut decls_node.walk()) {
                         let (lhs, rhs) = get_left_and_right(&decl_node);
-                        let lhs_arity = lhs.named_child_count();
-                        let rhs_arity = rhs.named_child_count();
-                        let lhs_has_cont = lhs.child_by_field_id(field!("cont")).is_some();
 
-                        if let_decl_is_malformed(lhs_arity, rhs_arity, lhs_has_cont) {
-                            errors.push(AnnParsingError::new(
-                                ParsingError::MalformedLetDecl {
-                                    lhs_arity,
-                                    rhs_arity,
-                                },
-                                &decl_node,
-                            ));
+                        let lhs_arity;
+                        let rhs_arity;
+                        let lhs_has_cont;
+
+                        let is_var_decl = decl_node.kind_id() == kind!("let_var_decl");
+                        if is_var_decl {
+                            lhs_arity = 1;
+                            rhs_arity = 1;
+                            lhs_has_cont = false;
+
+                            temp_cont_stack.push(K::EvalDelayed(lhs));
+                            temp_cont_stack.push(K::EvalDelayed(rhs));
+                        } else {
+                            lhs_arity = lhs.named_child_count();
+                            rhs_arity = rhs.named_child_count();
+                            lhs_has_cont = lhs.child_by_field_id(field!("cont")).is_some();
+
+                            if let_decl_is_malformed(lhs_arity, rhs_arity, lhs_has_cont) {
+                                errors.push(AnnParsingError::new(
+                                    ParsingError::MalformedLetDecl {
+                                        lhs_arity,
+                                        rhs_arity,
+                                    },
+                                    &decl_node,
+                                ));
+                            }
+                            temp_cont_stack.push(K::EvalList(lhs.walk()));
+                            temp_cont_stack.push(K::EvalList(rhs.walk()));
                         }
-                        temp_cont_stack.push(K::EvalList(lhs.walk()));
-                        temp_cont_stack.push(K::EvalList(rhs.walk()));
+
                         let_decls.push(LetDecl {
                             lhs_arity,
                             lhs_has_cont,
                             rhs_arity,
+                            is_var_decl,
                         });
                         total_len += lhs_arity + rhs_arity;
                     }
@@ -1649,6 +1666,7 @@ struct LetDecl {
     lhs_arity: usize,
     lhs_has_cont: bool,
     rhs_arity: usize,
+    is_var_decl: bool,
 }
 
 struct LetDeclIter<'slice, 'a, I>
@@ -1694,7 +1712,11 @@ where
                 // elements, and it is not zero. Therefore, lhs_arity <= slice.len()
                 let (lhs, rhs) = this_procs.split_at_unchecked(let_decl.lhs_arity);
                 LetBinding {
-                    lhs: into_names(lhs, this_mask, let_decl.lhs_has_cont),
+                    lhs: if let_decl.is_var_decl {
+                        Names::single(into_name(lhs[0], true))
+                    } else {
+                        into_names(lhs, this_mask, let_decl.lhs_has_cont)
+                    },
                     rhs: rhs.to_smallvec(),
                 }
             };
