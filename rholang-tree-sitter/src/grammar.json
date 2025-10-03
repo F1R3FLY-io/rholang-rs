@@ -1,5 +1,4 @@
 {
-  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/grammar.schema.json",
   "name": "rholang",
   "word": "var",
   "rules": {
@@ -1219,7 +1218,7 @@
           },
           {
             "type": "STRING",
-            "value": "restrict"
+            "value": "|>"
           },
           {
             "type": "SYMBOL",
@@ -1229,14 +1228,18 @@
       }
     },
     "pathmap_drop": {
-      "type": "PREC",
-      "value": 10,
+      "type": "PREC_LEFT",
+      "value": 8,
       "content": {
         "type": "SEQ",
         "members": [
           {
+            "type": "SYMBOL",
+            "name": "_proc"
+          },
+          {
             "type": "STRING",
-            "value": "drop"
+            "value": "<<"
           },
           {
             "type": "FIELD",
@@ -1244,18 +1247,6 @@
             "content": {
               "type": "SYMBOL",
               "name": "long_literal"
-            }
-          },
-          {
-            "type": "STRING",
-            "value": ","
-          },
-          {
-            "type": "FIELD",
-            "name": "pathmap",
-            "content": {
-              "type": "SYMBOL",
-              "name": "_proc"
             }
           }
         ]
@@ -2707,77 +2698,6 @@
     "_source",
     "_proc_var",
     "_literal"
-  ],
-  "reserved": {
-    "global": [
-      {
-        "type": "STRING",
-        "value": "new"
-      },
-      {
-        "type": "STRING",
-        "value": "if"
-      },
-      {
-        "type": "STRING",
-        "value": "else"
-      },
-      {
-        "type": "STRING",
-        "value": "let"
-      },
-      {
-        "type": "STRING",
-        "value": "match"
-      },
-      {
-        "type": "STRING",
-        "value": "select"
-      },
-      {
-        "type": "STRING",
-        "value": "contract"
-      },
-      {
-        "type": "STRING",
-        "value": "for"
-      },
-      {
-        "type": "STRING",
-        "value": "or"
-      },
-      {
-        "type": "STRING",
-        "value": "and"
-      },
-      {
-        "type": "STRING",
-        "value": "matches"
-      },
-      {
-        "type": "STRING",
-        "value": "not"
-      },
-      {
-        "type": "STRING",
-        "value": "bundle"
-      },
-      {
-        "type": "STRING",
-        "value": "true"
-      },
-      {
-        "type": "STRING",
-        "value": "false"
-      },
-      {
-        "type": "STRING",
-        "value": "restrict"
-      },
-      {
-        "type": "STRING",
-        "value": "drop"
-      }
-    ]
-  }
+  ]
 }
+
