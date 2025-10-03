@@ -31,13 +31,7 @@ fn for_comprehension_inputs<'a>(
     receipts
         .iter()
         .flatten()
-        .filter_map(|binding| match binding {
-            Bind::Linear {
-                rhs: Source::SendReceive { inputs, .. },
-                ..
-            } => Some(inputs),
-            _ => None,
-        })
+        .filter_map(|binding| binding.input())
         .flatten()
 }
 
