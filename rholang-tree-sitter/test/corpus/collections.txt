@@ -6,6 +6,7 @@ Collections
 {Set(1,2,3)}
 {{"key1":123}}
 {(1,"2")}
+{{|"val1","val2"|}}
 
 
 ---
@@ -33,4 +34,9 @@ Collections
     (collection
       (tuple
         (long_literal)
+        (string_literal))))
+  (block
+    (collection
+      (pathmap
+        (string_literal)
         (string_literal)))))
