@@ -14,8 +14,8 @@ const FOR_KW: u16 = 17;
 const IN_KW: u16 = 5;
 
 // Static values for fields
-const PATTERN_FIELD: u16 = 21;
-const PROC_FIELD: u16 = 22;
+const PATTERN_FIELD: u16 = 20;
+const PROC_FIELD: u16 = 21;
 const DECLS_FIELD: u16 = 11;
 const BUNDLE_TYPE_FIELD: u16 = 4;
 
