@@ -411,6 +411,11 @@ pub enum Collection<'ast> {
         elements: Vec<KeyValuePair<'ast>>,
         remainder: Option<Var<'ast>>,
     },
+
+    PathMap {
+        elements: Vec<AnnProc<'ast>>,
+        remainder: Option<Var<'ast>>,
+    },
 }
 
 // sends
