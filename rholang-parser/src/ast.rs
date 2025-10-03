@@ -309,6 +309,9 @@ pub enum BinaryExpOp {
     Mod,
     Disjunction,
     Conjunction,
+    PathmapSubtract,
+    PathmapRestrict,
+    PathmapDrop,
 }
 
 // for-comprehensions
@@ -409,6 +412,11 @@ pub enum Collection<'ast> {
 
     Map {
         elements: Vec<KeyValuePair<'ast>>,
+        remainder: Option<Var<'ast>>,
+    },
+
+    Pathmap {
+        elements: Vec<AnnProc<'ast>>,
         remainder: Option<Var<'ast>>,
     },
 }
