@@ -30,7 +30,7 @@ fn for_comprehension_inputs<'a>(
 ) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
     receipts
         .iter()
-        .flat_map(|bindings| bindings.iter())
+        .flatten()
         .filter_map(|binding| match binding {
             Bind::Linear {
                 rhs: Source::SendReceive { inputs, .. },
@@ -38,7 +38,7 @@ fn for_comprehension_inputs<'a>(
             } => Some(inputs),
             _ => None,
         })
-        .flat_map(|inputs| inputs.iter())
+        .flatten()
 }
 
 /// Helper: extract expression + cases from `Match`.
@@ -60,7 +60,7 @@ fn select_branches<'a>(
                 Source::SendReceive { inputs, .. } => Some(inputs),
                 _ => None,
             })
-            .flat_map(|inputs| inputs.iter())
+            .flatten()
             .chain(iter::once(&branch.proc))
     })
 }
