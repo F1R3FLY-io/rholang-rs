@@ -17,6 +17,7 @@ pub(crate) struct ASTBuilder<'ast> {
     bad: Proc<'ast>,
     empty_list: Proc<'ast>,
     empty_map: Proc<'ast>,
+    empty_pathmap: Proc<'ast>,
     zero: Proc<'ast>,
     one: Proc<'ast>,
 }
@@ -39,6 +40,10 @@ impl<'ast> ASTBuilder<'ast> {
                 remainder: None,
             }),
             empty_map: Proc::Collection(Collection::Map {
+                elements: Vec::new(),
+                remainder: None,
+            }),
+            empty_pathmap: Proc::Collection(Collection::Pathmap {
                 elements: Vec::new(),
                 remainder: None,
             }),
@@ -74,6 +79,10 @@ impl<'ast> ASTBuilder<'ast> {
 
     pub(crate) fn const_empty_map(&self) -> &Proc<'ast> {
         &self.empty_map
+    }
+
+    pub(crate) fn const_empty_pathmap(&self) -> &Proc<'ast> {
+        &self.empty_pathmap
     }
 
     pub(crate) fn bad_const(&self) -> &Proc<'ast> {
@@ -168,6 +177,35 @@ impl<'ast> ASTBuilder<'ast> {
             elements: Self::to_key_value(pairs),
             remainder: Some(remainder),
         }))
+    }
+
+    pub(crate) fn alloc_pathmap(&self, procs: &[AnnProc<'ast>]) -> &Proc<'ast> {
+        if procs.is_empty() {
+            return self.const_empty_pathmap();
+        }
+        self.arena.alloc(Proc::Collection(Collection::Pathmap {
+            elements: procs.to_vec(),
+            remainder: None,
+        }))
+    }
+
+    pub(crate) fn alloc_pathmap_with_remainder(
+        &self,
+        procs: &[AnnProc<'ast>],
+        remainder: Var<'ast>,
+    ) -> &Proc<'ast> {
+        self.arena.alloc(Proc::Collection(Collection::Pathmap {
+            elements: procs.to_vec(),
+            remainder: Some(remainder),
+        }))
+    }
+
+    pub(crate) fn alloc_pathmap_drop(
+        &self,
+        count: i64,
+        pathmap: AnnProc<'ast>,
+    ) -> &Proc<'ast> {
+        self.arena.alloc(Proc::PathmapDrop { count, pathmap })
     }
 
     pub(crate) fn alloc_var(&self, id: Id<'ast>) -> &Proc<'ast> {

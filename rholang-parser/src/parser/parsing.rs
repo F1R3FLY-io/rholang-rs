@@ -190,7 +190,9 @@ pub(super) fn node_to_ast<'ast>(
                 | kind!("div")
                 | kind!("mod")
                 | kind!("disjunction")
-                | kind!("conjunction") => {
+                | kind!("conjunction")
+                | kind!("pathmap_subtract")
+                | kind!("pathmap_restrict") => {
                     let (left, right) = get_left_and_right(&node);
                     cont_stack.push(K::ConsumeBinaryExp {
                         op: match node.kind_id() {
@@ -212,7 +214,9 @@ pub(super) fn node_to_ast<'ast>(
                             kind!("div") => BinaryExpOp::Div,
                             kind!("mod") => BinaryExpOp::Mod,
                             kind!("disjunction") => BinaryExpOp::Disjunction,
-                            _ => BinaryExpOp::Conjunction,
+                            kind!("conjunction") => BinaryExpOp::Conjunction,
+                            kind!("pathmap_subtract") => BinaryExpOp::PathmapSubtract,
+                            _ => BinaryExpOp::PathmapRestrict,
                         },
                         span,
                     });
@@ -232,6 +236,24 @@ pub(super) fn node_to_ast<'ast>(
                     });
                     node = proc_node;
                     continue 'parse;
+                }
+
+                kind!("pathmap_drop") => {
+                    let count_node = get_field(&node, field!("count"));
+                    let pathmap_node = get_field(&node, field!("pathmap"));
+                    
+                    let count_value = get_node_value(&count_node, source);
+                    match count_value.parse::<i64>() {
+                        Ok(count) => {
+                            cont_stack.push(K::ConsumePathmapDrop { count, span });
+                            node = pathmap_node;
+                            continue 'parse;
+                        }
+                        Err(_) => {
+                            errors.push(AnnParsingError::new(ParsingError::NumberOutOfRange, &count_node));
+                            bad = true;
+                        }
+                    }
                 }
 
                 kind!("collection") => {
@@ -297,7 +319,20 @@ pub(super) fn node_to_ast<'ast>(
                                 }
                             }
                         }
-                        _ => unreachable!("Rholang collections are: list, set, tuple and map"),
+                        kind!("pathmap") => {
+                            let arity = collection_node.named_child_count();
+                            if arity == 0 {
+                                proc_stack.push(ast_builder.const_empty_pathmap(), span);
+                            } else {
+                                cont_stack.push(K::ConsumePathmap {
+                                    arity,
+                                    has_remainder,
+                                    span,
+                                });
+                                cont_stack.push(K::EvalList(collection_node.walk()));
+                            }
+                        }
+                        _ => unreachable!("Rholang collections are: list, set, tuple, map and pathmap"),
                     }
                 }
 
@@ -915,6 +950,23 @@ fn apply_cont<'tree, 'ast>(
                             }),
                         K::ConsumeUnaryExp { op, span } => proc_stack
                             .replace_top(|top| ast_builder.alloc_unary_exp(op, top).ann(span)),
+                        K::ConsumePathmap {
+                            arity,
+                            has_remainder,
+                            span,
+                        } => proc_stack.replace_top_slice(arity, |elems| {
+                            let pathmap = if has_remainder {
+                                assert!(!elems.is_empty());
+                                // SAFETY: We have checked above that there is at least one element
+                                let (last, init) = elems.split_last().unwrap_unchecked();
+                                ast_builder.alloc_pathmap_with_remainder(init, into_remainder(*last))
+                            } else {
+                                ast_builder.alloc_pathmap(elems)
+                            };
+                            pathmap.ann(span)
+                        }),
+                        K::ConsumePathmapDrop { count, span } => proc_stack
+                            .replace_top(|pathmap| ast_builder.alloc_pathmap_drop(count, pathmap).ann(span)),
                         _ => unreachable!("Eval continuations are handled in another branch"),
                     };
 
@@ -1024,6 +1076,15 @@ enum K<'tree, 'ast> {
     },
     ConsumeUnaryExp {
         op: UnaryExpOp,
+        span: SourceSpan,
+    },
+    ConsumePathmap {
+        arity: usize,
+        has_remainder: bool,
+        span: SourceSpan,
+    },
+    ConsumePathmapDrop {
+        count: i64,
         span: SourceSpan,
     },
     EvalDelayed(tree_sitter::Node<'tree>),
@@ -1141,6 +1202,16 @@ impl Debug for K<'_, '_> {
             Self::ConsumeUnaryExp { op, span } => f
                 .debug_struct("ConsumeUnaryExp")
                 .field("op", op)
+                .field("span", span)
+                .finish(),
+            Self::ConsumePathmap { arity, span, .. } => f
+                .debug_struct("ConsumePathmap")
+                .field("arity", arity)
+                .field("span", span)
+                .finish(),
+            Self::ConsumePathmapDrop { count, span } => f
+                .debug_struct("ConsumePathmapDrop")
+                .field("count", count)
                 .field("span", span)
                 .finish(),
             Self::EvalDelayed(arg0) => f.debug_tuple("EvalDelayed").field(arg0).finish(),
