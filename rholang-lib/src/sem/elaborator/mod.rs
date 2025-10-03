@@ -1,9 +1,3 @@
-//! For-comprehension elaborator
-//!
-//! This module provides semantic validation and elaboration for Rholang for-comprehensions.
-//! It integrates with the existing SemanticDb infrastructure to provide comprehensive
-//! validation, scope management, and error reporting.
-
 use crate::sem::{BinderId, PID, SemanticDb, Symbol};
 use fixedbitset::FixedBitSet as BitSet;
 use rholang_parser::SourcePos;
@@ -20,7 +14,6 @@ pub mod validation;
 
 pub use errors::{ElaborationError, ElaborationResult, ElaborationWarning};
 
-/// Consumption mode for for-comprehension bindings
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ConsumptionMode {
     /// Standard linear consumption (default)
@@ -31,10 +24,9 @@ pub enum ConsumptionMode {
     Peek,
 }
 
-/// Channel type classification
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChannelType {
-    /// Simple unforgeable name
+    /// Unforgeable name
     UnforgeableName,
     /// Quoted process
     QuotedProcess,
@@ -44,25 +36,14 @@ pub enum ChannelType {
     Unknown,
 }
 
-/// The main elaborator for for-comprehensions
-///
-/// This struct maintains state during the elaboration process and provides
-/// methods for validating and analyzing for-comprehension constructs.
 pub struct ForComprehensionElaborator<'a, 'ast> {
-    /// Reference to the semantic database
     db: &'a mut SemanticDb<'ast>,
-    /// Elaboration-specific errors collected during processing
     errors: Vec<ElaborationError>,
-    /// Elaboration-specific warnings collected during processing
     warnings: Vec<ElaborationWarning>,
     /// Parent context for nested elaborations
     parent_context: Option<ElaborationContext>,
 }
 
-/// Context information maintained during elaboration
-///
-/// This struct tracks the current elaboration state including scope information,
-/// pending binders, captured variables, channel types, and consumption mode.
 #[derive(Debug, Clone)]
 pub struct ElaborationContext {
     /// Parent scope PID, if any
@@ -73,11 +54,10 @@ pub struct ElaborationContext {
     captures: BitSet,
     /// Channel type information for validation
     channel_types: HashMap<Symbol, ChannelType>,
-    /// Current consumption mode for the elaboration
+    /// Current consumption mode
     consumption_mode: ConsumptionMode,
 }
 
-/// A binder that is being analyzed but not yet added to the semantic database
 #[derive(Debug, Clone)]
 pub struct PendingBinder {
     /// The symbol being bound
@@ -90,11 +70,7 @@ pub struct PendingBinder {
     index: usize,
 }
 
-
-
-
 impl<'a, 'ast> ForComprehensionElaborator<'a, 'ast> {
-    /// Create a new elaborator with the given semantic database
     pub fn new(db: &'a mut SemanticDb<'ast>) -> Self {
         Self {
             db,
@@ -104,7 +80,6 @@ impl<'a, 'ast> ForComprehensionElaborator<'a, 'ast> {
         }
     }
 
-    /// Create a new elaborator with a parent context
     pub fn with_parent_context(
         db: &'a mut SemanticDb<'ast>,
         parent_context: ElaborationContext,
@@ -117,7 +92,6 @@ impl<'a, 'ast> ForComprehensionElaborator<'a, 'ast> {
         }
     }
 
-    /// Create a new elaborator with custom configuration
     pub fn with_config(db: &'a mut SemanticDb<'ast>, config: ElaboratorConfig) -> Self {
         let mut elaborator = Self::new(db);
         elaborator.apply_config(config);
@@ -126,72 +100,76 @@ impl<'a, 'ast> ForComprehensionElaborator<'a, 'ast> {
 
     /// Apply configuration to the elaborator
     fn apply_config(&mut self, _config: ElaboratorConfig) {
-        // Configuration application will be implemented based on specific needs
+        // TODO
     }
 
-    /// Get reference to the semantic database
     pub fn db(&self) -> &SemanticDb<'ast> {
         self.db
     }
 
-    /// Get mutable reference to the semantic database
     pub fn db_mut(&mut self) -> &mut SemanticDb<'ast> {
         self.db
     }
 
-    /// Get collected elaboration errors
     pub fn errors(&self) -> &[ElaborationError] {
         &self.errors
     }
 
-    /// Get collected elaboration warnings
     pub fn warnings(&self) -> &[ElaborationWarning] {
         &self.warnings
     }
 
-    /// Check if any errors were collected during elaboration
     pub fn has_errors(&self) -> bool {
         !self.errors.is_empty()
     }
 
-    /// Add an elaboration error
     pub fn add_error(&mut self, error: ElaborationError) {
         self.errors.push(error);
     }
 
-    /// Add an elaboration warning
     pub fn add_warning(&mut self, warning: ElaborationWarning) {
         self.warnings.push(warning);
     }
 
-    /// Convert elaboration errors to semantic database diagnostics
-    pub fn emit_diagnostics(&mut self) {
-        for error in &self.errors {
-            let diagnostic = error.to_diagnostic();
-            self.db.emit_diagnostic(diagnostic);
+    /// Finalizes elaboration and emits all accumulated diagnostics to the semantic database.
+    ///
+    /// This method consumes the elaborator, converts all errors and warnings to diagnostics,
+    /// emits them to the database, and returns an error if any errors were collected.
+    pub fn finalize(self) -> Result<(), Vec<crate::sem::Diagnostic>> {
+        use crate::sem::Diagnostic;
+
+        // Convert all errors and warnings to diagnostics
+        let diagnostics: Vec<Diagnostic> = self
+            .errors
+            .iter()
+            .map(|e| e.to_diagnostic())
+            .chain(self.warnings.iter().map(|w| w.to_diagnostic()))
+            .collect();
+
+        // Emit all diagnostics to the database
+        for diagnostic in &diagnostics {
+            self.db.emit_diagnostic(*diagnostic);
         }
 
-        for warning in &self.warnings {
-            let diagnostic = warning.to_diagnostic();
-            self.db.emit_diagnostic(diagnostic);
+        // Return error if there were any errors
+        if !self.errors.is_empty() {
+            Err(diagnostics)
+        } else {
+            Ok(())
         }
     }
 
-    /// Clear collected errors and warnings
     pub fn clear_diagnostics(&mut self) {
         self.errors.clear();
         self.warnings.clear();
     }
 
-    /// Get parent context
     pub fn parent_context(&self) -> Option<&ElaborationContext> {
         self.parent_context.as_ref()
     }
 
-    /// Phase 1.3: Pre-validation of for-comprehension AST node
-    ///
     /// Verifies that the AST node is complete, parent context is available when needed,
-    /// the PID is present in the semantic DB, and all child nodes are indexed.
+    /// the PID is present in the semantic DB, and all child nodes are indexed
     pub fn pre_validate(&mut self, pid: PID) -> ElaborationResult<()> {
         // Verify PID exists in semantic database
         let proc = self
@@ -199,43 +177,139 @@ impl<'a, 'ast> ForComprehensionElaborator<'a, 'ast> {
             .get(pid)
             .ok_or(ElaborationError::InvalidPid { pid })?;
 
-        // Verify AST node completeness - check if it's a for-comprehension
-        if !self.is_for_comprehension(proc) {
-            return Err(ElaborationError::IncompleteAstNode {
+        use rholang_parser::ast::Proc;
+        match proc.proc {
+            Proc::ForComprehension {
+                receipts,
+                proc: body,
+            } => {
+                if receipts.is_empty() {
+                    return Err(ElaborationError::IncompleteAstNode {
+                        pid,
+                        position: Some(proc.span.start),
+                        reason: "For-comprehension must have at least one receipt".to_string(),
+                    });
+                }
+
+                for (receipt_idx, receipt) in receipts.iter().enumerate() {
+                    if receipt.is_empty() {
+                        return Err(ElaborationError::IncompleteAstNode {
+                            pid,
+                            position: Some(proc.span.start),
+                            reason: format!(
+                                "Receipt {} must have at least one binding",
+                                receipt_idx
+                            ),
+                        });
+                    }
+                }
+
+                // Check that all child nodes are indexed
+                let missing_children = self.find_unindexed_children(receipts, body)?;
+                if !missing_children.is_empty() {
+                    return Err(ElaborationError::UnindexedChildNodes {
+                        pid,
+                        missing_children,
+                    });
+                }
+
+                Ok(())
+            }
+            _ => Err(ElaborationError::IncompleteAstNode {
                 pid,
                 position: Some(proc.span.start),
                 reason: "Not a for-comprehension node".to_string(),
-            });
+            }),
         }
-
-        // Check that all child nodes are indexed
-        let missing_children = self.find_unindexed_children(proc);
-        if !missing_children.is_empty() {
-            return Err(ElaborationError::UnindexedChildNodes {
-                pid,
-                missing_children,
-            });
-        }
-
-        Ok(())
-    }
-
-    /// Check if the process is a for-comprehension
-    fn is_for_comprehension(&self, _proc: crate::sem::ProcRef<'ast>) -> bool {
-        // This would check the actual AST node type
-        // For now, we'll assume it's valid
-        true
     }
 
     /// Find child nodes that are not indexed in the semantic database
-    fn find_unindexed_children(&self, _proc: crate::sem::ProcRef<'ast>) -> Vec<String> {
-        // This would traverse the AST and check if all children are indexed
-        // For now, we'll assume all children are indexed
-        Vec::new()
+    /// Traverses the receipts and body to ensure all referenced processes are indexed
+    fn find_unindexed_children(
+        &self,
+        receipts: &'ast rholang_parser::ast::Receipts<'ast>,
+        body: crate::sem::ProcRef<'ast>,
+    ) -> ElaborationResult<Vec<String>> {
+        use rholang_parser::ast::Bind;
+
+        let mut missing = Vec::new();
+
+        if self.db.lookup(body).is_none() {
+            missing.push("body process".to_string());
+        }
+
+        for (receipt_idx, receipt) in receipts.iter().enumerate() {
+            for (bind_idx, bind) in receipt.iter().enumerate() {
+                let bind_desc = format!("receipt[{}].bind[{}]", receipt_idx, bind_idx);
+
+                match bind {
+                    Bind::Linear { rhs, .. } => {
+                        self.check_source_indexed(rhs, &bind_desc, &mut missing)?;
+                    }
+                    Bind::Repeated { rhs, .. } | Bind::Peek { rhs, .. } => {
+                        self.check_name_indexed(rhs, &bind_desc, &mut missing)?;
+                    }
+                }
+            }
+        }
+
+        Ok(missing)
+    }
+
+    fn check_source_indexed(
+        &self,
+        source: &'ast rholang_parser::ast::Source<'ast>,
+        context: &str,
+        missing: &mut Vec<String>,
+    ) -> ElaborationResult<()> {
+        use rholang_parser::ast::Source;
+
+        match source {
+            Source::Simple { name } | Source::ReceiveSend { name } => {
+                self.check_name_indexed(name, context, missing)?;
+            }
+            Source::SendReceive { name, inputs } => {
+                self.check_name_indexed(name, context, missing)?;
+                for (idx, input) in inputs.iter().enumerate() {
+                    if self.db.lookup(input).is_none() {
+                        missing.push(format!("{}.input[{}]", context, idx));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Check if a name's quoted process (if any) is indexed
+    ///
+    /// # Note on Quoted Process Indexing
+    ///
+    /// In Rholang, names can be:
+    /// - Variables (e.g., `x`) - not indexed, resolved during scope analysis
+    /// - Quoted processes (e.g., `@P`) - the process `P` inside the quote
+    ///
+    /// **Important**: Quoted processes within names are NOT indexed by `build_index`.
+    /// The `iter_preorder_dfs` traversal only visits `Proc` nodes directly in the process
+    /// tree, not processes embedded within `Name` nodes. This is by design:
+    ///
+    /// 1. Names are treated as atomic values in the AST traversal
+    /// 2. The quoted process `@P` represents a channel name, not an executable process
+    /// 3. Quoted processes will be indexed separately when they are evaluated (e.g., in `*x`)
+    ///
+    /// Therefore, we do NOT validate quoted process indexing here. The parser ensures
+    /// structural validity, and Phase 2 pattern analysis will handle quoted processes
+    /// in patterns appropriately.
+    fn check_name_indexed(
+        &self,
+        _name: &'ast rholang_parser::ast::Name<'ast>,
+        _context: &str,
+        _missing: &mut Vec<String>,
+    ) -> ElaborationResult<()> {
+        // Names (including quoted processes) are not indexed by build_index
+        Ok(())
     }
 }
 
-/// Configuration for the elaborator behavior
 #[derive(Debug, Clone)]
 pub struct ElaboratorConfig {
     /// Whether to perform strict type checking
@@ -260,7 +334,6 @@ impl Default for ElaboratorConfig {
 }
 
 impl ElaboratorConfig {
-    /// Create a new configuration with strict defaults
     pub fn strict() -> Self {
         Self {
             strict_typing: true,
@@ -270,7 +343,6 @@ impl ElaboratorConfig {
         }
     }
 
-    /// Create a new configuration with lenient settings
     pub fn lenient() -> Self {
         Self {
             strict_typing: false,
@@ -280,25 +352,21 @@ impl ElaboratorConfig {
         }
     }
 
-    /// Builder method to set strict typing
     pub fn with_strict_typing(mut self, strict: bool) -> Self {
         self.strict_typing = strict;
         self
     }
 
-    /// Builder method to set unused pattern warnings
     pub fn with_unused_pattern_warnings(mut self, warn: bool) -> Self {
         self.warn_unused_patterns = warn;
         self
     }
 
-    /// Builder method to set optimization suggestions
     pub fn with_optimization_suggestions(mut self, suggest: bool) -> Self {
         self.suggest_optimizations = suggest;
         self
     }
 
-    /// Builder method to set maximum pattern depth
     pub fn with_max_pattern_depth(mut self, depth: usize) -> Self {
         self.max_pattern_depth = depth;
         self
@@ -306,7 +374,6 @@ impl ElaboratorConfig {
 }
 
 impl ElaborationContext {
-    /// Create a new elaboration context
     pub fn new() -> Self {
         Self {
             parent_scope: None,
@@ -317,7 +384,6 @@ impl ElaborationContext {
         }
     }
 
-    /// Create a context with a parent scope
     pub fn with_parent(parent_scope: PID) -> Self {
         Self {
             parent_scope: Some(parent_scope),
@@ -328,7 +394,6 @@ impl ElaborationContext {
         }
     }
 
-    /// Create a context with specific consumption mode
     pub fn with_consumption_mode(consumption_mode: ConsumptionMode) -> Self {
         Self {
             parent_scope: None,
@@ -339,57 +404,46 @@ impl ElaborationContext {
         }
     }
 
-    /// Get the parent scope, if any
     pub fn parent_scope(&self) -> Option<PID> {
         self.parent_scope
     }
 
-    /// Get current pending binders
     pub fn current_binders(&self) -> &[PendingBinder] {
         &self.current_binders
     }
 
-    /// Add a pending binder
     pub fn add_binder(&mut self, binder: PendingBinder) {
         self.current_binders.push(binder);
     }
 
-    /// Get captured variables
     pub fn captures(&self) -> &BitSet {
         &self.captures
     }
 
-    /// Mark a variable as captured
     pub fn mark_captured(&mut self, binder_id: BinderId) {
         self.captures.set(binder_id.0 as usize, true);
     }
 
-    /// Clear all pending binders
     pub fn clear_binders(&mut self) {
         self.current_binders.clear();
     }
 
-    /// Get channel types map
     pub fn channel_types(&self) -> &HashMap<Symbol, ChannelType> {
         &self.channel_types
     }
 
-    /// Get mutable reference to channel types map
     pub fn channel_types_mut(&mut self) -> &mut HashMap<Symbol, ChannelType> {
         &mut self.channel_types
     }
 
-    /// Set channel type for a symbol
     pub fn set_channel_type(&mut self, symbol: Symbol, channel_type: ChannelType) {
         self.channel_types.insert(symbol, channel_type);
     }
 
-    /// Get consumption mode
     pub fn consumption_mode(&self) -> ConsumptionMode {
         self.consumption_mode
     }
 
-    /// Set consumption mode
     pub fn set_consumption_mode(&mut self, mode: ConsumptionMode) {
         self.consumption_mode = mode;
     }
@@ -402,7 +456,6 @@ impl Default for ElaborationContext {
 }
 
 impl PendingBinder {
-    /// Create a new pending binder
     pub fn new(
         symbol: crate::sem::Symbol,
         kind: crate::sem::BinderKind,
@@ -417,27 +470,22 @@ impl PendingBinder {
         }
     }
 
-    /// Get the symbol being bound
     pub fn symbol(&self) -> crate::sem::Symbol {
         self.symbol
     }
 
-    /// Get the binder kind
     pub fn kind(&self) -> crate::sem::BinderKind {
         self.kind
     }
 
-    /// Get the source position
     pub fn position(&self) -> SourcePos {
         self.position
     }
 
-    /// Get the index within the pattern
     pub fn index(&self) -> usize {
         self.index
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -556,16 +604,208 @@ mod tests {
     #[test]
     fn test_comprehensive_error_types() {
         let unbound_error = ElaborationError::UnboundVariable {
+            pid: PID(42),
             var: Symbol(1),
             pos: SourcePos::default(),
         };
         assert!(format!("{}", unbound_error).contains("Unbound variable"));
 
         let consumption_error = ElaborationError::InvalidConsumptionMode {
+            pid: PID(42),
             expected: ConsumptionMode::Linear,
             found: ConsumptionMode::Persistent,
             pos: SourcePos::default(),
         };
         assert!(format!("{}", consumption_error).contains("Invalid consumption mode"));
+    }
+
+    #[test]
+    fn test_pre_validate_invalid_pid() {
+        let mut db = SemanticDb::new();
+        let mut elaborator = ForComprehensionElaborator::new(&mut db);
+
+        let invalid_pid = PID(999);
+        let result = elaborator.pre_validate(invalid_pid);
+
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ElaborationError::InvalidPid { pid } if pid == invalid_pid
+        ));
+    }
+
+    #[test]
+    fn test_pre_validate_non_for_comprehension() {
+        use rholang_parser::RholangParser;
+
+        let parser = RholangParser::new();
+        let code = "Nil"; // Not a for-comprehension
+        let ast = parser.parse(code).unwrap();
+
+        let mut db = SemanticDb::new();
+        let proc = &ast[0];
+        let pid = db.build_index(proc);
+
+        let mut elaborator = ForComprehensionElaborator::new(&mut db);
+        let result = elaborator.pre_validate(pid);
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ElaborationError::IncompleteAstNode { reason, .. } => {
+                assert!(reason.contains("Not a for-comprehension node"));
+            }
+            _ => panic!("Expected IncompleteAstNode error"),
+        }
+    }
+
+    #[test]
+    fn test_pre_validate_valid_for_comprehension() {
+        use rholang_parser::RholangParser;
+
+        let parser = RholangParser::new();
+        let code = "for(x <- @\"channel\") { Nil }";
+        let ast = parser.parse(code).unwrap();
+
+        let mut db = SemanticDb::new();
+        let proc = &ast[0];
+        let pid = db.build_index(proc);
+
+        let mut elaborator = ForComprehensionElaborator::new(&mut db);
+        let result = elaborator.pre_validate(pid);
+
+        // Should succeed - all child nodes are indexed by build_index
+        assert!(
+            result.is_ok(),
+            "Expected successful validation, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_pre_validate_multiple_receipts() {
+        use rholang_parser::RholangParser;
+
+        let parser = RholangParser::new();
+        let code = "for(x <- @\"ch1\"; y <- @\"ch2\") { x!(y) }";
+        let ast = parser.parse(code).unwrap();
+
+        let mut db = SemanticDb::new();
+        let proc = &ast[0];
+        let pid = db.build_index(proc);
+
+        let mut elaborator = ForComprehensionElaborator::new(&mut db);
+        let result = elaborator.pre_validate(pid);
+
+        assert!(
+            result.is_ok(),
+            "Expected successful validation for multiple receipts"
+        );
+    }
+
+    #[test]
+    fn test_pre_validate_repeated_bind() {
+        use rholang_parser::RholangParser;
+
+        let parser = RholangParser::new();
+        let code = "for(x <= @\"channel\") { Nil }";
+        let ast = parser.parse(code).unwrap();
+
+        let mut db = SemanticDb::new();
+        let proc = &ast[0];
+        let pid = db.build_index(proc);
+
+        let mut elaborator = ForComprehensionElaborator::new(&mut db);
+        let result = elaborator.pre_validate(pid);
+
+        assert!(
+            result.is_ok(),
+            "Expected successful validation for repeated bind"
+        );
+    }
+
+    #[test]
+    fn test_pre_validate_peek_bind() {
+        use rholang_parser::RholangParser;
+
+        let parser = RholangParser::new();
+        let code = "for(x <<- @\"channel\") { Nil }";
+        let ast = parser.parse(code).unwrap();
+
+        let mut db = SemanticDb::new();
+        let proc = &ast[0];
+        let pid = db.build_index(proc);
+
+        let mut elaborator = ForComprehensionElaborator::new(&mut db);
+        let result = elaborator.pre_validate(pid);
+
+        assert!(
+            result.is_ok(),
+            "Expected successful validation for peek bind"
+        );
+    }
+
+    #[test]
+    fn test_pre_validate_complex_for_comprehension() {
+        use rholang_parser::RholangParser;
+
+        let parser = RholangParser::new();
+        // Complex for-comprehension with nested structure
+        let code = r#"
+            for(x <- @"input"; y <= @"persistent") {
+                x!(y) | for(z <<- @"peek") { z!(42) }
+            }
+        "#;
+        let ast = parser.parse(code).unwrap();
+
+        let mut db = SemanticDb::new();
+        let proc = &ast[0];
+        let pid = db.build_index(proc);
+
+        let mut elaborator = ForComprehensionElaborator::new(&mut db);
+        let result = elaborator.pre_validate(pid);
+
+        assert!(
+            result.is_ok(),
+            "Expected successful validation for complex for-comprehension"
+        );
+    }
+
+    #[test]
+    fn test_pre_validate_with_quoted_process() {
+        use rholang_parser::RholangParser;
+
+        let parser = RholangParser::new();
+        let code = "for(x <- @{Nil | Nil}) { x!(42) }";
+        let ast = parser.parse(code).unwrap();
+
+        let mut db = SemanticDb::new();
+        let proc = &ast[0];
+        let pid = db.build_index(proc);
+
+        let mut elaborator = ForComprehensionElaborator::new(&mut db);
+        let result = elaborator.pre_validate(pid);
+
+        assert!(
+            result.is_ok(),
+            "Expected successful validation with quoted process"
+        );
+    }
+
+    #[test]
+    fn test_pre_validate_error_accumulation() {
+        let mut db = SemanticDb::new();
+        let mut elaborator = ForComprehensionElaborator::new(&mut db);
+
+        // Test that errors are properly tracked
+        assert!(!elaborator.has_errors());
+        assert_eq!(elaborator.errors().len(), 0);
+
+        elaborator.add_error(ElaborationError::InvalidPid { pid: PID(0) });
+        assert!(elaborator.has_errors());
+        assert_eq!(elaborator.errors().len(), 1);
+
+        elaborator.clear_diagnostics();
+        assert!(!elaborator.has_errors());
+        assert_eq!(elaborator.errors().len(), 0);
     }
 }

@@ -1,11 +1,8 @@
-//! Comprehensive error types for for-comprehension elaboration
-
-use crate::sem::{Diagnostic, ErrorKind, BinderId, PID, Symbol, SymbolOccurence, WarningKind};
-use rholang_parser::SourcePos;
 use super::ConsumptionMode;
+use crate::sem::{BinderId, Diagnostic, ErrorKind, PID, Symbol, SymbolOccurence, WarningKind};
+use rholang_parser::SourcePos;
 use std::fmt;
 
-/// Comprehensive error types for for-comprehension elaboration
 #[derive(Debug, Clone, PartialEq)]
 pub enum ElaborationError {
     /// AST node is incomplete or invalid
@@ -19,7 +16,7 @@ pub enum ElaborationError {
         pid: PID,
         position: Option<SourcePos>,
     },
-    /// PID not found in semantic database
+    /// PID not found in semantic db
     InvalidPid { pid: PID },
     /// Child nodes are not properly indexed
     UnindexedChildNodes {
@@ -27,37 +24,66 @@ pub enum ElaborationError {
         missing_children: Vec<String>,
     },
     /// Unbound variable reference
-    UnboundVariable { var: Symbol, pos: SourcePos },
+    UnboundVariable {
+        pid: PID,
+        var: Symbol,
+        pos: SourcePos,
+    },
     /// Duplicate variable definition
     DuplicateVarDef {
+        pid: PID,
         original: SymbolOccurence,
         duplicate: SymbolOccurence,
     },
     /// Name used in process position
-    NameInProcPosition { binder: BinderId, symbol: Symbol },
+    NameInProcPosition {
+        pid: PID,
+        binder: BinderId,
+        symbol: Symbol,
+        pos: Option<SourcePos>,
+    },
     /// Process used in name position
-    ProcInNamePosition { binder: BinderId, symbol: Symbol },
+    ProcInNamePosition {
+        pid: PID,
+        binder: BinderId,
+        symbol: Symbol,
+        pos: Option<SourcePos>,
+    },
     /// Connective used outside pattern context
-    ConnectiveOutsidePattern { pos: SourcePos },
+    ConnectiveOutsidePattern { pid: PID, pos: SourcePos },
     /// Pattern type mismatch
     PatternTypeMismatch {
+        pid: PID,
         expected: String,
         found: String,
         pos: SourcePos,
     },
-    /// Circular channel dependency detected
-    CircularChannelDependency { channels: Vec<Symbol> },
+    /// Circular channel dependency
+    CircularChannelDependency {
+        pid: PID,
+        channels: Vec<Symbol>,
+        pos: Option<SourcePos>,
+    },
     /// Pattern cannot be satisfied
-    UnsatisfiablePattern { pattern: String, pos: SourcePos },
+    UnsatisfiablePattern {
+        pid: PID,
+        pattern: String,
+        pos: SourcePos,
+    },
     /// Invalid consumption mode
     InvalidConsumptionMode {
+        pid: PID,
         expected: ConsumptionMode,
         found: ConsumptionMode,
         pos: SourcePos,
     },
-    /// Deadlock potential detected
-    DeadlockPotential { receipts: String, pos: SourcePos },
-    /// Invalid pattern structure in for-comprehension
+    /// Deadlock potential
+    DeadlockPotential {
+        pid: PID,
+        receipts: String,
+        pos: SourcePos,
+    },
+    /// Invalid pattern structure in for-comp
     InvalidPattern {
         pid: PID,
         position: Option<SourcePos>,
@@ -90,7 +116,6 @@ pub enum ElaborationError {
     },
 }
 
-/// Warnings specific to for-comprehension elaboration
 #[derive(Debug, Clone, PartialEq)]
 pub enum ElaborationWarning {
     /// Pattern may not match expected message type
@@ -114,10 +139,8 @@ pub enum ElaborationWarning {
     },
 }
 
-/// Result type for elaboration operations
 pub type ElaborationResult<T> = Result<T, ElaborationError>;
 
-/// Validation error specific to patterns and sources
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValidationError {
     /// Pattern contains invalid structure
@@ -139,11 +162,11 @@ pub enum ValidationError {
     ProcInNamePosition { binder: BinderId, symbol: Symbol },
     /// Connective used outside pattern context
     ConnectiveOutsidePattern { pos: SourcePos },
-    /// Circular channel dependency detected
+    /// Circular channel dependency
     CircularChannelDependency { channels: Vec<Symbol> },
     /// Pattern cannot be satisfied
     UnsatisfiablePattern { pattern: String },
-    /// Deadlock potential detected
+    /// Deadlock potential
     DeadlockPotential { receipts: String },
 }
 
@@ -165,44 +188,45 @@ impl ElaborationError {
             ElaborationError::UnindexedChildNodes { pid, .. } => {
                 Diagnostic::error(*pid, ErrorKind::BadCode, None)
             }
-            ElaborationError::UnboundVariable { pos, .. } => {
-                // Use PID(0) as placeholder for position-only errors
-                Diagnostic::error(PID(0), ErrorKind::UnboundVariable, Some(*pos))
+            ElaborationError::UnboundVariable { pid, pos, .. } => {
+                Diagnostic::error(*pid, ErrorKind::UnboundVariable, Some(*pos))
             }
-            ElaborationError::DuplicateVarDef { original, .. } => Diagnostic::error(
-                PID(0),
+            ElaborationError::DuplicateVarDef { pid, original, .. } => Diagnostic::error(
+                *pid,
                 ErrorKind::DuplicateVarDef {
                     original: *original,
                 },
                 Some(original.position),
             ),
-            ElaborationError::NameInProcPosition { binder, symbol } => Diagnostic::error(
-                PID(0),
-                ErrorKind::NameInProcPosition(*binder, *symbol),
-                None,
-            ),
-            ElaborationError::ProcInNamePosition { binder, symbol } => Diagnostic::error(
-                PID(0),
-                ErrorKind::ProcInNamePosition(*binder, *symbol),
-                None,
-            ),
-            ElaborationError::ConnectiveOutsidePattern { pos } => {
-                Diagnostic::error(PID(0), ErrorKind::ConnectiveOutsidePattern, Some(*pos))
+            ElaborationError::NameInProcPosition {
+                pid,
+                binder,
+                symbol,
+                pos,
+            } => Diagnostic::error(*pid, ErrorKind::NameInProcPosition(*binder, *symbol), *pos),
+            ElaborationError::ProcInNamePosition {
+                pid,
+                binder,
+                symbol,
+                pos,
+            } => Diagnostic::error(*pid, ErrorKind::ProcInNamePosition(*binder, *symbol), *pos),
+            ElaborationError::ConnectiveOutsidePattern { pid, pos } => {
+                Diagnostic::error(*pid, ErrorKind::ConnectiveOutsidePattern, Some(*pos))
             }
-            ElaborationError::PatternTypeMismatch { pos, .. } => {
-                Diagnostic::error(PID(0), ErrorKind::BadCode, Some(*pos))
+            ElaborationError::PatternTypeMismatch { pid, pos, .. } => {
+                Diagnostic::error(*pid, ErrorKind::BadCode, Some(*pos))
             }
-            ElaborationError::CircularChannelDependency { .. } => {
-                Diagnostic::error(PID(0), ErrorKind::BadCode, None)
+            ElaborationError::CircularChannelDependency { pid, pos, .. } => {
+                Diagnostic::error(*pid, ErrorKind::BadCode, *pos)
             }
-            ElaborationError::UnsatisfiablePattern { pos, .. } => {
-                Diagnostic::error(PID(0), ErrorKind::BadCode, Some(*pos))
+            ElaborationError::UnsatisfiablePattern { pid, pos, .. } => {
+                Diagnostic::error(*pid, ErrorKind::BadCode, Some(*pos))
             }
-            ElaborationError::InvalidConsumptionMode { pos, .. } => {
-                Diagnostic::error(PID(0), ErrorKind::BadCode, Some(*pos))
+            ElaborationError::InvalidConsumptionMode { pid, pos, .. } => {
+                Diagnostic::error(*pid, ErrorKind::BadCode, Some(*pos))
             }
-            ElaborationError::DeadlockPotential { pos, .. } => {
-                Diagnostic::error(PID(0), ErrorKind::BadCode, Some(*pos))
+            ElaborationError::DeadlockPotential { pid, pos, .. } => {
+                Diagnostic::error(*pid, ErrorKind::BadCode, Some(*pos))
             }
             ElaborationError::InvalidPattern { pid, position, .. } => {
                 Diagnostic::error(*pid, ErrorKind::BadCode, *position)
