@@ -192,7 +192,8 @@ pub(super) fn node_to_ast<'ast>(
                 | kind!("disjunction")
                 | kind!("conjunction")
                 | kind!("pathmap_subtract")
-                | kind!("pathmap_restrict") => {
+                | kind!("pathmap_restrict")
+                | kind!("pathmap_drop") => {
                     let (left, right) = get_left_and_right(&node);
                     cont_stack.push(K::ConsumeBinaryExp {
                         op: match node.kind_id() {
@@ -216,7 +217,8 @@ pub(super) fn node_to_ast<'ast>(
                             kind!("disjunction") => BinaryExpOp::Disjunction,
                             kind!("conjunction") => BinaryExpOp::Conjunction,
                             kind!("pathmap_subtract") => BinaryExpOp::PathmapSubtract,
-                            _ => BinaryExpOp::PathmapRestrict,
+                            kind!("pathmap_restrict") => BinaryExpOp::PathmapRestrict,
+                            _ => BinaryExpOp::PathmapDrop,
                         },
                         span,
                     });
@@ -238,23 +240,6 @@ pub(super) fn node_to_ast<'ast>(
                     continue 'parse;
                 }
 
-                kind!("pathmap_drop") => {
-                    let count_node = get_field(&node, field!("count"));
-                    let pathmap_node = get_field(&node, field!("pathmap"));
-                    
-                    let count_value = get_node_value(&count_node, source);
-                    match count_value.parse::<i64>() {
-                        Ok(count) => {
-                            cont_stack.push(K::ConsumePathmapDrop { count, span });
-                            node = pathmap_node;
-                            continue 'parse;
-                        }
-                        Err(_) => {
-                            errors.push(AnnParsingError::new(ParsingError::NumberOutOfRange, &count_node));
-                            bad = true;
-                        }
-                    }
-                }
 
                 kind!("collection") => {
                     let collection_node = get_first_child(&node);
@@ -965,8 +950,6 @@ fn apply_cont<'tree, 'ast>(
                             };
                             pathmap.ann(span)
                         }),
-                        K::ConsumePathmapDrop { count, span } => proc_stack
-                            .replace_top(|pathmap| ast_builder.alloc_pathmap_drop(count, pathmap).ann(span)),
                         _ => unreachable!("Eval continuations are handled in another branch"),
                     };
 
@@ -1081,10 +1064,6 @@ enum K<'tree, 'ast> {
     ConsumePathmap {
         arity: usize,
         has_remainder: bool,
-        span: SourceSpan,
-    },
-    ConsumePathmapDrop {
-        count: i64,
         span: SourceSpan,
     },
     EvalDelayed(tree_sitter::Node<'tree>),
@@ -1207,11 +1186,6 @@ impl Debug for K<'_, '_> {
             Self::ConsumePathmap { arity, span, .. } => f
                 .debug_struct("ConsumePathmap")
                 .field("arity", arity)
-                .field("span", span)
-                .finish(),
-            Self::ConsumePathmapDrop { count, span } => f
-                .debug_struct("ConsumePathmapDrop")
-                .field("count", count)
                 .field("span", span)
                 .finish(),
             Self::EvalDelayed(arg0) => f.debug_tuple("EvalDelayed").field(arg0).finish(),

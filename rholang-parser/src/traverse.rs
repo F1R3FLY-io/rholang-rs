@@ -154,10 +154,6 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
                 self.stack.push(arg);
             }
 
-            Proc::PathmapDrop { pathmap, .. } => {
-                self.stack.push(pathmap);
-            }
-
             Proc::Select { branches } => {
                 self.stack.extend(select_branches(branches).rev());
             }

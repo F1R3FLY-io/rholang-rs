@@ -200,14 +200,6 @@ impl<'ast> ASTBuilder<'ast> {
         }))
     }
 
-    pub(crate) fn alloc_pathmap_drop(
-        &self,
-        count: i64,
-        pathmap: AnnProc<'ast>,
-    ) -> &Proc<'ast> {
-        self.arena.alloc(Proc::PathmapDrop { count, pathmap })
-    }
-
     pub(crate) fn alloc_var(&self, id: Id<'ast>) -> &Proc<'ast> {
         self.arena.alloc(Proc::ProcVar(Var::Id(id)))
     }

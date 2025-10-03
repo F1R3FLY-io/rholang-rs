@@ -108,12 +108,6 @@ pub enum Proc<'ast> {
         var: Id<'ast>,
     },
 
-    // Pathmap operations
-    PathmapDrop {
-        count: i64,
-        pathmap: AnnProc<'ast>,
-    },
-
     Bad, // bad process usually represents a parsing error
 }
 
@@ -317,6 +311,7 @@ pub enum BinaryExpOp {
     Conjunction,
     PathmapSubtract,
     PathmapRestrict,
+    PathmapDrop,
 }
 
 // for-comprehensions

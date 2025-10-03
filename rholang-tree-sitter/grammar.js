@@ -34,9 +34,7 @@ module.exports = grammar({
                 "not",
                 "bundle",
                 "true",
-                "false",
-                "restrict",
-                "drop"
+                "false"
             ],
         },
 
@@ -196,8 +194,8 @@ module.exports = grammar({
         negation: $ => prec(15, seq('~', $._proc)),
         // Pathmap operations
         pathmap_subtract: $ => prec.left(8, seq($._proc, '\\\\', $._proc)),
-        pathmap_restrict: $ => prec.left(8, seq($._proc, 'restrict', $._proc)),
-        pathmap_drop: $ => prec(10, seq('drop', field('count', $.long_literal), ',', field('pathmap', $._proc))),
+        pathmap_restrict: $ => prec.left(8, seq($._proc, '|>', $._proc)),
+        pathmap_drop: $ => prec.left(8, seq($._proc, '<<', field('count', $.long_literal))),
         _ground_expression: $ => prec(16, choice($.block, $._literal, $.nil, $.collection, $._proc_var, $.simple_type, $.unit)),
 
         // synchronous send continuations
