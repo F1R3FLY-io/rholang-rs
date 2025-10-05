@@ -13,16 +13,16 @@ ahash = "0.8.12"
 # Used by: shell, rholang-jni-bridge
 anyhow = "1.0.98"
 
-# Used by: shell
-async-trait = "0.1.88"
+# Used by: shell, librho
+async-trait = "0.1.89"
 
 # General purpose, used mostly by librho
 bitvec = "1.0.1"
 indexmap = "2.11.0"
 intmap = "3.1.2"
 
-# Used by: shell
-tokio = { version = "1.45.1", features = ["rt", "rt-multi-thread", "full"] }
+# Used by: shell, librho
+tokio = { version = "1.47.1", features = ["rt", "rt-multi-thread", "test-util", "parking_lot", "sync"] }
 
 # Used by: shell
 rustyline-async = "0.4.6"
