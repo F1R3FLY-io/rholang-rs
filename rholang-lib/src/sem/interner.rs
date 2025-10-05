@@ -1,11 +1,12 @@
-use std::{cell::RefCell, ops::Index};
+use std::ops::Index;
 
 use indexmap::IndexSet;
 
 use super::Symbol;
+use parking_lot::RwLock;
 
 pub(super) struct Interner {
-    rev: RefCell<IndexSet<String, ahash::RandomState>>,
+    rev: RwLock<IndexSet<String, ahash::RandomState>>,
 }
 
 const DEFAULT_INTERNER_CAPACITY: usize = 32;
@@ -13,7 +14,7 @@ const DEFAULT_INTERNER_CAPACITY: usize = 32;
 impl Interner {
     pub(super) fn new() -> Self {
         Self {
-            rev: RefCell::new(IndexSet::with_capacity_and_hasher(
+            rev: RwLock::new(IndexSet::with_capacity_and_hasher(
                 DEFAULT_INTERNER_CAPACITY,
                 super::stable_hasher(),
             )),
@@ -22,11 +23,11 @@ impl Interner {
 
     pub(super) fn intern(&self, name: &str) -> Symbol {
         // First try immutable borrow to check for existing symbol
-        if let Some(sym) = self.rev.borrow().get_index_of(name) {
+        if let Some(sym) = self.rev.read().get_index_of(name) {
             Symbol(sym as u32) // SAFETY: we never allow length of the symbol table to exceed |u32|
         } else {
             // Only borrow mutably if we need to insert
-            let mut rev = self.rev.borrow_mut();
+            let mut rev = self.rev.write();
             let new_sym = rev
                 .len()
                 .try_into()
@@ -37,19 +38,18 @@ impl Interner {
     }
 
     pub(super) fn resolve(&self, sym: Symbol) -> Option<&str> {
-        // SAFETY: safe because `intern` only holds a mutable borrow when inserting,
-        // and here we only call `resolve` after `intern` has returned.
-        // There is never an active mutable borrow while using this reference.
-        let rev = unsafe { self.rev.try_borrow_unguarded().unwrap() };
-        rev.get_index(sym.0 as usize).map(|s| s.as_str())
+        let rev = self.rev.read();
+        rev.get_index(sym.0 as usize).map(|s| unsafe {
+            // SAFETY: safe because `intern` only holds a mutable borrow when inserting,
+            // and here we only call `resolve` after `intern` has returned.
+            // There is never an active mutable borrow while using this reference.
+            str::from_utf8_unchecked(std::slice::from_raw_parts(s.as_ptr(), s.len()))
+        })
     }
 
     pub(super) fn resolve_owned(&self, sym: Symbol) -> Option<String> {
-        // No need to use Ref trickery
-        self.rev
-            .borrow()
-            .get_index(sym.0 as usize)
-            .map(|s| s.clone())
+        // No need to use `String.as_ptr()` trickery
+        self.rev.read().get_index(sym.0 as usize).map(|s| s.clone())
     }
 }
 
