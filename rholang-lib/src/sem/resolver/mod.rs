@@ -6,6 +6,8 @@ use smallvec::SmallVec;
 mod pattern;
 mod proc;
 
+pub type NamePattern<'a> = &'a ast::Names<'a>;
+
 struct BindingStack {
     scopes: SmallVec<[ScopeInfo; 4]>,
     env: Env,
@@ -224,17 +226,17 @@ struct Shadowed {
 
 /// Controls how to treat shadowed variables when lexical scope is dropped
 trait ShadowedStrategy {
-    fn warn_shadowed(db: &mut SemanticDb, current: PID, shadowed: &[Shadowed]);
+    fn report_shadowed(db: &mut SemanticDb, current: PID, shadowed: &[Shadowed]);
 }
 
 /// Disallow shadowing within the same process ([`ErrorKind::DuplicateVarDef`]); allow shadowing accross processes
 enum DisallowDups {}
 
 /// allow shadowing accross scope, emit a warning ([`WarningKind::ShadowedVar`])
-enum OnlyWarn {}
+enum AllowDups {}
 
 impl ShadowedStrategy for DisallowDups {
-    fn warn_shadowed(db: &mut SemanticDb, current: PID, shadowed: &[Shadowed]) {
+    fn report_shadowed(db: &mut SemanticDb, current: PID, shadowed: &[Shadowed]) {
         use super::{ErrorKind, WarningKind};
 
         for shadow in shadowed {
@@ -261,8 +263,8 @@ impl ShadowedStrategy for DisallowDups {
     }
 }
 
-impl ShadowedStrategy for OnlyWarn {
-    fn warn_shadowed(db: &mut SemanticDb, current: PID, shadowed: &[Shadowed]) {
+impl ShadowedStrategy for AllowDups {
+    fn report_shadowed(db: &mut SemanticDb, current: PID, shadowed: &[Shadowed]) {
         use super::WarningKind;
 
         for shadow in shadowed {
@@ -371,7 +373,7 @@ impl<'s, 'd, 'a> LexicallyScoped<'s, 'd, 'a> {
     }
 }
 
-impl<'s, 'd, 'a> LexicallyScoped<'s, 'd, 'a, OnlyWarn, PopFree> {
+impl<'s, 'd, 'a> LexicallyScoped<'s, 'd, 'a, AllowDups, PopFree> {
     fn free(
         db: &'d mut SemanticDb<'a>,
         stack: &'s mut BindingStack,
@@ -398,7 +400,7 @@ where
     P: PoppingStrategy,
 {
     fn drop(&mut self) {
-        S::warn_shadowed(self.db, self.scope, &self.shadowed);
+        S::report_shadowed(self.db, self.scope, &self.shadowed);
 
         let popped_scope = P::pop(self.stack);
         assert!(
