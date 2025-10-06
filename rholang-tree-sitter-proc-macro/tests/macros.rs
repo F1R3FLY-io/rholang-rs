@@ -2,11 +2,11 @@
 use rholang_tree_sitter_proc_macro::{field, kind, kw};
 
 // Static values for node kinds
-const NEW_KIND: u16 = 79;
-const SEND_KIND: u16 = 87;
-const BUNDLE_KIND: u16 = 82;
-const BRANCH_KIND: u16 = 129;
-const CASE_KIND: u16 = 128;
+const NEW_KIND: u16 = 84;
+const SEND_KIND: u16 = 92;
+const BUNDLE_KIND: u16 = 87;
+const BRANCH_KIND: u16 = 136;
+const CASE_KIND: u16 = 135;
 
 // Static values for keywords
 const NEW_KW: u16 = 4;

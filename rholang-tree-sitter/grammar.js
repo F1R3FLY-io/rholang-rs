@@ -18,25 +18,25 @@ module.exports = grammar({
 
     inline: $ => [$.name],
 
-    reserved: {
-        global: $ => [
-            "new",
-            "if",
-            "else",
-            "let",
-            "match",
-            "select",
-            "contract",
-            "for",
-            "or",
-            "and",
-            "matches",
-            "not",
-            "bundle",
-            "true",
-            "false"
-        ],
-    },
+        reserved: {
+            global: $ => [
+                "new",
+                "if",
+                "else",
+                "let",
+                "match",
+                "select",
+                "contract",
+                "for",
+                "or",
+                "and",
+                "matches",
+                "not",
+                "bundle",
+                "true",
+                "false"
+            ],
+        },
 
     rules: {
         // Starting point of the grammar
@@ -152,7 +152,10 @@ module.exports = grammar({
             $.not,
             $.or,
             $.sub,
-            $.var_ref
+            $.var_ref,
+            $.pathmap_subtract,
+            $.pathmap_restrict,
+            $.pathmap_drop
         ),
 
         // expressions in precedence order
@@ -189,6 +192,10 @@ module.exports = grammar({
         disjunction: $ => prec.left(13, seq($._proc, '\\/', $._proc)),
         conjunction: $ => prec.left(14, seq($._proc, '/\\', $._proc)),
         negation: $ => prec(15, seq('~', $._proc)),
+        // Pathmap operations
+        pathmap_subtract: $ => prec.left(8, seq($._proc, '\\\\', $._proc)),
+        pathmap_restrict: $ => prec.right(8, seq($._proc, '|>', $._proc)),
+        pathmap_drop: $ => prec.left(8, seq($._proc, '<<', $._proc)),
         _ground_expression: $ => prec(16, choice($.block, $._literal, $.nil, $.collection, $._proc_var, $.simple_type, $.unit)),
 
         // synchronous send continuations
@@ -285,7 +292,7 @@ module.exports = grammar({
         nil: $ => 'Nil',
 
         // Collections
-        collection: $ => choice($.list, $.tuple, $.set, $.map),
+        collection: $ => choice($.list, $.tuple, $.set, $.map, $.pathmap),
 
         list: $ => seq('[', commaSep($._proc), optional($._proc_remainder), ']'),
 
@@ -293,6 +300,8 @@ module.exports = grammar({
 
         map: $ => seq('{', commaSep($.key_value_pair), optional($._proc_remainder), '}'),
         key_value_pair: $ => seq(field('key', $._proc), ':', field('value', $._proc)),
+
+        pathmap: $ => seq('{|', commaSep($._proc), optional($._proc_remainder), '|}'),
 
         tuple: $ => choice(
             seq('(', $._proc, ',)'),

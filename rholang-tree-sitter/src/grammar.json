@@ -603,6 +603,18 @@
         {
           "type": "SYMBOL",
           "name": "var_ref"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "pathmap_subtract"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "pathmap_restrict"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "pathmap_drop"
         }
       ]
     },
@@ -1166,6 +1178,69 @@
           {
             "type": "STRING",
             "value": "~"
+          },
+          {
+            "type": "SYMBOL",
+            "name": "_proc"
+          }
+        ]
+      }
+    },
+    "pathmap_subtract": {
+      "type": "PREC_LEFT",
+      "value": 8,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "SYMBOL",
+            "name": "_proc"
+          },
+          {
+            "type": "STRING",
+            "value": "\\\\"
+          },
+          {
+            "type": "SYMBOL",
+            "name": "_proc"
+          }
+        ]
+      }
+    },
+    "pathmap_restrict": {
+      "type": "PREC_RIGHT",
+      "value": 8,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "SYMBOL",
+            "name": "_proc"
+          },
+          {
+            "type": "STRING",
+            "value": "|>"
+          },
+          {
+            "type": "SYMBOL",
+            "name": "_proc"
+          }
+        ]
+      }
+    },
+    "pathmap_drop": {
+      "type": "PREC_LEFT",
+      "value": 8,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "SYMBOL",
+            "name": "_proc"
+          },
+          {
+            "type": "STRING",
+            "value": "<<"
           },
           {
             "type": "SYMBOL",
@@ -1955,6 +2030,10 @@
         {
           "type": "SYMBOL",
           "name": "map"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "pathmap"
         }
       ]
     },
@@ -2194,6 +2273,76 @@
             "type": "SYMBOL",
             "name": "_proc"
           }
+        }
+      ]
+    },
+    "pathmap": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "{|"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "_proc"
+                },
+                {
+                  "type": "REPEAT",
+                  "content": {
+                    "type": "SEQ",
+                    "members": [
+                      {
+                        "type": "STRING",
+                        "value": ","
+                      },
+                      {
+                        "type": "SYMBOL",
+                        "name": "_proc"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "type": "CHOICE",
+                  "members": [
+                    {
+                      "type": "STRING",
+                      "value": ","
+                    },
+                    {
+                      "type": "BLANK"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_proc_remainder"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "STRING",
+          "value": "|}"
         }
       ]
     },

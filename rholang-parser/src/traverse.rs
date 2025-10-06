@@ -141,6 +141,7 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
             Proc::Collection(collection) => match collection {
                 Collection::List { elements, .. }
                 | Collection::Set { elements, .. }
+                | Collection::Pathmap { elements, .. }
                 | Collection::Tuple(elements) => {
                     self.stack.extend(elements.iter().rev());
                 }
