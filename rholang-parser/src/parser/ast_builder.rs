@@ -171,10 +171,6 @@ impl<'ast> ASTBuilder<'ast> {
     }
 
     pub(crate) fn alloc_pathmap(&self, procs: &[AnnProc<'ast>]) -> &Proc<'ast> {
-        if procs.is_empty() {
-            // TODO -> alloc empty pathmap?
-        }
-
         self.arena.alloc(Proc::Collection(Collection::PathMap {
             elements: procs.to_vec(),
             remainder: None,

@@ -8,8 +8,6 @@ module.exports = grammar({
     ],
     word: $ => $.var,
 
-    conflicts: ($) => [[$.pathmap, $.par]],
-
     supertypes: $ => [
         $._let_decls,
         $._bundle,
@@ -296,7 +294,7 @@ module.exports = grammar({
         map: $ => seq('{', commaSep($.key_value_pair), optional($._proc_remainder), '}'),
         key_value_pair: $ => seq(field('key', $._proc), ':', field('value', $._proc)),
 
-        pathmap: ($) => seq("{", "|", commaSep($._proc), optional($._proc_remainder), "|", "}"),
+        pathmap: $ => seq('{|', commaSep($._proc), optional($._proc_remainder), '|}'),
 
         tuple: $ => choice(
             seq('(', $._proc, ',)'),
