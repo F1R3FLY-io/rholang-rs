@@ -8564,20 +8564,9 @@
   {
     "type": "pathmap_drop",
     "named": true,
-    "fields": {
-      "count": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "long_literal",
-            "named": true
-          }
-        ]
-      }
-    },
+    "fields": {},
     "children": {
-      "multiple": false,
+      "multiple": true,
       "required": true,
       "types": [
         {
@@ -10007,6 +9996,7 @@
   {
     "type": "source_file",
     "named": true,
+    "root": true,
     "fields": {},
     "children": {
       "multiple": true,

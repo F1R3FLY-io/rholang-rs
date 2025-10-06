@@ -1,4 +1,5 @@
 {
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/grammar.schema.json",
   "name": "rholang",
   "word": "var",
   "rules": {
@@ -1207,7 +1208,7 @@
       }
     },
     "pathmap_restrict": {
-      "type": "PREC_LEFT",
+      "type": "PREC_RIGHT",
       "value": 8,
       "content": {
         "type": "SEQ",
@@ -1242,12 +1243,8 @@
             "value": "<<"
           },
           {
-            "type": "FIELD",
-            "name": "count",
-            "content": {
-              "type": "SYMBOL",
-              "name": "long_literal"
-            }
+            "type": "SYMBOL",
+            "name": "_proc"
           }
         ]
       }
@@ -2698,6 +2695,69 @@
     "_source",
     "_proc_var",
     "_literal"
-  ]
+  ],
+  "reserved": {
+    "global": [
+      {
+        "type": "STRING",
+        "value": "new"
+      },
+      {
+        "type": "STRING",
+        "value": "if"
+      },
+      {
+        "type": "STRING",
+        "value": "else"
+      },
+      {
+        "type": "STRING",
+        "value": "let"
+      },
+      {
+        "type": "STRING",
+        "value": "match"
+      },
+      {
+        "type": "STRING",
+        "value": "select"
+      },
+      {
+        "type": "STRING",
+        "value": "contract"
+      },
+      {
+        "type": "STRING",
+        "value": "for"
+      },
+      {
+        "type": "STRING",
+        "value": "or"
+      },
+      {
+        "type": "STRING",
+        "value": "and"
+      },
+      {
+        "type": "STRING",
+        "value": "matches"
+      },
+      {
+        "type": "STRING",
+        "value": "not"
+      },
+      {
+        "type": "STRING",
+        "value": "bundle"
+      },
+      {
+        "type": "STRING",
+        "value": "true"
+      },
+      {
+        "type": "STRING",
+        "value": "false"
+      }
+    ]
+  }
 }
-
