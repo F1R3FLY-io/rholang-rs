@@ -1,5 +1,6 @@
 use super::{DiagnosticPass, FactPass, Pass, SemanticDb};
 use as_any::Downcast;
+use nonempty_collections::NEVec;
 use std::{borrow::Cow, fmt};
 
 pub struct Pipeline {
@@ -125,13 +126,13 @@ impl fmt::Display for Pipeline {
 
 /// Diagnostic passes run in parallel
 struct DiagnosticGroup {
-    passes: Vec<Box<dyn DiagnosticPass>>,
+    passes: NEVec<Box<dyn DiagnosticPass>>,
 }
 
 impl DiagnosticGroup {
     fn single<D: DiagnosticPass>(pass: D) -> Self {
         Self {
-            passes: vec![Box::new(pass)],
+            passes: NEVec::new(Box::new(pass)),
         }
     }
 
@@ -141,10 +142,6 @@ impl DiagnosticGroup {
 
     /// Run all diagnostics concurrently
     async fn run_async<'d>(&self, db: &SemanticDb<'d>) -> Vec<super::Diagnostic> {
-        if self.passes.is_empty() {
-            return Vec::new();
-        }
-
         let mut all = Vec::new();
         let (_, results) = async_scoped::TokioScope::scope_and_block(|scope| {
             for pass in &self.passes {
@@ -166,18 +163,18 @@ impl DiagnosticGroup {
 
 impl Pass for DiagnosticGroup {
     fn name(&self) -> Cow<'static, str> {
-        match self.passes.len() {
-            0 => Cow::Borrowed("∅ DiagnosticGroup"),
-            1 => Cow::Owned(format!("DiagnosticGroup[{}]", self.passes[0].name())),
-            n => {
-                let joined = self
-                    .passes
-                    .iter()
-                    .map(|p| p.name())
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                Cow::Owned(format!("DiagnosticGroup({n}): [{}]", joined))
-            }
+        let len = self.passes.len().get(); // NonZeroUsize → usize
+
+        if len == 1 {
+            Cow::Owned(format!("DiagnosticGroup[{}]", self.passes.first().name()))
+        } else {
+            let joined = self
+                .passes
+                .iter()
+                .map(|p| p.name())
+                .collect::<Vec<_>>()
+                .join(", ");
+            Cow::Owned(format!("DiagnosticGroup({len}): [{}]", joined))
         }
     }
 }
