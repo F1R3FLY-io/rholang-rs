@@ -68,7 +68,7 @@ fn test_branch_true_and_false() {
     ];
     let mut p_true = Process::new(prog_true, "cf_bt_true");
     p_true.names = vec![label("L")];
-    p_true.set_labels([("L", 5)]); // target is index 5: PUSH_INT 10
+    p_true.set_labels([("L", 4)]); // target is index 4: PUSH_INT 10
     let out_true = vm.execute(&mut p_true).expect("exec ok");
     assert_eq!(out_true, Value::Int(10));
 
@@ -102,7 +102,7 @@ fn test_branch_true_and_false() {
     ];
     let mut p_bf = Process::new(prog_bf, "cf_bf");
     p_bf.names = vec![label("T")];
-    p_bf.set_labels([("T", 5)]);
+    p_bf.set_labels([("T", 4)]);
     let out_bf = vm3.execute(&mut p_bf).expect("exec ok");
     assert_eq!(out_bf, Value::Int(3));
 }
@@ -123,7 +123,7 @@ fn test_branch_success_true_and_false() {
     ];
     let mut p = Process::new(prog, "cf_bs_true");
     p.names = vec![label("S")];
-    p.set_labels([("S", 5)]);
+    p.set_labels([("S", 4)]);
     let out = vm.execute(&mut p).expect("exec ok");
     assert_eq!(out, Value::Int(123));
 

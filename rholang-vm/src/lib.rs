@@ -8,6 +8,9 @@ mod execute;
 mod error;
 mod rspace;
 
+#[cfg(feature = "parallel-exec")]
+pub mod parallel;
+
 pub use crate::vm::VM;
 pub use crate::error::ExecError;
 
@@ -18,4 +21,8 @@ pub mod api {
     pub use crate::value::Value;
     pub use crate::process::Process;
     pub use crate::vm::VM;
+    #[cfg(feature = "parallel-exec")]
+    pub use crate::parallel::vm_parallel::VmParallel;
+    #[cfg(feature = "parallel-exec")]
+    pub use crate::parallel::vm_parallel::VmBuilder;
 }

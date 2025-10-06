@@ -48,10 +48,11 @@ fn get_memory_usage() -> usize {
     // This isn't real memory tracking but provides non-zero values for testing
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    // Use seconds precision to avoid overly large deltas on platforms without /proc
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
-        .as_nanos() as usize
+        .as_secs() as usize
 }
 
 #[test]

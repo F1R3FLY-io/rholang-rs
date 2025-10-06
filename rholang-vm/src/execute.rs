@@ -81,7 +81,7 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
             let (b, a) = (vm.stack.pop(), vm.stack.pop());
             match (a, b) {
                 (Some(Value::Int(a)), Some(Value::Int(b))) => {
-                    if b == 0 { return Err(ExecError::OpcodeParamError { opcode: "MOD", message: "mod by zero".to_string() }); }
+                    if b == 0 { return Err(ExecError::OpcodeParamError { opcode: "MOD", message: "modulo by zero".to_string() }); }
                     vm.stack.push(Value::Int(a % b))
                 }
                 _ => return Err(ExecError::OpcodeParamError { opcode: "MOD", message: "requires Ints".to_string() }),
@@ -107,34 +107,34 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
             vm.stack.push(Value::Bool(a != b));
         }
         Opcode::CMP_LT => {
-            let b = vm.stack.pop().ok_or_else(|| ExecError::OpcodeParamError { opcode: "CMP_LT", message: "stack underflow rhs".to_string() })?;
-            let a = vm.stack.pop().ok_or_else(|| ExecError::OpcodeParamError { opcode: "CMP_LT", message: "stack underflow lhs".to_string() })?;
+            let b = vm.stack.pop().ok_or_else(|| ExecError::OpcodeParamError { opcode: "CMP_LT", message: "stack underflow rhs (requires Ints)".to_string() })?;
+            let a = vm.stack.pop().ok_or_else(|| ExecError::OpcodeParamError { opcode: "CMP_LT", message: "stack underflow lhs (requires Ints)".to_string() })?;
             match (a, b) {
                 (Value::Int(a), Value::Int(b)) => vm.stack.push(Value::Bool(a < b)),
                 (a, b) => return Err(ExecError::OpcodeParamError { opcode: "CMP_LT", message: format!("requires Ints, got {:?} and {:?}", a, b) }),
             }
         }
         Opcode::CMP_LTE => {
-            let b = vm.stack.pop().ok_or_else(|| ExecError::OpcodeParamError { opcode: "CMP_LTE", message: "stack underflow rhs".to_string() })?;
-            let a = vm.stack.pop().ok_or_else(|| ExecError::OpcodeParamError { opcode: "CMP_LTE", message: "stack underflow lhs".to_string() })?;
+            let b = vm.stack.pop().ok_or_else(|| ExecError::OpcodeParamError { opcode: "CMP_LTE", message: "stack underflow rhs (requires Ints)".to_string() })?;
+            let a = vm.stack.pop().ok_or_else(|| ExecError::OpcodeParamError { opcode: "CMP_LTE", message: "stack underflow lhs (requires Ints)".to_string() })?;
             match (a, b) {
                 (Value::Int(a), Value::Int(b)) => vm.stack.push(Value::Bool(a <= b)),
                 (a, b) => return Err(ExecError::OpcodeParamError { opcode: "CMP_LTE", message: format!("requires Ints, got {:?} and {:?}", a, b) }),
             }
         }
         Opcode::CMP_GT => {
-            let b = vm.stack.pop().ok_or_else(|| ExecError::OpcodeParamError { opcode: "CMP_GT", message: "stack underflow rhs".to_string() })?;
-            let a = vm.stack.pop().ok_or_else(|| ExecError::OpcodeParamError { opcode: "CMP_GT", message: "stack underflow lhs".to_string() })?;
+            let b = vm.stack.pop().ok_or_else(|| ExecError::OpcodeParamError { opcode: "CMP_GT", message: "stack underflow rhs (requires Ints)".to_string() })?;
+            let a = vm.stack.pop().ok_or_else(|| ExecError::OpcodeParamError { opcode: "CMP_GT", message: "stack underflow lhs (requires Ints)".to_string() })?;
             match (a, b) {
                 (Value::Int(a), Value::Int(b)) => vm.stack.push(Value::Bool(a > b)),
                 (a, b) => return Err(ExecError::OpcodeParamError { opcode: "CMP_GT", message: format!("requires Ints, got {:?} and {:?}", a, b) }),
             }
         }
         Opcode::CMP_GTE => {
-            let b = vm.stack.pop().ok_or_else(|| ExecError::OpcodeParamError { opcode: "CMP_GTE", message: "stack underflow rhs".to_string() })?;
-            let a = vm.stack.pop().ok_or_else(|| ExecError::OpcodeParamError { opcode: "CMP_GTE", message: "stack underflow lhs".to_string() })?;
+            let b = vm.stack.pop().ok_or_else(|| ExecError::OpcodeParamError { opcode: "CMP_GTE", message: "stack underflow rhs (requires Ints)".to_string() })?;
+            let a = vm.stack.pop().ok_or_else(|| ExecError::OpcodeParamError { opcode: "CMP_GTE", message: "stack underflow lhs (requires Ints)".to_string() })?;
             match (a, b) {
-                (Value::Int(a), Value::Int(b)) => vm.stack.push(Value::Bool(a >= b)),
+                (Value::Int(a), Value::Int(b)) => vm.stack.push(Value::Bool(b >= a)),
                 (a, b) => return Err(ExecError::OpcodeParamError { opcode: "CMP_GTE", message: format!("requires Ints, got {:?} and {:?}", a, b) }),
             }
         }

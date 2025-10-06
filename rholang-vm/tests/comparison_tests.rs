@@ -160,7 +160,9 @@ fn test_relational_ops_with_negatives() {
     let mut vm1 = VM::new();
     let prog1 = vec![
         Instruction::unary(Opcode::PUSH_INT, 5),
+        Instruction::nullary(Opcode::NEG),
         Instruction::unary(Opcode::PUSH_INT, 3),
+        Instruction::nullary(Opcode::NEG),
         Instruction::nullary(Opcode::CMP_LT),
         Instruction::nullary(Opcode::HALT),
     ];
@@ -172,7 +174,9 @@ fn test_relational_ops_with_negatives() {
     let mut vm2 = VM::new();
     let prog2 = vec![
         Instruction::unary(Opcode::PUSH_INT, 3),
+        Instruction::nullary(Opcode::NEG),
         Instruction::unary(Opcode::PUSH_INT, 5),
+        Instruction::nullary(Opcode::NEG),
         Instruction::nullary(Opcode::CMP_GT),
         Instruction::nullary(Opcode::HALT),
     ];
