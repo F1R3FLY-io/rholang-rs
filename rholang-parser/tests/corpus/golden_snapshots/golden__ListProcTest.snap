@@ -6,29 +6,17 @@ Good(
     [
         AnnProc {
             proc: Contract {
-                name: AnnName {
-                    name: ProcVar(
-                        Id(
-                            Id {
-                                name: "ListProcTest",
-                                pos: SourcePos {
-                                    line: 3,
-                                    col: 10,
-                                },
+                name: NameVar(
+                    Id(
+                        Id {
+                            name: "ListProcTest",
+                            pos: SourcePos {
+                                line: 3,
+                                col: 10,
                             },
-                        ),
+                        },
                     ),
-                    span: SourceSpan {
-                        start: SourcePos {
-                            line: 3,
-                            col: 10,
-                        },
-                        end: SourcePos {
-                            line: 3,
-                            col: 22,
-                        },
-                    },
-                },
+                ),
                 formals: Names {
                     names: [],
                     remainder: None,

@@ -3,35 +3,36 @@ resolver = "3"
 members = [
     "rholang-tree-sitter",
     "rholang-parser",
-    "rholang-tree-sitter-proc-macro"
+    "rholang-tree-sitter-proc-macro",
+    "rholang-shell",
 ]
 
 [workspace.dependencies]
-# Used by: shell, rholang-parser, rholang-jni-bridge
+# Used by: rholang-shell, rholang-parser, rholang-jni-bridge
 anyhow = "1.0.98"
 
-# Used by: shell
+# Used by: rholang-shell
 async-trait = "0.1.88"
 
 # General purpose, used mostly by rholang-parser
 bitvec = "1.0.1"
 
-# Used by: shell
+# Used by: rholang-shell
 tokio = { version = "1.45.1", features = ["rt", "rt-multi-thread", "full"] }
 
-# Used by: shell
+# Used by: rholang-shell
 rustyline-async = "0.4.6"
 
-# Used by: shell, rholang-parser
+# Used by: rholang-shell, rholang-parser
 rstest = "0.25.0"
 
-# Used by: shell
+# Used by: rholang-shell
 clap = { version = "4.5.40", features = ["derive"] }
 
-# Used by: shell
+# Used by: rholang-shell
 async-std = { version = "1.13.1", features = ["attributes"] }
 
-# Used by: shell
+# Used by: rholang-shell
 bracket-parser = "0.1.0"
 
 # Library for benchmarking
@@ -41,7 +42,7 @@ divan = "0.1.21"
 smallvec = { version = "1.15.1", features = ["union", "const_generics", "const_new", "may_dangle"] }
 
 # Used by: rholang-parser, rholang-tree-sitter
-tree-sitter = "0.25.8"
+tree-sitter = "0.25.9"
 
 # Used by: rholang-tree-sitter
 tree-sitter-language = "0.1.5"
@@ -64,6 +65,9 @@ syn = "2.0.58"
 
 # Used by: rholang-tree-sitter-proc-macro examples
 is-terminal = "0.4.12"
+
+# Macros used everywhere
+pretty_assertions = { version = "1.4.1", features = ["unstable"] }
 
 [profile.dev]
 debug = true

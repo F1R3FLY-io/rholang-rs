@@ -2,9 +2,8 @@ use smallvec::ToSmallVec;
 use typed_arena::Arena;
 
 use crate::ast::{
-    AnnName, AnnProc, BinaryExpOp, Bind, BundleType, Case, Collection, Id, KeyValuePair,
-    LetBinding, NameDecl, Names, Proc, SendType, SimpleType, SyncSendCont, UnaryExpOp, Var,
-    VarRefKind,
+    AnnProc, BinaryExpOp, Bind, BundleType, Case, Collection, Id, KeyValuePair, LetBinding, Name,
+    NameDecl, Names, Proc, SendType, SimpleType, SyncSendCont, UnaryExpOp, Var, VarRefKind,
 };
 
 pub struct ASTBuilder<'ast> {
@@ -24,11 +23,11 @@ pub struct ASTBuilder<'ast> {
 }
 
 impl<'ast> ASTBuilder<'ast> {
-    pub(super) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::with_capacity(64)
     }
 
-    pub(super) fn with_capacity(capacity: usize) -> Self {
+    pub(crate) fn with_capacity(capacity: usize) -> Self {
         ASTBuilder {
             arena: Arena::with_capacity(capacity),
             string_arena: Arena::with_capacity(32), // Reasonable default for synthetic strings
@@ -55,11 +54,11 @@ impl<'ast> ASTBuilder<'ast> {
         &self.nil
     }
 
-    pub(super) fn const_true(&self) -> &Proc<'ast> {
+    pub(crate) fn const_true(&self) -> &Proc<'ast> {
         &self.r#true
     }
 
-    pub(super) fn const_false(&self) -> &Proc<'ast> {
+    pub(crate) fn const_false(&self) -> &Proc<'ast> {
         &self.r#false
     }
 
@@ -67,19 +66,19 @@ impl<'ast> ASTBuilder<'ast> {
         &self.wild
     }
 
-    pub(super) fn const_unit(&self) -> &Proc<'ast> {
+    pub(crate) fn const_unit(&self) -> &Proc<'ast> {
         &self.unit
     }
 
-    pub(super) fn const_empty_list(&self) -> &Proc<'ast> {
+    pub(crate) fn const_empty_list(&self) -> &Proc<'ast> {
         &self.empty_list
     }
 
-    pub(super) fn const_empty_map(&self) -> &Proc<'ast> {
+    pub(crate) fn const_empty_map(&self) -> &Proc<'ast> {
         &self.empty_map
     }
 
-    pub(super) fn bad_const(&self) -> &Proc<'ast> {
+    pub(crate) fn bad_const(&self) -> &Proc<'ast> {
         &self.bad
     }
 
@@ -96,11 +95,11 @@ impl<'ast> ASTBuilder<'ast> {
         }
     }
 
-    pub(super) fn alloc_uri_literal(&self, value: &'ast str) -> &Proc<'ast> {
+    pub(crate) fn alloc_uri_literal(&self, value: &'ast str) -> &Proc<'ast> {
         self.arena.alloc(Proc::UriLiteral(value.into()))
     }
 
-    pub(super) fn alloc_simple_type(&self, value: SimpleType) -> &Proc<'ast> {
+    pub(crate) fn alloc_simple_type(&self, value: SimpleType) -> &Proc<'ast> {
         self.arena.alloc(Proc::SimpleType(value))
     }
 
@@ -143,7 +142,7 @@ impl<'ast> ASTBuilder<'ast> {
         }))
     }
 
-    pub(super) fn alloc_tuple(&self, procs: &[AnnProc<'ast>]) -> &Proc<'ast> {
+    pub(crate) fn alloc_tuple(&self, procs: &[AnnProc<'ast>]) -> &Proc<'ast> {
         self.arena
             .alloc(Proc::Collection(Collection::Tuple(procs.to_vec())))
     }
@@ -181,7 +180,7 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::Par { left, right })
     }
 
-    pub(super) fn alloc_if_then(
+    pub(crate) fn alloc_if_then(
         &self,
         condition: AnnProc<'ast>,
         if_true: AnnProc<'ast>,
@@ -193,7 +192,7 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub(super) fn alloc_if_then_else(
+    pub(crate) fn alloc_if_then_else(
         &self,
         condition: AnnProc<'ast>,
         if_true: AnnProc<'ast>,
@@ -209,7 +208,7 @@ impl<'ast> ASTBuilder<'ast> {
     pub fn alloc_send(
         &self,
         send_type: SendType,
-        channel: AnnName<'ast>,
+        channel: Name<'ast>,
         inputs: &[AnnProc<'ast>],
     ) -> &Proc<'ast> {
         self.arena.alloc(Proc::Send {
@@ -233,11 +232,7 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub fn alloc_match(
-        &self,
-        expression: AnnProc<'ast>,
-        cases: &[AnnProc<'ast>],
-    ) -> &Proc<'ast> {
+    pub fn alloc_match(&self, expression: AnnProc<'ast>, cases: &[AnnProc<'ast>]) -> &Proc<'ast> {
         self.arena.alloc(Proc::Match {
             expression,
             cases: cases
@@ -250,16 +245,11 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub(super) fn alloc_bundle(&self, bundle_type: BundleType, proc: AnnProc<'ast>) -> &Proc<'ast> {
+    pub(crate) fn alloc_bundle(&self, bundle_type: BundleType, proc: AnnProc<'ast>) -> &Proc<'ast> {
         self.arena.alloc(Proc::Bundle { bundle_type, proc })
     }
 
-    pub fn alloc_let<Ls>(
-        &self,
-        bindings: Ls,
-        body: AnnProc<'ast>,
-        concurrent: bool,
-    ) -> &Proc<'ast>
+    pub fn alloc_let<Ls>(&self, bindings: Ls, body: AnnProc<'ast>, concurrent: bool) -> &Proc<'ast>
     where
         Ls: IntoIterator<Item = LetBinding<'ast>>,
     {
@@ -276,7 +266,7 @@ impl<'ast> ASTBuilder<'ast> {
 
     pub fn alloc_contract(
         &self,
-        name: AnnName<'ast>,
+        name: Name<'ast>,
         formals: Names<'ast>,
         body: AnnProc<'ast>,
     ) -> &Proc<'ast> {
@@ -287,40 +277,36 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub(super) fn alloc_send_sync(
+    pub(crate) fn alloc_send_sync(
         &self,
-        channel: AnnName<'ast>,
+        channel: Name<'ast>,
         messages: &[AnnProc<'ast>],
     ) -> &Proc<'ast> {
         self.arena.alloc(Proc::SendSync {
             channel,
-            messages: messages.to_smallvec(),
+            inputs: messages.to_smallvec(),
             cont: SyncSendCont::Empty,
         })
     }
 
-    pub(super) fn alloc_send_sync_with_cont(
+    pub(crate) fn alloc_send_sync_with_cont(
         &self,
-        channel: AnnName<'ast>,
+        channel: Name<'ast>,
         messages: &[AnnProc<'ast>],
         cont: AnnProc<'ast>,
     ) -> &Proc<'ast> {
         self.arena.alloc(Proc::SendSync {
             channel,
-            messages: messages.to_smallvec(),
+            inputs: messages.to_smallvec(),
             cont: SyncSendCont::NonEmpty(cont),
         })
     }
 
-    pub fn alloc_eval(&self, name: AnnName<'ast>) -> &Proc<'ast> {
+    pub fn alloc_eval(&self, name: Name<'ast>) -> &Proc<'ast> {
         self.arena.alloc(Proc::Eval { name })
     }
 
-    pub(super) fn alloc_quote(&self, proc: &'ast Proc<'ast>) -> &Proc<'ast> {
-        self.arena.alloc(Proc::Quote { proc })
-    }
-
-    pub(super) fn alloc_method(
+    pub(crate) fn alloc_method(
         &self,
         name: Id<'ast>,
         receiver: AnnProc<'ast>,
@@ -342,20 +328,20 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::BinaryExp { op, left, right })
     }
 
-    pub(super) fn alloc_unary_exp(&self, op: UnaryExpOp, arg: &'ast Proc<'ast>) -> &Proc<'ast> {
+    pub(crate) fn alloc_unary_exp(&self, op: UnaryExpOp, arg: AnnProc<'ast>) -> &Proc<'ast> {
         self.arena.alloc(Proc::UnaryExp { op, arg })
     }
 
-    pub(super) fn alloc_var_ref(&self, kind: VarRefKind, var: Id<'ast>) -> &Proc<'ast> {
+    pub(crate) fn alloc_var_ref(&self, kind: VarRefKind, var: Id<'ast>) -> &Proc<'ast> {
         self.arena.alloc(Proc::VarRef { kind, var })
     }
 
     /// Allocate a string in the string arena and return a reference with the AST lifetime
-    /// 
+    ///
     /// This provides a clean alternative to Box::leak for synthetic strings (like generated
     /// variable names) that need to live for the entire AST lifetime. The string is properly
     /// arena-allocated and will be cleaned up when the ASTBuilder is dropped.
-    /// 
+    ///
     /// # Example
     /// ```rust
     /// let name_ref = builder.alloc_str("synthetic_var_name");
@@ -364,5 +350,24 @@ impl<'ast> ASTBuilder<'ast> {
     pub fn alloc_str(&'ast self, s: &str) -> &'ast str {
         let allocated_string = self.string_arena.alloc(s.to_string());
         allocated_string.as_str()
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn chain<G>(
+        &'ast self,
+        first: &'ast Proc<'ast>,
+        mut generator: G,
+    ) -> impl Iterator<Item = &'ast Proc<'ast>> + 'ast
+    where
+        G: FnMut(&'ast Proc<'ast>) -> Option<Proc<'ast>> + 'ast,
+    {
+        let mut last = first;
+
+        std::iter::from_fn(move || {
+            generator(last).map(|next| {
+                last = self.arena.alloc(next);
+                last
+            })
+        })
     }
 }

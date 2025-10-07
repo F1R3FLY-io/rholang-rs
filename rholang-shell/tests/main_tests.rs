@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-// Correctly import from the shell crate
+// Correctly import from the rholang-shell crate
 use shell::providers::{FakeInterpreterProvider, InterpretationResult, InterpreterProvider};
 
 #[tokio::test]

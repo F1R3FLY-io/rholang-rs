@@ -126,7 +126,7 @@ async fn test_process_special_command_quit() -> Result<()> {
     let output = String::from_utf8(stdout.into_inner())?;
 
     assert!(
-        output.contains("Exiting shell..."),
+        output.contains("Exiting rholang-shell..."),
         "Exit message not displayed"
     );
 

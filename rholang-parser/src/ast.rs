@@ -3,9 +3,9 @@ use std::{
     ops::Deref,
 };
 
-use smallvec::SmallVec;
+use smallvec::{SmallVec, smallvec};
 
-use crate::{SourcePos, SourceSpan};
+use crate::{SourcePos, SourceSpan, traverse::PreorderDfsIter};
 
 pub type ProcList<'a> = SmallVec<[AnnProc<'a>; 1]>;
 
@@ -35,7 +35,7 @@ pub enum Proc<'ast> {
     },
 
     Send {
-        channel: AnnName<'ast>,
+        channel: Name<'ast>,
         send_type: SendType,
         inputs: ProcList<'ast>,
     },
@@ -71,23 +71,20 @@ pub enum Proc<'ast> {
     },
 
     Contract {
-        name: AnnName<'ast>,
+        name: Name<'ast>,
         formals: Names<'ast>,
         body: AnnProc<'ast>,
     },
 
     SendSync {
-        channel: AnnName<'ast>,
-        messages: ProcList<'ast>,
+        channel: Name<'ast>,
+        inputs: ProcList<'ast>,
         cont: SyncSendCont<'ast>,
     },
 
     // expressions
     Eval {
-        name: AnnName<'ast>,
-    },
-    Quote {
-        proc: &'ast Proc<'ast>,
+        name: Name<'ast>,
     },
     Method {
         receiver: AnnProc<'ast>,
@@ -97,7 +94,7 @@ pub enum Proc<'ast> {
 
     UnaryExp {
         op: UnaryExpOp,
-        arg: &'ast Proc<'ast>,
+        arg: AnnProc<'ast>,
     },
     BinaryExp {
         op: BinaryExpOp,
@@ -114,10 +111,22 @@ pub enum Proc<'ast> {
     Bad, // bad process usually represents a parsing error
 }
 
+impl<'a> Proc<'a> {
+    pub fn ann(&'a self, span: SourceSpan) -> AnnProc<'a> {
+        AnnProc { proc: self, span }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct AnnProc<'ast> {
     pub proc: &'ast Proc<'ast>,
     pub span: SourceSpan,
+}
+
+impl<'a> AnnProc<'a> {
+    pub fn iter_preorder_dfs(&'a self) -> impl Iterator<Item = &'a Self> {
+        PreorderDfsIter::<16>::new(self)
+    }
 }
 
 // process variables and names
@@ -173,45 +182,32 @@ impl<'a> TryFrom<AnnProc<'a>> for Var<'a> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum Name<'ast> {
-    ProcVar(Var<'ast>),
-    Quote(&'ast Proc<'ast>),
-}
-
-impl<'a> TryFrom<&Proc<'a>> for Name<'a> {
+impl<'a> TryFrom<Name<'a>> for Var<'a> {
     type Error = String;
 
-    fn try_from(value: &Proc<'a>) -> Result<Self, Self::Error> {
+    fn try_from(value: Name<'a>) -> Result<Self, Self::Error> {
         match value {
-            Proc::ProcVar(var) => Ok(Name::ProcVar(*var)),
-            Proc::Quote { proc } => Ok(Name::Quote(proc)),
-            Proc::Bad => Ok(Name::ProcVar(Var::Wildcard)), //helps with error recovery
-            other => Err(format!("{{ {other:?} }} is not a name")),
+            Name::NameVar(var) => Ok(var),
+            other => Err(format!("attempt to convert {{ {other:?} }} to a var")),
         }
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct AnnName<'ast> {
-    pub name: Name<'ast>,
-    pub span: SourceSpan,
+pub enum Name<'ast> {
+    NameVar(Var<'ast>),
+    Quote(AnnProc<'ast>),
 }
 
-impl<'a> TryFrom<AnnProc<'a>> for AnnName<'a> {
-    type Error = String;
-
-    fn try_from(value: AnnProc<'a>) -> Result<Self, Self::Error> {
-        value.proc.try_into().map(|name| AnnName {
-            name,
-            span: value.span,
-        })
+impl<'a> From<Id<'a>> for Name<'a> {
+    fn from(value: Id<'a>) -> Self {
+        Name::NameVar(Var::Id(value))
     }
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Names<'ast> {
-    pub names: SmallVec<[AnnName<'ast>; 1]>,
+    pub names: SmallVec<[Name<'ast>; 1]>,
     pub remainder: Option<Var<'ast>>,
 }
 
@@ -246,33 +242,31 @@ impl Clone for Names<'_> {
 }
 
 impl<'a> Names<'a> {
-    pub(super) fn from_slice(
-        slice: &[AnnProc<'a>],
-        with_remainder: bool,
-    ) -> Result<Names<'a>, String> {
-        fn to_names<'b>(procs: &[AnnProc<'b>]) -> Result<SmallVec<[AnnName<'b>; 1]>, String> {
-            procs.iter().map(|p| (*p).try_into()).collect()
-        }
-        //this method is optimized for small input (<= 2 names) because it collects directly into SmallVec's inline buffer
-        //Consider allocating to an intermediate Vec if output is deemed to be large
-        if with_remainder {
-            match slice.split_last() {
-                None => Err("attempt to build 'x, y ...@z' out of zero names".to_string()),
-                Some((last, init)) => {
-                    let names = to_names(init)?;
-                    let remainder = (*last).try_into()?;
-                    Ok(Names {
-                        names,
-                        remainder: Some(remainder),
-                    })
-                }
+    pub(super) fn from_iter<I>(iterable: I, with_remainder: bool) -> Result<Names<'a>, String>
+    where
+        I: IntoIterator<Item = Name<'a>, IntoIter: DoubleEndedIterator>,
+    {
+        let mut iter = iterable.into_iter();
+        let remainder = if with_remainder {
+            match iter.next_back() {
+                None => return Err("attempt to build 'x, y ...@z' out of zero names".to_string()),
+                Some(last) => Some(last.try_into()?),
             }
         } else {
-            let names = to_names(slice)?;
-            Ok(Names {
-                names,
-                remainder: None,
-            })
+            None
+        };
+
+        Ok(Names {
+            names: iter.collect(),
+            remainder,
+        })
+    }
+
+    #[allow(dead_code)]
+    pub(super) fn single(name: Name<'a>) -> Self {
+        Names {
+            names: smallvec![name],
+            remainder: None,
         }
     }
 
@@ -324,18 +318,9 @@ pub type Receipt<'a> = SmallVec<[Bind<'a>; 1]>;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Bind<'ast> {
-    Linear {
-        lhs: Names<'ast>,
-        rhs: Source<'ast>,
-    },
-    Repeated {
-        lhs: Names<'ast>,
-        rhs: AnnName<'ast>,
-    },
-    Peek {
-        lhs: Names<'ast>,
-        rhs: AnnName<'ast>,
-    },
+    Linear { lhs: Names<'ast>, rhs: Source<'ast> },
+    Repeated { lhs: Names<'ast>, rhs: Name<'ast> },
+    Peek { lhs: Names<'ast>, rhs: Name<'ast> },
 }
 
 // source definitions
@@ -343,13 +328,13 @@ pub enum Bind<'ast> {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Source<'ast> {
     Simple {
-        name: AnnName<'ast>,
+        name: Name<'ast>,
     },
     ReceiveSend {
-        name: AnnName<'ast>,
+        name: Name<'ast>,
     },
     SendReceive {
-        name: AnnName<'ast>,
+        name: Name<'ast>,
         inputs: ProcList<'ast>,
     },
 }
@@ -453,7 +438,7 @@ pub type LetBindings<'a> = SmallVec<[LetBinding<'a>; 1]>;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum LetBinding<'ast> {
     Single {
-        lhs: AnnName<'ast>,
+        lhs: Name<'ast>,
         rhs: AnnProc<'ast>,
     },
     Multiple {

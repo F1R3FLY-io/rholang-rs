@@ -1,6 +1,6 @@
 use clap::Parser;
 
-// Import the Args struct from the shell crate
+// Import the Args struct from the rholang-shell crate
 use shell::Args;
 
 #[test]

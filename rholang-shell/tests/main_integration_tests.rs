@@ -17,7 +17,7 @@ impl MockArgs {
     }
 }
 
-// Mock the run_shell function to avoid actually running the shell
+// Mock the run_shell function to avoid actually running the rholang-shell
 fn mock_run_shell<I>(
     args: MockArgs,
     _interpreter: I,

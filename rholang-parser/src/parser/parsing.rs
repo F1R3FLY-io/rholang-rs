@@ -1,13 +1,16 @@
+use bitvec::slice::BitSlice;
+use bitvec::slice::Iter as MaskIter;
+use bitvec::vec::BitVec;
 use nonempty_collections::NEVec;
 use rholang_tree_sitter_proc_macro::{field, kind};
 use smallvec::{SmallVec, ToSmallVec};
 use std::fmt::Debug;
-use std::iter::Zip;
+use std::iter::{FusedIterator, Zip};
 use std::slice::Iter as SliceIter;
 use validated::Validated;
 
 use crate::SourcePos;
-use crate::ast::Var;
+use crate::ast::{Name, Var};
 use crate::parser::errors::{self, ParsingFailure};
 use crate::{
     SourceSpan,
@@ -144,7 +147,7 @@ pub(super) fn node_to_ast<'ast>(
                     continue 'parse;
                 }
                 kind!("quote") => {
-                    cont_stack.push(K::ConsumeQuote { span });
+                    cont_stack.push(K::ConsumeQuote);
                     node = get_first_child(&node);
                     continue 'parse;
                 }
@@ -736,56 +739,55 @@ fn apply_cont<'tree, 'ast>(
                     let k = cont_stack.pop().unwrap_unchecked();
 
                     let underflow = !match k {
+                        K::ConsumeQuote => proc_stack.mark_quote(),
                         K::ConsumeBinaryExp { op, span } => {
-                            proc_stack.replace_top2(|left, right| AnnProc {
-                                proc: ast_builder.alloc_binary_exp(op, left, right),
-                                span,
+                            proc_stack.replace_top2(|left, right| {
+                                ast_builder.alloc_binary_exp(op, left, right).ann(span)
                             })
                         }
-                        K::ConsumeBundle { span, typ } => proc_stack.replace_top(|proc| AnnProc {
-                            proc: ast_builder.alloc_bundle(typ, proc),
-                            span,
-                        }),
+                        K::ConsumeBundle { span, typ } => proc_stack
+                            .replace_top(|proc| ast_builder.alloc_bundle(typ, proc).ann(span)),
                         K::ConsumeContract {
                             arity,
                             has_cont,
                             span,
-                        } => proc_stack.replace_top_slice(arity + 2, |name_body_formals| {
-                            let name = name_body_formals[0].try_into().expect("expected a name");
-                            let body = name_body_formals[1];
-                            let args = Names::from_slice(&name_body_formals[2..], has_cont)
-                                .expect("expected a list of names");
-                            AnnProc {
-                                proc: ast_builder.alloc_contract(name, args, body),
-                                span,
-                            }
-                        }),
-                        K::ConsumeEval { span } => proc_stack.replace_top(|proc| AnnProc {
-                            proc: ast_builder.alloc_eval(proc.try_into().expect("expected a name")),
-                            span,
-                        }),
+                        } => proc_stack.replace_top_slice_with_mask(
+                            arity + 2,
+                            |name_body_formals, mask| {
+                                let name = into_name(name_body_formals[0], mask[0]);
+                                let body = name_body_formals[1];
+                                let args =
+                                    into_names(&name_body_formals[2..], &mask[2..], has_cont);
+                                ast_builder.alloc_contract(name, args, body).ann(span)
+                            },
+                        ),
+                        K::ConsumeEval { span } => {
+                            proc_stack.replace_top_with_mask(|proc, quoted| {
+                                ast_builder.alloc_eval(into_name(proc, quoted)).ann(span)
+                            })
+                        }
                         K::ConsumeForComprehension {
                             desc,
                             total_len,
                             span,
-                        } => proc_stack.replace_top_slice(total_len + 1, |body_procs| {
-                            let body = body_procs[0];
-                            let procs = &body_procs[1..];
-                            AnnProc {
-                                proc: ast_builder.alloc_for(ReceiptIter::new(&desc, procs), body),
-                                span,
-                            }
+                        } => proc_stack.replace_top_slice_with_mask(
+                            total_len + 1,
+                            |body_procs, mask| {
+                                let body = body_procs[0];
+                                let procs = &body_procs[1..];
+                                ast_builder
+                                    .alloc_for(ReceiptIter::new(&desc, procs, &mask[1..]), body)
+                                    .ann(span)
+                            },
+                        ),
+                        K::ConsumeIfThen { span } => proc_stack.replace_top2(|cond, if_true| {
+                            ast_builder.alloc_if_then(cond, if_true).ann(span)
                         }),
-                        K::ConsumeIfThen { span } => {
-                            proc_stack.replace_top2(|cond, if_true| AnnProc {
-                                proc: ast_builder.alloc_if_then(cond, if_true),
-                                span,
-                            })
-                        }
                         K::ConsumeIfThenElse { span } => {
-                            proc_stack.replace_top3(|cond, if_true, if_false| AnnProc {
-                                proc: ast_builder.alloc_if_then_else(cond, if_true, if_false),
-                                span,
+                            proc_stack.replace_top3(|cond, if_true, if_false| {
+                                ast_builder
+                                    .alloc_if_then_else(cond, if_true, if_false)
+                                    .ann(span)
                             })
                         }
                         K::ConsumeLet {
@@ -793,17 +795,19 @@ fn apply_cont<'tree, 'ast>(
                             concurrent,
                             let_decls,
                             total_len,
-                        } => proc_stack.replace_top_slice(total_len + 1, |body_procs| {
-                            let body = body_procs[0];
-                            AnnProc {
-                                proc: ast_builder.alloc_let(
-                                    LetDeclIter::new(&let_decls, &body_procs[1..]),
-                                    body,
-                                    concurrent,
-                                ),
-                                span,
-                            }
-                        }),
+                        } => proc_stack.replace_top_slice_with_mask(
+                            total_len + 1,
+                            |body_procs, mask| {
+                                let body = body_procs[0];
+                                ast_builder
+                                    .alloc_let(
+                                        LetDeclIter::new(&let_decls, &body_procs[1..], &mask[1..]),
+                                        body,
+                                        concurrent,
+                                    )
+                                    .ann(span)
+                            },
+                        ),
                         K::ConsumeList {
                             arity,
                             has_remainder,
@@ -813,14 +817,11 @@ fn apply_cont<'tree, 'ast>(
                                 assert!(!elems.is_empty());
                                 // SAFETY: We have checked above that there is at least one element
                                 let (last, init) = elems.split_last().unwrap_unchecked();
-                                ast_builder.alloc_list_with_remainder(
-                                    init,
-                                    (*last).try_into().expect("expected a var"),
-                                )
+                                ast_builder.alloc_list_with_remainder(init, into_remainder(*last))
                             } else {
                                 ast_builder.alloc_list(elems)
                             };
-                            AnnProc { proc: list, span }
+                            list.ann(span)
                         }),
                         K::ConsumeMap {
                             arity,
@@ -829,90 +830,69 @@ fn apply_cont<'tree, 'ast>(
                         } => {
                             let n = arity * 2 + if has_remainder { 1 } else { 0 };
                             proc_stack.replace_top_slice(n, |elems| {
-                                if has_remainder {
-                                    AnnProc {
-                                        proc: ast_builder.alloc_map_with_remainder(
-                                            &elems[1..],
-                                            elems[0].try_into().expect("expected a var"),
-                                        ),
-                                        span,
-                                    }
+                                let map = if has_remainder {
+                                    ast_builder.alloc_map_with_remainder(
+                                        &elems[1..],
+                                        into_remainder(elems[0]),
+                                    )
                                 } else {
-                                    AnnProc {
-                                        proc: ast_builder.alloc_map(elems),
-                                        span,
-                                    }
-                                }
+                                    ast_builder.alloc_map(elems)
+                                };
+                                map.ann(span)
                             })
                         }
                         K::ConsumeMatch { span, arity } => {
                             proc_stack.replace_top_slice(arity * 2 + 1, |expr_cases| {
                                 let expr = expr_cases[0];
                                 let cases = &expr_cases[1..];
-                                AnnProc {
-                                    proc: ast_builder.alloc_match(expr, cases),
-                                    span,
-                                }
+                                ast_builder.alloc_match(expr, cases).ann(span)
                             })
                         }
                         K::ConsumeMethod { span, id, arity } => {
                             proc_stack.replace_top_slice(arity + 1, |recv_args| {
                                 let recv = recv_args[0];
                                 let args = &recv_args[1..];
-                                AnnProc {
-                                    proc: ast_builder.alloc_method(id, recv, args),
-                                    span,
-                                }
+                                ast_builder.alloc_method(id, recv, args).ann(span)
                             })
                         }
-                        K::ConsumeNew { decls, span } => proc_stack.replace_top(|body| AnnProc {
-                            proc: ast_builder.alloc_new(body, decls),
-                            span,
-                        }),
-                        K::ConsumePar { span } => proc_stack.replace_top2(|left, right| AnnProc {
-                            proc: ast_builder.alloc_par(left, right),
-                            span,
-                        }),
-                        K::ConsumeQuote { span } => proc_stack.replace_top(|top| AnnProc {
-                            proc: ast_builder.alloc_quote(top.proc),
-                            span,
+                        K::ConsumeNew { decls, span } => proc_stack
+                            .replace_top(|body| ast_builder.alloc_new(body, decls).ann(span)),
+                        K::ConsumePar { span } => proc_stack.replace_top2(|left, right| {
+                            ast_builder.alloc_par(left, right).ann(span)
                         }),
                         K::ConsumeSend {
                             send_type,
                             arity,
                             span,
-                        } => proc_stack.replace_top_slice(arity + 1, |name_args| {
-                            let channel = name_args[0].try_into().expect("expected a name");
-                            let inputs = &name_args[1..];
-                            AnnProc {
-                                proc: ast_builder.alloc_send(send_type, channel, inputs),
-                                span,
-                            }
-                        }),
-                        K::ConsumeSendSync { span, arity } => {
-                            proc_stack.replace_top_slice(arity + 1, |name_inputs| {
-                                let channel = name_inputs[0].try_into().expect("expected a name");
-                                AnnProc {
-                                    proc: ast_builder.alloc_send_sync(channel, &name_inputs[1..]),
-                                    span,
-                                }
+                        } => {
+                            proc_stack.replace_top_slice_with_mask(arity + 1, |name_args, mask| {
+                                let channel = into_name(name_args[0], mask[0]);
+                                let inputs = &name_args[1..];
+                                ast_builder.alloc_send(send_type, channel, inputs).ann(span)
                             })
                         }
+                        K::ConsumeSendSync { span, arity } => proc_stack
+                            .replace_top_slice_with_mask(arity + 1, |name_inputs, mask| {
+                                let channel = into_name(name_inputs[0], mask[0]);
+                                ast_builder
+                                    .alloc_send_sync(channel, &name_inputs[1..])
+                                    .ann(span)
+                            }),
                         K::ConsumeSendSyncWithCont { span, arity } => {
-                            proc_stack.replace_top_slice(arity + 2, |name_inputs_cont| {
-                                let channel =
-                                    name_inputs_cont[0].try_into().expect("expected a name");
-                                // SAFETY: Because we successfully consumed |arity + 2|
-                                // elements, then the slice.len() is greater or equal 2
-                                let (last, messages) =
-                                    name_inputs_cont[1..].split_last().unwrap_unchecked();
-                                let cont = *last;
-                                AnnProc {
-                                    proc: ast_builder
-                                        .alloc_send_sync_with_cont(channel, messages, cont),
-                                    span,
-                                }
-                            })
+                            proc_stack.replace_top_slice_with_mask(
+                                arity + 2,
+                                |name_inputs_cont, mask| {
+                                    let channel = into_name(name_inputs_cont[0], mask[0]);
+                                    // SAFETY: Because we successfully consumed |arity + 2|
+                                    // elements, then the slice.len() is greater or equal 2
+                                    let (last, messages) =
+                                        name_inputs_cont[1..].split_last().unwrap_unchecked();
+                                    let cont = *last;
+                                    ast_builder
+                                        .alloc_send_sync_with_cont(channel, messages, cont)
+                                        .ann(span)
+                                },
+                            )
                         }
                         K::ConsumeSet {
                             arity,
@@ -923,25 +903,18 @@ fn apply_cont<'tree, 'ast>(
                                 assert!(!elems.is_empty());
                                 // SAFETY: We have checked above that there is at least one element
                                 let (last, init) = elems.split_last().unwrap_unchecked();
-                                ast_builder.alloc_set_with_remainder(
-                                    init,
-                                    (*last).try_into().expect("expected a var"),
-                                )
+                                ast_builder.alloc_set_with_remainder(init, into_remainder(*last))
                             } else {
                                 ast_builder.alloc_set(elems)
                             };
-                            AnnProc { proc: set, span }
+                            set.ann(span)
                         }),
-                        K::ConsumeTuple { arity, span } => {
-                            proc_stack.replace_top_slice(arity, |elems| AnnProc {
-                                proc: ast_builder.alloc_tuple(elems),
-                                span,
-                            })
-                        }
-                        K::ConsumeUnaryExp { op, span } => proc_stack.replace_top(|top| AnnProc {
-                            proc: ast_builder.alloc_unary_exp(op, top.proc),
-                            span,
-                        }),
+                        K::ConsumeTuple { arity, span } => proc_stack
+                            .replace_top_slice(arity, |elems| {
+                                ast_builder.alloc_tuple(elems).ann(span)
+                            }),
+                        K::ConsumeUnaryExp { op, span } => proc_stack
+                            .replace_top(|top| ast_builder.alloc_unary_exp(op, top).ann(span)),
                         _ => unreachable!("Eval continuations are handled in another branch"),
                     };
 
@@ -1026,9 +999,7 @@ enum K<'tree, 'ast> {
     ConsumePar {
         span: SourceSpan,
     },
-    ConsumeQuote {
-        span: SourceSpan,
-    },
+    ConsumeQuote,
     ConsumeSend {
         send_type: SendType,
         arity: usize,
@@ -1136,9 +1107,7 @@ impl Debug for K<'_, '_> {
                 .field("span", span)
                 .finish(),
             Self::ConsumePar { span } => f.debug_struct("ConsumePar").field("span", span).finish(),
-            Self::ConsumeQuote { span } => {
-                f.debug_struct("ConsumeQuote").field("span", span).finish()
-            }
+            Self::ConsumeQuote => f.debug_struct("ConsumeQuote").finish(),
             Self::ConsumeSend {
                 send_type,
                 arity,
@@ -1185,6 +1154,7 @@ impl Debug for K<'_, '_> {
 
 struct ProcStack<'a> {
     stack: Vec<AnnProc<'a>>,
+    quote_mask: BitVec,
 }
 
 impl<'a> ProcStack<'a> {
@@ -1193,11 +1163,14 @@ impl<'a> ProcStack<'a> {
     fn new() -> Self {
         ProcStack {
             stack: Vec::with_capacity(Self::DEFAULT_CAPACITY),
+            quote_mask: BitVec::with_capacity(Self::DEFAULT_CAPACITY),
         }
     }
 
+    #[inline(always)]
     fn push(&mut self, proc: &'a Proc<'a>, span: SourceSpan) {
-        self.stack.push(AnnProc { proc, span });
+        self.stack.push(proc.ann(span));
+        self.quote_mask.push(false);
     }
 
     fn to_proc(self) -> AnnProc<'a> {
@@ -1205,6 +1178,10 @@ impl<'a> ProcStack<'a> {
         assert!(
             stack.len() == 1,
             "bug: parsing finished prematurely\n.Remaining process stack: {stack:#?}"
+        );
+        assert!(
+            self.quote_mask.last().is_some_and(|q| !q),
+            "bug: the last process on the stack is quoted"
         );
         unsafe {
             // SAFETY: We check above that the stack contains exactly one element.
@@ -1252,6 +1229,7 @@ impl<'a> ProcStack<'a> {
             let top_1 = stack.last_mut().unwrap_unchecked();
             *top_1 = replace(*top_1, top);
         }
+        self.quote_mask.pop();
     }
 
     #[inline]
@@ -1280,6 +1258,9 @@ impl<'a> ProcStack<'a> {
             let top_2 = stack.last_mut().unwrap_unchecked();
             *top_2 = replace(*top_2, top_1, top);
         }
+        let quote_mask = &mut self.quote_mask;
+        quote_mask.pop();
+        quote_mask.pop();
     }
 
     #[inline]
@@ -1307,6 +1288,9 @@ impl<'a> ProcStack<'a> {
         let result = replace(slice);
         stack.truncate(split);
         stack.push(result);
+        let quote_mask = &mut self.quote_mask;
+        quote_mask.truncate(split);
+        quote_mask.push(false);
     }
 
     fn replace_top_slice<F>(&mut self, n: usize, replace: F) -> bool
@@ -1319,11 +1303,69 @@ impl<'a> ProcStack<'a> {
         self.replace_top_slice_unchecked(n, replace);
         true
     }
+
+    fn replace_top_slice_with_mask<F>(&mut self, n: usize, replace: F) -> bool
+    where
+        F: FnOnce(&[AnnProc<'a>], &BitSlice) -> AnnProc<'a>,
+    {
+        let stack = &mut self.stack;
+        if stack.len() < n {
+            return false;
+        }
+        let quote_mask = &mut self.quote_mask;
+        let top = stack.len();
+        let split = top - n;
+        let slice = &stack[split..];
+        let result = replace(slice, &quote_mask[split..]);
+        stack.truncate(split);
+        stack.push(result);
+        quote_mask.truncate(split);
+        quote_mask.push(false);
+        true
+    }
+
+    #[inline]
+    fn replace_top_with_mask<F>(&mut self, replace: F) -> bool
+    where
+        F: FnOnce(AnnProc<'a>, bool) -> AnnProc<'a>,
+    {
+        let stack = &mut self.stack;
+        if stack.is_empty() {
+            return false;
+        }
+        unsafe {
+            let top = stack.last_mut().unwrap_unchecked();
+            let mask = self.quote_mask.last_mut().unwrap_unchecked().replace(false);
+            *top = replace(*top, mask);
+        }
+        true
+    }
+
+    #[inline(always)]
+    unsafe fn mark_quote_unchecked(&mut self) {
+        unsafe {
+            self.quote_mask.last_mut().unwrap_unchecked().commit(true);
+        }
+    }
+
+    #[inline]
+    fn mark_quote(&mut self) -> bool {
+        if self.stack.is_empty() {
+            return false;
+        }
+        unsafe {
+            self.mark_quote_unchecked();
+        }
+        true
+    }
 }
 
 impl Debug for ProcStack<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(&self.stack, f)
+        f.debug_tuple("ProcStack")
+            .field(&self.stack)
+            .field(&self.quote_mask)
+            .finish()
     }
 }
 
@@ -1431,17 +1473,16 @@ impl BindDesc {
         }
     }
 
-    fn to_bind<'a>(self, procs: &[AnnProc<'a>]) -> Bind<'a> {
-        fn slice_to_names<'a>(slice: &[AnnProc<'a>], cont: bool) -> Names<'a> {
-            Names::from_slice(slice, cont).expect("expected a list of names")
-        }
-
-        assert!(procs.len() == self.len());
+    fn to_bind<'a>(self, procs: &[AnnProc<'a>], mask: &BitSlice) -> Bind<'a> {
+        assert_eq!(procs.len(), self.len());
         unsafe {
             // SAFETY: We check above that the slice contains exactly |self.len()| elements which is
-            // always > 0 by construction
+            // always > 0 by construction. The mask is also guaranteed to have the exact same length
             let (first, rest) = procs.split_first().unwrap_unchecked();
-            let channel_name = (*first).try_into().expect("expected a name");
+            let (q0, qs) = mask.split_first().unwrap_unchecked();
+
+            let channel_name = into_name(*first, *q0);
+
             match self {
                 BindDesc::Linear {
                     cont_present,
@@ -1461,17 +1502,18 @@ impl BindDesc {
                     };
 
                     let lhs_start = source.len() - 1;
-                    let lhs = slice_to_names(&rest[lhs_start..], cont_present);
+                    let lhs = into_names(&rest[lhs_start..], &qs[lhs_start..], cont_present);
 
                     Bind::Linear { lhs, rhs }
                 }
+
                 BindDesc::Repeated { cont_present, .. } => Bind::Repeated {
-                    lhs: slice_to_names(rest, cont_present),
+                    lhs: into_names(rest, qs, cont_present),
                     rhs: channel_name,
                 },
 
                 BindDesc::Peek { cont_present, .. } => Bind::Peek {
-                    lhs: slice_to_names(rest, cont_present),
+                    lhs: into_names(rest, qs, cont_present),
                     rhs: channel_name,
                 },
             }
@@ -1491,6 +1533,7 @@ where
 {
     iter: O,
     procs: &'slice [AnnProc<'a>],
+    mask: &'slice BitSlice,
 }
 
 impl<'slice, 'a, O> Iterator for BindIter<'slice, 'a, O>
@@ -1499,15 +1542,17 @@ where
 {
     type Item = Bind<'a>;
 
+    #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(next) = self.iter.next() {
-            let (this, rest) = self.procs.split_at(next.len());
-            let item = next.to_bind(this);
-            self.procs = rest;
-            return Some(item);
-        }
+        self.iter.next().map(|next| {
+            let (this_procs, rest_procs) = self.procs.split_at(next.len());
+            let (this_mask, rest_mask) = self.mask.split_at(next.len());
 
-        None
+            self.procs = rest_procs;
+            self.mask = rest_mask;
+
+            next.to_bind(this_procs, this_mask)
+        })
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -1525,12 +1570,18 @@ where
     }
 }
 
+impl<'slice, 'a, O> FusedIterator for BindIter<'slice, 'a, O> where
+    O: Iterator<Item = &'slice BindDesc> + ExactSizeIterator
+{
+}
+
 struct ReceiptIter<'slice, 'a, O>
 where
     O: Iterator<Item = &'slice ReceiptDesc> + ExactSizeIterator,
 {
     iter: O,
     procs: &'slice [AnnProc<'a>],
+    mask: &'slice BitSlice,
 }
 
 impl<'slice, 'a, O> ReceiptIter<'slice, 'a, O>
@@ -1540,10 +1591,13 @@ where
     fn new(
         receipts: impl IntoIterator<Item = O::Item, IntoIter = O>,
         procs: &'slice [AnnProc<'a>],
+        mask: &'slice BitSlice,
     ) -> Self {
+        assert_eq!(procs.len(), mask.len());
         ReceiptIter {
             iter: receipts.into_iter(),
             procs,
+            mask,
         }
     }
 }
@@ -1554,18 +1608,21 @@ where
 {
     type Item = BindIter<'slice, 'a, SliceIter<'slice, BindDesc>>;
 
+    #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(next) = self.iter.next() {
-            let (this, rest) = self.procs.split_at(next.len);
-            let item = BindIter {
-                iter: next.parts.iter(),
-                procs: this,
-            };
-            self.procs = rest;
-            return Some(item);
-        }
+        self.iter.next().map(|next| {
+            let (this_procs, rest_procs) = self.procs.split_at(next.len);
+            let (this_mask, rest_mask) = self.mask.split_at(next.len);
 
-        None
+            self.procs = rest_procs;
+            self.mask = rest_mask;
+
+            BindIter {
+                iter: next.parts.iter(),
+                procs: this_procs,
+                mask: this_mask,
+            }
+        })
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -1583,6 +1640,11 @@ where
     }
 }
 
+impl<'slice, 'a, O> std::iter::FusedIterator for ReceiptIter<'slice, 'a, O> where
+    O: Iterator<Item = &'slice ReceiptDesc> + ExactSizeIterator
+{
+}
+
 #[derive(Debug, Clone, Copy)]
 struct LetDecl {
     lhs_arity: usize,
@@ -1590,14 +1652,19 @@ struct LetDecl {
     rhs_arity: usize,
 }
 
+type MaskIterSpec<'a> = MaskIter<'a, usize, bitvec::order::Lsb0>;
 struct LetBindingIter<'slice, 'a> {
-    iter: Zip<SliceIter<'slice, AnnProc<'a>>, SliceIter<'slice, AnnProc<'a>>>,
+    iter: Zip<
+        Zip<SliceIter<'slice, AnnProc<'a>>, MaskIterSpec<'slice>>,
+        SliceIter<'slice, AnnProc<'a>>,
+    >,
     tail: Option<(Var<'a>, &'slice [AnnProc<'a>])>,
 }
 
 impl<'slice, 'a> LetBindingIter<'slice, 'a> {
-    fn new(decl: &LetDecl, slice: &'slice [AnnProc<'a>]) -> Self {
+    fn new(decl: &LetDecl, slice: &'slice [AnnProc<'a>], mask: &'slice BitSlice) -> Self {
         assert!(!slice.is_empty() && slice.len() == decl.lhs_arity + decl.rhs_arity);
+        assert_eq!(slice.len(), mask.len());
         unsafe {
             // SAFETY: We check above that the slice contains exactly |lhs_arity + rhs_arity|
             // elements, and it is not zero. Therefore, lhs_arity <= slice.len()
@@ -1606,15 +1673,12 @@ impl<'slice, 'a> LetBindingIter<'slice, 'a> {
                 // SAFETY: If lhs has a continuation then it's arity is at least 1
                 let (rem, init) = lhs.split_last().unwrap_unchecked();
                 LetBindingIter {
-                    iter: init.iter().zip(rhs.iter()),
-                    tail: Some((
-                        (*rem).try_into().expect("expected a var"),
-                        &rhs[(lhs.len() - 1)..],
-                    )),
+                    iter: init.iter().zip(mask.iter()).zip(rhs.iter()),
+                    tail: Some((into_remainder(*rem), &rhs[(lhs.len() - 1)..])),
                 }
             } else {
                 LetBindingIter {
-                    iter: lhs.iter().zip(rhs.iter()),
+                    iter: lhs.iter().zip(mask.iter()).zip(rhs.iter()),
                     tail: None,
                 }
             }
@@ -1628,8 +1692,8 @@ impl<'a> Iterator for LetBindingIter<'_, 'a> {
     fn next(&mut self) -> Option<Self::Item> {
         self.iter
             .next()
-            .map(|(l, r)| LetBinding::Single {
-                lhs: (*l).try_into().expect("expected a name"),
+            .map(|((l, q), r)| LetBinding::Single {
+                lhs: into_name(*l, *q),
                 rhs: *r,
             })
             .or_else(|| {
@@ -1656,6 +1720,7 @@ where
 {
     outer: O,
     procs: &'slice [AnnProc<'a>],
+    mask: &'slice BitSlice,
     current_inner: Option<LetBindingIter<'slice, 'a>>,
 }
 
@@ -1666,10 +1731,12 @@ where
     fn new(
         decls: impl IntoIterator<Item = O::Item, IntoIter = O>,
         procs: &'slice [AnnProc<'a>],
+        mask: &'slice BitSlice,
     ) -> Self {
         LetDeclIter {
             outer: decls.into_iter(),
             procs,
+            mask,
             current_inner: None,
         }
     }
@@ -1682,18 +1749,28 @@ where
     type Item = LetBinding<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if let Some(inner) = &mut self.current_inner
-                && let Some(item) = inner.next()
-            {
+        if let Some(inner) = &mut self.current_inner {
+            if let Some(item) = inner.next() {
                 return Some(item);
             }
-            // Either no current inner, or it's exhausted
+        }
+        // inner exhausted → refill from outer
+        loop {
             match self.outer.next() {
                 Some(let_decl) => {
-                    let (this, rest) = self.procs.split_at(let_decl.lhs_arity + let_decl.rhs_arity);
-                    self.current_inner = Some(LetBindingIter::new(let_decl, this));
-                    self.procs = rest;
+                    let split_point = let_decl.lhs_arity + let_decl.rhs_arity;
+                    let (this_procs, rest_procs) = self.procs.split_at(split_point);
+                    let (this_mask, rest_mask) = self.mask.split_at(split_point);
+
+                    let mut new_inner = LetBindingIter::new(let_decl, this_procs, this_mask);
+
+                    self.procs = rest_procs;
+                    self.mask = rest_mask;
+
+                    if let Some(item) = new_inner.next() {
+                        self.current_inner = Some(new_inner);
+                        return Some(item);
+                    }
                 }
                 None => return None,
             }
@@ -1704,3 +1781,97 @@ where
         (self.outer.len(), None)
     }
 }
+
+// process <-> name conversion
+#[inline(always)]
+fn into_name(ann_proc: AnnProc, quoted: bool) -> Name {
+    if quoted {
+        Name::Quote(ann_proc)
+    } else {
+        match ann_proc.proc {
+            Proc::ProcVar(var) => Name::NameVar(*var),
+            _ => panic!("invalid proc variant for into_name"),
+        }
+    }
+}
+
+#[inline]
+fn into_remainder(ann_proc: AnnProc) -> Var {
+    ann_proc
+        .try_into()
+        .expect("invalid remainder (not a proc_var)")
+}
+
+fn into_names<'slice, 'a>(
+    procs: &'slice [AnnProc<'a>],
+    mask: &'slice BitSlice,
+    with_remainder: bool,
+) -> Names<'a> {
+    Names::from_iter(NamesIter::new(procs, mask), with_remainder).unwrap()
+}
+
+pub struct NamesIter<'slice, 'a> {
+    procs: &'slice [AnnProc<'a>],
+    mask: &'slice BitSlice,
+    front: usize,
+    back: usize,
+}
+
+impl<'slice, 'a> NamesIter<'slice, 'a> {
+    #[inline]
+    pub fn new(procs: &'slice [AnnProc<'a>], mask: &'slice BitSlice) -> Self {
+        assert_eq!(procs.len(), mask.len());
+        let len = procs.len();
+        Self {
+            procs,
+            mask,
+            front: 0,
+            back: len,
+        }
+    }
+}
+
+impl<'slice, 'a> Iterator for NamesIter<'slice, 'a> {
+    type Item = Name<'a>;
+
+    #[inline(always)]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.front < self.back {
+            let i = self.front;
+            self.front = i + 1;
+            unsafe {
+                let proc = self.procs.get_unchecked(i);
+                let quoted = *self.mask.get_unchecked(i);
+                Some(into_name(*proc, quoted))
+            }
+        } else {
+            None
+        }
+    }
+
+    #[inline(always)]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.back - self.front;
+        (remaining, Some(remaining))
+    }
+}
+
+impl<'slice, 'a> DoubleEndedIterator for NamesIter<'slice, 'a> {
+    #[inline(always)]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.front < self.back {
+            self.back -= 1;
+            let i = self.back;
+            unsafe {
+                let proc = self.procs.get_unchecked(i);
+                let quoted = *self.mask.get_unchecked(i);
+                Some(into_name(*proc, quoted))
+            }
+        } else {
+            None
+        }
+    }
+}
+
+impl<'slice, 'a> ExactSizeIterator for NamesIter<'slice, 'a> {}
+impl<'slice, 'a> FusedIterator for NamesIter<'slice, 'a> {}
