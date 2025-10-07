@@ -44,6 +44,8 @@ pub trait DiagnosticPass: Pass + Send + Sync {
     fn run(&self, db: &SemanticDb) -> Vec<Diagnostic>;
 }
 
+pub use resolver::ResolverPass;
+
 pub type ProcRef<'a> = &'a ast::AnnProc<'a>;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -72,8 +74,8 @@ pub struct Symbol(u32);
 /// Symbol occurence in the source code (used to mark variables)
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SymbolOccurence {
-    pub symbol: Symbol,
     pub position: SourcePos,
+    pub symbol: Symbol,
 }
 
 impl From<Binder> for SymbolOccurence {
@@ -130,7 +132,7 @@ impl Display for BinderId {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Binder {
     pub name: Symbol,
     pub kind: BinderKind,
