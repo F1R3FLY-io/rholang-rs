@@ -84,6 +84,99 @@ fn test_simple_scope<'test>(tree: ProcRef<'test>, db: &mut SemanticDb<'test>) {
         ];
         let actual_bindings: Vec<VarBinding> = db.bound_positions().map(|(_, b)| b).collect();
         assert_eq!(actual_bindings, expected_bindings);
+
+        assert!(
+            db.diagnostics().is_empty(),
+            "expected no warnings or errors"
+        );
+    } else {
+        panic!("unexpected AST structure: {tree:#?}");
+    }
+}
+
+#[test_rholang_code(
+    r#"
+new blockData(`rho:block:data`), retCh, stdout(`rho:io:stdout`) in {
+  blockData!(*retCh) |
+  for(@blockNumber, @timestamp, @sender <- retCh) {
+      stdout!({"block number": blockNumber}) |
+      stdout!({"block time": timestamp})|
+      stdout!({"block sender": sender})
+  }
+}"#
+)]
+fn test_multi_name_single_pattern<'test>(tree: ProcRef<'test>, db: &mut SemanticDb<'test>) {
+    let root = db[tree];
+    let resolver = ResolverPass::new(root);
+    resolver.run(db);
+
+    let root_scope = db.get_scope(root).expect("expected root scope");
+    assert_eq!(
+        root_scope.num_binders(),
+        3,
+        "expected 'new' to introduce three names"
+    );
+
+    let root_binders: Vec<BinderId> = root_scope.binder_range().collect();
+    if let ast::Proc::New {
+        proc: new_body,
+        decls,
+    } = tree.proc
+    {
+        ensure_name_decls_introduce_binders(db, decls, &root_binders);
+
+        if let ast::Proc::Par { left: _, right } = new_body.proc {
+            let inner_for = db[right];
+            let inner_scope = db.get_scope(inner_for).expect("expected inner 'for' scope");
+            assert_eq!(
+                inner_scope.num_binders(),
+                3,
+                "expected 'for(@blockNumber, @timestamp, @sender <- retCh) {{ P }}' to introduce three vars"
+            );
+            assert_eq!(
+                inner_scope.num_free(),
+                3,
+                "expected 'for(@blockNumber, @timestamp, @sender <- retCh) {{ P }}' to introduce three free vars"
+            );
+
+            let inner_binders: Vec<BinderId> = inner_scope.free().collect();
+            let expected_binders = vec![
+                ("blockNumber", BinderKind::Proc),
+                ("timestamp", BinderKind::Proc),
+                ("sender", BinderKind::Proc),
+            ];
+            ensure_binders_in_order(db, &inner_binders, &expected_binders);
+
+            assert_eq!(
+                inner_scope.num_captures(),
+                2,
+                "expected inner 'for' to capture two names from the enclosing 'new'"
+            );
+
+            let expected_bindings = vec![
+                VarBinding::Bound(root_binders[0]), // blockData in blockData!(*retCh)
+                VarBinding::Bound(root_binders[1]), // retCh in blockData!(*retCh)
+                VarBinding::Free { index: 0 },      // @blockNumber in for
+                VarBinding::Free { index: 1 },      // @timestamp in for
+                VarBinding::Free { index: 2 },      // @sender in for
+                VarBinding::Bound(root_binders[1]), // retCh in for
+                VarBinding::Bound(root_binders[2]), // stdout in for body
+                VarBinding::Bound(inner_binders[0]), // blockNumber in for body
+                VarBinding::Bound(root_binders[2]), // stdout in for body
+                VarBinding::Bound(inner_binders[1]), // timestamp in for body
+                VarBinding::Bound(root_binders[2]), // stdout in for body
+                VarBinding::Bound(inner_binders[2]), // sender in for body
+            ];
+            let actual_bindings: Vec<VarBinding> = db.bound_positions().map(|(_, b)| b).collect();
+            assert_eq!(actual_bindings, expected_bindings);
+
+            assert!(
+                db.diagnostics().is_empty(),
+                "expected no warnings or errors"
+            );
+        } else {
+            panic!("unexpected AST structure: {new_body:#?}");
+        }
     } else {
         panic!("unexpected AST structure: {tree:#?}");
     }
@@ -112,6 +205,30 @@ fn ensure_name_decls_introduce_binders(
                 source_position: _
             } if index == i && symbol_matches_string(db, name, decl.id.name) && opt_symbol_matches_string(db, uri, decl.uri.as_deref()),
             "expected 'new' to bind only names in declaration order"
+        );
+    }
+}
+
+fn ensure_binders_in_order(db: &SemanticDb, bids: &[BinderId], names_kinds: &[(&str, BinderKind)]) {
+    let num_binders = bids.len();
+    assert_eq!(
+        num_binders,
+        names_kinds.len(),
+        "expected {num_binders} binder(s)"
+    );
+    for (i, bid) in bids.iter().enumerate() {
+        let binder = db[*bid];
+        let (expected_name, expected_kind) = names_kinds[i];
+        assert_matches!(
+            binder,
+            Binder {
+                name,
+                kind,
+                scope: _,
+                index,
+                source_position: _
+            } if index == i && symbol_matches_string(db, name, expected_name) && kind == expected_kind,
+            "unexpected binder"
         );
     }
 }
