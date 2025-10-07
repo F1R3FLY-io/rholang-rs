@@ -54,11 +54,11 @@ impl<'ast> ASTBuilder<'ast> {
         &self.nil
     }
 
-    pub(crate) fn const_true(&self) -> &Proc<'ast> {
+    pub fn const_true(&self) -> &Proc<'ast> {
         &self.r#true
     }
 
-    pub(crate) fn const_false(&self) -> &Proc<'ast> {
+    pub fn const_false(&self) -> &Proc<'ast> {
         &self.r#false
     }
 
@@ -99,7 +99,7 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::UriLiteral(value.into()))
     }
 
-    pub(crate) fn alloc_simple_type(&self, value: SimpleType) -> &Proc<'ast> {
+    pub fn alloc_simple_type(&self, value: SimpleType) -> &Proc<'ast> {
         self.arena.alloc(Proc::SimpleType(value))
     }
 
@@ -142,7 +142,7 @@ impl<'ast> ASTBuilder<'ast> {
         }))
     }
 
-    pub(crate) fn alloc_tuple(&self, procs: &[AnnProc<'ast>]) -> &Proc<'ast> {
+    pub fn alloc_tuple(&self, procs: &[AnnProc<'ast>]) -> &Proc<'ast> {
         self.arena
             .alloc(Proc::Collection(Collection::Tuple(procs.to_vec())))
     }
@@ -180,11 +180,7 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::Par { left, right })
     }
 
-    pub(crate) fn alloc_if_then(
-        &self,
-        condition: AnnProc<'ast>,
-        if_true: AnnProc<'ast>,
-    ) -> &Proc<'ast> {
+    pub fn alloc_if_then(&self, condition: AnnProc<'ast>, if_true: AnnProc<'ast>) -> &Proc<'ast> {
         self.arena.alloc(Proc::IfThenElse {
             condition,
             if_true,
@@ -192,7 +188,7 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub(crate) fn alloc_if_then_else(
+    pub fn alloc_if_then_else(
         &self,
         condition: AnnProc<'ast>,
         if_true: AnnProc<'ast>,
@@ -202,6 +198,19 @@ impl<'ast> ASTBuilder<'ast> {
             condition,
             if_true,
             if_false: Some(if_false),
+        })
+    }
+
+    pub fn alloc_if_then_else_opt(
+        &self,
+        condition: AnnProc<'ast>,
+        if_true: AnnProc<'ast>,
+        if_false: Option<AnnProc<'ast>>,
+    ) -> &Proc<'ast> {
+        self.arena.alloc(Proc::IfThenElse {
+            condition,
+            if_true,
+            if_false,
         })
     }
 
@@ -232,6 +241,10 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
+    pub fn alloc_proc_var(&self, var: Var<'ast>) -> &Proc<'ast> {
+        self.arena.alloc(Proc::ProcVar(var))
+    }
+
     pub fn alloc_match(&self, expression: AnnProc<'ast>, cases: &[AnnProc<'ast>]) -> &Proc<'ast> {
         self.arena.alloc(Proc::Match {
             expression,
@@ -245,7 +258,7 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub(crate) fn alloc_bundle(&self, bundle_type: BundleType, proc: AnnProc<'ast>) -> &Proc<'ast> {
+    pub fn alloc_bundle(&self, bundle_type: BundleType, proc: AnnProc<'ast>) -> &Proc<'ast> {
         self.arena.alloc(Proc::Bundle { bundle_type, proc })
     }
 
@@ -306,7 +319,7 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::Eval { name })
     }
 
-    pub(crate) fn alloc_method(
+    pub fn alloc_method(
         &self,
         name: Id<'ast>,
         receiver: AnnProc<'ast>,
@@ -328,11 +341,11 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::BinaryExp { op, left, right })
     }
 
-    pub(crate) fn alloc_unary_exp(&self, op: UnaryExpOp, arg: AnnProc<'ast>) -> &Proc<'ast> {
+    pub fn alloc_unary_exp(&self, op: UnaryExpOp, arg: AnnProc<'ast>) -> &Proc<'ast> {
         self.arena.alloc(Proc::UnaryExp { op, arg })
     }
 
-    pub(crate) fn alloc_var_ref(&self, kind: VarRefKind, var: Id<'ast>) -> &Proc<'ast> {
+    pub fn alloc_var_ref(&self, kind: VarRefKind, var: Id<'ast>) -> &Proc<'ast> {
         self.arena.alloc(Proc::VarRef { kind, var })
     }
 
