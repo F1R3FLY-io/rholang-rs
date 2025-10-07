@@ -6,6 +6,33 @@ use smallvec::SmallVec;
 mod pattern;
 mod proc;
 
+#[cfg(test)]
+mod tests;
+
+pub struct ResolverPass {
+    root: PID,
+}
+
+impl ResolverPass {
+    pub fn new(root: PID) -> Self {
+        Self { root }
+    }
+}
+
+impl Pass for ResolverPass {
+    fn name(&self) -> Cow<'static, str> {
+        let name = format!("ResolverPass({})", self.root);
+        Cow::Owned(name)
+    }
+}
+
+impl FactPass for ResolverPass {
+    fn run(&self, db: &mut SemanticDb) {
+        let mut stack = BindingStack::new();
+        proc::resolve(db, &mut stack, self.root);
+    }
+}
+
 pub type NamePattern<'a> = &'a ast::Names<'a>;
 
 struct BindingStack {
