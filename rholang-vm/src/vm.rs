@@ -1,5 +1,4 @@
 use anyhow::Result;
-use rholang_bytecode::core::instructions::Instruction as CoreInst;
 
 use crate::execute::{self, StepResult};
 use crate::process::Process;

@@ -1,5 +1,3 @@
-use anyhow::Result;
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Int(i64),

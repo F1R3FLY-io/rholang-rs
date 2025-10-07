@@ -67,7 +67,7 @@ fn test_constant_pool_memory_usage() {
 
     // Add many strings - they should be interned
     for i in 0..1000 {
-        pool.add_string(&format!("string_{}", i % 50)); // Only 50 unique strings
+        let _ = pool.add_string(&format!("string_{}", i % 50)); // Only 50 unique strings
     }
 
     let stats = pool.stats();
@@ -158,7 +158,7 @@ fn test_constant_pool_serialization_memory_efficiency() {
     // Add test data
     for i in 0..100 {
         pool.add_integer(i);
-        pool.add_string(&format!("test_string_{i}"));
+        let _ = pool.add_string(&format!("test_string_{i}"));
     }
 
     // Add process template
@@ -294,7 +294,7 @@ fn test_large_constant_pool_memory_scaling() {
 
     // Add strings with high duplication
     for i in 0..num_items {
-        pool.add_string(&format!("string_{}", i / dedup_factor));
+        let _ = pool.add_string(&format!("string_{}", i / dedup_factor));
     }
 
     let stats = pool.stats();
