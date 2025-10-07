@@ -1,4 +1,5 @@
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use quote::{format_ident, quote};
 use syn::{FnArg, ItemFn, LitStr, Pat, PatType, Type, parse_macro_input, spanned::Spanned};
 
@@ -11,6 +12,7 @@ pub fn test_rholang_code(attr: TokenStream, item: TokenStream) -> TokenStream {
     let func = parse_macro_input!(item as ItemFn);
     let func_name = &func.sig.ident;
     let func_block = &func.block;
+    let generics = &func.sig.generics;
     let inputs = &func.sig.inputs;
 
     // Check signature validity
@@ -56,18 +58,13 @@ pub fn test_rholang_code(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
 
             // --- Hygiene: create unique identifiers ---
-            let parser_ident = format_ident!("__parser_{}", func_name);
-            let parsed_ident = format_ident!("__parsed_{}", func_name);
-            let db_ident = format_ident!("__db_{}", func_name);
-            let procs_ident = format_ident!("__procs_{}", func_name);
+            let db_ident = syn::Ident::new("db", Span::call_site());
+            let procs_ident = syn::Ident::new("procs", Span::call_site());
+            let inner_func_ident = format_ident!("_{}", func_name);
 
             // --- Determine how to bind the arguments ---
-            let bind_procs = class1
-                .unwrap()
-                .bind_argument(name1, &db_ident, &procs_ident);
-            let bind_db = class2
-                .unwrap()
-                .bind_argument(name2, &db_ident, &procs_ident);
+            let bind_1 = class1.unwrap().bind_argument(&db_ident, &procs_ident);
+            let bind_2 = class2.unwrap().bind_argument(&db_ident, &procs_ident);
 
             // Build the expanded test
             let expanded = quote! {
@@ -75,22 +72,21 @@ pub fn test_rholang_code(attr: TokenStream, item: TokenStream) -> TokenStream {
                 fn #func_name() {
                     let code = #code_str;
 
-                    let #parser_ident = rholang_parser::RholangParser::new();
-                    let #parsed_ident = #parser_ident.parse(code);
+                    let parser = rholang_parser::RholangParser::new();
+                    let parsed = parser.parse(code);
 
-                    match #parsed_ident {
+                    match parsed {
                         validated::Validated::Good(#procs_ident) => {
                             let mut #db_ident = SemanticDb::new();
                             for proc in &#procs_ident {
                                 #db_ident.build_index(proc);
                             }
 
-                            {
-                                #bind_procs
-                                #bind_db
-
+                            fn #inner_func_ident #generics(#name1: #ty1, #name2: #ty2) {
                                 #func_block
                             }
+
+                            #inner_func_ident(#bind_1, #bind_2);
                         }
                         validated::Validated::Fail(nevec) => panic!(
                             "Test failed because the provided rholang code could not be parsed correctly. The errors are:\n{nevec:#?}"
@@ -149,19 +145,14 @@ enum Classification {
 }
 
 impl Classification {
-    fn bind_argument(
-        self,
-        to: &syn::Ident,
-        db: &syn::Ident,
-        procs: &syn::Ident,
-    ) -> proc_macro2::TokenStream {
+    fn bind_argument(self, db: &syn::Ident, procs: &syn::Ident) -> proc_macro2::TokenStream {
         match self {
-            Classification::ProcRefSlice => quote! { let #to = &#procs; },
+            Classification::ProcRefSlice => quote! { &#procs },
             Classification::ProcRef => {
-                quote! { let #to = if #procs.is_empty() { panic!("Parser did not produce any output") } else { &#procs[0] }; }
+                quote! { { if #procs.is_empty() { panic!("Parser did not produce any output") } else { &#procs[0] } } }
             }
-            Classification::SemDbRef => quote! { let #to = &#db; },
-            Classification::MutSemDbRef => quote! { let #to = &mut #db; },
+            Classification::SemDbRef => quote! { &#db },
+            Classification::MutSemDbRef => quote! { &mut #db },
         }
     }
 }
