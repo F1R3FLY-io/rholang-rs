@@ -342,6 +342,15 @@ impl<'a> SemanticDb<'a> {
         };
         self.binder_of(occurence)
     }
+
+    /// Returns an iterator over all variable bindings.
+    ///
+    /// The iteration is in order of appearance in the source code.
+    pub fn bound_positions(
+        &self,
+    ) -> impl Iterator<Item = (SourcePos, VarBinding)> + ExactSizeIterator {
+        self.var_to_binder.iter().map(|(k, v)| (k.position, *v))
+    }
 }
 
 /// Enable `db[pid]` syntax to access the process by PID.
