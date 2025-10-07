@@ -58,9 +58,9 @@ pub fn test_rholang_code(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
 
             // --- Hygiene: create unique identifiers ---
-            let db_ident = syn::Ident::new("db", Span::call_site());
-            let procs_ident = syn::Ident::new("procs", Span::call_site());
-            let inner_func_ident = format_ident!("_{}", func_name);
+            let db_ident = syn::Ident::new("db", Span::mixed_site());
+            let procs_ident = syn::Ident::new("procs", Span::mixed_site());
+            let inner_func_ident = format_ident!("_{}", func_name, span = Span::mixed_site());
 
             // --- Determine how to bind the arguments ---
             let bind_1 = class1.unwrap().bind_argument(&db_ident, &procs_ident);
@@ -89,7 +89,7 @@ pub fn test_rholang_code(attr: TokenStream, item: TokenStream) -> TokenStream {
                             #inner_func_ident(#bind_1, #bind_2);
                         }
                         validated::Validated::Fail(nevec) => panic!(
-                            "Test failed because the provided rholang code could not be parsed correctly. The errors are:\n{nevec:#?}"
+                            "Test failed: invalid rholang code.\nErrors:\n{nevec:#?}"
                         ),
                     }
 
@@ -98,20 +98,14 @@ pub fn test_rholang_code(attr: TokenStream, item: TokenStream) -> TokenStream {
 
             expanded.into()
         } else {
-            return syn::Error::new(
-                arg2.span(),
-                "unsupported argument pattern: expected plain literal",
-            )
-            .to_compile_error()
-            .into();
+            return syn::Error::new(arg2.span(), "expected simple identifier arguments")
+                .to_compile_error()
+                .into();
         }
     } else {
-        return syn::Error::new(
-            arg1.span(),
-            "unsupported argument pattern: expected plain literal",
-        )
-        .to_compile_error()
-        .into();
+        return syn::Error::new(arg1.span(), "expected simple identifier arguments")
+            .to_compile_error()
+            .into();
     }
 }
 
