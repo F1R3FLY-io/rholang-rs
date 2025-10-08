@@ -30,7 +30,7 @@ impl<'ast> ASTBuilder<'ast> {
     pub(crate) fn with_capacity(capacity: usize) -> Self {
         ASTBuilder {
             arena: Arena::with_capacity(capacity),
-            string_arena: Arena::with_capacity(32), // Reasonable default for synthetic strings
+            string_arena: Arena::with_capacity(32),
             nil: Proc::Nil,
             r#true: Proc::BoolLiteral(true),
             r#false: Proc::BoolLiteral(false),
@@ -349,17 +349,6 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::VarRef { kind, var })
     }
 
-    /// Allocate a string in the string arena and return a reference with the AST lifetime
-    ///
-    /// This provides a clean alternative to Box::leak for synthetic strings (like generated
-    /// variable names) that need to live for the entire AST lifetime. The string is properly
-    /// arena-allocated and will be cleaned up when the ASTBuilder is dropped.
-    ///
-    /// # Example
-    /// ```rust
-    /// let name_ref = builder.alloc_str("synthetic_var_name");
-    /// let id = Id { name: name_ref, pos: some_pos };
-    /// ```
     pub fn alloc_str(&'ast self, s: &str) -> &'ast str {
         let allocated_string = self.string_arena.alloc(s.to_string());
         allocated_string.as_str()
