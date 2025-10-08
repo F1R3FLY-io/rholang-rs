@@ -382,9 +382,11 @@ impl ScopeInfo {
         }
 
         // Merge other metadata
-        self.free.extend_from_bitslice(&rhs.free);
-        self.uses.extend_from_bitslice(&rhs.uses);
-        self.num_binders += rhs.num_binders;
+        if rhs.num_binders() != 0 {
+            self.free.extend_from_bitslice(&rhs.free);
+            self.uses.extend_from_bitslice(&rhs.uses);
+            self.num_binders += rhs.num_binders;
+        }
     }
 }
 
