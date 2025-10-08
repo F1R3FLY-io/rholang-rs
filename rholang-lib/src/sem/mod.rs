@@ -71,11 +71,35 @@ impl IntKey for PID {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Symbol(u32);
 
+impl Symbol {
+    pub const DUMMY: Symbol = Symbol(u32::MAX);
+}
+
 /// Symbol occurence in the source code (used to mark variables)
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug)]
 pub struct SymbolOccurence {
     pub position: SourcePos,
     pub symbol: Symbol,
+}
+
+impl PartialEq for SymbolOccurence {
+    fn eq(&self, other: &Self) -> bool {
+        self.position == other.position
+    }
+}
+
+impl Eq for SymbolOccurence {}
+
+impl PartialOrd for SymbolOccurence {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for SymbolOccurence {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.position.cmp(&other.position)
+    }
 }
 
 impl From<Binder> for SymbolOccurence {
@@ -163,6 +187,7 @@ pub struct ScopeInfo {
     uses: BitVec,           // Tracks which binders of *this scope* are actually used.
     free: BitVec,           // Track binders that are free (only in patterns)
     captures: BitSet,       // Tracks which *outer binders* are captured from enclosing scopes.
+    span: SourceSpan,
 }
 
 impl ScopeInfo {
@@ -171,31 +196,37 @@ impl ScopeInfo {
             .expect("didn't expect more than 4 billions of binders")
     }
 
-    pub fn new(binder_start: BinderId, num_binders: usize) -> Self {
+    pub fn new(binder_start: BinderId, num_binders: usize, span: SourceSpan) -> Self {
         Self::from_parts(
             binder_start,
             bitvec![0; num_binders],
             BitSet::with_capacity(binder_start.0 as usize),
+            span,
         )
     }
 
-    pub fn ground(binder_start: BinderId) -> Self {
-        Self::from_parts(binder_start, BitVec::EMPTY, BitSet::new())
+    pub fn ground(binder_start: BinderId, span: SourceSpan) -> Self {
+        Self::from_parts(binder_start, BitVec::EMPTY, BitSet::new(), span)
     }
 
-    pub fn free_var(binder_start: BinderId) -> Self {
-        Self::from_parts(binder_start, bitvec![1], BitSet::new())
+    pub fn free_var(binder_start: BinderId, span: SourceSpan) -> Self {
+        Self::from_parts(binder_start, bitvec![1], BitSet::new(), span)
     }
 
-    pub fn var_ref(binder_start: BinderId, ref_binder: BinderId) -> ScopeInfo {
+    pub fn var_ref(binder_start: BinderId, ref_binder: BinderId, span: SourceSpan) -> ScopeInfo {
         let captures = BitSet::with_capacity(binder_start.0 as usize);
-        let mut res = Self::from_parts(binder_start, BitVec::EMPTY, captures);
+        let mut res = Self::from_parts(binder_start, BitVec::EMPTY, captures, span);
         res.mark_captured(ref_binder);
 
         res
     }
 
-    pub fn from_parts(binder_start: BinderId, free: BitVec, captures: BitSet) -> Self {
+    pub fn from_parts(
+        binder_start: BinderId,
+        free: BitVec,
+        captures: BitSet,
+        span: SourceSpan,
+    ) -> Self {
         let num_binders = free.len();
         Self::valid_range(binder_start.0 as usize + num_binders);
         Self {
@@ -204,6 +235,7 @@ impl ScopeInfo {
             uses: bitvec![0; num_binders],
             free,
             captures,
+            span,
         }
     }
 
