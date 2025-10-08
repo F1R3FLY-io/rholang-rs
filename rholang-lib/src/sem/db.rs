@@ -227,7 +227,7 @@ impl<'a> SemanticDb<'a> {
     }
 
     /// Returns an iterator over the free binders introduced by the given process
-    pub fn free_of(&self, proc: PID) -> FreeIter<'_> {
+    pub fn free_of(&self, proc: PID) -> Free<'_> {
         self.get_scope(proc)
             .map(|scope| scope.free())
             .unwrap_or_default()
