@@ -107,9 +107,27 @@ impl<'a> SemanticDb<'a> {
         self.rev.values().copied()
     }
 
-    /// Iterate over all (PID, ProcRef) pairs in indexing order.
+    /// Iterate over all ([`PID`], [`ProcRef`]) pairs in indexing order.
     pub fn iter(&self) -> Iter<'a, '_> {
         self.rev.iter().map(|(proc, pid)| (*pid, **proc))
+    }
+
+    /// Finds the first process node that matches the given predicate.
+    ///
+    /// This is a convenience for common queries like:
+    /// ```ignore
+    /// db.find_proc(|p| matches!(p.proc, ast::Proc::ForComprehension { .. }))
+    /// ```
+    ///
+    /// # Returns
+    /// - Some([`PID`], [`ProcRef`]) if a matching process is found.
+    /// - `None` if no process satisfies the predicate.
+    pub fn find_proc<P>(&self, predicate: P) -> Option<(PID, ProcRef<'a>)>
+    where
+        P: Fn(ProcRef<'a>) -> bool,
+    {
+        self.iter()
+            .find_map(|(pid, node)| predicate(node).then_some((pid, node)))
     }
 
     pub fn emit_diagnostic(&mut self, diagnostic: Diagnostic) {
@@ -380,6 +398,18 @@ impl<'a> SemanticDb<'a> {
     /// Returns an iterator over all variable bindings within the given scope.
     pub fn bound_in_scope(&self, scope: &ScopeInfo) -> impl Iterator<Item = BoundPos> {
         self.bound_in_range(scope.span)
+    }
+
+    /// Finds the binder corresponding to a given symbol within a specific scope.
+    ///
+    /// This method searches all variable binders declared in `scope`
+    /// (and only within that scope) and returns the first [`BinderId`] whose bound name
+    /// matches the provided [`Symbol`].
+    ///
+    /// This function does not search parent or nested scopes — only binders declared directly in `scope`
+    pub fn find_binder_for_symbol(&self, sym: Symbol, scope: &ScopeInfo) -> Option<BinderId> {
+        self.binders_full(scope)
+            .find_map(|(bid, binder)| (binder.name == sym).then_some(bid))
     }
 }
 
