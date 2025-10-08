@@ -75,6 +75,12 @@ impl Symbol {
     pub const DUMMY: Symbol = Symbol(u32::MAX);
 }
 
+impl Display for Symbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 /// Symbol occurence in the source code (used to mark variables)
 #[derive(Copy, Clone, Debug)]
 pub struct SymbolOccurence {
@@ -376,9 +382,11 @@ impl ScopeInfo {
         }
 
         // Merge other metadata
-        self.free.extend_from_bitslice(&rhs.free);
-        self.uses.extend_from_bitslice(&rhs.uses);
-        self.num_binders += rhs.num_binders;
+        if rhs.num_binders() != 0 {
+            self.free.extend_from_bitslice(&rhs.free);
+            self.uses.extend_from_bitslice(&rhs.uses);
+            self.num_binders += rhs.num_binders;
+        }
     }
 }
 

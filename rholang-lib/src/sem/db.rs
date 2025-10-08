@@ -127,7 +127,7 @@ impl<'a> SemanticDb<'a> {
         P: Fn(ProcRef<'a>) -> bool,
     {
         self.iter()
-            .find_map(|(pid, node)| predicate(node).then_some((pid, node)))
+            .find_map(|candidate| predicate(candidate.1).then_some(candidate))
     }
 
     pub fn emit_diagnostic(&mut self, diagnostic: Diagnostic) {
