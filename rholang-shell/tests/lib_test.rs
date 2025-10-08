@@ -1,5 +1,5 @@
 use anyhow::Result;
-use shell::{
+use rholang_shell::{
     handle_interrupt, help_message, process_multiline_input, process_single_line_input,
     process_special_command, providers::InterpretationResult, Args,
 };
@@ -23,7 +23,7 @@ impl MockInterpreterProvider {
 }
 
 #[async_trait::async_trait]
-impl shell::providers::InterpreterProvider for MockInterpreterProvider {
+impl rholang_shell::providers::InterpreterProvider for MockInterpreterProvider {
     async fn interpret(&self, code: &str) -> InterpretationResult {
         InterpretationResult::Success(format!("Interpreted: {}", code))
     }

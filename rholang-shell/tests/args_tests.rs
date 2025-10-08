@@ -1,7 +1,7 @@
 use clap::Parser;
 
 // Import the Args struct from the rholang-shell crate
-use shell::Args;
+use rholang_shell::Args;
 
 #[test]
 fn test_args_default_values() {
