@@ -220,7 +220,7 @@ mod expect {
     }
 
     pub(super) fn bound(db: &SemanticDb, expected: &[VarBinding]) {
-        let actual_bindings: Vec<VarBinding> = db.bound_positions().map(|(_, b)| b).collect();
+        let actual_bindings: Vec<VarBinding> = db.bound_positions().map(|bound| bound.binding).collect();
         assert_eq!(actual_bindings, expected, "expect::bound");
     }
 
