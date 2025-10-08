@@ -75,6 +75,12 @@ impl Symbol {
     pub const DUMMY: Symbol = Symbol(u32::MAX);
 }
 
+impl Display for Symbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 /// Symbol occurence in the source code (used to mark variables)
 #[derive(Copy, Clone, Debug)]
 pub struct SymbolOccurence {
