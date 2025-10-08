@@ -346,10 +346,40 @@ impl<'a> SemanticDb<'a> {
     /// Returns an iterator over all variable bindings.
     ///
     /// The iteration is in order of appearance in the source code.
-    pub fn bound_positions(
-        &self,
-    ) -> impl Iterator<Item = (SourcePos, VarBinding)> + ExactSizeIterator {
-        self.var_to_binder.iter().map(|(k, v)| (k.position, *v))
+    pub fn bound_positions(&self) -> impl Iterator<Item = BoundPos> + ExactSizeIterator {
+        self.var_to_binder.iter().map(|(occ, binding)| BoundPos {
+            pos: occ.position,
+            binding: *binding,
+        })
+    }
+
+    /// Returns an iterator over variable bindings that occur within a given source span.
+    ///
+    /// The range is inclusive–exclusive: `[span.start, span.end)`.
+    pub fn bound_in_range(&self, span: SourceSpan) -> impl Iterator<Item = BoundPos> {
+        use std::ops::Bound::*;
+
+        // Construct range bounds for the BTreeMap key type
+        let start_key = SymbolOccurence {
+            position: span.start,
+            symbol: Symbol::DUMMY, // any dummy symbol, ordering ignores it
+        };
+        let end_key = SymbolOccurence {
+            position: span.end,
+            symbol: Symbol::DUMMY,
+        };
+
+        self.var_to_binder
+            .range((Included(start_key), Excluded(end_key)))
+            .map(|(occ, binding)| BoundPos {
+                pos: occ.position,
+                binding: *binding,
+            })
+    }
+
+    /// Returns an iterator over all variable bindings within the given scope.
+    pub fn bound_in_scope(&self, scope: &ScopeInfo) -> impl Iterator<Item = BoundPos> {
+        self.bound_in_range(scope.span)
     }
 }
 
