@@ -80,29 +80,11 @@ cargo test -- --nocapture
 # Run tests for specific workspace member
 cargo test -p shell
 
-# Run tests for the VM crate (rholang-vm)
-cargo test -p rholang-vm
-
-# Run a specific VM integration test file by its binary name (without .rs)
-# Example for tests/bytecode_examples_tests.rs:
-cargo test -p rholang-vm --test bytecode_examples_tests
-
-# Include ignored tests
-cargo test -p rholang-vm -- --include-ignored
-
-# Run specific test module or test name filter
-cargo test <filter-substring>
+# Run specific test module
+cargo test <module_name>
 
 # Run tests and show test coverage
 cargo test --all-features
-```
-
-#### Makefile shortcuts for VM tests
-```bash
-# From project root
-make test-vm            # all rholang-vm tests
-make test-vm-all        # include #[ignore] tests
-make test-vm-bin BIN=bytecode_examples_tests ARGS='-- --nocapture'
 ```
 
 ### Development Container
@@ -251,14 +233,12 @@ new helloworld, stdout(`rho:io:stdout`) in {
 3. Run the full test suite and static analysis
 4. Submit a pull request with comprehensive tests
 
-## 📄 License
+## License
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
-
+This project is part of the F1r3fly open-source ecosystem.
 
 ## Resources
 
-- [Rholang Execution Design (Process-Oriented Bytecode)](docs/RHOLANG_EXECUTION_DESIGN.md)
 - [Rholang Official Documentation](https://rholang.org/)
 - [F1r3fly Project](https://github.com/F1R3FLY-io/f1r3fly)
 - [RChain Cooperative](https://rchain.coop/)

@@ -197,13 +197,11 @@ new
                                         proc: (block
                                           (let
                                             decls: (linear_decls
-                                              (decl
-                                                names: (names
-                                                  (var))
-                                                procs: (procs
-                                                  (add
-                                                    (var)
-                                                    (var)))))
+                                              (let_var_decl
+                                                (var)
+                                                (add
+                                                  (var)
+                                                  (var))))
                                             proc: (block
                                               (par
                                                 (send
@@ -271,13 +269,11 @@ new
                                               proc: (block
                                                 (let
                                                   decls: (linear_decls
-                                                    (decl
-                                                      names: (names
-                                                        (var))
-                                                      procs: (procs
-                                                        (sub
-                                                          (var)
-                                                          (var)))))
+                                                    (let_var_decl
+                                                      (var)
+                                                      (sub
+                                                        (var)
+                                                        (var))))
                                                   proc: (block
                                                     (par
                                                       (send

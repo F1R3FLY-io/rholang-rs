@@ -71,10 +71,10 @@ get_crate_name() {
     local full_path="$1"
     # Extract just the crate name from the full path
     if [[ "$full_path" == path+file* ]]; then
-        # For paths like "path+file:///Users/beret/f1r3fly/rholang/rholang-shell#0.1.0"
+        # For paths like "path+file:///Users/beret/f1r3fly/rholang/shell#0.1.0"
         echo "$full_path" | sed 's|.*/\([^/]*\)#.*|\1|'
     else
-        # For simple paths like "rholang-shell"
+        # For simple paths like "shell"
         echo "$full_path"
     fi
 }

@@ -24,50 +24,7 @@ pub fn help_message() -> String {
         + "\n  .reset or Ctrl+C - Interrupt current input (in multiline mode: clear buffer)"
         + "\n  .ps - List all running processes"
         + "\n  .kill <index> - Kill a running process by index"
-        + "\n  .quit - Exit the rholang-shell"
-}
-
-const DEFAULT_PROMPT: &str = ">>> ";
-
-fn handle_kill_command<W: Write, I: InterpreterProvider>(
-    arg: &str,
-    stdout: &mut W,
-    interpreter: &I,
-) -> Result<()> {
-    let pid_str = arg.trim();
-    if pid_str.is_empty() {
-        writeln!(stdout, "Usage: .kill <pid>")?;
-        return Ok(());
-    }
-    match pid_str.parse::<usize>() {
-        Ok(pid) => match interpreter.kill_process(pid) {
-            Ok(true) => writeln!(stdout, "Process {} killed successfully", pid)?,
-            Ok(false) => writeln!(stdout, "Process {} not found", pid)?,
-            Err(e) => writeln!(stdout, "Error killing process {}: {}", pid, e)?,
-        },
-        Err(_) => writeln!(stdout, "Invalid process ID: {}", pid_str)?,
-    }
-    Ok(())
-}
-
-fn print_processes<W: Write, I: InterpreterProvider>(
-    stdout: &mut W,
-    interpreter: &I,
-) -> Result<()> {
-    match interpreter.list_processes() {
-        Ok(processes) => {
-            if processes.is_empty() {
-                writeln!(stdout, "No running processes")?;
-            } else {
-                writeln!(stdout, "Running processes:")?;
-                for (pid, code) in processes {
-                    writeln!(stdout, "  {}: {}", pid, code)?;
-                }
-            }
-        }
-        Err(e) => writeln!(stdout, "Error listing processes: {}", e)?,
-    }
-    Ok(())
+        + "\n  .quit - Exit the shell"
 }
 
 /// Process a special command (starting with '.')
@@ -80,31 +37,46 @@ pub fn process_special_command<W: Write, I: InterpreterProvider>(
     update_prompt: impl FnOnce(&str) -> Result<()>,
     interpreter: &I,
 ) -> Result<bool> {
-    let trimmed = command.trim();
-    if !trimmed.starts_with('.') {
+    if !command.starts_with('.') {
         return Ok(false);
     }
 
-    let (cmd, arg) = trimmed.split_once(' ').map_or((trimmed, ""), |(c, a)| (c, a.trim()));
+    // Check for .kill command with an index
+    if command.starts_with(".kill ") {
+        let parts: Vec<&str> = command.splitn(2, ' ').collect();
+        if parts.len() == 2 {
+            if let Ok(pid) = parts[1].trim().parse::<usize>() {
+                match interpreter.kill_process(pid) {
+                    Ok(true) => writeln!(stdout, "Process {} killed successfully", pid)?,
+                    Ok(false) => writeln!(stdout, "Process {} not found", pid)?,
+                    Err(e) => writeln!(stdout, "Error killing process {}: {}", pid, e)?,
+                }
+                return Ok(false);
+            } else {
+                writeln!(stdout, "Invalid process ID: {}", parts[1])?;
+                return Ok(false);
+            }
+        }
+    }
 
-    match cmd {
+    match command {
         ".help" => {
             writeln!(stdout, "{}", help_message())?;
         }
         ".mode" => {
             // Toggle multiline mode
             *multiline = !*multiline;
-            let mode_msg = if *multiline {
+            let mode_message = if *multiline {
                 "Switched to multiline mode (enter twice to execute)"
             } else {
                 buffer.clear();
-                update_prompt(DEFAULT_PROMPT)?;
+                update_prompt(">>> ")?;
                 "Switched to single line mode"
             };
-            writeln!(stdout, "{mode_msg}")?;
+            writeln!(stdout, "{mode_message}")?;
         }
         ".quit" => {
-            writeln!(stdout, "Exiting rholang-shell...")?;
+            writeln!(stdout, "Exiting shell...")?;
             return Ok(true); // Signal to exit
         }
         ".list" => {
@@ -114,7 +86,8 @@ pub fn process_special_command<W: Write, I: InterpreterProvider>(
             }
         }
         ".delete" | ".del" => {
-            if let Some(removed) = buffer.pop() {
+            if !buffer.is_empty() {
+                let removed = buffer.pop().unwrap();
                 writeln!(stdout, "Removed last line: {removed}")?;
             } else {
                 writeln!(stdout, "Buffer is empty, nothing to delete")?;
@@ -122,26 +95,31 @@ pub fn process_special_command<W: Write, I: InterpreterProvider>(
         }
         ".reset" => {
             buffer.clear();
-            update_prompt(DEFAULT_PROMPT)?;
+            update_prompt(">>> ")?;
             writeln!(stdout, "Buffer reset")?;
         }
         ".buffer" => {
             writeln!(stdout, "Current buffer: {:?}", buffer)?;
         }
-        ".ps" => {
-            print_processes(stdout, interpreter)?;
-        }
-        ".kill" => {
-            handle_kill_command(arg, stdout, interpreter)?;
-        }
+        ".ps" => match interpreter.list_processes() {
+            Ok(processes) => {
+                if processes.is_empty() {
+                    writeln!(stdout, "No running processes")?;
+                } else {
+                    writeln!(stdout, "Running processes:")?;
+                    for (pid, code) in processes {
+                        writeln!(stdout, "  {}: {}", pid, code)?;
+                    }
+                }
+            }
+            Err(e) => writeln!(stdout, "Error listing processes: {}", e)?,
+        },
         _ => {
             writeln!(stdout, "Unknown command: {command}")?;
         }
     }
     Ok(false) // Don't exit
 }
-
-// ... existing code ...
 
 /// Process a line of input in multiline mode
 /// Returns Some(command) if a command is ready to be executed, None otherwise
@@ -235,7 +213,7 @@ pub fn handle_interrupt<W: Write, I: InterpreterProvider>(
     Ok(())
 }
 
-/// Run the rholang-shell with the provided interpreter provider
+/// Run the shell with the provided interpreter provider
 pub async fn run_shell<I: InterpreterProvider>(args: Args, interpreter: I) -> Result<()> {
     writeln!(std::io::stdout(), "{}", help_message())?;
 

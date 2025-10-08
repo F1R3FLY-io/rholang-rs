@@ -1,4 +1,4 @@
-use std::iter;
+use std::iter::{self, FusedIterator};
 
 use smallvec::SmallVec;
 
@@ -30,15 +30,9 @@ fn for_comprehension_inputs<'a>(
 ) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
     receipts
         .iter()
-        .flat_map(|bindings| bindings.iter())
-        .filter_map(|binding| match binding {
-            Bind::Linear {
-                rhs: Source::SendReceive { inputs, .. },
-                ..
-            } => Some(inputs),
-            _ => None,
-        })
-        .flat_map(|inputs| inputs.iter())
+        .flatten()
+        .filter_map(|binding| binding.input())
+        .flatten()
 }
 
 /// Helper: extract expression + cases from `Match`.
@@ -60,7 +54,7 @@ fn select_branches<'a>(
                 Source::SendReceive { inputs, .. } => Some(inputs),
                 _ => None,
             })
-            .flat_map(|inputs| inputs.iter())
+            .flatten()
             .chain(iter::once(&branch.proc))
     })
 }
@@ -93,27 +87,25 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
 
             Proc::Let { bindings, body, .. } => {
                 for binding in bindings.iter().rev() {
-                    match binding {
-                        LetBinding::Single { lhs: _, rhs } => {
-                            self.stack.push(rhs);
-                        }
-                        LetBinding::Multiple { lhs: _, rhs } => {
-                            self.stack.extend(rhs.iter().rev());
-                        }
-                    }
+                    self.stack.extend(binding.rhs.iter().rev());
                 }
                 self.stack.push(body);
             }
 
-            Proc::Contract { body, .. } => {
-                self.stack.push(body);
+            Proc::Contract { body: inner, .. }
+            | Proc::New { proc: inner, .. }
+            | Proc::Bundle { proc: inner, .. }
+            | Proc::UnaryExp { arg: inner, .. } => {
+                self.stack.push(inner);
             }
 
-            Proc::New { proc, .. } | Proc::Bundle { proc, .. } => {
-                self.stack.push(proc);
+            Proc::Send { inputs, .. } => {
+                self.stack.extend(inputs.iter().rev());
             }
-
-            Proc::Send { inputs, .. } | Proc::SendSync { inputs, .. } => {
+            Proc::SendSync { inputs, cont, .. } => {
+                if let SyncSendCont::NonEmpty(proc) = cont {
+                    self.stack.push(proc);
+                }
                 self.stack.extend(inputs.iter().rev());
             }
 
@@ -149,10 +141,6 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
                 }
             },
 
-            Proc::UnaryExp { arg, .. } => {
-                self.stack.push(arg);
-            }
-
             Proc::Select { branches } => {
                 self.stack.extend(select_branches(branches).rev());
             }
@@ -174,6 +162,8 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
         Some(node)
     }
 }
+
+impl<'a, const S: usize> FusedIterator for PreorderDfsIter<'a, S> {}
 
 #[cfg(test)]
 mod tests {
@@ -212,14 +202,14 @@ mod tests {
 
     #[test]
     fn nested_let_and_body() {
-        // let x = 42 in ()
-        let rhs = Proc::LongLiteral(42).ann(SourcePos::at_col(9).span_of(2));
-        let body = Proc::Unit.ann(SourcePos::at_col(15).span_of(2));
+        // let x <- 42 in ()
+        let rhs = Proc::LongLiteral(42).ann(SourcePos::at_col(10).span_of(2));
+        let body = Proc::Unit.ann(SourcePos::at_col(16).span_of(2));
         let x = Id {
             name: "x",
             pos: SourcePos::at_col(5),
         };
-        let binding = LetBinding::Single { lhs: x.into(), rhs };
+        let binding = LetBinding::single(x.into(), rhs);
         let let_proc = Proc::Let {
             bindings: smallvec![binding],
             body,
@@ -291,18 +281,15 @@ mod tests {
 
     #[test]
     fn mixed_tree() {
-        // true | { let z = 7 in () }
+        // true | { let z <- 7 in () }
         let leaf1 = Proc::BoolLiteral(true);
         let leaf2 = Proc::LongLiteral(7);
         let z = Id {
             name: "z",
             pos: SourcePos::at_col(14),
         };
-        let binding = LetBinding::Single {
-            lhs: z.into(),
-            rhs: leaf2.ann(SourcePos::at_col(18).span_of(1)),
-        };
-        let let_body = Proc::Unit.ann(SourcePos::at_col(23).span_of(2));
+        let binding = LetBinding::single(z.into(), leaf2.ann(SourcePos::at_col(19).span_of(1)));
+        let let_body = Proc::Unit.ann(SourcePos::at_col(24).span_of(2));
         let let_proc = Proc::Let {
             bindings: smallvec![binding],
             body: let_body,
@@ -315,7 +302,7 @@ mod tests {
                 end: let_body.span.end,
             }),
         };
-        let root = par_proc.ann(SourcePos::default().span_of(26));
+        let root = par_proc.ann(SourcePos::default().span_of(27));
 
         let nodes: Vec<_> = (&root).iter_preorder_dfs().collect();
 

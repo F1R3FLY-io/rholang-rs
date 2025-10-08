@@ -1,11 +1,10 @@
 use bitvec::slice::BitSlice;
-use bitvec::slice::Iter as MaskIter;
 use bitvec::vec::BitVec;
 use nonempty_collections::NEVec;
 use rholang_tree_sitter_proc_macro::{field, kind};
 use smallvec::{SmallVec, ToSmallVec};
 use std::fmt::Debug;
-use std::iter::{FusedIterator, Zip};
+use std::iter::FusedIterator;
 use std::slice::Iter as SliceIter;
 use validated::Validated;
 
@@ -549,25 +548,42 @@ pub(super) fn node_to_ast<'ast>(
 
                     for decl_node in decls_node.named_children(&mut decls_node.walk()) {
                         let (lhs, rhs) = get_left_and_right(&decl_node);
-                        let lhs_arity = lhs.named_child_count();
-                        let rhs_arity = rhs.named_child_count();
-                        let lhs_has_cont = lhs.child_by_field_id(field!("cont")).is_some();
 
-                        if let_decl_is_malformed(lhs_arity, rhs_arity, lhs_has_cont) {
-                            errors.push(AnnParsingError::new(
-                                ParsingError::MalformedLetDecl {
-                                    lhs_arity,
-                                    rhs_arity,
-                                },
-                                &decl_node,
-                            ));
+                        let lhs_arity;
+                        let rhs_arity;
+                        let lhs_has_cont;
+
+                        let is_var_decl = decl_node.kind_id() == kind!("let_var_decl");
+                        if is_var_decl {
+                            lhs_arity = 1;
+                            rhs_arity = 1;
+                            lhs_has_cont = false;
+
+                            temp_cont_stack.push(K::EvalDelayed(lhs));
+                            temp_cont_stack.push(K::EvalDelayed(rhs));
+                        } else {
+                            lhs_arity = lhs.named_child_count();
+                            rhs_arity = rhs.named_child_count();
+                            lhs_has_cont = lhs.child_by_field_id(field!("cont")).is_some();
+
+                            if let_decl_is_malformed(lhs_arity, rhs_arity, lhs_has_cont) {
+                                errors.push(AnnParsingError::new(
+                                    ParsingError::MalformedLetDecl {
+                                        lhs_arity,
+                                        rhs_arity,
+                                    },
+                                    &decl_node,
+                                ));
+                            }
+                            temp_cont_stack.push(K::EvalList(lhs.walk()));
+                            temp_cont_stack.push(K::EvalList(rhs.walk()));
                         }
-                        temp_cont_stack.push(K::EvalList(lhs.walk()));
-                        temp_cont_stack.push(K::EvalList(rhs.walk()));
+
                         let_decls.push(LetDecl {
                             lhs_arity,
                             lhs_has_cont,
                             rhs_arity,
+                            is_var_decl,
                         });
                         total_len += lhs_arity + rhs_arity;
                     }
@@ -1650,135 +1666,72 @@ struct LetDecl {
     lhs_arity: usize,
     lhs_has_cont: bool,
     rhs_arity: usize,
+    is_var_decl: bool,
 }
 
-type MaskIterSpec<'a> = MaskIter<'a, usize, bitvec::order::Lsb0>;
-struct LetBindingIter<'slice, 'a> {
-    iter: Zip<
-        Zip<SliceIter<'slice, AnnProc<'a>>, MaskIterSpec<'slice>>,
-        SliceIter<'slice, AnnProc<'a>>,
-    >,
-    tail: Option<(Var<'a>, &'slice [AnnProc<'a>])>,
-}
-
-impl<'slice, 'a> LetBindingIter<'slice, 'a> {
-    fn new(decl: &LetDecl, slice: &'slice [AnnProc<'a>], mask: &'slice BitSlice) -> Self {
-        assert!(!slice.is_empty() && slice.len() == decl.lhs_arity + decl.rhs_arity);
-        assert_eq!(slice.len(), mask.len());
-        unsafe {
-            // SAFETY: We check above that the slice contains exactly |lhs_arity + rhs_arity|
-            // elements, and it is not zero. Therefore, lhs_arity <= slice.len()
-            let (lhs, rhs) = slice.split_at_unchecked(decl.lhs_arity);
-            if decl.lhs_has_cont && rhs.len() > lhs.len() {
-                // SAFETY: If lhs has a continuation then it's arity is at least 1
-                let (rem, init) = lhs.split_last().unwrap_unchecked();
-                LetBindingIter {
-                    iter: init.iter().zip(mask.iter()).zip(rhs.iter()),
-                    tail: Some((into_remainder(*rem), &rhs[(lhs.len() - 1)..])),
-                }
-            } else {
-                LetBindingIter {
-                    iter: lhs.iter().zip(mask.iter()).zip(rhs.iter()),
-                    tail: None,
-                }
-            }
-        }
-    }
-}
-
-impl<'a> Iterator for LetBindingIter<'_, 'a> {
-    type Item = LetBinding<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter
-            .next()
-            .map(|((l, q), r)| LetBinding::Single {
-                lhs: into_name(*l, *q),
-                rhs: *r,
-            })
-            .or_else(|| {
-                self.tail.map(|(lhs, rhs)| LetBinding::Multiple {
-                    lhs,
-                    rhs: rhs.to_vec(),
-                })
-            })
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        if self.tail.is_none() {
-            self.iter.size_hint()
-        } else {
-            let (min, max) = self.iter.size_hint();
-            (min + 1, max.map(|hint| hint + 1))
-        }
-    }
-}
-
-struct LetDeclIter<'slice, 'a, O>
+struct LetDeclIter<'slice, 'a, I>
 where
-    O: Iterator<Item = &'slice LetDecl> + ExactSizeIterator,
+    I: Iterator<Item = &'slice LetDecl> + ExactSizeIterator,
 {
-    outer: O,
+    iter: I,
     procs: &'slice [AnnProc<'a>],
     mask: &'slice BitSlice,
-    current_inner: Option<LetBindingIter<'slice, 'a>>,
 }
 
-impl<'slice, 'a, O> LetDeclIter<'slice, 'a, O>
+impl<'slice, 'a, I> LetDeclIter<'slice, 'a, I>
 where
-    O: Iterator<Item = &'slice LetDecl> + ExactSizeIterator,
+    I: Iterator<Item = &'slice LetDecl> + ExactSizeIterator,
 {
     fn new(
-        decls: impl IntoIterator<Item = O::Item, IntoIter = O>,
+        decls: impl IntoIterator<Item = I::Item, IntoIter = I>,
         procs: &'slice [AnnProc<'a>],
         mask: &'slice BitSlice,
     ) -> Self {
         LetDeclIter {
-            outer: decls.into_iter(),
+            iter: decls.into_iter(),
             procs,
             mask,
-            current_inner: None,
         }
     }
 }
 
-impl<'slice, 'a, O> Iterator for LetDeclIter<'slice, 'a, O>
+impl<'slice, 'a, I> Iterator for LetDeclIter<'slice, 'a, I>
 where
-    O: Iterator<Item = &'slice LetDecl> + ExactSizeIterator,
+    I: Iterator<Item = &'slice LetDecl> + ExactSizeIterator,
 {
     type Item = LetBinding<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(inner) = &mut self.current_inner {
-            if let Some(item) = inner.next() {
-                return Some(item);
-            }
-        }
-        // inner exhausted → refill from outer
-        loop {
-            match self.outer.next() {
-                Some(let_decl) => {
-                    let split_point = let_decl.lhs_arity + let_decl.rhs_arity;
-                    let (this_procs, rest_procs) = self.procs.split_at(split_point);
-                    let (this_mask, rest_mask) = self.mask.split_at(split_point);
+        if let Some(let_decl) = self.iter.next() {
+            let split_point = let_decl.lhs_arity + let_decl.rhs_arity;
+            let (this_procs, rest_procs) = self.procs.split_at(split_point);
+            let (this_mask, rest_mask) = self.mask.split_at(split_point);
 
-                    let mut new_inner = LetBindingIter::new(let_decl, this_procs, this_mask);
-
-                    self.procs = rest_procs;
-                    self.mask = rest_mask;
-
-                    if let Some(item) = new_inner.next() {
-                        self.current_inner = Some(new_inner);
-                        return Some(item);
-                    }
+            let item = unsafe {
+                // SAFETY: We check above that the slice contains exactly |lhs_arity + rhs_arity|
+                // elements, and it is not zero. Therefore, lhs_arity <= slice.len()
+                let (lhs, rhs) = this_procs.split_at_unchecked(let_decl.lhs_arity);
+                LetBinding {
+                    lhs: if let_decl.is_var_decl {
+                        Names::single(into_name(lhs[0], true))
+                    } else {
+                        into_names(lhs, this_mask, let_decl.lhs_has_cont)
+                    },
+                    rhs: rhs.to_smallvec(),
                 }
-                None => return None,
-            }
+            };
+
+            self.procs = rest_procs;
+            self.mask = rest_mask;
+
+            return Some(item);
         }
+
+        None
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.outer.len(), None)
+        (self.iter.len(), None)
     }
 }
 
@@ -1820,7 +1773,7 @@ pub struct NamesIter<'slice, 'a> {
 impl<'slice, 'a> NamesIter<'slice, 'a> {
     #[inline]
     pub fn new(procs: &'slice [AnnProc<'a>], mask: &'slice BitSlice) -> Self {
-        assert_eq!(procs.len(), mask.len());
+        assert!(procs.len() <= mask.len());
         let len = procs.len();
         Self {
             procs,

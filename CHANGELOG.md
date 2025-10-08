@@ -5,6 +5,11 @@ All notable changes to the Rholang-RS project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+=======
+## [Unreleased]
+### Added
+- Planned features for future releases as outlined in the ROADMAP.md
+
 ## [0.1.2] - 2025-07-01
 ### Added
 - Docker-based development container setup with IntelliJ run configuration
@@ -105,4 +110,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Developer Experience improvements
 - Extended Capabilities
 
-For detailed information about future plans, please refer to the [ROADMAP.md](docs/ROADMAP.md) file.
+For detailed information about future plans, please refer to the [ROADMAP.md](docs/ROADMAP.md) file

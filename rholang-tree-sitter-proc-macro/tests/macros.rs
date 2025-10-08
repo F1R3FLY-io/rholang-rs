@@ -5,8 +5,8 @@ use rholang_tree_sitter_proc_macro::{field, kind, kw};
 const NEW_KIND: u16 = 79;
 const SEND_KIND: u16 = 87;
 const BUNDLE_KIND: u16 = 82;
-const BRANCH_KIND: u16 = 128;
-const CASE_KIND: u16 = 127;
+const BRANCH_KIND: u16 = 129;
+const CASE_KIND: u16 = 128;
 
 // Static values for keywords
 const NEW_KW: u16 = 4;

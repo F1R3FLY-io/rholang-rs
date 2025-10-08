@@ -3,7 +3,7 @@ set -e
 
 # Script to run commands in the development container
 # Usage: ./scripts/run-in-container.sh [command]
-# If no command is provided, an interactive rholang-shell is started
+# If no command is provided, an interactive shell is started
 
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
@@ -23,7 +23,7 @@ if ! docker-compose ps -q dev &> /dev/null || [ -z "$(docker-compose ps -q dev)"
     docker-compose build dev
 fi
 
-# If no command is provided, start an interactive rholang-shell
+# If no command is provided, start an interactive shell
 if [ $# -eq 0 ]; then
     echo "Starting interactive shell in development container..."
     docker-compose run --rm dev
