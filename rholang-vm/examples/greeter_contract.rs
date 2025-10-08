@@ -29,24 +29,20 @@ fn main() -> Result<()> {
         Instruction::unary(Opcode::NAME_CREATE, STORE_CONC),
         Instruction::nullary(Opcode::ALLOC_LOCAL),
         Instruction::unary(Opcode::STORE_LOCAL, 0),
-
         // Create stdout channel
         Instruction::unary(Opcode::NAME_CREATE, STORE_CONC),
         Instruction::nullary(Opcode::ALLOC_LOCAL),
         Instruction::unary(Opcode::STORE_LOCAL, 1),
-
         // stdout!([1])
         Instruction::unary(Opcode::LOAD_LOCAL, 1),
         Instruction::unary(Opcode::PUSH_INT, 1),
         Instruction::unary(Opcode::CREATE_LIST, 1),
         Instruction::unary(Opcode::TELL, STORE_CONC),
-
         // stdout!([2])
         Instruction::unary(Opcode::LOAD_LOCAL, 1),
         Instruction::unary(Opcode::PUSH_INT, 2),
         Instruction::unary(Opcode::CREATE_LIST, 1),
         Instruction::unary(Opcode::TELL, STORE_CONC),
-
         // Read: consume first and discard, then peek second
         Instruction::unary(Opcode::LOAD_LOCAL, 1),
         Instruction::unary(Opcode::ASK, STORE_CONC),

@@ -1,6 +1,8 @@
 use rholang_vm::{api::Instruction, api::Opcode, api::Process, api::Value, VM};
 
-fn label(name: &str) -> Value { Value::Str(name.to_string()) }
+fn label(name: &str) -> Value {
+    Value::Str(name.to_string())
+}
 
 #[test]
 fn test_cmp_eq_and_neq_various_types() {
@@ -196,7 +198,9 @@ fn test_relational_ops_type_errors_and_underflow() {
     ];
     let mut p1 = Process::new(prog1, "lt_type_err");
     p1.names = vec![label("x")];
-    let err1 = vm1.execute(&mut p1).expect_err("should error for type mismatch on CMP_LT");
+    let err1 = vm1
+        .execute(&mut p1)
+        .expect_err("should error for type mismatch on CMP_LT");
     let msg1 = err1.to_string().to_lowercase();
     assert!(msg1.contains("cmp_lt") && msg1.contains("int"));
 
@@ -207,7 +211,9 @@ fn test_relational_ops_type_errors_and_underflow() {
         Instruction::nullary(Opcode::CMP_GT),
     ];
     let mut p2 = Process::new(prog2, "gt_underflow_err");
-    let err2 = vm2.execute(&mut p2).expect_err("should error for underflow on CMP_GT");
+    let err2 = vm2
+        .execute(&mut p2)
+        .expect_err("should error for underflow on CMP_GT");
     let msg2 = err2.to_string().to_lowercase();
     assert!(msg2.contains("cmp_gt") && msg2.contains("int"));
 }

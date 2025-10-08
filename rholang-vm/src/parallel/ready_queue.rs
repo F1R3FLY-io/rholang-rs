@@ -11,19 +11,36 @@ pub struct ReadyQueue {
     q: Arc<SegQueue<WorkItem>>,
 }
 
+impl Default for ReadyQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ReadyQueue {
     pub fn new() -> Self {
-        Self { seq: Arc::new(AtomicU64::new(1)), q: Arc::new(SegQueue::new()) }
+        Self {
+            seq: Arc::new(AtomicU64::new(1)),
+            q: Arc::new(SegQueue::new()),
+        }
     }
 
-    pub fn next_seq(&self) -> u64 { self.seq.fetch_add(1, Ordering::SeqCst) }
+    pub fn next_seq(&self) -> u64 {
+        self.seq.fetch_add(1, Ordering::SeqCst)
+    }
 
     pub fn enqueue(&self, mut item: WorkItem) {
-        if item.seq == 0 { item.seq = self.next_seq(); }
+        if item.seq == 0 {
+            item.seq = self.next_seq();
+        }
         self.q.push(item);
     }
 
-    pub fn try_pop(&self) -> Option<WorkItem> { self.q.pop() }
+    pub fn try_pop(&self) -> Option<WorkItem> {
+        self.q.pop()
+    }
 
-    pub fn is_empty(&self) -> bool { self.q.is_empty() }
+    pub fn is_empty(&self) -> bool {
+        self.q.is_empty()
+    }
 }

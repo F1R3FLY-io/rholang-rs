@@ -12,18 +12,15 @@ fn test_contract_operation_examples_minimal() {
         Instruction::unary(Opcode::NAME_CREATE, STORE_CONC),
         Instruction::nullary(Opcode::ALLOC_LOCAL),
         Instruction::unary(Opcode::STORE_LOCAL, 0),
-
         // Store a continuation-like payload and drop ID (we'll use an Int as payload)
         Instruction::unary(Opcode::PUSH_INT, 7),
         Instruction::nullary(Opcode::CONT_STORE),
         Instruction::nullary(Opcode::POP),
-
         // Send data to the contract channel: ch!([42])
         Instruction::unary(Opcode::LOAD_LOCAL, 0),
         Instruction::unary(Opcode::PUSH_INT, 42),
         Instruction::unary(Opcode::CREATE_LIST, 1),
         Instruction::unary(Opcode::TELL, STORE_CONC),
-
         // Persistent semantics via peek
         Instruction::unary(Opcode::LOAD_LOCAL, 0),
         Instruction::unary(Opcode::PEEK, STORE_CONC),
@@ -118,7 +115,7 @@ fn test_continuation_store_and_resume() {
     let mut vm = VM::new();
     let prog = vec![
         Instruction::unary(Opcode::PUSH_INT, 99),
-        Instruction::nullary(Opcode::CONT_STORE), // -> id
+        Instruction::nullary(Opcode::CONT_STORE),  // -> id
         Instruction::nullary(Opcode::CONT_RESUME), // pops id, pushes stored value
         Instruction::nullary(Opcode::HALT),
     ];

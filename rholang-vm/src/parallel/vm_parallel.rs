@@ -14,11 +14,33 @@ pub struct VmBuilder {
     default_budget: u32,
 }
 
+impl Default for VmBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VmBuilder {
-    pub fn new() -> Self { Self { threads: None, default_budget: 10_000 } }
-    pub fn threads(mut self, n: usize) -> Self { self.threads = Some(n); self }
-    pub fn default_budget(mut self, b: u32) -> Self { self.default_budget = b; self }
-    pub fn build(self) -> VmParallel { VmParallel::with_config(self.threads.unwrap_or_else(num_cpus::get), self.default_budget) }
+    pub fn new() -> Self {
+        Self {
+            threads: None,
+            default_budget: 10_000,
+        }
+    }
+    pub fn threads(mut self, n: usize) -> Self {
+        self.threads = Some(n);
+        self
+    }
+    pub fn default_budget(mut self, b: u32) -> Self {
+        self.default_budget = b;
+        self
+    }
+    pub fn build(self) -> VmParallel {
+        VmParallel::with_config(
+            self.threads.unwrap_or_else(num_cpus::get),
+            self.default_budget,
+        )
+    }
 }
 
 #[derive(Clone)]
@@ -31,12 +53,20 @@ pub struct VmParallel {
 }
 
 impl VmParallel {
-    pub fn builder() -> VmBuilder { VmBuilder::new() }
+    pub fn builder() -> VmBuilder {
+        VmBuilder::new()
+    }
 
     pub fn with_config(threads: usize, budget: u32) -> Self {
         let rq = ReadyQueue::new();
         let first_seq = 1; // ReadyQueue starts at seq=1; first enqueued work will take 1
-        Self { threads, budget, rq: rq.clone(), journal: Journal::new(first_seq), next_pid: 1 }
+        Self {
+            threads,
+            budget,
+            rq: rq.clone(),
+            journal: Journal::new(first_seq),
+            next_pid: 1,
+        }
     }
 
     pub fn spawn_process(&mut self, process: Arc<Process>) -> u64 {
@@ -54,7 +84,9 @@ impl VmParallel {
         self.journal
             .committed()
             .into_iter()
-            .filter_map(|e| match e { Effect::Output { pid, value, .. } => Some((pid, value)), })
+            .filter_map(|e| match e {
+                Effect::Output { pid, value, .. } => Some((pid, value)),
+            })
             .collect()
     }
 }

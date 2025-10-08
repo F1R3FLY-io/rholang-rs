@@ -1,10 +1,10 @@
 use anyhow::Result;
 
+use crate::error::ExecError;
 use crate::execute::{self, StepResult};
 use crate::process::Process;
+use crate::rspace::{InMemoryRSpace, RSpace};
 use crate::value::Value;
-use crate::rspace::{RSpace, InMemoryRSpace};
-use crate::error::ExecError;
 
 pub struct VM {
     pub(crate) stack: Vec<Value>,
@@ -17,13 +17,37 @@ pub struct VM {
     pub(crate) next_name_id: u64,
 }
 
-impl VM {
-    pub fn new() -> Self { VM { stack: Vec::new(), rspace: Box::new(InMemoryRSpace::new()), cont_table: std::collections::HashMap::new(), next_cont_id: 1, next_name_id: 1 } }
+impl Default for VM {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
-    pub fn with_rspace(rspace: Box<dyn RSpace>) -> Self { VM { stack: Vec::new(), rspace, cont_table: std::collections::HashMap::new(), next_cont_id: 1, next_name_id: 1 } }
+impl VM {
+    pub fn new() -> Self {
+        VM {
+            stack: Vec::new(),
+            rspace: Box::new(InMemoryRSpace::new()),
+            cont_table: std::collections::HashMap::new(),
+            next_cont_id: 1,
+            next_name_id: 1,
+        }
+    }
+
+    pub fn with_rspace(rspace: Box<dyn RSpace>) -> Self {
+        VM {
+            stack: Vec::new(),
+            rspace,
+            cont_table: std::collections::HashMap::new(),
+            next_cont_id: 1,
+            next_name_id: 1,
+        }
+    }
 
     // Helper to clear in-VM RSpace store (useful for test isolation)
-    pub fn reset_rspace(&mut self) { self.rspace.reset(); }
+    pub fn reset_rspace(&mut self) {
+        self.rspace.reset();
+    }
 
     // Execute a provided Process (the only entry point)
     pub fn execute(&mut self, process: &mut Process) -> Result<Value> {
@@ -31,16 +55,24 @@ impl VM {
         self.stack.clear();
         let mut pc = 0usize;
         while pc < process.code.len() {
-            let inst = process.code[pc].clone();
+            let inst = process.code[pc];
             match execute::step(self, process, inst)? {
-                StepResult::Next => { pc += 1; }
-                StepResult::Stop => { break; }
+                StepResult::Next => {
+                    pc += 1;
+                }
+                StepResult::Stop => {
+                    break;
+                }
                 StepResult::Jump(label) => {
                     if let Some(&target) = process.labels.get(&label) {
                         pc = target;
                     } else {
                         // Label not found is an execution error
-                        return Err(ExecError::LabelNotFound { label, source: process.source_ref.clone() }.into());
+                        return Err(ExecError::LabelNotFound {
+                            label,
+                            source: process.source_ref.clone(),
+                        }
+                        .into());
                     }
                 }
             }

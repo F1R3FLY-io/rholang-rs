@@ -1,4 +1,4 @@
-use rholang_vm::{api::Instruction, api::Opcode, api::Value, api::Process, VM};
+use rholang_vm::{api::Instruction, api::Opcode, api::Process, api::Value, VM};
 
 #[test]
 fn test_list_diff_basic() {
@@ -18,7 +18,10 @@ fn test_list_diff_basic() {
     ];
     let mut process = Process::new(prog, "diff");
     let out = vm.execute(&mut process).expect("exec ok");
-    assert_eq!(out, Value::List(vec![Value::Int(1), Value::Int(2), Value::Int(3)]));
+    assert_eq!(
+        out,
+        Value::List(vec![Value::Int(1), Value::Int(2), Value::Int(3)])
+    );
 }
 
 #[test]

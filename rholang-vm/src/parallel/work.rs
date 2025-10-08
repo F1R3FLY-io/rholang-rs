@@ -1,6 +1,6 @@
 #![cfg(feature = "parallel-exec")]
-use std::sync::Arc;
 use crate::process::Process;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct WorkItem {
@@ -13,6 +13,12 @@ pub struct WorkItem {
 
 impl WorkItem {
     pub fn new(pid: u64, process: Arc<Process>, budget: u32) -> Self {
-        Self { pid, process, ip: 0, budget, seq: 0 }
+        Self {
+            pid,
+            process,
+            ip: 0,
+            budget,
+            seq: 0,
+        }
     }
 }

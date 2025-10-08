@@ -24,7 +24,13 @@ struct InnerJournal {
 
 impl Journal {
     pub fn new(first_seq: u64) -> Self {
-        Self { inner: Arc::new(Mutex::new(InnerJournal { pending: BTreeMap::new(), next_seq_to_flush: first_seq, committed: Vec::new() })) }
+        Self {
+            inner: Arc::new(Mutex::new(InnerJournal {
+                pending: BTreeMap::new(),
+                next_seq_to_flush: first_seq,
+                committed: Vec::new(),
+            })),
+        }
     }
 
     pub fn commit(&self, effect: Effect) {
@@ -46,5 +52,7 @@ impl Journal {
         }
     }
 
-    pub fn committed(&self) -> Vec<Effect> { self.inner.lock().unwrap().committed.clone() }
+    pub fn committed(&self) -> Vec<Effect> {
+        self.inner.lock().unwrap().committed.clone()
+    }
 }

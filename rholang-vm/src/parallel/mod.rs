@@ -1,10 +1,10 @@
 #[cfg(feature = "parallel-exec")]
-pub mod ready_queue;
-#[cfg(feature = "parallel-exec")]
-pub mod work;
-#[cfg(feature = "parallel-exec")]
 pub mod journal;
+#[cfg(feature = "parallel-exec")]
+pub mod ready_queue;
 #[cfg(feature = "parallel-exec")]
 pub mod scheduler;
 #[cfg(feature = "parallel-exec")]
 pub mod vm_parallel;
+#[cfg(feature = "parallel-exec")]
+pub mod work;

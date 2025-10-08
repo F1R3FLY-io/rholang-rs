@@ -1,5 +1,5 @@
-use rholang_bytecode::core::instructions::Instruction as CoreInst;
 use crate::value::Value;
+use rholang_bytecode::core::instructions::Instruction as CoreInst;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
@@ -14,7 +14,13 @@ pub struct Process {
 
 impl Process {
     pub fn new<S: Into<String>>(code: Vec<CoreInst>, source_ref: S) -> Self {
-        Self { code, source_ref: source_ref.into(), locals: Vec::new(), names: Vec::new(), labels: HashMap::new() }
+        Self {
+            code,
+            source_ref: source_ref.into(),
+            locals: Vec::new(),
+            names: Vec::new(),
+            labels: HashMap::new(),
+        }
     }
 
     /// Replace labels map with provided entries

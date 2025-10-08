@@ -30,11 +30,11 @@ fn main() -> Result<()> {
     let program2 = vec![
         Instruction::unary(Opcode::PUSH_INT, 10),
         Instruction::unary(Opcode::PUSH_INT, 5),
-        Instruction::nullary(Opcode::SUB),      // 10 - 5 = 5
+        Instruction::nullary(Opcode::SUB), // 10 - 5 = 5
         Instruction::unary(Opcode::PUSH_INT, 4),
-        Instruction::nullary(Opcode::ADD),      // 5 + 4 = 9
+        Instruction::nullary(Opcode::ADD), // 5 + 4 = 9
         Instruction::unary(Opcode::PUSH_INT, 2),
-        Instruction::nullary(Opcode::MUL),      // 9 * 2 = 18
+        Instruction::nullary(Opcode::MUL), // 9 * 2 = 18
         Instruction::nullary(Opcode::HALT),
     ];
     let mut process2 = Process::new(program2, "simple_arithmetic: complex");

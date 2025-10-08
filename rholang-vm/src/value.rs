@@ -11,5 +11,11 @@ pub enum Value {
 }
 
 impl Value {
-    pub(crate) fn as_int(&self) -> Option<i64> { if let Value::Int(n) = self { Some(*n) } else { None } }
+    pub(crate) fn as_int(&self) -> Option<i64> {
+        if let Value::Int(n) = self {
+            Some(*n)
+        } else {
+            None
+        }
+    }
 }

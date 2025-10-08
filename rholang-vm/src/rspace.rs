@@ -20,14 +20,26 @@ pub struct InMemoryRSpace {
 }
 
 impl InMemoryRSpace {
-    pub fn new() -> Self { Self { store: HashMap::new() } }
+    pub fn new() -> Self {
+        Self {
+            store: HashMap::new(),
+        }
+    }
 }
 
-impl Default for InMemoryRSpace { fn default() -> Self { Self::new() } }
+impl Default for InMemoryRSpace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 fn ensure_kind_matches_channel(kind: u16, channel: &str) -> anyhow::Result<()> {
     if !channel.starts_with(&format!("@{}:", kind)) {
-        anyhow::bail!("channel-kind mismatch: kind {} does not match channel {}", kind, channel);
+        anyhow::bail!(
+            "channel-kind mismatch: kind {} does not match channel {}",
+            kind,
+            channel
+        );
     }
     Ok(())
 }
@@ -43,14 +55,22 @@ impl RSpace for InMemoryRSpace {
     fn ask(&mut self, kind: u16, channel: String) -> Result<Option<Value>> {
         ensure_kind_matches_channel(kind, &channel)?;
         let key = (kind, channel);
-        Ok(self.store.get_mut(&key).and_then(|q| if q.is_empty(){None}else{Some(q.remove(0))}))
+        Ok(self.store.get_mut(&key).and_then(|q| {
+            if q.is_empty() {
+                None
+            } else {
+                Some(q.remove(0))
+            }
+        }))
     }
 
     fn peek(&self, kind: u16, channel: String) -> Result<Option<Value>> {
         ensure_kind_matches_channel(kind, &channel)?;
         let key = (kind, channel);
-        Ok(self.store.get(&key).and_then(|q| q.get(0)).cloned())
+        Ok(self.store.get(&key).and_then(|q| q.first()).cloned())
     }
 
-    fn reset(&mut self) { self.store.clear(); }
+    fn reset(&mut self) {
+        self.store.clear();
+    }
 }

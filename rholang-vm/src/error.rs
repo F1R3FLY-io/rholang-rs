@@ -3,8 +3,14 @@ use std::fmt;
 
 #[derive(Debug)]
 pub enum ExecError {
-    LabelNotFound { label: String, source: String },
-    OpcodeParamError { opcode: &'static str, message: String },
+    LabelNotFound {
+        label: String,
+        source: String,
+    },
+    OpcodeParamError {
+        opcode: &'static str,
+        message: String,
+    },
 }
 
 impl fmt::Display for ExecError {

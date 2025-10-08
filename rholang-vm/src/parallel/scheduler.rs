@@ -1,10 +1,12 @@
 #![cfg(feature = "parallel-exec")]
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::thread;
 
 use super::journal::{Effect, Journal};
 use super::ready_queue::ReadyQueue;
-use super::work::WorkItem;
 use crate::vm::VM;
 
 pub struct Scheduler {
@@ -12,7 +14,9 @@ pub struct Scheduler {
 }
 
 impl Scheduler {
-    pub fn new(threads: usize) -> Self { Self { threads } }
+    pub fn new(threads: usize) -> Self {
+        Self { threads }
+    }
 
     pub fn run(&self, rq: ReadyQueue, journal: Journal) {
         let stop = Arc::new(AtomicBool::new(false));
@@ -28,11 +32,19 @@ impl Scheduler {
                         let mut proc = (*item.process).clone();
                         match vm.execute(&mut proc) {
                             Ok(value) => {
-                                j_cl.commit(Effect::Output { pid: item.pid, seq: item.seq, value });
-                            },
+                                j_cl.commit(Effect::Output {
+                                    pid: item.pid,
+                                    seq: item.seq,
+                                    value,
+                                });
+                            }
                             Err(_) => {
                                 // For MVP, ignore error details and still commit Nil to keep seq progress deterministic
-                                j_cl.commit(Effect::Output { pid: item.pid, seq: item.seq, value: crate::value::Value::Nil });
+                                j_cl.commit(Effect::Output {
+                                    pid: item.pid,
+                                    seq: item.seq,
+                                    value: crate::value::Value::Nil,
+                                });
                             }
                         }
                     } else {
@@ -49,6 +61,8 @@ impl Scheduler {
             std::thread::sleep(std::time::Duration::from_millis(1));
         }
         stop.store(true, Ordering::SeqCst);
-        for h in handles { let _ = h.join(); }
+        for h in handles {
+            let _ = h.join();
+        }
     }
 }

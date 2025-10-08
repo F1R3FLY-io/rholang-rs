@@ -1,4 +1,4 @@
-use rholang_vm::{api::Opcode, api::Instruction, api::Value, api::Process, VM};
+use rholang_vm::{api::Instruction, api::Opcode, api::Process, api::Value, VM};
 
 #[test]
 fn test_addition() {

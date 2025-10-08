@@ -24,7 +24,7 @@ fn test_nop_and_halt() {
 fn test_jump_to_label_and_not_found() {
     // OK jump
     let mut vm = VM::new();
-    let mut prog = vec![
+    let prog = vec![
         // push label "L"
         Instruction::unary(Opcode::PUSH_STR, 0),
         Instruction::nullary(Opcode::JUMP),
@@ -46,7 +46,9 @@ fn test_jump_to_label_and_not_found() {
     // reuse program but process has names with label "M" and labels empty
     let mut p2 = Process::new(prog, "cf_jump_err");
     p2.names = vec![label("M")];
-    let err = vm2.execute(&mut p2).expect_err("should error for missing label");
+    let err = vm2
+        .execute(&mut p2)
+        .expect_err("should error for missing label");
     let msg = err.to_string().to_lowercase();
     assert!(msg.contains("label not found"));
 }
@@ -56,8 +58,8 @@ fn test_branch_true_and_false() {
     // BRANCH_TRUE: label under cond, cond on top
     // Case true: jump
     let mut vm = VM::new();
-    let mut prog_true = vec![
-        Instruction::unary(Opcode::PUSH_STR, 0), // label "L"
+    let prog_true = vec![
+        Instruction::unary(Opcode::PUSH_STR, 0),  // label "L"
         Instruction::unary(Opcode::PUSH_BOOL, 1), // true
         Instruction::nullary(Opcode::BRANCH_TRUE),
         // fallthrough path (should be skipped)
@@ -74,7 +76,7 @@ fn test_branch_true_and_false() {
 
     // Case false: fall through
     let mut vm2 = VM::new();
-    let mut prog_false = vec![
+    let prog_false = vec![
         Instruction::unary(Opcode::PUSH_STR, 0),
         Instruction::unary(Opcode::PUSH_BOOL, 0), // false
         Instruction::nullary(Opcode::BRANCH_TRUE),
@@ -90,7 +92,7 @@ fn test_branch_true_and_false() {
 
     // BRANCH_FALSE: true fallthrough, false jumps
     let mut vm3 = VM::new();
-    let mut prog_bf = vec![
+    let prog_bf = vec![
         Instruction::unary(Opcode::PUSH_STR, 0),
         Instruction::unary(Opcode::PUSH_BOOL, 0), // false -> should jump
         Instruction::nullary(Opcode::BRANCH_FALSE),
@@ -111,7 +113,7 @@ fn test_branch_true_and_false() {
 fn test_branch_success_true_and_false() {
     // success true: jump; stack: [.., label, true]
     let mut vm = VM::new();
-    let mut prog = vec![
+    let prog = vec![
         Instruction::unary(Opcode::PUSH_STR, 0),
         Instruction::unary(Opcode::PUSH_BOOL, 1),
         Instruction::nullary(Opcode::BRANCH_SUCCESS),
@@ -129,7 +131,7 @@ fn test_branch_success_true_and_false() {
 
     // success false: should pop label and fall through
     let mut vm2 = VM::new();
-    let mut prog2 = vec![
+    let prog2 = vec![
         Instruction::unary(Opcode::PUSH_STR, 0),
         Instruction::unary(Opcode::PUSH_BOOL, 0),
         Instruction::nullary(Opcode::BRANCH_SUCCESS),
@@ -146,26 +148,30 @@ fn test_branch_success_true_and_false() {
 fn test_branch_true_param_errors() {
     // Missing bool -> error
     let mut vm = VM::new();
-    let mut prog = vec![
+    let prog = vec![
         Instruction::unary(Opcode::PUSH_STR, 0),
         Instruction::nullary(Opcode::BRANCH_TRUE),
     ];
     let mut p = Process::new(prog, "cf_bt_err1");
     p.names = vec![label("L")];
-    let err = vm.execute(&mut p).expect_err("should error for missing condition");
+    let err = vm
+        .execute(&mut p)
+        .expect_err("should error for missing condition");
     let msg = err.to_string().to_lowercase();
     assert!(msg.contains("branch_true") && msg.contains("expects bool"));
 
     // Wrong label type -> error
     let mut vm2 = VM::new();
-    let mut prog2 = vec![
+    let prog2 = vec![
         // Put non-label under condition
         Instruction::unary(Opcode::PUSH_INT, 1),
         Instruction::unary(Opcode::PUSH_BOOL, 1),
         Instruction::nullary(Opcode::BRANCH_TRUE),
     ];
     let mut p2 = Process::new(prog2, "cf_bt_err2");
-    let err2 = vm2.execute(&mut p2).expect_err("should error for wrong label type");
+    let err2 = vm2
+        .execute(&mut p2)
+        .expect_err("should error for wrong label type");
     let msg2 = err2.to_string().to_lowercase();
     assert!(msg2.contains("branch_true") && msg2.contains("label string"));
 }
