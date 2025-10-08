@@ -76,7 +76,7 @@ pub fn process_special_command<W: Write, I: InterpreterProvider>(
             writeln!(stdout, "{mode_message}")?;
         }
         ".quit" => {
-            writeln!(stdout, "Exiting shell...")?;
+            writeln!(stdout, "Exiting rholang-shell...")?;
             return Ok(true); // Signal to exit
         }
         ".list" => {
