@@ -53,8 +53,8 @@ impl BindingStack {
         self.scopes.push(scope);
     }
 
-    fn push_emtpy(&mut self, db: &SemanticDb) {
-        self.scopes.push(ScopeInfo::ground(db.next_binder()));
+    fn push_emtpy(&mut self, db: &SemanticDb, span: SourceSpan) {
+        self.scopes.push(ScopeInfo::ground(db.next_binder(), span));
     }
 
     #[must_use]
@@ -352,8 +352,13 @@ where
     P: PoppingStrategy,
 {
     #[must_use]
-    fn empty(db: &'d mut SemanticDb<'a>, stack: &'s mut BindingStack, scope: PID) -> Self {
-        stack.push_emtpy(db);
+    fn empty(
+        db: &'d mut SemanticDb<'a>,
+        stack: &'s mut BindingStack,
+        scope: PID,
+        span: SourceSpan,
+    ) -> Self {
+        stack.push_emtpy(db, span);
         Self {
             stack,
             db,
