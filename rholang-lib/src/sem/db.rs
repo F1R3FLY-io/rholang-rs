@@ -346,10 +346,11 @@ impl<'a> SemanticDb<'a> {
     /// Returns an iterator over all variable bindings.
     ///
     /// The iteration is in order of appearance in the source code.
-    pub fn bound_positions(
-        &self,
-    ) -> impl Iterator<Item = (SourcePos, VarBinding)> + ExactSizeIterator {
-        self.var_to_binder.iter().map(|(k, v)| (k.position, *v))
+    pub fn bound_positions(&self) -> impl Iterator<Item = BoundPos> + ExactSizeIterator {
+        self.var_to_binder.iter().map(|(occ, binding)| BoundPos {
+            pos: occ.position,
+            binding: *binding,
+        })
     }
 }
 

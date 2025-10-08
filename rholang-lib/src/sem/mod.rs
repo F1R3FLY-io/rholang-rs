@@ -87,6 +87,12 @@ impl From<Binder> for SymbolOccurence {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct BoundPos {
+    pub pos: SourcePos,
+    pub binding: VarBinding,
+}
+
 /// ID of a binder (variable or name)
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BinderId(u32);
