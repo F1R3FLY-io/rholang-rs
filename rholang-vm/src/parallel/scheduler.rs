@@ -1,4 +1,3 @@
-#![cfg(feature = "parallel-exec")]
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,

@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use rholang_parser::RholangParser;
-use validated::Validated;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
@@ -9,6 +8,7 @@ use std::time::Duration;
 use tokio::sync::oneshot;
 use tokio::task;
 use tokio::time::timeout;
+use validated::Validated;
 
 /// Represents an error that occurred during interpretation
 #[derive(Debug, Clone)]

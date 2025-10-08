@@ -11,6 +11,7 @@ pub enum Value {
 }
 
 impl Value {
+    #[allow(dead_code)]
     pub(crate) fn as_int(&self) -> Option<i64> {
         if let Value::Int(n) = self {
             Some(*n)

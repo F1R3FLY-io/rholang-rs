@@ -10,7 +10,7 @@ fn mk_add_process(a: i16, b: i16) -> Process {
     code.push(Instruction::unary(Opcode::PUSH_INT, b as u16));
     code.push(Instruction::nullary(Opcode::ADD));
     code.push(Instruction::nullary(Opcode::HALT));
-    
+
     Process::new(code, "test")
 }
 

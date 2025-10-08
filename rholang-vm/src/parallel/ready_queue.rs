@@ -1,4 +1,3 @@
-#![cfg(feature = "parallel-exec")]
 use crossbeam::queue::SegQueue;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;

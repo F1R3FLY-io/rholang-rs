@@ -1,4 +1,3 @@
-#![cfg(feature = "parallel-exec")]
 use crate::value::Value;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};

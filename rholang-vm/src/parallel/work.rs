@@ -1,4 +1,3 @@
-#![cfg(feature = "parallel-exec")]
 use crate::process::Process;
 use std::sync::Arc;
 

@@ -1,4 +1,3 @@
-#![cfg(feature = "parallel-exec")]
 use std::sync::Arc;
 
 use super::journal::{Effect, Journal};
@@ -84,9 +83,7 @@ impl VmParallel {
         self.journal
             .committed()
             .into_iter()
-            .filter_map(|e| match e {
-                Effect::Output { pid, value, .. } => Some((pid, value)),
-            })
+            .map(|Effect::Output { pid, value, .. }| (pid, value))
             .collect()
     }
 }
