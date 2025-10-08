@@ -24,7 +24,7 @@ pub fn help_message() -> String {
         + "\n  .reset or Ctrl+C - Interrupt current input (in multiline mode: clear buffer)"
         + "\n  .ps - List all running processes"
         + "\n  .kill <index> - Kill a running process by index"
-        + "\n  .quit - Exit the shell"
+        + "\n  .quit - Exit the rholang-shell"
 }
 
 /// Process a special command (starting with '.')
