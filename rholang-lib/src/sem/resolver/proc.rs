@@ -79,7 +79,7 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
         } => {
             resolve_unguarded(db, stack, target);
             let pat_id = db[pattern];
-            let pattern_scope = resolve_proc_pattern(db, stack, pat_id);
+            let pattern_scope = resolve_proc_pattern(db, stack, pat_id, pattern.span);
             let _ = db.add_scope(pat_id, pattern_scope); // free variables from this pattern should not be visible at the top level
         }
         Par { left, right } | BinaryExp { left, right, .. } => {
@@ -124,7 +124,15 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
                 stack: &mut BindingStack,
             ) {
                 let pat_id = db[pattern];
-                let pattern_scope = resolve_proc_pattern(db, stack, pat_id);
+                let pattern_scope = resolve_proc_pattern(
+                    db,
+                    stack,
+                    pat_id,
+                    SourceSpan {
+                        start: pattern.span.start,
+                        end: proc.span.end,
+                    },
+                );
 
                 let mut body = LexicallyScoped::free(db, stack, pat_id, pattern_scope);
                 body.with(|db, scoped_stack| resolve_rec(db, scoped_stack, proc))
@@ -159,6 +167,7 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
                 db: &mut SemanticDb<'a>,
                 decls: &[ast::NameDecl<'a>],
                 new: PID,
+                span: SourceSpan,
             ) -> ScopeInfo {
                 let binder_start = db.next_binder();
                 for (i, n) in decls.iter().enumerate() {
@@ -172,11 +181,11 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
                         source_position: n.id.pos,
                     });
                 }
-                ScopeInfo::new(binder_start, decls.len())
+                ScopeInfo::new(binder_start, decls.len(), span)
             }
 
             let current = db[this];
-            let locals = bind_decls(db, decls, current);
+            let locals = bind_decls(db, decls, current, this.span);
 
             let mut block = LexicallyScoped::new(db, stack, current, locals);
             block.with(|db, scoped_stack| resolve_rec(db, scoped_stack, proc))
@@ -189,7 +198,8 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
         } => {
             let current = db[this];
 
-            let mut for_scope = LexicallyScoped::<AllowDups, PopFree>::empty(db, stack, current);
+            let mut for_scope =
+                LexicallyScoped::<AllowDups, PopFree>::empty(db, stack, current, this.span);
             for_scope.with_shadowed(|db, scoped_stack, shadowed| {
                 // Resolves a "concurrent group" inside a parallel-for construct.
                 // Each concurrent group looks like: `pat1 <- v1 & pat2 <- v2 & ...`.
@@ -197,6 +207,7 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
                 resolve_sequence(
                     sequential,
                     current,
+                    this.span,
                     shadowed,
                     db,
                     scoped_stack,
@@ -227,7 +238,7 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
             let current = db[this];
             resolve_name(name, current, db, stack);
 
-            let vars = resolve_name_pattern(db, stack, current, formals, 0);
+            let vars = resolve_name_pattern(db, stack, current, this.span, formals, 0);
             let mut contract_body = LexicallyScoped::free(db, stack, current, vars);
             contract_body.with(|db, scoped_stack| resolve_rec(db, scoped_stack, body))
         }
@@ -254,7 +265,8 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
             //   (think let rec)
             //
             // In both modes, the `body` is resolved in the extended environment.
-            let mut let_scope = LexicallyScoped::<AllowDups, PopFree>::empty(db, stack, current);
+            let mut let_scope =
+                LexicallyScoped::<AllowDups, PopFree>::empty(db, stack, current, this.span);
 
             let_scope.with_shadowed(|db, scoped_stack, shadowed| {
                 if *concurrent {
@@ -266,7 +278,8 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
 
                     // Step 2: resolve all LHS patterns *together*.
                     let lhss = bindings.iter().map(|decl| &decl.lhs);
-                    let lhs_scope = resolve_concurrent_patterns(lhss, current, 0, db, scoped_stack);
+                    let lhs_scope =
+                        resolve_concurrent_patterns(lhss, current, this.span, 0, db, scoped_stack);
 
                     // Merge new binders into the environment (with duplicate checks).
                     scoped_stack.absorb_free(lhs_scope, db, shadowed);
@@ -275,6 +288,7 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
                     resolve_sequence(
                         bindings,
                         current,
+                        this.span,
                         shadowed,
                         db,
                         scoped_stack,
@@ -390,6 +404,7 @@ fn resolve_name<'a>(
 fn resolve_sequence<'a, G, Rhs, Lhs>(
     groups: G,
     current: PID,
+    span: SourceSpan,
     shadowed: &mut Vec<Shadowed>,
     db: &mut SemanticDb<'a>,
     stack: &mut BindingStack,
@@ -408,7 +423,7 @@ fn resolve_sequence<'a, G, Rhs, Lhs>(
         let lhs = resolve_rhs(group, db, stack);
 
         // Resolve LHS binders for this group.
-        let scope = resolve_concurrent_patterns(lhs, current, num_binders, db, stack);
+        let scope = resolve_concurrent_patterns(lhs, current, span, num_binders, db, stack);
 
         num_binders += scope.num_binders();
         stack.absorb_free(scope, db, shadowed);
@@ -418,6 +433,7 @@ fn resolve_sequence<'a, G, Rhs, Lhs>(
 fn resolve_concurrent_patterns<'a, P>(
     patterns: P,
     proc: PID,
+    span: SourceSpan,
     proc_var_index: usize,
     db: &mut SemanticDb<'a>,
     env: &mut BindingStack,
@@ -462,9 +478,15 @@ where
     let start = db.next_binder();
     patterns
         .into_iter()
-        .fold(ScopeInfo::ground(start), |mut acc, pattern| {
-            let pattern_scope =
-                resolve_name_pattern(db, env, proc, pattern, proc_var_index + acc.num_binders());
+        .fold(ScopeInfo::ground(start, span), |mut acc, pattern| {
+            let pattern_scope = resolve_name_pattern(
+                db,
+                env,
+                proc,
+                SourceSpan::default(),
+                pattern,
+                proc_var_index + acc.num_binders(),
+            );
             absorb_checking_dups(&mut acc, pattern_scope, db, proc);
             acc
         })

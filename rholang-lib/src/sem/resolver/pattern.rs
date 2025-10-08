@@ -8,6 +8,7 @@ pub(super) fn resolve_proc_pattern<'a>(
     db: &mut SemanticDb<'a>,
     env: &mut BindingStack,
     pid: PID,
+    span: SourceSpan,
 ) -> ScopeInfo {
     let pattern = db[pid];
     let first_binder = db.next_binder();
@@ -20,23 +21,23 @@ pub(super) fn resolve_proc_pattern<'a>(
         | StringLiteral(_)
         | UriLiteral(_)
         | SimpleType(_)
-        | ProcVar(Var::Wildcard) => ScopeInfo::ground(first_binder),
+        | ProcVar(Var::Wildcard) => ScopeInfo::ground(first_binder, span),
         ProcVar(Var::Id(id)) => {
             new_free(pid, *id, BinderKind::Proc, 0, db);
-            ScopeInfo::free_var(first_binder)
+            ScopeInfo::free_var(first_binder, span)
         }
         VarRef { kind, var } => match resolve_var_ref(*var, *kind, pid, db, env) {
-            Some((_, ref_binder)) => ScopeInfo::var_ref(first_binder, ref_binder),
+            Some((_, ref_binder)) => ScopeInfo::var_ref(first_binder, ref_binder, span),
             None => {
                 db.error(pid, ErrorKind::UnboundVariable, Some(var.pos));
-                ScopeInfo::ground(first_binder)
+                ScopeInfo::ground(first_binder, span)
             }
         },
         // go into recursive mode for complex
         _ => {
             let mut res = PatternResolver::new(pid, first_binder, 0);
             resolve_proc_pattern_rec(db, env, &mut res, pattern, 0);
-            res.take()
+            res.take(span)
         }
     }
 }
@@ -45,6 +46,7 @@ pub(super) fn resolve_name_pattern<'a>(
     db: &mut SemanticDb<'a>,
     env: &mut BindingStack,
     scope: PID,
+    span: SourceSpan,
     pattern: NamePattern<'a>,
     proc_var_index: usize,
 ) -> ScopeInfo {
@@ -55,28 +57,30 @@ pub(super) fn resolve_name_pattern<'a>(
     match pattern.kind() {
         NamesKind::Empty
         | NamesKind::SingleRemainder(Var::Wildcard)
-        | NamesKind::SingleName(Name::NameVar(Var::Wildcard)) => ScopeInfo::ground(first_binder),
+        | NamesKind::SingleName(Name::NameVar(Var::Wildcard)) => {
+            ScopeInfo::ground(first_binder, span)
+        }
         NamesKind::SingleRemainder(Var::Id(var)) => {
             new_free(scope, var, BinderKind::Proc, proc_var_index, db);
-            ScopeInfo::free_var(first_binder)
+            ScopeInfo::free_var(first_binder, span)
         }
         NamesKind::SingleName(Name::NameVar(Var::Id(var))) => {
             new_free(scope, *var, BinderKind::Name(None), proc_var_index, db);
-            ScopeInfo::free_var(first_binder)
+            ScopeInfo::free_var(first_binder, span)
         }
         NamesKind::SingleName(Name::Quote(ast::AnnProc {
             proc: ProcVar(var), ..
         })) => match var {
-            Var::Wildcard => ScopeInfo::ground(first_binder),
+            Var::Wildcard => ScopeInfo::ground(first_binder, span),
             Var::Id(id) => {
                 new_free(scope, *id, BinderKind::Proc, proc_var_index, db);
-                ScopeInfo::free_var(first_binder)
+                ScopeInfo::free_var(first_binder, span)
             }
         },
         _ => {
             let mut res = PatternResolver::new(scope, first_binder, proc_var_index);
             resolve_names(db, env, &mut res, pattern);
-            res.take()
+            res.take(span)
         }
     }
 }
@@ -457,8 +461,8 @@ impl PatternResolver {
         }
     }
 
-    fn take(self) -> ScopeInfo {
-        let mut result = ScopeInfo::from_parts(self.first_binder, self.free, self.refs);
+    fn take(self, span: SourceSpan) -> ScopeInfo {
+        let mut result = ScopeInfo::from_parts(self.first_binder, self.free, self.refs, span);
         result.set_uses(self.used);
         result
     }
