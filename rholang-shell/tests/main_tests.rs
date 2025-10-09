@@ -1,9 +1,7 @@
 use anyhow::Result;
 
 // Correctly import from the rholang-shell crate
-use rholang_shell::providers::{
-    FakeInterpreterProvider, InterpretationResult, InterpreterProvider,
-};
+use rholang_shell::providers::{FakeInterpreterProvider, InterpretationResult, InterpreterProvider};
 
 #[tokio::test]
 async fn test_interpreter_receives_commands() -> Result<()> {

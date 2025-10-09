@@ -24,6 +24,7 @@ clap = { workspace = true }
 bracket-parser = { workspace = true }
 rholang-parser = { path = "../rholang-parser" }
 validated = { workspace = true }
+atty = "0.2"
 
 
 [[example]]
@@ -33,3 +34,4 @@ path = "examples/process_examples.rs"
 [dev-dependencies]
 rstest = { workspace = true }
 async-std = { workspace = true }
+insta = "1.43.1"

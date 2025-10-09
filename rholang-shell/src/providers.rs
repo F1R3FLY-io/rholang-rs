@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use rholang_parser::RholangParser;
+use validated::Validated;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
@@ -8,7 +9,6 @@ use std::time::Duration;
 use tokio::sync::oneshot;
 use tokio::task;
 use tokio::time::timeout;
-use validated::Validated;
 
 /// Represents an error that occurred during interpretation
 #[derive(Debug, Clone)]
@@ -293,12 +293,9 @@ impl InterpreterProvider for RholangParserInterpreterProvider {
                 let parser = RholangParser::new();
                 let validated = parser.parse(&code_for_task);
                 match validated {
-                    Validated::Good(procs) => {
-                        // Ensure output contains the word "source" to satisfy tests
-                        InterpretationResult::Success(format!(
-                            "Parsed successfully: source ({} top-level procs)",
-                            procs.len()
-                        ))
+                    Validated::Good(_) => {
+                        // Print the full AST in the same format as golden tests (Debug pretty print)
+                        InterpretationResult::Success(format!("{:#?}", validated))
                     }
                     Validated::Fail(_failure) => {
                         // Return a parsing error without exposing internal details
