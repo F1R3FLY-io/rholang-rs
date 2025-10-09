@@ -126,8 +126,18 @@ impl<'a> SemanticDb<'a> {
     where
         P: Fn(ProcRef<'a>) -> bool,
     {
-        self.iter()
-            .find_map(|candidate| predicate(candidate.1).then_some(candidate))
+        self.iter().find(|candidate| predicate(candidate.1))
+    }
+
+    /// Returns an iterator over all process nodes satisfying the given predicate.
+    ///
+    /// This is useful when you expect multiple matches, e.g. all `for` comprehensions.
+    ///
+    pub fn filter_procs<P: 'a>(&self, predicate: P) -> impl Iterator<Item = (PID, ProcRef<'a>)>
+    where
+        P: Fn(ProcRef<'a>) -> bool,
+    {
+        self.iter().filter(move |candidate| predicate(candidate.1))
     }
 
     pub fn emit_diagnostic(&mut self, diagnostic: Diagnostic) {

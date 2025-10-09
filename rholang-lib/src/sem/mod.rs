@@ -585,3 +585,17 @@ impl<'a> DoubleEndedIterator for Captures<'a> {
 
 impl<'a> ExactSizeIterator for Captures<'a> {}
 impl<'a> FusedIterator for Captures<'a> {}
+
+#[cfg(test)]
+mod tests {
+    #[macro_export]
+    macro_rules! match_proc {
+        ($value:expr, $pat:pat => $body:expr) => {{
+            if let $pat = $value {
+                $body
+            } else {
+                panic!("unexpected AST structure: {:#?}", $value);
+            }
+        }};
+    }
+}
