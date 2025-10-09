@@ -75,6 +75,12 @@ impl Symbol {
     pub const DUMMY: Symbol = Symbol(u32::MAX);
 }
 
+impl Display for Symbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 /// Symbol occurence in the source code (used to mark variables)
 #[derive(Copy, Clone, Debug)]
 pub struct SymbolOccurence {
@@ -316,18 +322,16 @@ impl ScopeInfo {
         }
     }
 
-    pub fn captures(&self) -> impl DoubleEndedIterator<Item = BinderId> + ExactSizeIterator {
-        // SAFETY: fixed bit size will never exceed self.binder_start
-        let iter = self.captures.ones().map(|i| BinderId(i as u32));
-        WithLen::new(iter, self.num_captures())
+    pub fn captures(&self) -> Captures<'_> {
+        Captures::new(&self.captures)
     }
 
     pub fn num_free(&self) -> usize {
         self.free.count_ones()
     }
 
-    pub fn free(&self) -> FreeIter<'_> {
-        FreeIter::new(&self.free, self.binder_start.0)
+    pub fn free(&self) -> Free<'_> {
+        Free::new(&self.free, self.binder_start.0)
     }
 
     pub fn absorb(&mut self, rhs: ScopeInfo) {
@@ -378,9 +382,11 @@ impl ScopeInfo {
         }
 
         // Merge other metadata
-        self.free.extend_from_bitslice(&rhs.free);
-        self.uses.extend_from_bitslice(&rhs.uses);
-        self.num_binders += rhs.num_binders;
+        if rhs.num_binders() != 0 {
+            self.free.extend_from_bitslice(&rhs.free);
+            self.uses.extend_from_bitslice(&rhs.uses);
+            self.num_binders += rhs.num_binders;
+        }
     }
 }
 
@@ -481,12 +487,12 @@ fn stable_hasher() -> ahash::RandomState {
     ahash::RandomState::with_seeds(SEED0, SEED1, SEED2, SEED3)
 }
 
-pub struct FreeIter<'a> {
+pub struct Free<'a> {
     inner: bitvec::slice::IterOnes<'a, usize, Lsb0>,
     binder_start: u32,
 }
 
-impl<'a> FreeIter<'a> {
+impl<'a> Free<'a> {
     pub fn new(free: &'a BitVec, binder_start: u32) -> Self {
         Self {
             inner: free.iter_ones(),
@@ -502,13 +508,13 @@ impl<'a> FreeIter<'a> {
     }
 }
 
-impl Default for FreeIter<'_> {
+impl Default for Free<'_> {
     fn default() -> Self {
         Self::empty()
     }
 }
 
-impl<'a> Iterator for FreeIter<'a> {
+impl<'a> Iterator for Free<'a> {
     type Item = BinderId;
 
     #[inline]
@@ -523,7 +529,8 @@ impl<'a> Iterator for FreeIter<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for FreeIter<'a> {
+impl<'a> DoubleEndedIterator for Free<'a> {
+    #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         self.inner
             .next_back()
@@ -531,54 +538,64 @@ impl<'a> DoubleEndedIterator for FreeIter<'a> {
     }
 }
 
-impl<'a> ExactSizeIterator for FreeIter<'a> {}
-impl<'a> FusedIterator for FreeIter<'a> {}
+impl<'a> ExactSizeIterator for Free<'a> {}
+impl<'a> FusedIterator for Free<'a> {}
 
-struct WithLen<I> {
-    iter: I,
-    len: usize,
+pub struct Captures<'a> {
+    inner: fixedbitset::Ones<'a>,
+    current_len: usize,
 }
 
-impl<I> WithLen<I> {
-    pub fn new(iter: I, len: usize) -> Self {
-        Self { iter, len }
+impl<'a> Captures<'a> {
+    pub fn new(bitmap: &'a BitSet) -> Self {
+        Self {
+            inner: bitmap.ones(),
+            current_len: bitmap.count_ones(..),
+        }
     }
 }
 
-impl<I> Iterator for WithLen<I>
-where
-    I: Iterator,
-{
-    type Item = I::Item;
+impl<'a> Iterator for Captures<'a> {
+    type Item = BinderId;
 
-    #[inline(always)]
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let item = self.iter.next();
-        if item.is_some() {
-            self.len -= 1;
+        let id = self.inner.next().map(|i| BinderId(i as u32)); // SAFETY: fixed bit size is bounded
+        if id.is_some() {
+            self.current_len -= 1;
         }
-        item
+        id
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.len, Some(self.len))
+        (self.current_len, Some(self.current_len))
     }
 }
 
-impl<I> DoubleEndedIterator for WithLen<I>
-where
-    I: DoubleEndedIterator,
-{
-    #[inline(always)]
+impl<'a> DoubleEndedIterator for Captures<'a> {
+    #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        let item = self.iter.next_back();
-        if item.is_some() {
-            self.len -= 1;
+        let id = self.inner.next_back().map(|i| BinderId(i as u32)); // SAFETY: fixed bit size is bounded
+        if id.is_some() {
+            self.current_len -= 1;
         }
-        item
+        id
     }
 }
 
-impl<I> ExactSizeIterator for WithLen<I> where I: Iterator {}
+impl<'a> ExactSizeIterator for Captures<'a> {}
+impl<'a> FusedIterator for Captures<'a> {}
 
-impl<I> FusedIterator for WithLen<I> where I: FusedIterator {}
+#[cfg(test)]
+mod tests {
+    #[macro_export]
+    macro_rules! match_proc {
+        ($value:expr, $pat:pat => $body:expr) => {{
+            if let $pat = $value {
+                $body
+            } else {
+                panic!("unexpected AST structure: {:#?}", $value);
+            }
+        }};
+    }
+}
