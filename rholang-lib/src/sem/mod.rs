@@ -382,7 +382,11 @@ impl ScopeInfo {
         }
 
         // Merge other metadata
-        if rhs.num_binders() != 0 {
+        if self.num_binders == 0 {
+            self.free = rhs.free;
+            self.uses = rhs.uses;
+            self.num_binders = rhs.num_binders;
+        } else if rhs.num_binders() != 0 {
             self.free.extend_from_bitslice(&rhs.free);
             self.uses.extend_from_bitslice(&rhs.uses);
             self.num_binders += rhs.num_binders;
