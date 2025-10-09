@@ -10,8 +10,8 @@
 //! - Remainder pattern support
 
 use crate::sem::{BinderKind, SemanticDb, Symbol};
-use rholang_parser::ast::{self, AnnProc, Var};
 use rholang_parser::SourcePos;
+use rholang_parser::ast::{self, AnnProc, Var};
 use std::collections::HashSet;
 
 use super::errors::{ElaborationResult, ValidationError, ValidationResult};
@@ -124,9 +124,7 @@ impl<'a, 'ast> PatternAnalyzer<'a, 'ast> {
     /// Traverse a pattern recursively
     fn traverse_pattern(&mut self, pattern: AnnProc<'ast>) -> ElaborationResult<()> {
         self.current_depth += 1;
-        if self.current_depth > self.info.depth {
-            self.info.depth = self.current_depth;
-        }
+        self.info.depth = self.info.depth.max(self.current_depth);
 
         match pattern.proc {
             // Literals - valid in patterns
@@ -324,7 +322,11 @@ impl<'a, 'ast> PatternAnalyzer<'a, 'ast> {
                 // AND pattern - both sides must be satisfiable and compatible
                 self.check_pattern_satisfiability(*left)?;
                 self.check_pattern_satisfiability(*right)?;
-                // TODO: Check for contradictory constraints
+
+                // Note: Checking for contradictory constraints (e.g., x = 1 AND x = 2)
+                // requires type and value flow analysis, which will be implemented in
+                // Phase 4.1 (Type Consistency Checking). For now, we verify structural
+                // satisfiability only.
                 Ok(())
             }
 
@@ -346,9 +348,7 @@ impl<'a, 'ast> PatternAnalyzer<'a, 'ast> {
             }
 
             // Collections are satisfiable if their elements are
-            ast::Proc::Collection(collection) => {
-                self.check_collection_satisfiability(collection)
-            }
+            ast::Proc::Collection(collection) => self.check_collection_satisfiability(collection),
 
             // Parallel composition
             ast::Proc::Par { left, right } => {
@@ -441,11 +441,18 @@ impl<'a, 'ast> PatternVisitor<'ast> for PatternAnalyzer<'a, 'ast> {
 }
 
 /// Extract all variables from a pattern in for-comprehension bindings
+///
+/// If `from_quote` is true, the pattern comes from inside a `Name::Quote(@pattern)`,
+/// so we start with quote depth 1 (name context). Otherwise, start at quote depth 0 (proc context).
 pub fn extract_pattern_variables<'a, 'ast>(
     db: &'a SemanticDb<'ast>,
     pattern: AnnProc<'ast>,
+    from_quote: bool,
 ) -> ElaborationResult<Vec<PatternVariable>> {
     let mut analyzer = PatternAnalyzer::new(db);
+    if from_quote {
+        analyzer.quote_depth = 1; // Start in name context
+    }
     let info = analyzer.analyze_pattern(pattern)?;
     Ok(info.variables)
 }
@@ -478,7 +485,9 @@ mod tests {
     fn setup_test(code: &str) -> (AnnProc<'static>, SemanticDb<'static>) {
         let parser = Box::leak(Box::new(RholangParser::new()));
         let code_static: &'static str = Box::leak(code.to_string().into_boxed_str());
-        let ast = parser.parse(code_static).expect("Failed to parse test code");
+        let ast = parser
+            .parse(code_static)
+            .expect("Failed to parse test code");
         let ast_static = Box::leak(Box::new(ast));
 
         let mut db = SemanticDb::new();
@@ -590,7 +599,8 @@ mod tests {
     fn test_extract_pattern_variables() {
         let (proc, db) = setup_test("[x, y, z]");
 
-        let vars = extract_pattern_variables(&db, proc).unwrap();
+        // from_quote=false for proc-level pattern (not from Name::Quote)
+        let vars = extract_pattern_variables(&db, proc, false).unwrap();
 
         assert_eq!(vars.len(), 3);
         let var_names: Vec<_> = vars.iter().map(|v| db[v.symbol].to_string()).collect();

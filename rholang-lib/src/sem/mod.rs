@@ -49,7 +49,7 @@ pub use resolver::ResolverPass;
 
 pub type ProcRef<'a> = &'a ast::AnnProc<'a>;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PID(u32);
 
 impl Display for PID {

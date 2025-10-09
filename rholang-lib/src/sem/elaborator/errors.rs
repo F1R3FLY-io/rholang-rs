@@ -132,7 +132,7 @@ pub enum ElaborationWarning {
         symbol: crate::sem::Symbol,
     },
     /// Potentially inefficient pattern structure
-    InefficiientPattern {
+    InefficientPattern {
         pid: PID,
         position: Option<SourcePos>,
         suggestion: String,
@@ -266,7 +266,7 @@ impl ElaborationWarning {
             ElaborationWarning::UnusedPatternVariable { pid, position, .. } => {
                 Diagnostic::warning(*pid, WarningKind::UnusedVariable, *position)
             }
-            ElaborationWarning::InefficiientPattern { pid, position, .. } => {
+            ElaborationWarning::InefficientPattern { pid, position, .. } => {
                 Diagnostic::warning(*pid, WarningKind::UnusedVariable, *position)
             }
         }
@@ -374,7 +374,7 @@ impl fmt::Display for ElaborationWarning {
             ElaborationWarning::UnusedPatternVariable { .. } => {
                 write!(f, "Unused pattern variable")
             }
-            ElaborationWarning::InefficiientPattern { suggestion, .. } => {
+            ElaborationWarning::InefficientPattern { suggestion, .. } => {
                 write!(f, "Inefficient pattern: {}", suggestion)
             }
         }

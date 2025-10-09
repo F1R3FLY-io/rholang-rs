@@ -247,6 +247,23 @@ impl<'a> SemanticDb<'a> {
         self.proc_to_scope.iter()
     }
 
+    /// Returns an iterator over all for-comprehension processes in the database.
+    ///
+    /// Each item is a tuple of (PID, ProcRef) where the ProcRef points to a
+    /// `Proc::ForComprehension` node. The iteration order follows the indexing order.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// for (pid, proc_ref) in db.iter_for_comprehensions() {
+    ///     // Process each for-comprehension
+    /// }
+    /// ```
+    pub fn iter_for_comprehensions(&self) -> impl Iterator<Item = (PID, ProcRef<'a>)> + '_ {
+        self.iter()
+            .filter(|(_, proc_ref)| matches!(proc_ref.proc, ast::Proc::ForComprehension { .. }))
+    }
+
     /// Returns a slice of all binders introduced by the given scope.
     ///
     /// # Panics
