@@ -115,7 +115,7 @@ impl<'a> SemanticDb<'a> {
     /// Finds the first process node that matches the given predicate.
     ///
     /// This is a convenience for common queries like:
-    /// ```ignore
+    /// ```example
     /// db.find_proc(|p| matches!(p.proc, ast::Proc::ForComprehension { .. }))
     /// ```
     ///

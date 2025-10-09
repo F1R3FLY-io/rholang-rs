@@ -4,6 +4,7 @@ use crate::match_proc;
 
 use super::{
     BinderId, BinderKind, ErrorKind, FactPass, ProcRef, ResolverPass, SemanticDb, VarBinding,
+    WarningKind,
 };
 
 use rholang_parser::ast;
@@ -28,8 +29,7 @@ fn test_scope_nested<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'tes
         (root_binders, inner_scope)
     });
 
-    let free: Vec<BinderId> =
-        expect::free(db, vec![("map", BinderKind::Proc)], inner_scope).collect();
+    let [map] = expect::free(db, [("map", BinderKind::Proc)], inner_scope);
 
     expect::captures(&root_binders, inner_scope);
     expect::bound(
@@ -37,7 +37,7 @@ fn test_scope_nested<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'tes
         &vec![
             VarBinding::Free { index: 0 },      // @map in for
             VarBinding::Bound(root_binders[1]), // rtn in for
-            VarBinding::Bound(free[0]),         // map in map.get("auction_end")
+            VarBinding::Bound(map),             // map in map.get("auction_end")
             VarBinding::Bound(root_binders[0]), // anyone in [*anyone]
         ],
     );
@@ -79,16 +79,15 @@ fn test_pattern_many_names<'test>(tree: ProcRef<'test>, db: &'test mut SemanticD
         (root_binders, inner_scope)
     });
 
-    let inner_binders: Vec<BinderId> = expect::free(
+    let inner_binders = expect::free(
         db,
-        vec![
+        [
             ("blockNumber", BinderKind::Proc),
             ("timestamp", BinderKind::Proc),
             ("sender", BinderKind::Proc),
         ],
         inner_scope,
-    )
-    .collect();
+    );
 
     expect::captures(&root_binders[1..], inner_scope);
     expect::bound(
@@ -140,9 +139,8 @@ fn test_scope_deeply_nested<'test>(tree: ProcRef<'test>, db: &'test mut Semantic
     // find first inner for comprehension
     let first_inner_for_node = expect::node(db, expect::for_with_channel_match("PoSCh"));
     let first_for_scope = expect::scope(db, db[first_inner_for_node], 1);
-    let pos_in_for = expect::free(db, vec![("PoS", BinderKind::Proc)], first_for_scope)
-        .next()
-        .unwrap();
+    let [pos_in_for] = expect::free(db, [("PoS", BinderKind::Proc)], first_for_scope);
+
     // and then find the innermost new
     let (deployer_id, innermost_new_body) = match_proc!(first_inner_for_node.proc, ast::Proc::ForComprehension {
         receipts: _,
@@ -223,9 +221,7 @@ fn test_contract<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) 
         ..
     } => expect::scope(db, contract_node, 1));
 
-    let depth = expect::free(db, vec![("depth", BinderKind::Proc)], contract_scope)
-        .next()
-        .unwrap();
+    let [depth] = expect::free(db, [("depth", BinderKind::Proc)], contract_scope);
 
     let mut expected_bindings = vec![
         VarBinding::Bound(dupe),       // contract dupe
@@ -233,13 +229,96 @@ fn test_contract<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) 
         VarBinding::Bound(depth),      // if (depth <= 0)
     ];
     expected_bindings.extend(
-        std::iter::once(VarBinding::Bound(dupe))
-            .chain(std::iter::once(VarBinding::Bound(depth)))
+        [VarBinding::Bound(dupe), VarBinding::Bound(depth)]
+            .iter()
             .cycle()
             .take(20),
     );
 
     expect::bound_in_scope(db, &expected_bindings, contract_scope);
+
+    expect::no_warnings_or_errors(db);
+}
+
+#[test_rholang_code(
+    r#"
+new loop, primeCheck, stdoutAck(`rho:io:stdoutAck`) in {
+  contract loop(@x) = {
+    match x {
+      [] => Nil
+      [head ...tail] => {
+        new ret in {
+          for (_ <- ret) {
+            loop!(tail)
+          } | primeCheck!(head, *ret)
+        }
+      }
+    }
+  } |
+  contract primeCheck(@x, ret) = {
+    match x {
+      Nil => stdoutAck!("Nil", *ret)
+      ~{~Nil | ~Nil} => stdoutAck!("Prime", *ret)
+      _ => stdoutAck!("Composite", *ret)
+    }
+  } |
+  loop!([Nil, 7, 7 | 8, 9 | Nil, 9 | 10, Nil, 9])
+}"#
+)]
+fn test_match<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+    let root = db[tree];
+    let resolver = ResolverPass::new(root);
+    resolver.run(db);
+
+    let root_scope = expect::scope(db, root, 3);
+    let root_binders: Vec<BinderId> = root_scope.binder_range().collect();
+    let var_stdout_ack = root_binders[2];
+
+    let contract_loop = expect::node(db, expect::contract_with_name_match("loop"));
+
+    let contract_prime_check = expect::node(db, expect::contract_with_name_match("primeCheck"));
+    let prime_check_scope = expect::scope(db, contract_prime_check, 2);
+    let [_, var_ret] = expect::free(
+        db,
+        [("x", BinderKind::Proc), ("ret", BinderKind::Name(None))],
+        prime_check_scope,
+    );
+
+    let loop_cases = match_proc!(contract_loop.proc, ast::Proc::Contract {
+        body: ast::AnnProc {
+            proc: ast::Proc::Match { cases, .. }, ..
+        }, ..
+    } => cases);
+
+    match loop_cases.as_slice() {
+        [empty, head_tail] => {
+            expect::ground_scope(db, &empty.pattern);
+
+            let head_tail_scope = expect::scope(db, &head_tail.pattern, 2);
+            expect::captures(&[], head_tail_scope);
+        }
+        _ => panic!("Expected 2 cases in {contract_loop:#?}"),
+    }
+
+    let prime_check_cases = match_proc!(contract_prime_check.proc, ast::Proc::Contract {
+        body: ast::AnnProc {
+            proc: ast::Proc::Match { cases, .. }, ..
+        }, ..
+    } => cases);
+
+    match prime_check_cases.as_slice() {
+        [nil, nil_neg, wildcard] => {
+            let nil_scope = expect::scope(db, &nil.pattern, 0);
+            expect::captures(&vec![var_stdout_ack, var_ret], nil_scope);
+
+            let nil_neg_scope = expect::scope(db, &nil_neg.pattern, 0);
+            expect::captures(&vec![var_stdout_ack, var_ret], nil_neg_scope);
+
+            let wildcard_scope = expect::scope(db, &wildcard.pattern, 0);
+            expect::captures(&vec![var_stdout_ack, var_ret], wildcard_scope);
+        }
+        _ => panic!("Expected 3 cases in {contract_prime_check:#?}"),
+    }
 
     expect::no_warnings_or_errors(db);
 }
@@ -261,16 +340,15 @@ fn test_pattern_sequence<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<
     resolver.run(db);
 
     let root_scope = expect::scope(db, root, 3);
-    let contract_binders: Vec<BinderId> = expect::free(
+    let contract_binders = expect::free(
         db,
-        vec![
+        [
             ("get", BinderKind::Name(None)),
             ("set", BinderKind::Name(None)),
             ("state", BinderKind::Name(None)),
         ],
         root_scope,
-    )
-    .collect();
+    );
 
     let ((left_for_scope, left_for_body), (right_for_scope, right_for_body)) = match_proc!(tree.proc, ast::Proc::Contract {
         body:
@@ -305,15 +383,12 @@ fn test_pattern_sequence<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<
         ((left_for_scope, left_for_body), (right_for_scope, right_for_body))
     });
 
-    let left_free: Vec<BinderId> = expect::free(
+    let left_free = expect::free(
         db,
-        vec![("rtn", BinderKind::Name(None)), ("v", BinderKind::Proc)],
+        [("rtn", BinderKind::Name(None)), ("v", BinderKind::Proc)],
         left_for_scope,
-    )
-    .collect();
-    let right_free = expect::free(db, vec![("newValue", BinderKind::Proc)], right_for_scope)
-        .next()
-        .unwrap();
+    );
+    let right_free = expect::free(db, [("newValue", BinderKind::Proc)], right_for_scope);
 
     expect::bound_in_range(
         db,
@@ -334,7 +409,7 @@ fn test_pattern_sequence<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<
         db,
         &vec![
             VarBinding::Bound(contract_binders[2]), // state
-            VarBinding::Bound(right_free),          // newValue
+            VarBinding::Bound(right_free[0]),       // newValue
             // Cell is unbound (see below)
             VarBinding::Bound(contract_binders[0]), // get
             VarBinding::Bound(contract_binders[1]), // set
@@ -345,6 +420,476 @@ fn test_pattern_sequence<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<
 
     // for simplicity in this test we omitted declaration of 'Cell', so we expect it to be unbounded
     expect::error(db, ErrorKind::UnboundVariable, root);
+}
+
+#[test_rholang_code(
+    r#"new chan in { 
+  for (@{x!(P)}, @{for(y <- z) { y!(Q) }} <- chan) { z!(P) | x!(Q) }
+}"#
+)]
+fn test_pattern_within_pattern<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+    let root = db[tree];
+    let resolver = ResolverPass::new(root);
+    resolver.run(db);
+
+    let root_scope = expect::scope(db, root, 1);
+    let var_chan = expect::binder(db, "chan", root_scope);
+
+    let inner_for = match_proc!(tree.proc, ast::Proc::New { proc: inner_for, .. } => {
+        expect::scope(db, inner_for, 5)
+    });
+
+    let [var_x, var_p, var_z, var_q] = expect::free(
+        db,
+        [
+            ("x", BinderKind::Name(None)),
+            ("P", BinderKind::Proc),
+            ("z", BinderKind::Name(None)),
+            ("Q", BinderKind::Proc),
+        ],
+        inner_for,
+    );
+    let var_y = expect::binder(db, "y", inner_for);
+
+    expect::bound_in_scope(
+        db,
+        &[
+            // first pattern
+            VarBinding::Free { index: 0 }, // x
+            VarBinding::Free { index: 1 }, // P
+            // second pattern
+            VarBinding::Free { index: 3 }, // y
+            VarBinding::Free { index: 2 }, // z
+            VarBinding::Bound(var_y),
+            VarBinding::Free { index: 4 }, // Q
+            // source
+            VarBinding::Bound(var_chan),
+            // body
+            VarBinding::Bound(var_z),
+            VarBinding::Bound(var_p),
+            VarBinding::Bound(var_x),
+            VarBinding::Bound(var_q),
+        ],
+        inner_for,
+    );
+
+    expect::no_warnings_or_errors(db);
+}
+
+#[test_rholang_code(
+    r#"new chan in { 
+  for (@{x!(P)}, @{for(y <- z) { y!(Q) }} <- chan) { x!(P, Q, *y) }
+}"#
+)]
+fn test_pattern_within_pattern_scoping<'test>(
+    tree: ProcRef<'test>,
+    db: &'test mut SemanticDb<'test>,
+) {
+    let root = db[tree];
+    let resolver = ResolverPass::new(root);
+    resolver.run(db);
+
+    expect::error(
+        db,
+        ErrorKind::UnboundVariable,
+        |node: ProcRef<'test>| matches!(node.proc, ast::Proc::Eval { name: ast::Name::NameVar(ast::Var::Id(ast::Id { name: var, .. })) } if *var == "y"),
+    );
+}
+
+#[test_rholang_code(
+    r#"
+new x, y in {
+    // This reference to token is a pattern that binds
+    for (@token <- x) {
+        // This reference should not be binding.
+        // It says "if I get the same thing I got from x, do P"
+        for (@=token <- y) { token } 
+    }
+}"#
+)]
+fn test_var_ref<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+    let root = db[tree];
+    let resolver = ResolverPass::new(root);
+    resolver.run(db);
+
+    let root_scope = expect::scope(db, root, 2);
+    match_proc!(tree.proc,
+        ast::Proc::New {
+            decls: _,
+            proc:
+                top_for @ ast::AnnProc {
+                    proc:
+                        ast::Proc::ForComprehension {
+                            receipts: _,
+                            proc: bottom_for,
+                        },
+                    ..
+                },
+        } => {
+            let var_y = expect::binder(db, "y", root_scope);
+            let top_for_scope = expect::scope(db, top_for, 1);
+            let bottom_for_scope = expect::scope(db, bottom_for, 0);
+
+            let [var_token] = expect::free(db, [("token", BinderKind::Proc)], top_for_scope);
+
+            expect::bound_in_scope(
+                db,
+                &[
+                    VarBinding::Bound(var_token),
+                    VarBinding::Bound(var_y),
+                    VarBinding::Bound(var_token),
+                ],
+                bottom_for_scope,
+            );
+            expect::captures(&[var_y, var_token], bottom_for_scope);
+        }
+    );
+
+    expect::no_warnings_or_errors(db);
+}
+
+#[test_rholang_code(
+    r#"new port, table in {
+        for(@"get", @arg, ack <- port; @value <- @{arg | *table}) {
+            @{arg | *table}!(value) |
+            ack!(value)
+        }
+    }"#
+)]
+fn test_pattern_sequence_captures<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+    let root = db[tree];
+    let resolver = ResolverPass::new(root);
+    resolver.run(db);
+
+    let root_scope = expect::scope(db, root, 2);
+    match_proc!(tree.proc,
+        ast::Proc::New {
+            decls,
+            proc:
+                inner_for @ ast::AnnProc {
+                    proc: ast::Proc::ForComprehension { .. },
+                    ..
+                },
+        } => {
+            let root_binders: Vec<BinderId> = expect::name_decls(db, decls, root_scope).collect();
+
+            let for_scope = expect::scope(db, inner_for, 3);
+            let [var_arg, var_ack, var_value] = expect::free(
+                db,
+                [
+                    ("arg", BinderKind::Proc),
+                    ("ack", BinderKind::Name(None)),
+                    ("value", BinderKind::Proc),
+                ],
+                for_scope,
+            );
+
+            expect::bound_in_scope(
+                db,
+                &[
+                    // first pattern
+                    VarBinding::Free { index: 0 },      // @arg
+                    VarBinding::Free { index: 1 },      // ack
+                    VarBinding::Bound(root_binders[0]), // port
+                    // second pattern
+                    VarBinding::Free { index: 2 },      // @value
+                    VarBinding::Bound(var_arg),         // arg in @{ arg | *table }
+                    VarBinding::Bound(root_binders[1]), // table in @{ arg | *table }
+                    // body
+                    VarBinding::Bound(var_arg), // arg in @{ arg | *table }!(value)
+                    VarBinding::Bound(root_binders[1]), // table in @{ arg | *table }!(value)
+                    VarBinding::Bound(var_value), // value in @{ arg | *table }!(value)
+                    VarBinding::Bound(var_ack), // ack in ack!(value)
+                    VarBinding::Bound(var_value), // value in ack!(value)
+                ],
+                for_scope,
+            );
+            expect::captures(&root_binders, for_scope);
+        }
+    );
+
+    expect::no_warnings_or_errors(db);
+}
+
+#[test_rholang_code(
+    r#"new port, table in {
+        for(@"get", @arg, ack <- port & @value <- @{arg | *table}) {
+            @{arg | *table}!(value) |
+            ack!(value)
+        }
+    }"#
+)]
+fn test_pattern_concurrent_captures<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+    let root = db[tree];
+    let resolver = ResolverPass::new(root);
+    resolver.run(db);
+
+    expect::error(
+        db,
+        ErrorKind::UnboundVariable,
+        expect::proc_var_match("arg"),
+    );
+}
+
+#[test_rholang_code(
+    r#"new port in {
+        for(@"set", @arg1, @arg2, @{ for (@value <- @{arg1 | table}) { @{arg1 | table}!(value) | ack!(_) } } <- port) {
+            @{arg1 | table}!(arg2) |
+            ack!(true)
+        }
+    }"#
+)]
+fn test_pattern_within_pattern_captures<'test>(
+    tree: ProcRef<'test>,
+    db: &'test mut SemanticDb<'test>,
+) {
+    let root = db[tree];
+    let resolver = ResolverPass::new(root);
+    resolver.run(db);
+
+    let root_scope = expect::scope(db, root, 1);
+    match_proc!(tree.proc,
+        ast::Proc::New {
+            decls: _,
+            proc:
+                inner_for @ ast::AnnProc {
+                    proc: ast::Proc::ForComprehension { .. },
+                    ..
+                },
+        } => {
+            let var_port = expect::binder(db, "port", root_scope);
+
+            let for_scope = expect::scope(db, inner_for, 5);
+            let [var_arg1, var_arg2, var_table, var_ack] = expect::free(
+                db,
+                [
+                    ("arg1", BinderKind::Proc),
+                    ("arg2", BinderKind::Proc),
+                    ("table", BinderKind::Proc),
+                    ("ack", BinderKind::Name(None)),
+                ],
+                for_scope,
+            );
+            let var_value = expect::binder(db, "value", for_scope);
+
+            expect::bound_in_scope(
+                db,
+                &[
+                    // first pattern
+                    VarBinding::Free { index: 0 }, // @arg1
+                    // second pattern
+                    VarBinding::Free { index: 1 }, // @arg2
+                    // third pattern
+                    VarBinding::Free { index: 3 }, // @value in (@value <- @{arg1 | table})
+                    VarBinding::Bound(var_arg1), // @arg1 in (@value <- @{arg1 | table})
+                    VarBinding::Free { index: 2 }, // table in (@value <- @{arg1 | table})
+                    VarBinding::Bound(var_arg1), //  @arg1 in @{arg1 | table}!(@value) | P
+                    VarBinding::Bound(var_table), // table in @{arg1 | table}!(@value) | P
+                    VarBinding::Bound(var_value), // @value in @{arg1 | table}!(@value) | P
+                    VarBinding::Free { index: 4 }, //  ack in ack(_)
+                    // source
+                    VarBinding::Bound(var_port),
+                    // body
+                    VarBinding::Bound(var_arg1), // arg1 in @{ arg1 | table }!(arg2)
+                    VarBinding::Bound(var_table), // table in @{ arg1 | table }!(arg2)
+                    VarBinding::Bound(var_arg2), // arg2 in @{ arg1 | table }!(arg2)
+                    VarBinding::Bound(var_ack),    // ack in ack!(true)
+                ],
+                for_scope,
+            );
+            expect::captures(&[var_port], for_scope);
+
+    });
+
+    expect::no_warnings_or_errors(db);
+}
+
+#[test_rholang_code(
+    r#"new port1, port2, port3 in {
+        for(@"set", @arg1 <- port1 & @arg2 <- port2 & @{ for (@value <- @{arg1 | table}) { @{arg1 | table}!(value) | ack!(_) } } <- port3) {
+            @{arg1 | table}!(arg2) |
+            ack!(true)
+        }
+    }"#
+)]
+fn test_pattern_within_pattern_concurrent_scoping<'test>(
+    tree: ProcRef<'test>,
+    db: &'test mut SemanticDb<'test>,
+) {
+    let root = db[tree];
+    let resolver = ResolverPass::new(root);
+    resolver.run(db);
+    match_proc!(tree.proc,
+        ast::Proc::New {
+            decls: _,
+            proc:
+                inner_for @ ast::AnnProc {
+                    proc: ast::Proc::ForComprehension { .. },
+                    ..
+                },
+        } => {
+            let for_scope = expect::scope(db, inner_for, 6);
+            let [var_arg1_1, _, _, _, _] = expect::free(
+                db,
+                [
+                    ("arg1", BinderKind::Proc),
+                    ("arg2", BinderKind::Proc),
+                    ("arg1", BinderKind::Proc),
+                    ("table", BinderKind::Proc),
+                    ("ack", BinderKind::Name(None)),
+                ],
+                for_scope,
+            );
+            let _ = expect::binder(db, "value", for_scope);
+
+            let var_arg1_1_info = db[var_arg1_1];
+            expect::error(db, ErrorKind::DuplicateVarDef { original: var_arg1_1_info.into() }, inner_for);
+    });
+}
+
+#[test_rholang_code(
+    r#"new port in {
+        for(@"set", @arg1, @arg2 <- port ; @{ for (@value <- @{arg1 | table}) { @{arg1 | table}!(value) | ack!(_) } } <- port) {
+            @{arg1 | table}!(arg2) |
+            ack!(true)
+        }
+    }"#
+)]
+fn test_pattern_within_pattern_sequential_captures<'test>(
+    tree: ProcRef<'test>,
+    db: &'test mut SemanticDb<'test>,
+) {
+    let root = db[tree];
+    let resolver = ResolverPass::new(root);
+    resolver.run(db);
+
+    let root_scope = expect::scope(db, root, 1);
+    match_proc!(tree.proc,
+        ast::Proc::New {
+            decls: _,
+            proc:
+                inner_for @ ast::AnnProc {
+                    proc: ast::Proc::ForComprehension { .. },
+                    ..
+                },
+        } => {
+            let var_port = expect::binder(db, "port", root_scope);
+
+            let for_scope = expect::scope(db, inner_for, 6);
+            let [var_arg1_1, var_arg2, var_arg1_2, var_table, var_ack] = expect::free(
+                db,
+                [
+                    ("arg1", BinderKind::Proc),
+                    ("arg2", BinderKind::Proc),
+                    ("arg1", BinderKind::Proc),
+                    ("table", BinderKind::Proc),
+                    ("ack", BinderKind::Name(None)),
+                ],
+                for_scope,
+            );
+            let var_value = expect::binder(db, "value", for_scope);
+
+            expect::bound_in_scope(
+                db,
+                &[
+                    // first pattern
+                    VarBinding::Free { index: 0 }, // @arg1
+                    VarBinding::Free { index: 1 }, // @arg2
+                    VarBinding::Bound(var_port),   // source
+                    // second pattern
+                    VarBinding::Free { index: 4 }, // @value in (@value <- @{arg1 | table})
+                    VarBinding::Free { index: 2 }, // @arg1 in (@value <- @{arg1 | table})
+                    VarBinding::Free { index: 3 }, // table in (@value <- @{arg1 | table})
+                    VarBinding::Bound(var_arg1_2), // @arg1 in @{arg1 | table}!(@value) | P
+                    VarBinding::Bound(var_table),  // table in @{arg1 | table}!(@value) | P
+                    VarBinding::Bound(var_value),  // @value in @{arg1 | table}!(@value) | P
+                    VarBinding::Free { index: 5 }, // ack in ack(_)
+                    VarBinding::Bound(var_port),   // source
+                    // body
+                    VarBinding::Bound(var_arg1_2), // arg1 in @{ arg1 | table }!(arg2)
+                    VarBinding::Bound(var_table),  // table in @{ arg1 | table }!(arg2)
+                    VarBinding::Bound(var_arg2),   // arg2 in @{ arg1 | table }!(arg2)
+                    VarBinding::Bound(var_ack),    // ack in ack!(true)
+                ],
+                for_scope,
+            );
+            expect::captures(&[var_port], for_scope);
+
+            // arg1 is shadowed
+            let var_arg1_1_info = db[var_arg1_1];
+            expect::warning(db, WarningKind::ShadowedVar { original: var_arg1_1_info.into() }, inner_for);
+    });
+}
+
+#[test_rholang_code(
+    r#"new port in {
+        for(@"set", @arg1, @arg2 <- port ; @{ for (@value <- @{=arg1 | table}) { @{=arg1 | table}!(value) | ack!(_) } } <- port) {
+            @{arg1 | table}!(arg2) |
+            ack!(true)
+        }
+    }"#
+)]
+fn test_pattern_within_pattern_with_var_ref<'test>(
+    tree: ProcRef<'test>,
+    db: &'test mut SemanticDb<'test>,
+) {
+    let root = db[tree];
+    let resolver = ResolverPass::new(root);
+    resolver.run(db);
+
+    let root_scope = expect::scope(db, root, 1);
+    match_proc!(tree.proc,
+        ast::Proc::New {
+            decls: _,
+            proc:
+                inner_for @ ast::AnnProc {
+                    proc: ast::Proc::ForComprehension { .. },
+                    ..
+                },
+        } => {
+            let var_port = expect::binder(db, "port", root_scope);
+
+            let for_scope = expect::scope(db, inner_for, 5);
+            let [var_arg1, var_arg2, var_table, var_ack] = expect::free(
+                db,
+                [
+                    ("arg1", BinderKind::Proc),
+                    ("arg2", BinderKind::Proc),
+                    ("table", BinderKind::Proc),
+                    ("ack", BinderKind::Name(None)),
+                ],
+                for_scope,
+            );
+            let var_value = expect::binder(db, "value", for_scope);
+
+            expect::bound_in_scope(
+                db,
+                &[
+                    // first pattern
+                    VarBinding::Free { index: 0 }, // @arg1
+                    VarBinding::Free { index: 1 }, // @arg2
+                    VarBinding::Bound(var_port),   // source
+                    // second pattern
+                    VarBinding::Free { index: 3 }, // @value in (@value <- @{=arg1 | table})
+                    VarBinding::Bound(var_arg1),   // arg1 in (@value <- @{=arg1 | table})
+                    VarBinding::Free { index: 2 }, // table in (@value <- @{=arg1 | table})
+                    VarBinding::Bound(var_arg1),   // @arg1 in @{=arg1 | table}!(@value) | P
+                    VarBinding::Bound(var_table),  // table in @{arg1 | table}!(@value) | P
+                    VarBinding::Bound(var_value),  // @value in @{arg1 | table}!(@value) | P
+                    VarBinding::Free { index: 4 }, // ack in ack(_)
+                    VarBinding::Bound(var_port),   // source
+                    // body
+                    VarBinding::Bound(var_arg1),   // arg1 in @{ arg1 | table }!(arg2)
+                    VarBinding::Bound(var_table),  // table in @{ arg1 | table }!(arg2)
+                    VarBinding::Bound(var_arg2),   // arg2 in @{ arg1 | table }!(arg2)
+                    VarBinding::Bound(var_ack),    // ack in ack!(true)
+                ],
+                for_scope,
+            );
+            expect::captures(&[var_port], for_scope);
+    });
+
+    expect::no_warnings_or_errors(db);
 }
 
 #[test_rholang_code(
@@ -397,7 +942,7 @@ fn test_error_proc_name<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'
 mod expect {
     use crate::sem::{
         Binder, BinderId, BinderKind, DiagnosticKind, ErrorKind, PID, ProcRef, ScopeInfo,
-        SemanticDb, Symbol, VarBinding,
+        SemanticDb, Symbol, VarBinding, WarningKind,
     };
     use pretty_assertions::{assert_eq, assert_matches};
     use rholang_parser::ast;
@@ -421,6 +966,10 @@ mod expect {
             })
         }
         move |node: ProcRef<'a>| matches!(node.proc, ast::Proc::ForComprehension { receipts, .. } if has_source_name(receipts, expected))
+    }
+
+    pub fn contract_with_name_match<'a>(expected: &str) -> impl ProcMatch<'a> {
+        move |node: ProcRef<'a>| matches!(node.proc, ast::Proc::Contract { name: ast::Name::NameVar(ast::Var::Id(ast::Id { name, ..})), .. } if *name ==expected)
     }
 
     impl ProcMatch<'_> for PID {
@@ -479,7 +1028,13 @@ mod expect {
             expected_binders,
             "expect::scope {expected:#?} with {expected_binders} binder(s)"
         );
+
         expected
+    }
+
+    pub(super) fn ground_scope<'test, M: ProcMatch<'test>>(db: &'test SemanticDb<'test>, m: M) {
+        let expected = scope(db, m, 0);
+        assert!(expected.is_ground(), "expect::ground_scope {expected:#?}");
     }
 
     pub(super) fn name_decls<'test>(
@@ -512,17 +1067,13 @@ mod expect {
         scope.binder_range()
     }
 
-    pub(super) fn free<'test, E>(
+    pub(super) fn free<'test, const N: usize>(
         db: &'test SemanticDb,
-        names_kinds: E,
+        names_kinds: [(&'test str, BinderKind); N],
         scope: &ScopeInfo,
-    ) -> impl Iterator<Item = BinderId> + ExactSizeIterator
-    where
-        E: IntoIterator<Item = (&'test str, BinderKind)>,
-        E::IntoIter: ExactSizeIterator,
-    {
-        let expected = names_kinds.into_iter();
-        let expected_len = expected.len();
+    ) -> [BinderId; N] {
+        let expected = names_kinds.iter();
+        let expected_len = N;
 
         let free = db.free_binders_of(scope);
         assert_eq!(
@@ -531,8 +1082,9 @@ mod expect {
             "expect::free {scope:#?} with {expected_len} binder(s)"
         );
 
-        free.zip(expected).enumerate().map(
-            |(i, ((bid, binder), (expected_name, expected_kind)))| {
+        free.zip(expected)
+            .enumerate()
+            .map(|(i, ((bid, binder), (expected_name, expected_kind)))| {
                 assert_matches!(
                     binder,
                     Binder {
@@ -541,13 +1093,15 @@ mod expect {
                         scope: _,
                         index: _,
                         source_position: _
-                    } if symbol_matches_string(db, *name, expected_name) && *kind == expected_kind,
+                    } if symbol_matches_string(db, *name, expected_name) && kind == expected_kind,
                     "expect::free {expected_name} with {expected_kind:#?} at {i}"
                 );
 
                 bid
-            },
-        )
+            })
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap()
     }
 
     pub(super) fn captures(expected: &[BinderId], scope: &ScopeInfo) {
@@ -601,6 +1155,19 @@ mod expect {
                     && m.matches(db, diagnostic.pid)
             })
             .or_else(|| panic!("expect::error #{expected:#?} in {:#?}", db.diagnostics()));
+    }
+
+    pub(super) fn warning<'test, M: ProcMatch<'test>>(
+        db: &'test SemanticDb<'test>,
+        expected: WarningKind,
+        m: M,
+    ) {
+        db.warnings()
+            .find(move |diagnostic| {
+                matches!(diagnostic.kind, DiagnosticKind::Warning(actual) if actual == expected)
+                    && m.matches(db, diagnostic.pid)
+            })
+            .or_else(|| panic!("expect::warning #{expected:#?} in {:#?}", db.diagnostics()));
     }
 
     fn symbol_matches_string(db: &SemanticDb, sym: Symbol, expected: &str) -> bool {
