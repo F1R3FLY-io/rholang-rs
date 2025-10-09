@@ -1,5 +1,7 @@
 use test_macros::test_rholang_code;
 
+use crate::match_proc;
+
 use super::{
     BinderId, BinderKind, ErrorKind, FactPass, ProcRef, ResolverPass, SemanticDb, VarBinding,
 };
@@ -20,32 +22,27 @@ fn test_scope_nested<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'tes
     resolver.run(db);
 
     let root_scope = expect::scope(db, root, 2);
-    if let ast::Proc::New {
-        proc: inner_for,
-        decls,
-    } = tree.proc
-    {
+    let (root_binders, inner_scope) = match_proc!(tree.proc, ast::Proc::New { proc: inner_for, decls } => {
         let root_binders: Vec<BinderId> = expect::name_decls(db, decls, root_scope).collect();
-
         let inner_scope = expect::scope(db, inner_for, 1);
-        let free: Vec<BinderId> =
-            expect::free(db, vec![("map", BinderKind::Proc)], inner_scope).collect();
+        (root_binders, inner_scope)
+    });
 
-        expect::captures(&root_binders, inner_scope);
-        expect::bound(
-            db,
-            &vec![
-                VarBinding::Free { index: 0 },      // @map in for
-                VarBinding::Bound(root_binders[1]), // rtn in for
-                VarBinding::Bound(free[0]),         // map in map.get("auction_end")
-                VarBinding::Bound(root_binders[0]), // anyone in [*anyone]
-            ],
-        );
+    let free: Vec<BinderId> =
+        expect::free(db, vec![("map", BinderKind::Proc)], inner_scope).collect();
 
-        expect::no_warnings_or_errors(db);
-    } else {
-        panic!("unexpected AST structure: {tree:#?}");
-    }
+    expect::captures(&root_binders, inner_scope);
+    expect::bound(
+        db,
+        &vec![
+            VarBinding::Free { index: 0 },      // @map in for
+            VarBinding::Bound(root_binders[1]), // rtn in for
+            VarBinding::Bound(free[0]),         // map in map.get("auction_end")
+            VarBinding::Bound(root_binders[0]), // anyone in [*anyone]
+        ],
+    );
+
+    expect::no_warnings_or_errors(db);
 }
 
 #[test_rholang_code(
@@ -65,7 +62,7 @@ fn test_pattern_many_names<'test>(tree: ProcRef<'test>, db: &'test mut SemanticD
     resolver.run(db);
 
     let root_scope = expect::scope(db, root, 3);
-    if let ast::Proc::New {
+    let (root_binders, inner_scope) = match_proc!(tree.proc, ast::Proc::New {
         proc:
             ast::AnnProc {
                 proc:
@@ -76,44 +73,43 @@ fn test_pattern_many_names<'test>(tree: ProcRef<'test>, db: &'test mut SemanticD
                 ..
             },
         decls,
-    } = tree.proc
-    {
+    } => {
         let root_binders: Vec<BinderId> = expect::name_decls(db, decls, root_scope).collect();
         let inner_scope = expect::scope(db, inner_for, 3);
-        let inner_binders: Vec<BinderId> = expect::free(
-            db,
-            vec![
-                ("blockNumber", BinderKind::Proc),
-                ("timestamp", BinderKind::Proc),
-                ("sender", BinderKind::Proc),
-            ],
-            inner_scope,
-        )
-        .collect();
+        (root_binders, inner_scope)
+    });
 
-        expect::captures(&root_binders[1..], inner_scope);
-        expect::bound(
-            db,
-            &vec![
-                VarBinding::Bound(root_binders[0]), // blockData in blockData!(*retCh)
-                VarBinding::Bound(root_binders[1]), // retCh in blockData!(*retCh)
-                VarBinding::Free { index: 0 },      // @blockNumber in for
-                VarBinding::Free { index: 1 },      // @timestamp in for
-                VarBinding::Free { index: 2 },      // @sender in for
-                VarBinding::Bound(root_binders[1]), // retCh in for
-                VarBinding::Bound(root_binders[2]), // stdout in for body
-                VarBinding::Bound(inner_binders[0]), // blockNumber in for body
-                VarBinding::Bound(root_binders[2]), // stdout in for body
-                VarBinding::Bound(inner_binders[1]), // timestamp in for body
-                VarBinding::Bound(root_binders[2]), // stdout in for body
-                VarBinding::Bound(inner_binders[2]), // sender in for body
-            ],
-        );
+    let inner_binders: Vec<BinderId> = expect::free(
+        db,
+        vec![
+            ("blockNumber", BinderKind::Proc),
+            ("timestamp", BinderKind::Proc),
+            ("sender", BinderKind::Proc),
+        ],
+        inner_scope,
+    )
+    .collect();
 
-        expect::no_warnings_or_errors(db);
-    } else {
-        panic!("unexpected AST structure: {tree:#?}");
-    }
+    expect::captures(&root_binders[1..], inner_scope);
+    expect::bound(
+        db,
+        &vec![
+            VarBinding::Bound(root_binders[0]), // blockData in blockData!(*retCh)
+            VarBinding::Bound(root_binders[1]), // retCh in blockData!(*retCh)
+            VarBinding::Free { index: 0 },      // @blockNumber in for
+            VarBinding::Free { index: 1 },      // @timestamp in for
+            VarBinding::Free { index: 2 },      // @sender in for
+            VarBinding::Bound(root_binders[1]), // retCh in for
+            VarBinding::Bound(root_binders[2]), // stdout in for body
+            VarBinding::Bound(inner_binders[0]), // blockNumber in for body
+            VarBinding::Bound(root_binders[2]), // stdout in for body
+            VarBinding::Bound(inner_binders[1]), // timestamp in for body
+            VarBinding::Bound(root_binders[2]), // stdout in for body
+            VarBinding::Bound(inner_binders[2]), // sender in for body
+        ],
+    );
+
+    expect::no_warnings_or_errors(db);
 }
 
 #[test_rholang_code(
@@ -148,7 +144,7 @@ fn test_scope_deeply_nested<'test>(tree: ProcRef<'test>, db: &'test mut Semantic
         .next()
         .unwrap();
     // and then find the innermost new
-    if let ast::Proc::ForComprehension {
+    let (deployer_id, innermost_new_body) = match_proc!(first_inner_for_node.proc, ast::Proc::ForComprehension {
         receipts: _,
         proc:
             ast::AnnProc {
@@ -167,34 +163,31 @@ fn test_scope_deeply_nested<'test>(tree: ProcRef<'test>, db: &'test mut Semantic
                     },
                 ..
             },
-    } = first_inner_for_node.proc
-    {
+    } => {
         let inner_new_scope = expect::scope(db, innermost_node, 1);
+        expect::captures(&vec![topmost_retch, pos_in_for], inner_new_scope);
         let deployer_id = expect::name_decls(db, innermost_decls, inner_new_scope)
             .next()
             .unwrap();
+        (deployer_id, innermost_new_body)
+    });
 
-        // and now we can query the body of innermost new for bindings
-        expect::bound_in_range(
-            db,
-            &vec![
-                // in @PoS!("bond", *deployerId, 100, *retCh)
-                VarBinding::Bound(pos_in_for),
-                VarBinding::Bound(deployer_id),
-                VarBinding::Bound(topmost_retch),
-                // in for(@(true, message) <- retCh) { P }
-                VarBinding::Free { index: 0 },
-                VarBinding::Bound(topmost_retch),
-                // in for body
-                VarBinding::Bound(topmost_stdout),
-            ],
-            innermost_new_body,
-        );
-
-        expect::captures(&vec![topmost_retch, pos_in_for], inner_new_scope);
-    } else {
-        panic!("unexpected AST structure: {first_inner_for_node:#?}");
-    }
+    // and now we can query the body of innermost new for bindings
+    expect::bound_in_range(
+        db,
+        &vec![
+            // in @PoS!("bond", *deployerId, 100, *retCh)
+            VarBinding::Bound(pos_in_for),
+            VarBinding::Bound(deployer_id),
+            VarBinding::Bound(topmost_retch),
+            // in for(@(true, message) <- retCh) { P }
+            VarBinding::Free { index: 0 },
+            VarBinding::Bound(topmost_retch),
+            // in for body
+            VarBinding::Bound(topmost_stdout),
+        ],
+        innermost_new_body,
+    );
 
     expect::no_warnings_or_errors(db);
 }
@@ -217,7 +210,7 @@ fn test_contract<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) 
     let root_scope = expect::scope(db, root, 1);
     let dupe = expect::binder(db, "dupe", root_scope);
 
-    if let ast::Proc::New {
+    let contract_scope = match_proc!(tree.proc, ast::Proc::New {
         proc:
             ast::AnnProc {
                 proc:
@@ -228,29 +221,25 @@ fn test_contract<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) 
                 ..
             },
         ..
-    } = tree.proc
-    {
-        let contract_scope = expect::scope(db, contract_node, 1);
-        let depth = expect::free(db, vec![("depth", BinderKind::Proc)], contract_scope)
-            .next()
-            .unwrap();
+    } => expect::scope(db, contract_node, 1));
 
-        let mut expected_bindings = vec![
-            VarBinding::Bound(dupe),       // contract dupe
-            VarBinding::Free { index: 0 }, // @depth
-            VarBinding::Bound(depth),      // if (depth <= 0)
-        ];
-        expected_bindings.extend(
-            std::iter::once(VarBinding::Bound(dupe))
-                .chain(std::iter::once(VarBinding::Bound(depth)))
-                .cycle()
-                .take(20),
-        );
+    let depth = expect::free(db, vec![("depth", BinderKind::Proc)], contract_scope)
+        .next()
+        .unwrap();
 
-        expect::bound_in_scope(db, &expected_bindings, contract_scope);
-    } else {
-        panic!("unexpected AST structure: {tree:#?}");
-    }
+    let mut expected_bindings = vec![
+        VarBinding::Bound(dupe),       // contract dupe
+        VarBinding::Free { index: 0 }, // @depth
+        VarBinding::Bound(depth),      // if (depth <= 0)
+    ];
+    expected_bindings.extend(
+        std::iter::once(VarBinding::Bound(dupe))
+            .chain(std::iter::once(VarBinding::Bound(depth)))
+            .cycle()
+            .take(20),
+    );
+
+    expect::bound_in_scope(db, &expected_bindings, contract_scope);
 
     expect::no_warnings_or_errors(db);
 }
@@ -283,7 +272,7 @@ fn test_pattern_sequence<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<
     )
     .collect();
 
-    if let ast::Proc::Contract {
+    let ((left_for_scope, left_for_body), (right_for_scope, right_for_body)) = match_proc!(tree.proc, ast::Proc::Contract {
         body:
             ast::AnnProc {
                 proc:
@@ -310,51 +299,49 @@ fn test_pattern_sequence<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<
                 ..
             },
         ..
-    } = tree.proc
-    {
+    } => {
         let left_for_scope = expect::scope(db, left, 2);
-        let left_free: Vec<BinderId> = expect::free(
-            db,
-            vec![("rtn", BinderKind::Name(None)), ("v", BinderKind::Proc)],
-            left_for_scope,
-        )
-        .collect();
-
         let right_for_scope = expect::scope(db, right, 1);
-        let right_free = expect::free(db, vec![("newValue", BinderKind::Proc)], right_for_scope)
-            .next()
-            .unwrap();
+        ((left_for_scope, left_for_body), (right_for_scope, right_for_body))
+    });
 
-        expect::bound_in_range(
-            db,
-            &vec![
-                VarBinding::Bound(left_free[0]),        // rtn
-                VarBinding::Bound(left_free[1]),        // v
-                VarBinding::Bound(contract_binders[2]), // state
-                VarBinding::Bound(left_free[1]),        // v
-                // Cell is unbound (see below)
-                VarBinding::Bound(contract_binders[0]), // get
-                VarBinding::Bound(contract_binders[1]), // set
-                VarBinding::Bound(contract_binders[2]), // state
-            ],
-            left_for_body,
-        );
+    let left_free: Vec<BinderId> = expect::free(
+        db,
+        vec![("rtn", BinderKind::Name(None)), ("v", BinderKind::Proc)],
+        left_for_scope,
+    )
+    .collect();
+    let right_free = expect::free(db, vec![("newValue", BinderKind::Proc)], right_for_scope)
+        .next()
+        .unwrap();
 
-        expect::bound_in_range(
-            db,
-            &vec![
-                VarBinding::Bound(contract_binders[2]), // state
-                VarBinding::Bound(right_free),          // newValue
-                // Cell is unbound (see below)
-                VarBinding::Bound(contract_binders[0]), // get
-                VarBinding::Bound(contract_binders[1]), // set
-                VarBinding::Bound(contract_binders[2]), // state
-            ],
-            right_for_body,
-        );
-    } else {
-        panic!("unexpected AST structure: {tree:#?}");
-    }
+    expect::bound_in_range(
+        db,
+        &vec![
+            VarBinding::Bound(left_free[0]),        // rtn
+            VarBinding::Bound(left_free[1]),        // v
+            VarBinding::Bound(contract_binders[2]), // state
+            VarBinding::Bound(left_free[1]),        // v
+            // Cell is unbound (see below)
+            VarBinding::Bound(contract_binders[0]), // get
+            VarBinding::Bound(contract_binders[1]), // set
+            VarBinding::Bound(contract_binders[2]), // state
+        ],
+        left_for_body,
+    );
+
+    expect::bound_in_range(
+        db,
+        &vec![
+            VarBinding::Bound(contract_binders[2]), // state
+            VarBinding::Bound(right_free),          // newValue
+            // Cell is unbound (see below)
+            VarBinding::Bound(contract_binders[0]), // get
+            VarBinding::Bound(contract_binders[1]), // set
+            VarBinding::Bound(contract_binders[2]), // state
+        ],
+        right_for_body,
+    );
 
     // for simplicity in this test we omitted declaration of 'Cell', so we expect it to be unbounded
     expect::error(db, ErrorKind::UnboundVariable, root);
