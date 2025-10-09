@@ -34,7 +34,7 @@ fn test_scope_nested<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'tes
     expect::captures(&root_binders, inner_scope);
     expect::bound(
         db,
-        &vec![
+        &[
             VarBinding::Free { index: 0 },      // @map in for
             VarBinding::Bound(root_binders[1]), // rtn in for
             VarBinding::Bound(map),             // map in map.get("auction_end")
@@ -92,7 +92,7 @@ fn test_pattern_many_names<'test>(tree: ProcRef<'test>, db: &'test mut SemanticD
     expect::captures(&root_binders[1..], inner_scope);
     expect::bound(
         db,
-        &vec![
+        &[
             VarBinding::Bound(root_binders[0]), // blockData in blockData!(*retCh)
             VarBinding::Bound(root_binders[1]), // retCh in blockData!(*retCh)
             VarBinding::Free { index: 0 },      // @blockNumber in for
@@ -163,7 +163,7 @@ fn test_scope_deeply_nested<'test>(tree: ProcRef<'test>, db: &'test mut Semantic
             },
     } => {
         let inner_new_scope = expect::scope(db, innermost_node, 1);
-        expect::captures(&vec![topmost_retch, pos_in_for], inner_new_scope);
+        expect::captures(&[topmost_retch, pos_in_for], inner_new_scope);
         let deployer_id = expect::name_decls(db, innermost_decls, inner_new_scope)
             .next()
             .unwrap();
@@ -173,7 +173,7 @@ fn test_scope_deeply_nested<'test>(tree: ProcRef<'test>, db: &'test mut Semantic
     // and now we can query the body of innermost new for bindings
     expect::bound_in_range(
         db,
-        &vec![
+        &[
             // in @PoS!("bond", *deployerId, 100, *retCh)
             VarBinding::Bound(pos_in_for),
             VarBinding::Bound(deployer_id),
@@ -309,13 +309,13 @@ fn test_match<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
     match prime_check_cases.as_slice() {
         [nil, nil_neg, wildcard] => {
             let nil_scope = expect::scope(db, &nil.pattern, 0);
-            expect::captures(&vec![var_stdout_ack, var_ret], nil_scope);
+            expect::captures(&[var_stdout_ack, var_ret], nil_scope);
 
             let nil_neg_scope = expect::scope(db, &nil_neg.pattern, 0);
-            expect::captures(&vec![var_stdout_ack, var_ret], nil_neg_scope);
+            expect::captures(&[var_stdout_ack, var_ret], nil_neg_scope);
 
             let wildcard_scope = expect::scope(db, &wildcard.pattern, 0);
-            expect::captures(&vec![var_stdout_ack, var_ret], wildcard_scope);
+            expect::captures(&[var_stdout_ack, var_ret], wildcard_scope);
         }
         _ => panic!("Expected 3 cases in {contract_prime_check:#?}"),
     }
@@ -392,7 +392,7 @@ fn test_pattern_sequence<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<
 
     expect::bound_in_range(
         db,
-        &vec![
+        &[
             VarBinding::Bound(left_free[0]),        // rtn
             VarBinding::Bound(left_free[1]),        // v
             VarBinding::Bound(contract_binders[2]), // state
@@ -407,7 +407,7 @@ fn test_pattern_sequence<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<
 
     expect::bound_in_range(
         db,
-        &vec![
+        &[
             VarBinding::Bound(contract_binders[2]), // state
             VarBinding::Bound(right_free[0]),       // newValue
             // Cell is unbound (see below)
@@ -420,6 +420,134 @@ fn test_pattern_sequence<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<
 
     // for simplicity in this test we omitted declaration of 'Cell', so we expect it to be unbounded
     expect::error(db, ErrorKind::UnboundVariable, root);
+}
+
+#[test_rholang_code(r#"
+new orExample, stdout(`rho:io:stdout`) in {
+  contract orExample(@record) = {
+    match record {
+     {{"name" : {name /\ String},  "age": {age /\ {Int \/ String}}}} => stdout!(["Hello, ", name, " aged ", age])
+    }
+  } |
+  orExample!({"name" : "Joe", "age": 40}) |
+  orExample!({"name": "Bob", "age": "41"})
+}"#)]
+fn test_connectives<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+    let root = db[tree];
+    let resolver = ResolverPass::new(root);
+    resolver.run(db);
+
+    let root_scope = expect::scope(db, root, 2);
+    let root_binders: Vec<BinderId> = root_scope.binder_range().collect();
+    let var_stdout = root_binders[1];
+
+    let contract = expect::node(db, expect::contract_with_name_match("orExample"));
+
+    let match_cases = match_proc!(contract.proc, ast::Proc::Contract {
+        body: ast::AnnProc {
+            proc: ast::Proc::Match { cases, .. }, ..
+        }, ..
+    } => cases);
+
+    match match_cases.as_slice() {
+        [case] => {
+            let case_scope = expect::scope(db, &case.pattern, 2);
+            let [name, age] = expect::free(
+                db,
+                [("name", BinderKind::Proc), ("age", BinderKind::Proc)],
+                case_scope,
+            );
+
+            expect::bound_in_scope(
+                db,
+                &[
+                    VarBinding::Free { index: 0 },
+                    VarBinding::Free { index: 1 },
+                    VarBinding::Bound(var_stdout),
+                    VarBinding::Bound(name),
+                    VarBinding::Bound(age),
+                ],
+                case_scope,
+            );
+        }
+        _ => panic!("Expected 1 case in {contract:#?}"),
+    }
+
+    expect::no_warnings_or_errors(db);
+}
+
+#[test_rholang_code(
+    r#"
+new helloNameAge, getOlder, stdout(`rho:io:stdout`) in {
+  contract helloNameAge(@{@"name"!(name) | @"age"!(age) | _}) = {
+    stdout!(["Hello, ", name, " aged ", age])
+  } |
+  contract getOlder(@{rest /\ {@"name"!(_) | _} | @"age"!(age) }, ret) = {
+    ret!(@"age"!(age + 1) | rest)
+  } |
+  getOlder!(@"name"!("Joe") | @"age"!(39), *helloNameAge)
+}"#
+)]
+fn test_pattern_recursive<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+    let root = db[tree];
+    let resolver = ResolverPass::new(root);
+    resolver.run(db);
+
+    let root_scope = expect::scope(db, root, 3);
+    let root_binders: Vec<BinderId> = root_scope.binder_range().collect();
+
+    let first_contract = expect::node(db, expect::contract_with_name_match("helloNameAge"));
+    let first_contract_scope = expect::scope(db, first_contract, 2);
+    let [name1, age1] = expect::free(
+        db,
+        [("name", BinderKind::Proc), ("age", BinderKind::Proc)],
+        first_contract_scope,
+    );
+
+    let second_contract = expect::node(db, expect::contract_with_name_match("getOlder"));
+    let second_contract_scope = expect::scope(db, second_contract, 3);
+    let [rest, age2, ret] = expect::free(
+        db,
+        [
+            ("rest", BinderKind::Proc),
+            ("age", BinderKind::Proc),
+            ("ret", BinderKind::Name(None)),
+        ],
+        second_contract_scope,
+    );
+
+    expect::bound_in_scope(
+        db,
+        &[
+            VarBinding::Bound(root_binders[1]), // contract name
+            // contract arguments
+            VarBinding::Free { index: 0 },
+            VarBinding::Free { index: 1 },
+            // body
+            VarBinding::Bound(root_binders[2]), // stdout
+            VarBinding::Bound(name1),
+            VarBinding::Bound(age1),
+        ],
+        first_contract_scope,
+    );
+
+    expect::bound_in_scope(
+        db,
+        &[
+            VarBinding::Bound(root_binders[0]), // contract name
+            // contract arguments
+            VarBinding::Free { index: 0 },
+            VarBinding::Free { index: 1 },
+            VarBinding::Free { index: 2 },
+            // body
+            VarBinding::Bound(ret),
+            VarBinding::Bound(age2),
+            VarBinding::Bound(rest),
+        ],
+        second_contract_scope,
+    );
+
+    expect::no_warnings_or_errors(db);
 }
 
 #[test_rholang_code(

@@ -115,6 +115,22 @@ impl<'a> Proc<'a> {
     pub fn ann(&'a self, span: SourceSpan) -> AnnProc<'a> {
         AnnProc { proc: self, span }
     }
+
+    pub fn is_ground(&self) -> bool {
+        match self {
+            Proc::Nil
+            | Proc::Unit
+            | Proc::BoolLiteral(_)
+            | Proc::LongLiteral(_)
+            | Proc::StringLiteral(_)
+            | Proc::UriLiteral(_)
+            | Proc::SimpleType(_)
+            | Proc::ProcVar(Var::Wildcard)
+            | Proc::Bad => true,
+            Proc::Collection(col) if col.is_empty() => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -126,6 +142,10 @@ pub struct AnnProc<'ast> {
 impl<'a> AnnProc<'a> {
     pub fn iter_preorder_dfs(&'a self) -> impl Iterator<Item = &'a Self> {
         PreorderDfsIter::<16>::new(self)
+    }
+
+    pub fn is_ground(&self) -> bool {
+        self.proc.is_ground()
     }
 }
 
@@ -506,6 +526,24 @@ impl<'a> Collection<'a> {
             | Collection::Set { remainder, .. }
             | Collection::Map { remainder, .. } => *remainder,
             Collection::Tuple(_) => None,
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            Collection::List {
+                elements,
+                remainder,
+            }
+            | Collection::Set {
+                elements,
+                remainder,
+            } => elements.is_empty() && remainder.is_none(),
+            Collection::Map {
+                elements,
+                remainder,
+            } => elements.is_empty() && remainder.is_none(),
+            Collection::Tuple(_) => false,
         }
     }
 }

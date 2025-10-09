@@ -13,15 +13,11 @@ pub(super) fn resolve_proc_pattern<'a>(
     let pattern = db[pid];
     let first_binder = db.next_binder();
     // shortcut, we can return right away for simple patterns
-    match pattern.proc {
-        Nil
-        | Unit
-        | BoolLiteral(_)
-        | LongLiteral(_)
-        | StringLiteral(_)
-        | UriLiteral(_)
-        | SimpleType(_)
-        | ProcVar(Var::Wildcard) => ScopeInfo::ground(first_binder, span),
+    let pattern_proc = pattern.proc;
+    if pattern_proc.is_ground() {
+        return ScopeInfo::ground(first_binder, span);
+    }
+    match pattern_proc {
         ProcVar(Var::Id(id)) => {
             new_free(pid, *id, BinderKind::Proc, 0, db);
             ScopeInfo::free_var(first_binder, span)
@@ -60,23 +56,24 @@ pub(super) fn resolve_name_pattern<'a>(
         | NamesKind::SingleName(Name::NameVar(Var::Wildcard)) => {
             ScopeInfo::ground(first_binder, span)
         }
-        NamesKind::SingleRemainder(Var::Id(var)) => {
-            new_free(scope, var, BinderKind::Proc, proc_var_index, db);
-            ScopeInfo::free_var(first_binder, span)
-        }
         NamesKind::SingleName(Name::NameVar(Var::Id(var))) => {
             new_free(scope, *var, BinderKind::Name(None), proc_var_index, db);
             ScopeInfo::free_var(first_binder, span)
         }
+        NamesKind::SingleName(Name::Quote(quoted)) if quoted.is_ground() => {
+            ScopeInfo::ground(first_binder, span)
+        }
         NamesKind::SingleName(Name::Quote(ast::AnnProc {
-            proc: ProcVar(var), ..
-        })) => match var {
-            Var::Wildcard => ScopeInfo::ground(first_binder, span),
-            Var::Id(id) => {
-                new_free(scope, *id, BinderKind::Proc, proc_var_index, db);
-                ScopeInfo::free_var(first_binder, span)
-            }
-        },
+            proc: ProcVar(Var::Id(id)),
+            ..
+        })) => {
+            new_free(scope, *id, BinderKind::Proc, proc_var_index, db);
+            ScopeInfo::free_var(first_binder, span)
+        }
+        NamesKind::SingleRemainder(Var::Id(var)) => {
+            new_free(scope, var, BinderKind::Proc, proc_var_index, db);
+            ScopeInfo::free_var(first_binder, span)
+        }
         _ => {
             let mut res = PatternResolver::new(scope, first_binder, proc_var_index);
             resolve_names(db, env, &mut res, pattern);
