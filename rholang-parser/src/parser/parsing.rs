@@ -645,9 +645,7 @@ pub(super) fn node_to_ast<'ast>(
                 kind!("var_ref") => {
                     let (var_ref_kind_node, var_node) = get_left_and_right(&node);
 
-                    let kind = get_first_child(&var_ref_kind_node).kind();
-
-                    let var_ref_kind = match kind {
+                    let var_ref_kind = match get_node_value(&var_ref_kind_node, source) {
                         "=" => VarRefKind::Proc,
                         "=*" => VarRefKind::Name,
                         _ => unreachable!("var_ref_kind is either '=' or '=*'"),
