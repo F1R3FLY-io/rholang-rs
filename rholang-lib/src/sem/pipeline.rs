@@ -1,7 +1,7 @@
 use super::{DiagnosticPass, FactPass, Pass, SemanticDb};
 use as_any::Downcast;
 use nonempty_collections::NEVec;
-use std::{borrow::Cow, fmt};
+use std::{borrow::Cow, fmt, num::NonZeroUsize};
 
 pub struct Pipeline {
     passes: Vec<Box<dyn Pass>>,
@@ -48,7 +48,7 @@ impl Pipeline {
 
             // Try DiagnosticGroup
             if let Some(diag_group) = pass.as_any().downcast_ref::<DiagnosticGroup>() {
-                let diags = diag_group.run(db);
+                let diags = diag_group.run_async(db).await;
                 all_diags.extend(diags);
                 continue;
             }
@@ -142,6 +142,10 @@ impl DiagnosticGroup {
 
     /// Run all diagnostics concurrently
     async fn run_async<'d>(&self, db: &SemanticDb<'d>) -> Vec<super::Diagnostic> {
+        if self.passes.len() == NonZeroUsize::MIN {
+            return self.passes.first().run(db);
+        }
+
         let mut all = Vec::new();
         let (_, results) = async_scoped::TokioScope::scope_and_block(|scope| {
             for pass in &self.passes {
@@ -163,9 +167,9 @@ impl DiagnosticGroup {
 
 impl Pass for DiagnosticGroup {
     fn name(&self) -> Cow<'static, str> {
-        let len = self.passes.len().get(); // NonZeroUsize → usize
+        let nz_len = self.passes.len();
 
-        if len == 1 {
+        if nz_len == NonZeroUsize::MIN {
             Cow::Owned(format!("DiagnosticGroup[{}]", self.passes.first().name()))
         } else {
             let joined = self
@@ -174,7 +178,7 @@ impl Pass for DiagnosticGroup {
                 .map(|p| p.name())
                 .collect::<Vec<_>>()
                 .join(", ");
-            Cow::Owned(format!("DiagnosticGroup({len}): [{}]", joined))
+            Cow::Owned(format!("DiagnosticGroup({nz_len}): [{}]", joined))
         }
     }
 }
