@@ -23,7 +23,7 @@ pub(super) fn resolve_proc_pattern<'a>(
             ScopeInfo::free_var(first_binder, span)
         }
         VarRef { kind, var } => match resolve_var_ref(*var, *kind, pid, db, env) {
-            Some((_, ref_binder)) => ScopeInfo::var_ref(first_binder, ref_binder, span),
+            Some(ref_binder) => ScopeInfo::var_ref(first_binder, ref_binder, span),
             None => {
                 db.error(pid, ErrorKind::UnboundVariable, Some(var.pos));
                 ScopeInfo::ground(first_binder, span)
@@ -489,7 +489,7 @@ impl PatternResolver {
         expects_name: bool,
         db: &mut SemanticDb<'b>,
         check_scope: bool,
-    ) -> Option<(SymbolOccurence, BinderId)> {
+    ) -> Option<BinderId> {
         let sym = db.intern(var.name);
         if let Some(binder) = self.env.lookup(sym) {
             if !check_scope || self.in_scope(binder) {
@@ -504,7 +504,7 @@ impl PatternResolver {
                     db.map_symbol_to_binder(occ, binder, expects_name, self.id),
                     "bug: pattern variable {var} already bound!!!"
                 );
-                return Some((occ, binder));
+                return Some(binder);
             }
         }
         None
@@ -515,7 +515,7 @@ impl PatternResolver {
         var: ast::Id,
         expects_name: bool,
         db: &mut SemanticDb<'b>,
-    ) -> Option<(SymbolOccurence, BinderId)> {
+    ) -> Option<BinderId> {
         self.__internal_resolve(var, expects_name, db, true)
     }
 
@@ -526,7 +526,6 @@ impl PatternResolver {
         db: &mut SemanticDb<'a>,
     ) -> BinderId {
         self.resolve_pattern_var(var, kind != BinderKind::Proc, db)
-            .map(|(_, binder)| binder)
             .unwrap_or_else(|| self.introduce_free(var, kind, db))
     }
 
@@ -536,12 +535,12 @@ impl PatternResolver {
         kind: ast::VarRefKind,
         db: &mut SemanticDb<'a>,
         lex_env: &mut BindingStack,
-    ) -> Option<(SymbolOccurence, BinderId)> {
+    ) -> Option<BinderId> {
         self.__internal_resolve(var, kind == ast::VarRefKind::Name, db, false)
             .or_else(|| {
-                let (occ, binder) = resolve_var_ref(var, kind, self.id, db, lex_env)?;
+                let binder = resolve_var_ref(var, kind, self.id, db, lex_env)?;
                 self.refs.grow_and_insert(binder.0 as usize);
-                Some((occ, binder))
+                Some(binder)
             })
     }
 
