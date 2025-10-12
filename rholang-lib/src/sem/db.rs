@@ -119,6 +119,22 @@ impl<'a> SemanticDb<'a> {
         }
     }
 
+    pub fn push_diagnostics<D>(&mut self, diagnostics: D)
+    where
+        D: IntoIterator<Item = Diagnostic>,
+    {
+        if self.has_errors {
+            self.diagnostics.extend(diagnostics);
+            return;
+        }
+
+        let old_len = self.diagnostics.len();
+        self.diagnostics.extend(diagnostics);
+        self.has_errors = self.diagnostics[old_len..]
+            .iter()
+            .any(|d| matches!(d.kind, DiagnosticKind::Error(_)));
+    }
+
     pub fn error(&mut self, pid: PID, kind: ErrorKind, pos: Option<SourcePos>) {
         self.emit_diagnostic(Diagnostic::error(pid, kind, pos));
     }
@@ -193,7 +209,7 @@ impl<'a> SemanticDb<'a> {
     }
 
     /// Returns an iterator over the free binders introduced by the given process
-    pub fn free_of(&self, proc: PID) -> FreeIter {
+    pub fn free_of(&self, proc: PID) -> FreeIter<'_> {
         self.get_scope(proc)
             .map(|scope| scope.free())
             .unwrap_or_default()
