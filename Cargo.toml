@@ -5,16 +5,17 @@ members = [
     "rholang-parser",
     "rholang-tree-sitter-proc-macro",
     "rholang-shell",
+    "rholang-lib"
 ]
 
 [workspace.dependencies]
-# Used by: rholang-shell, rholang-parser, rholang-jni-bridge
+# Used by: rholang-shell, rholang-jni-bridge
 anyhow = "1.0.98"
 
 # Used by: rholang-shell
 async-trait = "0.1.88"
 
-# General purpose, used mostly by rholang-parser
+# General purpose, used mostly by librho
 bitvec = "1.0.1"
 
 # Used by: rholang-shell
@@ -50,10 +51,10 @@ tree-sitter-language = "0.1.5"
 # Used by: rholang-parser
 validated = "1.0.0"
 
-# Used by: rholang-parser, rholang-jni-bridge
+# Used by: rholang-jni-bridge
 serde = { version = "1.0.188", features = ["derive"] }
 
-# Used by: rholang-parser, rholang-jni-bridge
+# Used by: rholang-jni-bridge
 serde_json = "1.0.107"
 
 # Used by: rholang-jni-bridge
