@@ -991,6 +991,152 @@ fn test_pattern_within_pattern_with_var_ref<'test>(
     expect::no_warnings_or_errors(db);
 }
 
+#[test_rholang_code(r#"
+new boardMembers, executeProposal, proposals, treasuryBalance in {
+  contract executeProposal(@proposalIndex, ret) = {
+    for (@currentBoardMembers <- boardMembers & @currentProposals <- proposals) {
+      let proposal = currentProposals.get(proposalIndex);
+          approvalCount = proposal.get("approvals").size() 
+       in if (approvalCount > currentBoardMembers.size() / 2) {
+            for (@balance <- treasuryBalance) {
+              if (balance >= proposal.get("amount")) {
+                let updatedBalance = balance - proposal.get("amount") 
+                in { treasuryBalance!(updatedBalance) | ret!("Proposal executed successfully.") }
+              } else {
+                ret!("Insufficient funds in the treasury.")
+              }
+            }
+          } else {
+            ret!("Not enough approvals to execute the proposal.")
+          }
+    }
+  }
+}"#, pipeline = pipeline)]
+fn test_let<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+    let root = db[tree];
+    let root_scope = expect::scope(db, root, 4);
+
+    let (root_binders, contract_node) = match_proc!(tree.proc,
+        ast::Proc::New { decls, proc } => {
+            let root_binders: Vec<BinderId> = expect::name_decls(db, decls, root_scope).collect();
+            (root_binders, proc)
+        }
+    );
+    let var_treasury_balance = root_binders[3];
+
+    let contract_scope = expect::scope(db, contract_node, 2);
+    let [var_index, var_ret] = expect::free(
+        db,
+        [
+            ("proposalIndex", BinderKind::Proc),
+            ("ret", BinderKind::Name(None)),
+        ],
+        contract_scope,
+    );
+
+    let for_node = match_proc!(contract_node.proc, ast::Proc::Contract { body, .. } => body);
+    let for_scope = expect::scope(db, for_node, 2);
+    let [var_current_mems, var_current_props] = expect::free(
+        db,
+        [
+            ("currentBoardMembers", BinderKind::Proc),
+            ("currentProposals", BinderKind::Proc),
+        ],
+        for_scope,
+    );
+
+    let (let_node, inner_for_node) = match_proc!(for_node.proc,
+        ast::Proc::ForComprehension {
+            proc:
+                body @ ast::AnnProc {
+                    proc:
+                        ast::Proc::Let {
+                            body:
+                                ast::AnnProc {
+                                    proc: ast::Proc::IfThenElse { if_true, .. },
+                                    ..
+                                },
+                            ..
+                        },
+                    ..
+                },
+            ..
+        } => (body, if_true)
+    );
+
+    let let_scope = expect::scope(db, let_node, 2);
+    let [var_proposal, var_approval_cnt] = expect::free(
+        db,
+        [
+            ("proposal", BinderKind::Proc),
+            ("approvalCount", BinderKind::Proc),
+        ],
+        let_scope,
+    );
+    let inner_for_scope = expect::scope(db, inner_for_node, 1);
+    let [var_balance] = expect::free(db, [("balance", BinderKind::Proc)], inner_for_scope);
+
+    let inner_let_node = match_proc!(inner_for_node.proc,
+        ast::Proc::ForComprehension {
+            proc:
+                ast::AnnProc {
+                    proc: ast::Proc::IfThenElse { if_true, .. },
+                    ..
+                },
+            ..
+        } => if_true
+    );
+    let inner_let_scope = expect::scope(db, inner_let_node, 1);
+    let [var_updated_balance] =
+        expect::free(db, [("updatedBalance", BinderKind::Proc)], inner_let_scope);
+
+    expect::captures(
+        &[var_treasury_balance, var_ret, var_proposal, var_balance],
+        inner_let_scope,
+    );
+
+    expect::bound_in_scope(
+        db,
+        &[
+            // -- first let
+            // proposal = currentProposals.get(proposalIndex);
+            VarBinding::Free { index: 0 },
+            VarBinding::Bound(var_current_props),
+            VarBinding::Bound(var_index),
+            // approvalCount = proposal.get("approvals").size()
+            VarBinding::Free { index: 1 },
+            VarBinding::Bound(var_proposal),
+            // -- in
+            // approvalCount > currentBoardMembers.size() / 2)
+            VarBinding::Bound(var_approval_cnt),
+            VarBinding::Bound(var_current_mems),
+            // -- -- for
+            // @balance <- treasuryBalance
+            VarBinding::Free { index: 0 },
+            VarBinding::Bound(var_treasury_balance),
+            // balance >= proposal.get("amount")
+            VarBinding::Bound(var_balance),
+            VarBinding::Bound(var_proposal),
+            // -- -- second let
+            // updatedBalance = balance - proposal.get("amount")
+            VarBinding::Free { index: 0 },
+            VarBinding::Bound(var_balance),
+            VarBinding::Bound(var_proposal),
+            // -- -- in
+            // treasuryBalance!(updatedBalance) | ret!("Proposal executed successfully.")
+            VarBinding::Bound(var_treasury_balance),
+            VarBinding::Bound(var_updated_balance),
+            VarBinding::Bound(var_ret),
+            // --
+            VarBinding::Bound(var_ret),
+            VarBinding::Bound(var_ret),
+        ],
+        let_scope,
+    );
+
+    expect::no_warnings_or_errors(db);
+}
+
 #[test_rholang_code(
     r#"
 new anyone, unused_rtn in {
