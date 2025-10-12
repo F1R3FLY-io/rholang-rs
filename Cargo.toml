@@ -3,20 +3,23 @@ resolver = "3"
 members = [
     "rholang-tree-sitter",
     "rholang-parser",
-    "rholang-tree-sitter-proc-macro"
-, "rholang-lib", "test-macros"]
+    "rholang-tree-sitter-proc-macro",
+    "rholang-shell",
+    "rholang-lib",
+    "test-macros"
+]
 
 [workspace.dependencies]
 # Used by: librho
 ahash = "0.8.12"
 
-# Used by: shell, rholang-jni-bridge
+# Used by: rholang-shell, rholang-jni-bridge
 anyhow = "1.0.98"
 
 # General purpose for dynamic metaprogramming
 as-any = "0.3.2"
 
-# Used by: shell, librho
+# Used by: rholang-shell, librho
 async-scoped = { version = "0.9.0", features = ["use-tokio"] }
 async-trait = "0.1.89"
 
@@ -25,23 +28,23 @@ bitvec = "1.0.1"
 indexmap = "2.11.0"
 intmap = "3.1.2"
 
-# Used by: shell, librho
+# Used by: rholang-shell, librho
 parking_lot = { version = "0.12.5" }
 tokio = { version = "1.47.1", features = ["rt", "rt-multi-thread", "test-util", "parking_lot", "sync"] }
 
-# Used by: shell
+# Used by: rholang-shell
 rustyline-async = "0.4.6"
 
-# Used by: shell, rholang-parser
+# Used by: rholang-shell, rholang-parser
 rstest = "0.25.0"
 
-# Used by: shell
+# Used by: rholang-shell
 clap = { version = "4.5.40", features = ["derive"] }
 
-# Used by: shell
+# Used by: rholang-shell
 async-std = { version = "1.13.1", features = ["attributes"] }
 
-# Used by: shell
+# Used by: rholang-shell
 bracket-parser = "0.1.0"
 
 # Library for benchmarking
@@ -51,7 +54,7 @@ divan = "0.1.21"
 smallvec = { version = "1.15.1", features = ["union", "const_generics", "const_new", "may_dangle"] }
 
 # Used by: rholang-parser, rholang-tree-sitter
-tree-sitter = "0.25.9"
+tree-sitter = "0.25.10"
 
 # Used by: rholang-tree-sitter
 tree-sitter-language = "0.1.5"

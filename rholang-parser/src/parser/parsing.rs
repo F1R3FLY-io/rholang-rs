@@ -42,6 +42,8 @@ pub(super) fn node_to_ast<'ast>(
     let mut errors = Vec::new();
     let mut proc_stack = ProcStack::new();
     let mut cont_stack = Vec::with_capacity(32);
+    // sometimes a small temporary stack is needed - allocate it here so it is re-used
+    let mut temp_cont_stack = Vec::new();
     let mut node = *start_node;
 
     'parse: loop {
@@ -273,8 +275,7 @@ pub(super) fn node_to_ast<'ast>(
                             cont_stack.push(K::EvalList(collection_node.walk()));
                         }
                         kind!("map") => {
-                            let mut temp_cont_stack =
-                                Vec::with_capacity(collection_node.named_child_count() * 2);
+                            temp_cont_stack.reserve(collection_node.named_child_count() * 2);
                             let arity = eval_named_pairs(
                                 &collection_node,
                                 kind!("key_value_pair"),
@@ -403,7 +404,7 @@ pub(super) fn node_to_ast<'ast>(
                     let proc_node = get_field(&node, field!("proc"));
 
                     let mut rs = SmallVec::with_capacity(receipts_node.named_child_count());
-                    let mut temp_cont_stack = Vec::with_capacity(rs.capacity() * 2);
+                    temp_cont_stack.reserve(rs.capacity() * 2);
 
                     let mut total_len = 0;
 
@@ -510,8 +511,7 @@ pub(super) fn node_to_ast<'ast>(
                     let expression_node = get_field(&node, field!("expression"));
                     let cases_node = get_field(&node, field!("cases"));
 
-                    let mut temp_cont_stack =
-                        Vec::with_capacity(2 * cases_node.named_child_count());
+                    temp_cont_stack.reserve(2 * cases_node.named_child_count());
                     let arity = eval_named_pairs(
                         &cases_node,
                         kind!("case"),
@@ -542,7 +542,7 @@ pub(super) fn node_to_ast<'ast>(
                     let concurrent = decls_node.kind_id() == kind!("conc_decls");
 
                     let mut let_decls = SmallVec::with_capacity(decls_node.named_child_count());
-                    let mut temp_cont_stack = Vec::with_capacity(2 * let_decls.capacity());
+                    temp_cont_stack.reserve(2 * let_decls.capacity());
 
                     let mut total_len = 0;
 
@@ -645,9 +645,7 @@ pub(super) fn node_to_ast<'ast>(
                 kind!("var_ref") => {
                     let (var_ref_kind_node, var_node) = get_left_and_right(&node);
 
-                    let kind = get_first_child(&var_ref_kind_node).kind();
-
-                    let var_ref_kind = match kind {
+                    let var_ref_kind = match get_node_value(&var_ref_kind_node, source) {
                         "=" => VarRefKind::Proc,
                         "=*" => VarRefKind::Name,
                         _ => unreachable!("var_ref_kind is either '=' or '=*'"),
@@ -667,27 +665,25 @@ pub(super) fn node_to_ast<'ast>(
         if bad {
             proc_stack.push(ast_builder.bad_const(), node.range().into());
         }
-        loop {
-            let step = apply_cont(&mut cont_stack, &mut proc_stack, ast_builder);
-            match step {
-                Step::Done => {
-                    if start_node.has_error() {
-                        // discover all the errors
-                        errors::query_errors(start_node, source, &mut errors);
-                    }
-                    if let Some(some_errors) = NEVec::try_from_vec(errors) {
-                        return Validated::fail(ParsingFailure {
-                            partial_tree: proc_stack.to_proc_partial(),
-                            errors: some_errors,
-                        });
-                    }
-                    let last = proc_stack.to_proc();
-                    return Validated::Good(last);
+        let step = apply_cont(&mut cont_stack, &mut proc_stack, ast_builder);
+        match step {
+            Step::Done => {
+                if start_node.has_error() {
+                    // discover all the errors
+                    errors::query_errors(start_node, source, &mut errors);
                 }
-                Step::Continue(n) => {
-                    node = n;
-                    continue 'parse;
+                if let Some(some_errors) = NEVec::try_from_vec(errors) {
+                    return Validated::fail(ParsingFailure {
+                        partial_tree: proc_stack.to_proc_partial(),
+                        errors: some_errors,
+                    });
                 }
+                let last = proc_stack.to_proc();
+                return Validated::Good(last);
+            }
+            Step::Continue(n) => {
+                node = n;
+                continue 'parse;
             }
         }
     }
@@ -1571,6 +1567,7 @@ where
         })
     }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let exact = self.iter.len();
         (exact, Some(exact))
@@ -1641,6 +1638,7 @@ where
         })
     }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let exact = self.iter.len();
         (exact, Some(exact))
@@ -1771,7 +1769,6 @@ pub struct NamesIter<'slice, 'a> {
 }
 
 impl<'slice, 'a> NamesIter<'slice, 'a> {
-    #[inline]
     pub fn new(procs: &'slice [AnnProc<'a>], mask: &'slice BitSlice) -> Self {
         assert!(procs.len() <= mask.len());
         let len = procs.len();

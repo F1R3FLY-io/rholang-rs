@@ -16,8 +16,8 @@ This document provides instructions for using the development container for the 
 The project includes several Make targets for working with the development container:
 
 ```bash
-# Start an interactive shell in the container
-make container-shell
+# Start an interactive rholang-shell in the container
+make container-rholang-shell
 
 # Build the project in the container
 make container-build
@@ -31,7 +31,7 @@ make container-check
 # Fix code quality issues in the container
 make container-fix
 
-# Run the shell binary in the container
+# Run the rholang-shell binary in the container
 make container-run
 ```
 
@@ -40,7 +40,7 @@ make container-run
 You can also use the run script directly:
 
 ```bash
-# Start an interactive shell in the container
+# Start an interactive rholang-shell in the container
 ./scripts/run-in-container.sh
 
 # Run a specific command in the container

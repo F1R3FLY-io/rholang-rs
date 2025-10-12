@@ -1,0 +1,44 @@
+{
+  "name": "@f1r3fly-io/tree-sitter-rholang-js",
+  "version": "1.1.7",
+  "description": "Parser for Rholang (Mercury)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/F1R3FLY-io/rholang-rs.git"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Marcin Rzeźnicki",
+    "email": "marcin.rzeznicki@gmail.com"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "type": "module",
+  "main": "dist/tree-sitter-rholang-js.cjs.js",
+  "module": "dist/tree-sitter-rholang-js.es.js",
+  "browser": "dist/tree-sitter-rholang-js.umd.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    "types": "./dist/index.d.ts",
+    "import": "./dist/tree-sitter-rholang-js.es.js",
+    "require": "./dist/tree-sitter-rholang-js.cjs.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "incremental",
+    "parsing",
+    "tree-sitter",
+    "rholang"
+  ],
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.lib.json --emitDeclarationOnly"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.4"
+  }
+}

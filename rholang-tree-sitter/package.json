@@ -2,7 +2,7 @@
   "name": "tree-sitter-rholang",
   "version": "1.1.0",
   "description": "Parser for Rholang (Mercury)",
-  "repository": "https://github.com/tree-sitter/tree-sitter-rholang",
+  "repository": "https://github.com/F1R3FLY-io/rholang-rs",
   "license": "MIT",
   "author": {
     "name": "Marcin Rzeźnicki",
@@ -45,6 +45,7 @@
   "scripts": {
     "install": "node-gyp-build",
     "prestart": "tree-sitter build --wasm",
+    "build:wasm": "tree-sitter build --wasm",
     "start": "tree-sitter playground",
     "test": "node --test bindings/node/*_test.js"
   }

@@ -9,6 +9,9 @@ pub type Iter<'db, 'a> = std::iter::Map<
     fn((&ByAddress<ProcRef<'db>>, &PID)) -> (PID, ProcRef<'db>),
 >;
 
+pub type Scopes<'a> = intmap::Values<'a, PID, ScopeInfo>;
+pub type ScopesFull<'a> = intmap::Iter<'a, PID, ScopeInfo>;
+
 const DEFAULT_INDEX_CAPACITY: usize = 64;
 const DEFAULT_BINDERS_CAPACITY: usize = 16;
 const DEFAULT_SCOPES_CAPACITY: usize = 16;
@@ -20,7 +23,6 @@ impl<'a> SemanticDb<'a> {
             interner: Interner::new(),
             diagnostics: Vec::new(),
             has_errors: false,
-            next_binder: 0,
             binder_is_name: BitVec::with_capacity(DEFAULT_BINDERS_CAPACITY),
             binders: Vec::with_capacity(DEFAULT_BINDERS_CAPACITY),
             proc_to_scope: IntMap::with_capacity(DEFAULT_SCOPES_CAPACITY),
@@ -53,9 +55,11 @@ impl<'a> SemanticDb<'a> {
 
     pub(super) fn fresh_binder(&mut self, binder: Binder) -> BinderId {
         let id = self.next_binder();
+        if id == BinderId::MAX {
+            panic!("Too many binders")
+        }
         let is_proc = binder.kind == BinderKind::Proc;
 
-        self.next_binder += 1;
         self.binder_is_name.push(!is_proc);
         self.binders.push(binder);
 
@@ -64,7 +68,7 @@ impl<'a> SemanticDb<'a> {
 
     /// Returns the first unassigned [`BinderId`]
     pub fn next_binder(&self) -> BinderId {
-        BinderId(self.next_binder)
+        BinderId(self.binders.len() as u32) // SAFETY: we never allow to add more than |u32| binders
     }
 
     /// Returns a reference to the binder for the given [`BinderId`],
@@ -115,7 +119,7 @@ impl<'a> SemanticDb<'a> {
     /// Finds the first process node that matches the given predicate.
     ///
     /// This is a convenience for common queries like:
-    /// ```ignore
+    /// ```example
     /// db.find_proc(|p| matches!(p.proc, ast::Proc::ForComprehension { .. }))
     /// ```
     ///
@@ -126,8 +130,18 @@ impl<'a> SemanticDb<'a> {
     where
         P: Fn(ProcRef<'a>) -> bool,
     {
-        self.iter()
-            .find_map(|candidate| predicate(candidate.1).then_some(candidate))
+        self.iter().find(|candidate| predicate(candidate.1))
+    }
+
+    /// Returns an iterator over all process nodes satisfying the given predicate.
+    ///
+    /// This is useful when you expect multiple matches, e.g. all `for` comprehensions.
+    ///
+    pub fn filter_procs<P>(&self, predicate: P) -> impl Iterator<Item = (PID, ProcRef<'a>)>
+    where
+        P: Fn(ProcRef<'a>) -> bool,
+    {
+        self.iter().filter(move |candidate| predicate(candidate.1))
     }
 
     pub fn emit_diagnostic(&mut self, diagnostic: Diagnostic) {
@@ -183,10 +197,10 @@ impl<'a> SemanticDb<'a> {
 
     #[inline]
     fn assert_scope_ib(&self, rng: &std::ops::Range<usize>) {
+        let next_binder = self.binders.len();
         assert!(
-            rng.end <= (self.next_binder as usize),
-            "Scope spans beyond the range of binders: {rng:#?} ends beyond {}",
-            self.next_binder
+            rng.end <= next_binder,
+            "Scope spans beyond the range of binders: {rng:#?} ends beyond {next_binder}"
         );
     }
 
@@ -236,32 +250,15 @@ impl<'a> SemanticDb<'a> {
     /// Returns an iterator over all scopes.
     ///
     /// The iteration order is unspecified.
-    pub fn scopes(&self) -> impl Iterator<Item = &ScopeInfo> {
+    pub fn scopes(&self) -> Scopes<'_> {
         self.proc_to_scope.values()
     }
 
     /// Returns an iterator over all processes and their associated scopes.
     ///
     /// The iteration order is unspecified.
-    pub fn scopes_full(&self) -> impl Iterator<Item = (PID, &ScopeInfo)> {
+    pub fn scopes_full(&self) -> ScopesFull<'_> {
         self.proc_to_scope.iter()
-    }
-
-    /// Returns an iterator over all for-comprehension processes in the database.
-    ///
-    /// Each item is a tuple of (PID, ProcRef) where the ProcRef points to a
-    /// `Proc::ForComprehension` node. The iteration order follows the indexing order.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// for (pid, proc_ref) in db.iter_for_comprehensions() {
-    ///     // Process each for-comprehension
-    /// }
-    /// ```
-    pub fn iter_for_comprehensions(&self) -> impl Iterator<Item = (PID, ProcRef<'a>)> + '_ {
-        self.iter()
-            .filter(|(_, proc_ref)| matches!(proc_ref.proc, ast::Proc::ForComprehension { .. }))
     }
 
     /// Returns a slice of all binders introduced by the given scope.
@@ -286,7 +283,7 @@ impl<'a> SemanticDb<'a> {
     pub fn binders_full(
         &self,
         scope: &ScopeInfo,
-    ) -> impl Iterator<Item = (BinderId, &Binder)> + ExactSizeIterator {
+    ) -> impl ExactSizeIterator<Item = (BinderId, &Binder)> {
         let binders = self.binders(scope);
         scope.binder_range().zip(binders)
     }
@@ -300,7 +297,7 @@ impl<'a> SemanticDb<'a> {
     pub fn free_binders_of(
         &self,
         scope: &ScopeInfo,
-    ) -> impl Iterator<Item = (BinderId, &Binder)> + ExactSizeIterator {
+    ) -> impl ExactSizeIterator<Item = (BinderId, &Binder)> {
         scope.free().map(|bid| (bid, &self[bid]))
     }
 
@@ -309,7 +306,7 @@ impl<'a> SemanticDb<'a> {
         assert!(
             binder < self.next_binder(),
             "binder {binder} not within the allocated range of binders: 0..{}",
-            self.next_binder
+            self.next_binder()
         );
     }
 
@@ -381,17 +378,19 @@ impl<'a> SemanticDb<'a> {
     /// Returns an iterator over all variable bindings.
     ///
     /// The iteration is in order of appearance in the source code.
-    pub fn bound_positions(&self) -> impl Iterator<Item = BoundPos> + ExactSizeIterator {
-        self.var_to_binder.iter().map(|(occ, binding)| BoundPos {
-            pos: occ.position,
-            binding: *binding,
-        })
+    pub fn bound_positions(&self) -> impl ExactSizeIterator<Item = BoundOccurence> {
+        self.var_to_binder
+            .iter()
+            .map(|(occ, binding)| BoundOccurence {
+                occurence: *occ,
+                binding: *binding,
+            })
     }
 
     /// Returns an iterator over variable bindings that occur within a given source span.
     ///
     /// The range is inclusive–exclusive: `[span.start, span.end)`.
-    pub fn bound_in_range(&self, span: SourceSpan) -> impl Iterator<Item = BoundPos> {
+    pub fn bound_in_range(&self, span: SourceSpan) -> impl Iterator<Item = BoundOccurence> {
         use std::ops::Bound::*;
 
         // Construct range bounds for the BTreeMap key type
@@ -406,14 +405,14 @@ impl<'a> SemanticDb<'a> {
 
         self.var_to_binder
             .range((Included(start_key), Excluded(end_key)))
-            .map(|(occ, binding)| BoundPos {
-                pos: occ.position,
+            .map(|(occ, binding)| BoundOccurence {
+                occurence: *occ,
                 binding: *binding,
             })
     }
 
     /// Returns an iterator over all variable bindings within the given scope.
-    pub fn bound_in_scope(&self, scope: &ScopeInfo) -> impl Iterator<Item = BoundPos> {
+    pub fn bound_in_scope(&self, scope: &ScopeInfo) -> impl Iterator<Item = BoundOccurence> {
         self.bound_in_range(scope.span)
     }
 
@@ -479,6 +478,12 @@ impl<'db, 'a> IntoIterator for &'a SemanticDb<'db> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
+    }
+}
+
+impl<'a> Default for SemanticDb<'a> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

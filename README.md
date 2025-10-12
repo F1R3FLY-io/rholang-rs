@@ -65,7 +65,7 @@ cargo build
 cargo build --release
 
 # Build specific workspace member
-cargo build -p shell
+cargo build -p rholang-shell
 ```
 
 ### Running Tests
@@ -78,7 +78,7 @@ cargo test
 cargo test -- --nocapture
 
 # Run tests for specific workspace member
-cargo test -p shell
+cargo test -p rholang-shell
 
 # Run specific test module
 cargo test <module_name>
@@ -92,8 +92,8 @@ cargo test --all-features
 For a consistent development environment, this project provides a Docker-based development container with all necessary tools pre-installed.
 
 ```bash
-# Start an interactive shell in the container
-make container-shell
+# Start an interactive rholang-shell in the container
+make container-rholang-shell
 
 # Build the project in the container
 make container-build
@@ -136,11 +136,11 @@ cargo audit
 ### Running the Interpreter
 
 ```bash
-# Run the Rholang shell (rhosh)
-cargo run -p shell
+# Run the Rholang rholang-shell (rhosh)
+cargo run -p rholang-shell
 
 # Run with specific arguments
-cargo run -p shell -- --help
+cargo run -p rholang-shell -- --help
 
 # Run the interpreter binary directly after building
 ./target/debug/rhosh
@@ -191,8 +191,8 @@ cargo test --lib
 # Run integration tests only
 cargo test --test '*'
 
-# Run tests for shell package
-cargo test -p shell
+# Run tests for rholang-shell package
+cargo test -p rholang-shell
 
 # Run benchmarks
 cargo bench
@@ -233,9 +233,10 @@ new helloworld, stdout(`rho:io:stdout`) in {
 3. Run the full test suite and static analysis
 4. Submit a pull request with comprehensive tests
 
-## License
+## 📄 License
 
-This project is part of the F1r3fly open-source ecosystem.
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+
 
 ## Resources
 
