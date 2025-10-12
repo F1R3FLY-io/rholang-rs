@@ -4,7 +4,7 @@ use crate::{match_proc, sem::pipeline::Pipeline};
 
 use super::{
     BinderId, BinderKind, ErrorKind, PID, ProcRef, ResolverPass, SemanticDb, VarBinding,
-    WarningKind,
+    WarningKind, diagnostics::UnusedVarsPass,
 };
 
 use rholang_parser::ast;
@@ -13,9 +13,11 @@ fn pipeline<I>(roots: I) -> Pipeline
 where
     I: Iterator<Item = PID>,
 {
-    let pipeline = roots.fold(Pipeline::new(), |pipeline, root| {
-        pipeline.add_fact(ResolverPass::new(root))
-    });
+    let pipeline = roots
+        .fold(Pipeline::new(), |pipeline, root| {
+            pipeline.add_fact(ResolverPass::new(root))
+        })
+        .add_diagnostic(UnusedVarsPass);
     pipeline
 }
 
@@ -188,7 +190,7 @@ fn test_scope_deeply_nested<'test>(tree: ProcRef<'test>, db: &'test mut Semantic
         innermost_new_body,
     );
 
-    expect::no_warnings_or_errors(db);
+    expect::unused_variable_warning(db, "message", expect::for_with_channel_match("retCh"));
 }
 
 #[test_rholang_code(r#"
@@ -412,6 +414,11 @@ fn test_pattern_sequence<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<
 
     // for simplicity in this test we omitted declaration of 'Cell', so we expect it to be unbounded
     expect::error(db, ErrorKind::UnboundVariable, root);
+    expect::error(
+        db,
+        ErrorKind::UnboundVariable,
+        |node: ProcRef<'test>| matches!(node.proc, ast::Proc::Send { channel, .. } if channel.is_ident("Cell")),
+    );
 }
 
 #[test_rholang_code(r#"
@@ -599,8 +606,9 @@ fn test_pattern_within_pattern_scoping<'test>(
     expect::error(
         db,
         ErrorKind::UnboundVariable,
-        |node: ProcRef<'test>| matches!(node.proc, ast::Proc::Eval { name: ast::Name::NameVar(ast::Var::Id(ast::Id { name: var, .. })) } if *var == "y"),
+        |node: ProcRef<'test>| matches!(node.proc, ast::Proc::Eval { name } if name.is_ident("y")),
     );
+    expect::unused_variable_warning(db, "z", expect::first_for_comprehension_match());
 }
 
 #[test_rholang_code(
@@ -838,6 +846,8 @@ fn test_pattern_within_pattern_concurrent_scoping<'test>(
 
             let var_arg1_1_info = db[var_arg1_1];
             expect::error(db, ErrorKind::DuplicateVarDef { original: var_arg1_1_info.into() }, inner_for);
+            // first arg1 is also unused
+            expect::warning(db, WarningKind::UnusedVariable(var_arg1_1, var_arg1_1_info.name), inner_for);
     });
 }
 
@@ -909,6 +919,7 @@ fn test_pattern_within_pattern_sequential_captures<'test>(
             // arg1 is shadowed
             let var_arg1_1_info = db[var_arg1_1];
             expect::warning(db, WarningKind::ShadowedVar { original: var_arg1_1_info.into() }, inner_for);
+            expect::warning(db, WarningKind::UnusedVariable(var_arg1_1, var_arg1_1_info.name), inner_for);
     });
 }
 
@@ -996,11 +1007,7 @@ fn test_error_proc_name<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'
     let unused_rtn = expect::binder(db, "unused_rtn", root_scope);
     let unused_rtn_info = db[unused_rtn];
 
-    let inner_for_scope = expect::scope(
-        db,
-        |node: ProcRef<'test>| matches!(node.proc, ast::Proc::ForComprehension { .. }),
-        1,
-    );
+    let inner_for_scope = expect::scope(db, expect::first_for_comprehension_match(), 1);
     let auction_contract = expect::binder(db, "auction_contract", inner_for_scope);
     let auction_contract_info = db[auction_contract];
     // another way of finding a process
@@ -1038,23 +1045,25 @@ mod expect {
     }
 
     pub fn proc_var_match<'a>(expected: &str) -> impl ProcMatch<'a> {
-        move |node: ProcRef<'a>| matches!(node.proc, ast::Proc::ProcVar(ast::Var::Id(ast::Id { name, .. })) if *name == expected)
+        move |node: ProcRef<'a>| node.proc.is_ident(expected)
+    }
+
+    pub fn first_for_comprehension_match<'a>() -> impl ProcMatch<'a> {
+        |node: ProcRef<'a>| matches!(node.proc, ast::Proc::ForComprehension { .. })
     }
 
     pub fn for_with_channel_match<'a>(expected: &str) -> impl ProcMatch<'a> {
         fn has_source_name<'x>(receipts: &[ast::Receipt], expected: &str) -> bool {
-            receipts.iter().flatten().any(|bind| {
-                matches!(
-                    bind.source_name(),
-                    ast::Name::NameVar(ast::Var::Id(ast::Id {name, ..})) if *name == expected
-                )
-            })
+            receipts
+                .iter()
+                .flatten()
+                .any(|bind| bind.source_name().is_ident(expected))
         }
         move |node: ProcRef<'a>| matches!(node.proc, ast::Proc::ForComprehension { receipts, .. } if has_source_name(receipts, expected))
     }
 
     pub fn contract_with_name_match<'a>(expected: &str) -> impl ProcMatch<'a> {
-        move |node: ProcRef<'a>| matches!(node.proc, ast::Proc::Contract { name: ast::Name::NameVar(ast::Var::Id(ast::Id { name, ..})), .. } if *name ==expected)
+        move |node: ProcRef<'a>| matches!(node.proc, ast::Proc::Contract { name, .. } if name.is_ident(expected))
     }
 
     impl ProcMatch<'_> for PID {
@@ -1253,6 +1262,30 @@ mod expect {
                     && m.matches(db, diagnostic.pid)
             })
             .or_else(|| panic!("expect::warning #{expected:#?} in {:#?}", db.diagnostics()));
+    }
+
+    pub(super) fn unused_variable_warning<'test, M: ProcMatch<'test>>(
+        db: &'test SemanticDb<'test>,
+        expected_name: &str,
+        m: M,
+    ) {
+        let expected_sym = db.intern(expected_name);
+        m.resolve(db)
+            .and_then(|proc| db.get_scope(proc))
+            .and_then(|scope| db.find_binder_for_symbol(expected_sym, scope))
+            .and_then(|expected_binder| {
+                let expected = DiagnosticKind::Warning(WarningKind::UnusedVariable(
+                    expected_binder,
+                    expected_sym,
+                ));
+                db.warnings().find(|diagnostic| diagnostic.kind == expected)
+            })
+            .or_else(|| {
+                panic!(
+                    "expect::unused_variable_warning with #{expected_sym} in {:#?}",
+                    db.diagnostics()
+                )
+            });
     }
 
     fn symbol_matches_string(db: &SemanticDb, sym: Symbol, expected: &str) -> bool {

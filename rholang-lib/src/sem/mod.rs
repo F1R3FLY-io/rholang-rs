@@ -9,6 +9,7 @@ use intmap::{IntKey, IntMap};
 use rholang_parser::{SourcePos, SourceSpan, ast};
 
 pub mod db;
+pub mod diagnostics;
 mod interner;
 pub mod pipeline;
 mod resolver;
@@ -462,7 +463,7 @@ pub enum InfoKind {}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WarningKind {
     ShadowedVar { original: SymbolOccurence },
-    UnusedVariable,
+    UnusedVariable(BinderId, Symbol),
     TopLevelPatternExpr { span: SourceSpan },
 }
 
