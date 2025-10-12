@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::BTreeMap, fmt::Display, iter::FusedIterator, u32};
+use std::{borrow::Cow, collections::BTreeMap, fmt::Display, iter::FusedIterator};
 
 use as_any::AsAny;
 use bitvec::prelude::*;

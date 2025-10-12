@@ -137,7 +137,7 @@ impl<'a> SemanticDb<'a> {
     ///
     /// This is useful when you expect multiple matches, e.g. all `for` comprehensions.
     ///
-    pub fn filter_procs<P: 'a>(&self, predicate: P) -> impl Iterator<Item = (PID, ProcRef<'a>)>
+    pub fn filter_procs<P>(&self, predicate: P) -> impl Iterator<Item = (PID, ProcRef<'a>)>
     where
         P: Fn(ProcRef<'a>) -> bool,
     {
@@ -283,7 +283,7 @@ impl<'a> SemanticDb<'a> {
     pub fn binders_full(
         &self,
         scope: &ScopeInfo,
-    ) -> impl Iterator<Item = (BinderId, &Binder)> + ExactSizeIterator {
+    ) -> impl ExactSizeIterator<Item = (BinderId, &Binder)> {
         let binders = self.binders(scope);
         scope.binder_range().zip(binders)
     }
@@ -297,7 +297,7 @@ impl<'a> SemanticDb<'a> {
     pub fn free_binders_of(
         &self,
         scope: &ScopeInfo,
-    ) -> impl Iterator<Item = (BinderId, &Binder)> + ExactSizeIterator {
+    ) -> impl ExactSizeIterator<Item = (BinderId, &Binder)> {
         scope.free().map(|bid| (bid, &self[bid]))
     }
 
@@ -378,7 +378,7 @@ impl<'a> SemanticDb<'a> {
     /// Returns an iterator over all variable bindings.
     ///
     /// The iteration is in order of appearance in the source code.
-    pub fn bound_positions(&self) -> impl Iterator<Item = BoundOccurence> + ExactSizeIterator {
+    pub fn bound_positions(&self) -> impl ExactSizeIterator<Item = BoundOccurence> {
         self.var_to_binder
             .iter()
             .map(|(occ, binding)| BoundOccurence {
@@ -478,6 +478,12 @@ impl<'db, 'a> IntoIterator for &'a SemanticDb<'db> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
+    }
+}
+
+impl<'a> Default for SemanticDb<'a> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

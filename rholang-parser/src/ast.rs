@@ -396,10 +396,7 @@ pub enum BinaryExpOp {
 
 impl BinaryExpOp {
     pub fn is_connective(self) -> bool {
-        match self {
-            BinaryExpOp::Conjunction | BinaryExpOp::Disjunction => true,
-            _ => false,
-        }
+        matches!(self, BinaryExpOp::Conjunction | BinaryExpOp::Disjunction)
     }
 }
 

@@ -93,11 +93,11 @@ impl Pipeline {
                 let _ = writeln!(out, "{:<25} (Fact)", fact.name());
 
                 // If the next pass is a diagnostic group, display its members under this fact
-                if let Some(next) = iter.peek() {
-                    if let Some(group) = next.as_any().downcast_ref::<DiagnosticGroup>() {
-                        render_group(&mut out, group, " ");
-                        iter.next(); // consume group
-                    }
+                if let Some(next) = iter.peek()
+                    && let Some(group) = next.as_any().downcast_ref::<DiagnosticGroup>()
+                {
+                    render_group(&mut out, group, " ");
+                    iter.next(); // consume group
                 }
             }
             // Diagnostic group that stands on its own
@@ -121,6 +121,12 @@ impl Pipeline {
 impl fmt::Display for Pipeline {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.describe())
+    }
+}
+
+impl Default for Pipeline {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
