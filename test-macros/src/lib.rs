@@ -20,6 +20,7 @@ impl TestRholangCodeArgs {
                 let pipeline = syn::Ident::new("pipeline", Span::mixed_site());
                 quote! {
                     let #pipeline = #pipeline_func(#procs.iter().map(|proc| #db.build_index(proc)));
+                    println!("Running the pipeline:\n{}", #pipeline.describe());
                     tokio::runtime::Builder::new_current_thread()
                         .build()
                         .unwrap()
