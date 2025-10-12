@@ -1,5 +1,6 @@
-use std::{collections::BTreeMap, fmt::Display, iter::FusedIterator, u32};
+use std::{borrow::Cow, collections::BTreeMap, fmt::Display, iter::FusedIterator, u32};
 
+use as_any::AsAny;
 use bitvec::prelude::*;
 use by_address::ByAddress;
 use fixedbitset::FixedBitSet as BitSet;
@@ -9,7 +10,39 @@ use rholang_parser::{SourcePos, SourceSpan, ast};
 
 pub mod db;
 mod interner;
+pub mod pipeline;
 mod resolver;
+
+/// A generic semantic analysis pass.
+///
+/// This is the root trait for all analysis passes — both fact-producing and diagnostic ones.
+/// It exists primarily to provide introspection and polymorphic storage within the pipeline.
+pub trait Pass: AsAny {
+    /// A human-readable name for debugging/logging.
+    fn name(&self) -> Cow<'static, str>;
+}
+
+/// A *fact pass* that computes or mutates semantic information.
+///
+/// These passes populate the [`SemanticDb`] with inferred or resolved facts
+/// (such as symbol bindings, types, captures, etc.).
+/// They are **executed sequentially** to guarantee deterministic mutation order.
+pub trait FactPass: Pass {
+    /// Executes the pass, mutating the [`SemanticDb`].
+    fn run(&self, db: &mut SemanticDb);
+}
+
+/// A *diagnostic pass* that inspects the results of fact passes.
+///
+/// Diagnostic passes **must not mutate** the [`SemanticDb`]. They analyze
+/// the collected facts and emit warnings, infos, or errors.
+///
+/// Diagnostic passes may run **in parallel** since they only read from the database.
+pub trait DiagnosticPass: Pass + Send + Sync {
+    /// Executes the pass asynchronously.  
+    /// Only read access to `db` is permitted.
+    fn run(&self, db: &SemanticDb) -> Vec<Diagnostic>;
+}
 
 pub type ProcRef<'a> = &'a ast::AnnProc<'a>;
 
@@ -253,11 +286,11 @@ impl ScopeInfo {
         self.free.count_ones()
     }
 
-    pub fn free(&self) -> FreeIter {
+    pub fn free(&self) -> FreeIter<'_> {
         FreeIter::new(&self.free, self.binder_start.0)
     }
 
-    fn absorb(&mut self, rhs: ScopeInfo) {
+    pub fn absorb(&mut self, rhs: ScopeInfo) {
         assert_eq!(
             self.binder_end(),
             rhs.binder_start,
