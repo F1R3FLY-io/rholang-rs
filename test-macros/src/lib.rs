@@ -82,11 +82,12 @@ pub fn test_rholang_code(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     // Extract argument (ident, type)
     fn extract_ident_and_ty(arg: &FnArg) -> Option<(&syn::Ident, &Type)> {
-        if let FnArg::Typed(PatType { pat, ty, .. }) = arg {
-            if let Pat::Ident(ident) = pat.as_ref() {
-                return Some((&ident.ident, ty.as_ref()));
-            }
+        if let FnArg::Typed(PatType { pat, ty, .. }) = arg
+            && let Pat::Ident(ident) = pat.as_ref()
+        {
+            return Some((&ident.ident, ty.as_ref()));
         }
+
         None
     }
 
@@ -152,20 +153,20 @@ pub fn test_rholang_code(attr: TokenStream, item: TokenStream) -> TokenStream {
 
             expanded.into()
         } else {
-            return syn::Error::new(arg2.span(), "expected simple identifier arguments")
+            syn::Error::new(arg2.span(), "expected simple identifier arguments")
                 .to_compile_error()
-                .into();
+                .into()
         }
     } else {
-        return syn::Error::new(arg1.span(), "expected simple identifier arguments")
+        syn::Error::new(arg1.span(), "expected simple identifier arguments")
             .to_compile_error()
-            .into();
+            .into()
     }
 }
 
 fn classify_type(ty: &Type) -> Option<Classification> {
     fn path_contains(path: &syn::Path, name: &str) -> bool {
-        path.segments.last().map_or(false, |s| s.ident == name)
+        path.segments.last().is_some_and(|s| s.ident == name)
     }
     match ty {
         Type::Reference(r) => match r.elem.as_ref() {
