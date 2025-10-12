@@ -1,28 +1,72 @@
+use super::interner::Interner;
+use ahash::RandomState;
 use std::ops::Index;
 
-use by_address::ByAddress;
-use indexmap::IndexMap;
-
 use super::*;
-
-const DEFAULT_REV_CAPACITY: usize = 64;
 
 pub type Iter<'db, 'a> = std::iter::Map<
     indexmap::map::Iter<'a, ByAddress<ProcRef<'db>>, PID>,
     fn((&ByAddress<ProcRef<'db>>, &PID)) -> (PID, ProcRef<'db>),
 >;
 
+const DEFAULT_INDEX_CAPACITY: usize = 64;
+const DEFAULT_BINDERS_CAPACITY: usize = 16;
+const DEFAULT_SCOPES_CAPACITY: usize = 16;
+
 impl<'a> SemanticDb<'a> {
     pub fn new() -> Self {
         Self {
-            rev: IndexMap::with_capacity(DEFAULT_REV_CAPACITY),
+            rev: IndexMap::with_capacity_and_hasher(DEFAULT_INDEX_CAPACITY, RandomState::new()),
+            interner: Interner::new(),
             diagnostics: Vec::new(),
             has_errors: false,
+            next_binder: 0,
+            binder_is_name: BitVec::with_capacity(DEFAULT_BINDERS_CAPACITY),
+            binders: Vec::with_capacity(DEFAULT_BINDERS_CAPACITY),
+            proc_to_scope: IntMap::with_capacity(DEFAULT_SCOPES_CAPACITY),
         }
     }
 
+    /// Returns a [`Symbol`] that uniquely represents the given string.
+    ///
+    /// If the string was already interned, returns the existing symbol;
+    /// otherwise, creates a new symbol. Symbols are unique and stable
+    /// within this `SemanticDb`.
+    pub fn intern(&self, str: &str) -> Symbol {
+        self.interner.intern(str)
+    }
+
+    /// Resolves a [`Symbol`] back to the original string.
+    ///
+    /// Returns `None` if the symbol was never interned in this database.
+    pub fn resolve_symbol(&self, sym: Symbol) -> Option<&str> {
+        self.interner.resolve(sym)
+    }
+
+    pub(super) fn fresh_binder(&mut self, binder: Binder) -> BinderId {
+        let id = self.next_binder();
+        let is_proc = binder.kind == BinderKind::Proc;
+
+        self.next_binder += 1;
+        self.binder_is_name.push(!is_proc);
+        self.binders.push(binder);
+
+        id
+    }
+
+    /// Returns the first unassigned [`BinderId`]
+    pub fn next_binder(&self) -> BinderId {
+        BinderId(self.next_binder)
+    }
+
+    /// Returns a reference to the binder for the given [`BinderId`],
+    /// or `None` if not found.
+    pub fn get_binder(&self, bid: BinderId) -> Option<&Binder> {
+        self.binders.get(bid.0 as usize)
+    }
+
     /// Builds an index for all processes in preorder DFS.
-    /// Returns the PID of the root.
+    /// Returns the [`PID`] of the root.
     pub fn build_index(&mut self, root: ProcRef<'a>) -> PID {
         let start_id = self.rev.len();
         let result = PID(start_id as u32); // SAFETY: we never allow to add more than u32 elements to the index
@@ -38,12 +82,12 @@ impl<'a> SemanticDb<'a> {
         result
     }
 
-    /// Returns a reference to a process by PID, or None if out of bounds.
+    /// Returns a reference to the process by [`PID`], or None if out of bounds.
     pub fn get(&self, id: PID) -> Option<ProcRef<'a>> {
         self.rev.get_index(id.0 as usize).map(|(proc, _)| **proc)
     }
 
-    /// Returns the PID corresponding to a given ProcRef, if it exists in the DB
+    /// Returns the [`PID`] corresponding to a given [`ProcRef`], if it exists in the DB
     pub fn lookup(&self, proc: ProcRef<'a>) -> Option<PID> {
         self.rev
             .get_index_of(&ByAddress(proc))
@@ -85,8 +129,76 @@ impl<'a> SemanticDb<'a> {
             .filter(|d| matches!(d.kind, DiagnosticKind::Error(_)))
     }
 
+    pub fn warnings(&self) -> impl Iterator<Item = &Diagnostic> {
+        self.diagnostics
+            .iter()
+            .filter(|d| matches!(d.kind, DiagnosticKind::Warning(_)))
+    }
+
     pub fn diagnostics(&self) -> &[Diagnostic] {
         &self.diagnostics
+    }
+
+    /// Adds scope information for the given process.
+    ///
+    /// Returns `true` if the scope was newly inserted, or `false` if a scope
+    /// for this process already existed.
+    pub(super) fn add_scope(&mut self, proc: PID, scope: ScopeInfo) -> bool {
+        self.proc_to_scope.insert_checked(proc, scope)
+    }
+
+    /// Returns the scope information associated with the given process, if any.
+    pub fn get_scope(&self, proc: PID) -> Option<&ScopeInfo> {
+        self.proc_to_scope.get(proc)
+    }
+
+    /// Returns all binders introduced by the given process.
+    ///
+    /// Returns `None` if the process does not introduce any binders.
+    ///
+    /// This is the safe counterpart of [`Self::binders`], which will panic if the
+    /// scope is invalid.
+    pub fn binders_of(&self, proc: PID) -> Option<&[Binder]> {
+        self.get_scope(proc).map(|scope| self.binders(scope))
+    }
+
+    /// Returns an iterator over all scopes.
+    ///
+    /// The iteration order is unspecified.
+    pub fn scopes(&self) -> impl Iterator<Item = &ScopeInfo> {
+        self.proc_to_scope.values()
+    }
+
+    /// Returns an iterator over all processes and their associated scopes.
+    ///
+    /// The iteration order is unspecified.
+    pub fn scopes_full(&self) -> impl Iterator<Item = (PID, &ScopeInfo)> {
+        self.proc_to_scope.iter()
+    }
+
+    /// Returns a slice of all binders introduced by the given scope.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the scope’s binder range is out of bounds of the database.
+    /// Consider using [`Self::binders_of`] if you want a safe version that returns
+    /// `None` instead of panicking.
+    pub fn binders(&self, scope: &ScopeInfo) -> &[Binder] {
+        let rng = scope.as_range();
+        assert!(
+            rng.end <= (self.next_binder as usize),
+            "Scope spans beyond the range of binders"
+        );
+        unsafe { self.binders.get_unchecked(rng) }
+    }
+
+    /// Returns an iterator over the binders introduced by the given scope,
+    /// along with their [`BinderId`]s.
+    pub fn binders_full(
+        &self,
+        scope: &ScopeInfo,
+    ) -> impl Iterator<Item = (BinderId, &Binder)> + ExactSizeIterator {
+        scope.binder_range().map(|bid| (bid, &self[bid]))
     }
 }
 
@@ -109,7 +221,26 @@ impl<'a> Index<ProcRef<'a>> for SemanticDb<'a> {
     fn index(&self, index: ProcRef<'a>) -> &Self::Output {
         self.rev
             .get(&ByAddress(index))
-            .expect("process not found in the DB")
+            .expect("process not present in the semantic db")
+    }
+}
+
+/// Enable `db[bid]` syntax to access binder by its id.
+impl<'a> Index<BinderId> for SemanticDb<'a> {
+    type Output = Binder;
+
+    fn index(&self, id: BinderId) -> &Self::Output {
+        assert!(id.0 < self.next_binder, "unassigned BinderId");
+        unsafe { self.binders.get_unchecked(id.0 as usize) }
+    }
+}
+
+/// Enable `db[symbol]` syntax to access String corresponding to the symbol.
+impl<'a> Index<Symbol> for SemanticDb<'a> {
+    type Output = str;
+
+    fn index(&self, sym: Symbol) -> &Self::Output {
+        &self.interner[sym]
     }
 }
 
