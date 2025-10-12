@@ -9,10 +9,10 @@ use intmap::{IntKey, IntMap};
 use rholang_parser::{SourcePos, SourceSpan, ast};
 
 pub mod db;
-pub mod elaborator;
 mod interner;
 pub mod pipeline;
 mod resolver;
+mod elaborator;
 
 /// A generic semantic analysis pass.
 ///
