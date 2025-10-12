@@ -131,6 +131,13 @@ impl<'a> Proc<'a> {
             _ => false,
         }
     }
+
+    pub fn is_ident(&self, expected: &str) -> bool {
+        match self {
+            Proc::ProcVar(var) => var.is_ident(expected),
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -146,6 +153,10 @@ impl<'a> AnnProc<'a> {
 
     pub fn is_ground(&self) -> bool {
         self.proc.is_ground()
+    }
+
+    pub fn is_ident(&self, expected: &str) -> bool {
+        self.proc.is_ident(expected)
     }
 }
 
@@ -190,6 +201,13 @@ impl Var<'_> {
             Var::Id(id) => Some(id.pos),
         }
     }
+
+    pub fn is_ident(self, expected: &str) -> bool {
+        match self {
+            Var::Wildcard => false,
+            Var::Id(id) => id.name == expected,
+        }
+    }
 }
 
 impl<'a> TryFrom<&Proc<'a>> for Var<'a> {
@@ -226,6 +244,15 @@ impl<'a> TryFrom<Name<'a>> for Var<'a> {
 pub enum Name<'ast> {
     NameVar(Var<'ast>),
     Quote(AnnProc<'ast>),
+}
+
+impl Name<'_> {
+    pub fn is_ident(&self, expected: &str) -> bool {
+        match self {
+            Name::NameVar(var) => var.is_ident(expected),
+            Name::Quote(ann_proc) => ann_proc.is_ident(expected),
+        }
+    }
 }
 
 impl<'a> From<Id<'a>> for Name<'a> {
