@@ -9,6 +9,7 @@ use intmap::{IntKey, IntMap};
 use rholang_parser::{SourcePos, SourceSpan, ast};
 
 pub mod db;
+pub mod diagnostics;
 mod interner;
 pub mod pipeline;
 mod resolver;
@@ -118,8 +119,8 @@ impl From<Binder> for SymbolOccurence {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct BoundPos {
-    pub pos: SourcePos,
+pub struct BoundOccurence {
+    pub occurence: SymbolOccurence,
     pub binding: VarBinding,
 }
 
@@ -128,13 +129,11 @@ pub struct BoundPos {
 pub struct BinderId(u32);
 
 impl BinderId {
+    pub const MAX: BinderId = BinderId(u32::MAX);
+
     #[inline(always)]
     pub fn checked_sub(self, rhs: Self) -> Option<Self> {
         self.0.checked_sub(rhs.0).map(BinderId)
-    }
-
-    pub fn saturating_sub(self, rhs: Self) -> Self {
-        BinderId(self.0.saturating_sub(rhs.0))
     }
 }
 
@@ -197,11 +196,6 @@ pub struct ScopeInfo {
 }
 
 impl ScopeInfo {
-    fn valid_range(num: usize) -> u32 {
-        num.try_into()
-            .expect("didn't expect more than 4 billions of binders")
-    }
-
     pub fn new(binder_start: BinderId, num_binders: usize, span: SourceSpan) -> Self {
         Self::from_parts(
             binder_start,
@@ -234,7 +228,12 @@ impl ScopeInfo {
         span: SourceSpan,
     ) -> Self {
         let num_binders = free.len();
-        Self::valid_range(binder_start.0 as usize + num_binders);
+        if num_binders > u32::MAX as usize
+            || binder_start.0 as usize + num_binders > u32::MAX as usize
+        {
+            panic!("didn't expect more than 4 billions of binders")
+        }
+
         Self {
             binder_start,
             num_binders: num_binders as u32,
@@ -311,6 +310,15 @@ impl ScopeInfo {
     }
 
     #[inline]
+    pub fn all_used(&self) -> bool {
+        self.uses.all()
+    }
+
+    pub fn unused(&self) -> Unused<'_> {
+        Unused::new(&self.uses, self.binder_start.0)
+    }
+
+    #[inline]
     pub fn mark_captured(&mut self, bid: BinderId) {
         assert!(bid < self.binder_start, "binder {bid} too far!");
         if self.captures.len() <= bid.0 as usize {
@@ -382,7 +390,11 @@ impl ScopeInfo {
         }
 
         // Merge other metadata
-        if rhs.num_binders() != 0 {
+        if self.num_binders == 0 {
+            self.free = rhs.free;
+            self.uses = rhs.uses;
+            self.num_binders = rhs.num_binders;
+        } else if rhs.num_binders() != 0 {
             self.free.extend_from_bitslice(&rhs.free);
             self.uses.extend_from_bitslice(&rhs.uses);
             self.num_binders += rhs.num_binders;
@@ -406,7 +418,6 @@ pub struct SemanticDb<'a> {
     diagnostics: Vec<Diagnostic>,
     has_errors: bool,
 
-    next_binder: u32,
     binder_is_name: BitVec,                // fast BinderId -> name or proc
     binders: Vec<Binder>,                  // semantic info about each binding
     proc_to_scope: IntMap<PID, ScopeInfo>, // PID -> semantic info about the scope
@@ -452,7 +463,7 @@ pub enum InfoKind {}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WarningKind {
     ShadowedVar { original: SymbolOccurence },
-    UnusedVariable,
+    UnusedVariable(BinderId, Symbol),
     TopLevelPatternExpr { span: SourceSpan },
 }
 
@@ -524,6 +535,7 @@ impl<'a> Iterator for Free<'a> {
             .map(|i| BinderId(self.binder_start + i as u32))
     }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.inner.size_hint()
     }
@@ -567,6 +579,7 @@ impl<'a> Iterator for Captures<'a> {
         id
     }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.current_len, Some(self.current_len))
     }
@@ -585,6 +598,61 @@ impl<'a> DoubleEndedIterator for Captures<'a> {
 
 impl<'a> ExactSizeIterator for Captures<'a> {}
 impl<'a> FusedIterator for Captures<'a> {}
+
+pub struct Unused<'a> {
+    inner: bitvec::slice::IterZeros<'a, usize, Lsb0>,
+    binder_start: u32,
+}
+
+impl<'a> Unused<'a> {
+    pub fn new(used: &'a BitVec, binder_start: u32) -> Self {
+        Self {
+            inner: used.iter_zeros(),
+            binder_start,
+        }
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            inner: bitvec::slice::IterZeros::default(),
+            binder_start: u32::MAX,
+        }
+    }
+}
+
+impl Default for Unused<'_> {
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
+impl<'a> Iterator for Unused<'a> {
+    type Item = BinderId;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner
+            .next()
+            .map(|i| BinderId(self.binder_start + i as u32))
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
+    }
+}
+
+impl<'a> DoubleEndedIterator for Unused<'a> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.inner
+            .next_back()
+            .map(|i| BinderId(self.binder_start + i as u32))
+    }
+}
+
+impl<'a> ExactSizeIterator for Unused<'a> {}
+impl<'a> FusedIterator for Unused<'a> {}
 
 #[cfg(test)]
 mod tests {

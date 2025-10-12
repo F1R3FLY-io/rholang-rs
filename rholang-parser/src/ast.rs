@@ -115,6 +115,29 @@ impl<'a> Proc<'a> {
     pub fn ann(&'a self, span: SourceSpan) -> AnnProc<'a> {
         AnnProc { proc: self, span }
     }
+
+    pub fn is_ground(&self) -> bool {
+        match self {
+            Proc::Nil
+            | Proc::Unit
+            | Proc::BoolLiteral(_)
+            | Proc::LongLiteral(_)
+            | Proc::StringLiteral(_)
+            | Proc::UriLiteral(_)
+            | Proc::SimpleType(_)
+            | Proc::ProcVar(Var::Wildcard)
+            | Proc::Bad => true,
+            Proc::Collection(col) if col.is_empty() => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_ident(&self, expected: &str) -> bool {
+        match self {
+            Proc::ProcVar(var) => var.is_ident(expected),
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -126,6 +149,14 @@ pub struct AnnProc<'ast> {
 impl<'a> AnnProc<'a> {
     pub fn iter_preorder_dfs(&'a self) -> impl Iterator<Item = &'a Self> {
         PreorderDfsIter::<16>::new(self)
+    }
+
+    pub fn is_ground(&self) -> bool {
+        self.proc.is_ground()
+    }
+
+    pub fn is_ident(&self, expected: &str) -> bool {
+        self.proc.is_ident(expected)
     }
 }
 
@@ -170,6 +201,13 @@ impl Var<'_> {
             Var::Id(id) => Some(id.pos),
         }
     }
+
+    pub fn is_ident(self, expected: &str) -> bool {
+        match self {
+            Var::Wildcard => false,
+            Var::Id(id) => id.name == expected,
+        }
+    }
 }
 
 impl<'a> TryFrom<&Proc<'a>> for Var<'a> {
@@ -206,6 +244,15 @@ impl<'a> TryFrom<Name<'a>> for Var<'a> {
 pub enum Name<'ast> {
     NameVar(Var<'ast>),
     Quote(AnnProc<'ast>),
+}
+
+impl Name<'_> {
+    pub fn is_ident(&self, expected: &str) -> bool {
+        match self {
+            Name::NameVar(var) => var.is_ident(expected),
+            Name::Quote(ann_proc) => ann_proc.is_ident(expected),
+        }
+    }
 }
 
 impl<'a> From<Id<'a>> for Name<'a> {
@@ -506,6 +553,24 @@ impl<'a> Collection<'a> {
             | Collection::Set { remainder, .. }
             | Collection::Map { remainder, .. } => *remainder,
             Collection::Tuple(_) => None,
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            Collection::List {
+                elements,
+                remainder,
+            }
+            | Collection::Set {
+                elements,
+                remainder,
+            } => elements.is_empty() && remainder.is_none(),
+            Collection::Map {
+                elements,
+                remainder,
+            } => elements.is_empty() && remainder.is_none(),
+            Collection::Tuple(_) => false,
         }
     }
 }

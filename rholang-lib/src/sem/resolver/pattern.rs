@@ -13,21 +13,17 @@ pub(super) fn resolve_proc_pattern<'a>(
     let pattern = db[pid];
     let first_binder = db.next_binder();
     // shortcut, we can return right away for simple patterns
-    match pattern.proc {
-        Nil
-        | Unit
-        | BoolLiteral(_)
-        | LongLiteral(_)
-        | StringLiteral(_)
-        | UriLiteral(_)
-        | SimpleType(_)
-        | ProcVar(Var::Wildcard) => ScopeInfo::ground(first_binder, span),
+    let pattern_proc = pattern.proc;
+    if pattern_proc.is_ground() {
+        return ScopeInfo::ground(first_binder, span);
+    }
+    match pattern_proc {
         ProcVar(Var::Id(id)) => {
             new_free(pid, *id, BinderKind::Proc, 0, db);
             ScopeInfo::free_var(first_binder, span)
         }
         VarRef { kind, var } => match resolve_var_ref(*var, *kind, pid, db, env) {
-            Some((_, ref_binder)) => ScopeInfo::var_ref(first_binder, ref_binder, span),
+            Some(ref_binder) => ScopeInfo::var_ref(first_binder, ref_binder, span),
             None => {
                 db.error(pid, ErrorKind::UnboundVariable, Some(var.pos));
                 ScopeInfo::ground(first_binder, span)
@@ -60,23 +56,24 @@ pub(super) fn resolve_name_pattern<'a>(
         | NamesKind::SingleName(Name::NameVar(Var::Wildcard)) => {
             ScopeInfo::ground(first_binder, span)
         }
-        NamesKind::SingleRemainder(Var::Id(var)) => {
-            new_free(scope, var, BinderKind::Proc, proc_var_index, db);
-            ScopeInfo::free_var(first_binder, span)
-        }
         NamesKind::SingleName(Name::NameVar(Var::Id(var))) => {
             new_free(scope, *var, BinderKind::Name(None), proc_var_index, db);
             ScopeInfo::free_var(first_binder, span)
         }
+        NamesKind::SingleName(Name::Quote(quoted)) if quoted.is_ground() => {
+            ScopeInfo::ground(first_binder, span)
+        }
         NamesKind::SingleName(Name::Quote(ast::AnnProc {
-            proc: ProcVar(var), ..
-        })) => match var {
-            Var::Wildcard => ScopeInfo::ground(first_binder, span),
-            Var::Id(id) => {
-                new_free(scope, *id, BinderKind::Proc, proc_var_index, db);
-                ScopeInfo::free_var(first_binder, span)
-            }
-        },
+            proc: ProcVar(Var::Id(id)),
+            ..
+        })) => {
+            new_free(scope, *id, BinderKind::Proc, proc_var_index, db);
+            ScopeInfo::free_var(first_binder, span)
+        }
+        NamesKind::SingleRemainder(Var::Id(var)) => {
+            new_free(scope, var, BinderKind::Proc, proc_var_index, db);
+            ScopeInfo::free_var(first_binder, span)
+        }
         _ => {
             let mut res = PatternResolver::new(scope, first_binder, proc_var_index);
             resolve_names(db, env, &mut res, pattern);
@@ -492,7 +489,7 @@ impl PatternResolver {
         expects_name: bool,
         db: &mut SemanticDb<'b>,
         check_scope: bool,
-    ) -> Option<(SymbolOccurence, BinderId)> {
+    ) -> Option<BinderId> {
         let sym = db.intern(var.name);
         if let Some(binder) = self.env.lookup(sym) {
             if !check_scope || self.in_scope(binder) {
@@ -507,7 +504,7 @@ impl PatternResolver {
                     db.map_symbol_to_binder(occ, binder, expects_name, self.id),
                     "bug: pattern variable {var} already bound!!!"
                 );
-                return Some((occ, binder));
+                return Some(binder);
             }
         }
         None
@@ -518,7 +515,7 @@ impl PatternResolver {
         var: ast::Id,
         expects_name: bool,
         db: &mut SemanticDb<'b>,
-    ) -> Option<(SymbolOccurence, BinderId)> {
+    ) -> Option<BinderId> {
         self.__internal_resolve(var, expects_name, db, true)
     }
 
@@ -529,7 +526,6 @@ impl PatternResolver {
         db: &mut SemanticDb<'a>,
     ) -> BinderId {
         self.resolve_pattern_var(var, kind != BinderKind::Proc, db)
-            .map(|(_, binder)| binder)
             .unwrap_or_else(|| self.introduce_free(var, kind, db))
     }
 
@@ -539,12 +535,12 @@ impl PatternResolver {
         kind: ast::VarRefKind,
         db: &mut SemanticDb<'a>,
         lex_env: &mut BindingStack,
-    ) -> Option<(SymbolOccurence, BinderId)> {
+    ) -> Option<BinderId> {
         self.__internal_resolve(var, kind == ast::VarRefKind::Name, db, false)
             .or_else(|| {
-                let (occ, binder) = resolve_var_ref(var, kind, self.id, db, lex_env)?;
+                let binder = resolve_var_ref(var, kind, self.id, db, lex_env)?;
                 self.refs.grow_and_insert(binder.0 as usize);
-                Some((occ, binder))
+                Some(binder)
             })
     }
 

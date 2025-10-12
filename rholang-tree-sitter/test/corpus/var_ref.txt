@@ -1,0 +1,46 @@
+==========
+Var-ref
+==========
+
+new x, y in {
+    // This reference to token is a pattern that binds
+    for (@token <- x) {
+        // This reference should not be binding.
+        // It says "if I get the same thing I got from x, do P"
+        for (@=token <- y) { token } 
+    }
+}
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var))
+      (name_decl
+        (var)))
+    proc: (block
+      (input
+        receipts: (receipts
+          (receipt
+            (linear_bind
+              names: (names
+                (quote
+                  (var)))
+              input: (simple_source
+                (var)))))
+        proc: (block
+          (input
+            receipts: (receipts
+              (receipt
+                (linear_bind
+                  names: (names
+                    (quote
+                      (var_ref
+                        kind: (var_ref_kind)
+                        var: (var))))
+                  input: (simple_source
+                    (var)))))
+            proc: (block
+              (var))))))))

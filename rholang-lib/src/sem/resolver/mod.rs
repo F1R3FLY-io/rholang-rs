@@ -120,7 +120,7 @@ fn resolve_var<'a>(
     site: PID,
     db: &mut SemanticDb<'a>,
     stack: &mut BindingStack,
-) -> Option<(SymbolOccurence, BinderId)> {
+) -> Option<BinderId> {
     let sym = db.intern(var.name);
     // Step 1: try to resolve against lexical scopes
     if let Some(binder) = stack.lookup(sym) {
@@ -150,7 +150,7 @@ fn resolve_var<'a>(
             "bug: variable {var} already bound!!!"
         );
 
-        Some((occ, binder))
+        Some(binder)
     } else {
         // Case C: not found anywhere
         None
@@ -163,7 +163,7 @@ fn resolve_var_ref<'a>(
     pattern: PID,
     db: &mut SemanticDb<'a>,
     stack: &mut BindingStack,
-) -> Option<(SymbolOccurence, BinderId)> {
+) -> Option<BinderId> {
     let sym = db.intern(var.name);
 
     if let Some(binder) = stack.lookup(sym) {
@@ -181,7 +181,7 @@ fn resolve_var_ref<'a>(
             "bug: variable {var} already bound!!!"
         );
 
-        Some((occ, binder))
+        Some(binder)
     } else {
         None
     }
