@@ -10,6 +10,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 ahash = { workspace = true }
+async-trait = { workspace = true }
 bitvec = { workspace = true }
 by_address = "1.2.1"
 fixedbitset = "0.5.7"
@@ -18,6 +19,7 @@ intmap = { workspace = true }
 rholang-parser = { path = "../rholang-parser" }
 smallvec = { workspace = true }
 stacker = "0.1.21"
+tokio = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }
