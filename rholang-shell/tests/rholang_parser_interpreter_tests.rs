@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::time::Duration;
 use tokio::time::sleep;
 
-use shell::providers::{InterpreterProvider, RholangParserInterpreterProvider};
+use rholang_shell::providers::{InterpreterProvider, RholangParserInterpreterProvider};
 
 #[tokio::test]
 async fn test_rholang_parser_interpreter_creation() -> Result<()> {

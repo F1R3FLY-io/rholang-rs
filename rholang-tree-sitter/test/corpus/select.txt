@@ -4,10 +4,10 @@ Select
 
 contract Cell( get, set, state ) = {
   select {
-    rtn <- get & v <- state => {
+    rtn <- get ; v <- state => {
      rtn!( v ) | state!( v ) | Cell!( get, set, state )
     }
-    newValue <- set & v <- state => {
+    newValue <- set ; v <- state => {
       state!( newValue ) | Cell!( get, set, state )
     }
   }

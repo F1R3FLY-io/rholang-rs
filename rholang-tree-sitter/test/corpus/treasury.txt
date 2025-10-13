@@ -200,26 +200,24 @@ in {
                                     proc: (block
                                       (let
                                         decls: (linear_decls
-                                          (decl
-                                            names: (names
-                                              (var))
-                                            procs: (procs
-                                              (collection
-                                                (map
-                                                  (key_value_pair
-                                                    key: (string_literal)
-                                                    value: (var))
-                                                  (key_value_pair
-                                                    key: (string_literal)
-                                                    value: (var))
-                                                  (key_value_pair
-                                                    key: (string_literal)
-                                                    value: (var))
-                                                  (key_value_pair
-                                                    key: (string_literal)
-                                                    value: (collection
-                                                      (set
-                                                        (var)))))))))
+                                          (let_var_decl
+                                            (var)
+                                            (collection
+                                              (map
+                                                (key_value_pair
+                                                  key: (string_literal)
+                                                  value: (var))
+                                                (key_value_pair
+                                                  key: (string_literal)
+                                                  value: (var))
+                                                (key_value_pair
+                                                  key: (string_literal)
+                                                  value: (var))
+                                                (key_value_pair
+                                                  key: (string_literal)
+                                                  value: (collection
+                                                    (set
+                                                      (var))))))))
                                         proc: (block
                                           (par
                                             (send
@@ -280,43 +278,37 @@ in {
                                   proc: (block
                                     (let
                                       decls: (linear_decls
-                                        (decl
-                                          names: (names
-                                            (var))
-                                          procs: (procs
-                                            (method
-                                              receiver: (var)
-                                              name: (var)
-                                              args: (args
-                                                (var)))))
-                                        (decl
-                                          names: (names
-                                            (var))
-                                          procs: (procs
-                                            (method
-                                              receiver: (var)
-                                              name: (var)
-                                              args: (args
-                                                (string_literal)
-                                                (method
-                                                  receiver: (method
-                                                    receiver: (var)
-                                                    name: (var)
-                                                    args: (args
-                                                      (string_literal)))
+                                        (let_var_decl
+                                          (var)
+                                          (method
+                                            receiver: (var)
+                                            name: (var)
+                                            args: (args
+                                              (var))))
+                                        (let_var_decl
+                                          (var)
+                                          (method
+                                            receiver: (var)
+                                            name: (var)
+                                            args: (args
+                                              (string_literal)
+                                              (method
+                                                receiver: (method
+                                                  receiver: (var)
                                                   name: (var)
                                                   args: (args
-                                                    (var)))))))
-                                        (decl
-                                          names: (names
-                                            (var))
-                                          procs: (procs
-                                            (method
-                                              receiver: (var)
-                                              name: (var)
-                                              args: (args
-                                                (var)
-                                                (var))))))
+                                                    (string_literal)))
+                                                name: (var)
+                                                args: (args
+                                                  (var))))))
+                                        (let_var_decl
+                                          (var)
+                                          (method
+                                            receiver: (var)
+                                            name: (var)
+                                            args: (args
+                                              (var)
+                                              (var)))))
                                       proc: (block
                                         (par
                                           (send
@@ -366,27 +358,23 @@ in {
                             proc: (block
                               (let
                                 decls: (linear_decls
-                                  (decl
-                                    names: (names
-                                      (var))
-                                    procs: (procs
-                                      (method
+                                  (let_var_decl
+                                    (var)
+                                    (method
+                                      receiver: (var)
+                                      name: (var)
+                                      args: (args
+                                        (var))))
+                                  (let_var_decl
+                                    (var)
+                                    (method
+                                      receiver: (method
                                         receiver: (var)
                                         name: (var)
                                         args: (args
-                                          (var)))))
-                                  (decl
-                                    names: (names
-                                      (var))
-                                    procs: (procs
-                                      (method
-                                        receiver: (method
-                                          receiver: (var)
-                                          name: (var)
-                                          args: (args
-                                            (string_literal)))
-                                        name: (var)
-                                        args: (args)))))
+                                          (string_literal)))
+                                      name: (var)
+                                      args: (args))))
                                 proc: (block
                                   (ifElse
                                     condition: (gt
@@ -419,17 +407,15 @@ in {
                                             consequence: (block
                                               (let
                                                 decls: (linear_decls
-                                                  (decl
-                                                    names: (names
-                                                      (var))
-                                                    procs: (procs
-                                                      (sub
-                                                        (var)
-                                                        (method
-                                                          receiver: (var)
-                                                          name: (var)
-                                                          args: (args
-                                                            (string_literal)))))))
+                                                  (let_var_decl
+                                                    (var)
+                                                    (sub
+                                                      (var)
+                                                      (method
+                                                        receiver: (var)
+                                                        name: (var)
+                                                        args: (args
+                                                          (string_literal))))))
                                                 proc: (block
                                                   (par
                                                     (par

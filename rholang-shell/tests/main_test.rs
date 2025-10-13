@@ -1,5 +1,5 @@
 use clap::Parser;
-use shell::Args;
+use rholang_shell::Args;
 
 // This test just verifies that the Args struct can be created and accessed
 #[test]

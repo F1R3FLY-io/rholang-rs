@@ -82,7 +82,7 @@ impl<'ast> ASTBuilder<'ast> {
 
     pub(crate) fn alloc_string_literal(&self, value: &'ast str) -> &Proc<'ast> {
         self.arena
-            .alloc(Proc::StringLiteral(value.trim_matches(|c| c == '"')))
+            .alloc(Proc::StringLiteral(crate::trim_byte(value, b'"')))
     }
 
     pub(crate) fn alloc_long_literal(&self, value: i64) -> &Proc<'ast> {

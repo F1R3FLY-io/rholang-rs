@@ -1,4 +1,4 @@
-use shell::help_message;
+use rholang_shell::help_message;
 
 #[test]
 fn test_help_message_content() {

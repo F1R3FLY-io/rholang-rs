@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use shell::{providers::RholangParserInterpreterProvider, run_shell, Args};
+use rholang_shell::{providers::RholangParserInterpreterProvider, run_shell, Args};
 use std::time::Duration;
 use tokio::time::timeout;
 

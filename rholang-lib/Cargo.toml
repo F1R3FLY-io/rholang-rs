@@ -1,0 +1,30 @@
+[package]
+name = "rholang-lib"
+description = "Library utilities for Rholang"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "librho"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+ahash = { workspace = true }
+as-any = { workspace = true }
+async-scoped = { workspace = true }
+bitvec = { workspace = true }
+by_address = "1.2.1"
+fixedbitset = "0.5.7"
+indexmap = { workspace = true }
+intmap = { workspace = true }
+nonempty-collections = "1.0.1"
+parking_lot = { workspace = true }
+rholang-parser = { path = "../rholang-parser" }
+smallvec = { workspace = true }
+stacker = "0.1.21"
+tokio = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }
+validated = { workspace = true }
+test-macros = { path = "../test-macros/" }

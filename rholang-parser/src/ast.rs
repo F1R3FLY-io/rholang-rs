@@ -1,5 +1,5 @@
 use std::{
-    fmt::{Display, Write},
+    fmt::{Debug, Display, Write},
     ops::Deref,
 };
 
@@ -115,6 +115,29 @@ impl<'a> Proc<'a> {
     pub fn ann(&'a self, span: SourceSpan) -> AnnProc<'a> {
         AnnProc { proc: self, span }
     }
+
+    pub fn is_ground(&self) -> bool {
+        match self {
+            Proc::Nil
+            | Proc::Unit
+            | Proc::BoolLiteral(_)
+            | Proc::LongLiteral(_)
+            | Proc::StringLiteral(_)
+            | Proc::UriLiteral(_)
+            | Proc::SimpleType(_)
+            | Proc::ProcVar(Var::Wildcard)
+            | Proc::Bad => true,
+            Proc::Collection(col) if col.is_empty() => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_ident(&self, expected: &str) -> bool {
+        match self {
+            Proc::ProcVar(var) => var.is_ident(expected),
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -126,6 +149,14 @@ pub struct AnnProc<'ast> {
 impl<'a> AnnProc<'a> {
     pub fn iter_preorder_dfs(&'a self) -> impl Iterator<Item = &'a Self> {
         PreorderDfsIter::<16>::new(self)
+    }
+
+    pub fn is_ground(&self) -> bool {
+        self.proc.is_ground()
+    }
+
+    pub fn is_ident(&self, expected: &str) -> bool {
+        self.proc.is_ident(expected)
     }
 }
 
@@ -161,6 +192,22 @@ impl PartialOrd for Id<'_> {
 pub enum Var<'ast> {
     Wildcard,
     Id(Id<'ast>),
+}
+
+impl Var<'_> {
+    pub fn get_position(self) -> Option<SourcePos> {
+        match self {
+            Var::Wildcard => None,
+            Var::Id(id) => Some(id.pos),
+        }
+    }
+
+    pub fn is_ident(self, expected: &str) -> bool {
+        match self {
+            Var::Wildcard => false,
+            Var::Id(id) => id.name == expected,
+        }
+    }
 }
 
 impl<'a> TryFrom<&Proc<'a>> for Var<'a> {
@@ -199,6 +246,15 @@ pub enum Name<'ast> {
     Quote(AnnProc<'ast>),
 }
 
+impl Name<'_> {
+    pub fn is_ident(&self, expected: &str) -> bool {
+        match self {
+            Name::NameVar(var) => var.is_ident(expected),
+            Name::Quote(ann_proc) => ann_proc.is_ident(expected),
+        }
+    }
+}
+
 impl<'a> From<Id<'a>> for Name<'a> {
     fn from(value: Id<'a>) -> Self {
         Name::NameVar(Var::Id(value))
@@ -209,6 +265,13 @@ impl<'a> From<Id<'a>> for Name<'a> {
 pub struct Names<'ast> {
     pub names: SmallVec<[Name<'ast>; 1]>,
     pub remainder: Option<Var<'ast>>,
+}
+
+pub enum NamesKind<'a> {
+    Empty,
+    SingleName(&'a Name<'a>),
+    SingleRemainder(Var<'a>),
+    Multiple,
 }
 
 impl Clone for Names<'_> {
@@ -242,7 +305,7 @@ impl Clone for Names<'_> {
 }
 
 impl<'a> Names<'a> {
-    pub(super) fn from_iter<I>(iterable: I, with_remainder: bool) -> Result<Names<'a>, String>
+    pub fn from_iter<I>(iterable: I, with_remainder: bool) -> Result<Names<'a>, String>
     where
         I: IntoIterator<Item = Name<'a>, IntoIter: DoubleEndedIterator>,
     {
@@ -262,8 +325,7 @@ impl<'a> Names<'a> {
         })
     }
 
-    #[allow(dead_code)]
-    pub(super) fn single(name: Name<'a>) -> Self {
+    pub fn single(name: Name<'a>) -> Self {
         Names {
             names: smallvec![name],
             remainder: None,
@@ -277,6 +339,22 @@ impl<'a> Names<'a> {
     pub fn only_remainder(&self) -> bool {
         self.names.is_empty() && self.remainder.is_some()
     }
+
+    pub fn is_single_name(&self) -> bool {
+        self.names.len() == 1 && self.remainder.is_none()
+    }
+
+    pub fn kind(&'a self) -> NamesKind<'a> {
+        if self.is_empty() {
+            NamesKind::Empty
+        } else if self.only_remainder() {
+            NamesKind::SingleRemainder(self.remainder.unwrap())
+        } else if self.is_single_name() {
+            NamesKind::SingleName(&self.names[0])
+        } else {
+            NamesKind::Multiple
+        }
+    }
 }
 
 // expressions
@@ -286,6 +364,11 @@ pub enum UnaryExpOp {
     Not,
     Neg,
     Negation,
+}
+impl UnaryExpOp {
+    pub fn is_connective(self) -> bool {
+        self == UnaryExpOp::Negation
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -311,16 +394,63 @@ pub enum BinaryExpOp {
     Conjunction,
 }
 
+impl BinaryExpOp {
+    pub fn is_connective(self) -> bool {
+        matches!(self, BinaryExpOp::Conjunction | BinaryExpOp::Disjunction)
+    }
+}
+
 // for-comprehensions
 
 pub type Receipts<'a> = SmallVec<[Receipt<'a>; 1]>;
 pub type Receipt<'a> = SmallVec<[Bind<'a>; 1]>;
+
+pub fn source_names<'a>(
+    receipt: &'a [Bind<'a>],
+) -> impl DoubleEndedIterator<Item = &'a Name<'a>> + ExactSizeIterator {
+    receipt.iter().map(|bind| bind.source_name())
+}
+
+pub fn inputs<'a>(receipt: &'a [Bind<'a>]) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
+    receipt.iter().filter_map(|bind| bind.input()).flatten()
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Bind<'ast> {
     Linear { lhs: Names<'ast>, rhs: Source<'ast> },
     Repeated { lhs: Names<'ast>, rhs: Name<'ast> },
     Peek { lhs: Names<'ast>, rhs: Name<'ast> },
+}
+
+impl<'a> Bind<'a> {
+    pub fn source_name(&self) -> &Name<'a> {
+        match self {
+            Bind::Linear { lhs: _, rhs } => match rhs {
+                Source::Simple { name }
+                | Source::ReceiveSend { name }
+                | Source::SendReceive { name, .. } => name,
+            },
+            Bind::Repeated { lhs: _, rhs } | Bind::Peek { lhs: _, rhs } => rhs,
+        }
+    }
+
+    pub fn input(&self) -> Option<&[AnnProc<'a>]> {
+        match self {
+            Bind::Linear { lhs: _, rhs } => match rhs {
+                Source::Simple { .. } | Source::ReceiveSend { .. } => None,
+                Source::SendReceive { name: _, inputs } => Some(inputs),
+            },
+            Bind::Repeated { .. } | Bind::Peek { .. } => None,
+        }
+    }
+
+    pub fn names(&self) -> &Names<'a> {
+        match self {
+            Bind::Linear { lhs, rhs: _ }
+            | Bind::Repeated { lhs, rhs: _ }
+            | Bind::Peek { lhs, rhs: _ } => lhs,
+        }
+    }
 }
 
 // source definitions
@@ -376,7 +506,7 @@ impl Deref for Uri<'_> {
 
 impl<'a> From<&'a str> for Uri<'a> {
     fn from(value: &'a str) -> Self {
-        Uri(value.trim_matches(|c| c == '`'))
+        Uri(super::trim_byte(value, b'`'))
     }
 }
 
@@ -413,6 +543,35 @@ pub enum Collection<'ast> {
     },
 }
 
+impl<'a> Collection<'a> {
+    pub fn remainder(&self) -> Option<Var<'a>> {
+        match self {
+            Collection::List { remainder, .. }
+            | Collection::Set { remainder, .. }
+            | Collection::Map { remainder, .. } => *remainder,
+            Collection::Tuple(_) => None,
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            Collection::List {
+                elements,
+                remainder,
+            }
+            | Collection::Set {
+                elements,
+                remainder,
+            } => elements.is_empty() && remainder.is_none(),
+            Collection::Map {
+                elements,
+                remainder,
+            } => elements.is_empty() && remainder.is_none(),
+            Collection::Tuple(_) => false,
+        }
+    }
+}
+
 // sends
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -436,15 +595,18 @@ pub enum BundleType {
 pub type LetBindings<'a> = SmallVec<[LetBinding<'a>; 1]>;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum LetBinding<'ast> {
-    Single {
-        lhs: Name<'ast>,
-        rhs: AnnProc<'ast>,
-    },
-    Multiple {
-        lhs: Var<'ast>,
-        rhs: Vec<AnnProc<'ast>>,
-    },
+pub struct LetBinding<'ast> {
+    pub lhs: Names<'ast>,
+    pub rhs: ProcList<'ast>,
+}
+
+impl<'a> LetBinding<'a> {
+    pub fn single(lhs: Name<'a>, rhs: AnnProc<'a>) -> Self {
+        Self {
+            lhs: Names::single(lhs),
+            rhs: smallvec![rhs],
+        }
+    }
 }
 
 // new name declaration
@@ -505,7 +667,8 @@ impl Display for Id<'_> {
         f.write_char('\'')?;
         f.write_str(self.name)?;
         f.write_char('\'')?;
-        Ok(())
+        f.write_char(':')?;
+        Display::fmt(&self.pos, f)
     }
 }
 
@@ -513,8 +676,7 @@ impl Display for Uri<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_char('`')?;
         f.write_str(self.0)?;
-        f.write_char('`')?;
-        Ok(())
+        f.write_char('`')
     }
 }
 
@@ -526,13 +688,16 @@ impl Display for SimpleType {
 
 impl Display for NameDecl<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.id, f)?;
+        f.write_char('\'')?;
+        f.write_str(self.id.name)?;
+        f.write_char('\'')?;
         if let Some(uri) = &self.uri {
             f.write_char('(')?;
             Display::fmt(uri, f)?;
             f.write_char(')')?;
         }
 
-        Ok(())
+        f.write_char(':')?;
+        Display::fmt(&self.id.pos, f)
     }
 }

@@ -1,0 +1,8 @@
+new x, y in {
+    // This reference to token is a pattern that binds
+    for (@token <- x) {
+        // This reference should not be binding.
+        // It says "if I get the same thing I got from x, do P"
+        for (@=token <- y) { token } 
+    }
+}
