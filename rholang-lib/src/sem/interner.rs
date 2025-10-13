@@ -49,7 +49,7 @@ impl Interner {
 
     pub(super) fn resolve_owned(&self, sym: Symbol) -> Option<String> {
         // No need to use `String.as_ptr()` trickery
-        self.rev.read().get_index(sym.0 as usize).map(|s| s.clone())
+        self.rev.read().get_index(sym.0 as usize).cloned()
     }
 }
 

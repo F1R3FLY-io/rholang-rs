@@ -491,21 +491,21 @@ impl PatternResolver {
         check_scope: bool,
     ) -> Option<BinderId> {
         let sym = db.intern(var.name);
-        if let Some(binder) = self.env.lookup(sym) {
-            if !check_scope || self.in_scope(binder) {
-                // Record the binder as used and add its symbol to the semantic db
-                let idx = self.binder_index(binder);
-                self.used.set(idx, true);
-                let occ = SymbolOccurence {
-                    symbol: sym,
-                    position: var.pos,
-                };
-                assert!(
-                    db.map_symbol_to_binder(occ, binder, expects_name, self.id),
-                    "bug: pattern variable {var} already bound!!!"
-                );
-                return Some(binder);
-            }
+        if let Some(binder) = self.env.lookup(sym)
+            && (!check_scope || self.in_scope(binder))
+        {
+            // Record the binder as used and add its symbol to the semantic db
+            let idx = self.binder_index(binder);
+            self.used.set(idx, true);
+            let occ = SymbolOccurence {
+                symbol: sym,
+                position: var.pos,
+            };
+            assert!(
+                db.map_symbol_to_binder(occ, binder, expects_name, self.id),
+                "bug: pattern variable {var} already bound!!!"
+            );
+            return Some(binder);
         }
         None
     }

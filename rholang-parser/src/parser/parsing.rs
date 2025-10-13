@@ -665,27 +665,25 @@ pub(super) fn node_to_ast<'ast>(
         if bad {
             proc_stack.push(ast_builder.bad_const(), node.range().into());
         }
-        loop {
-            let step = apply_cont(&mut cont_stack, &mut proc_stack, ast_builder);
-            match step {
-                Step::Done => {
-                    if start_node.has_error() {
-                        // discover all the errors
-                        errors::query_errors(start_node, source, &mut errors);
-                    }
-                    if let Some(some_errors) = NEVec::try_from_vec(errors) {
-                        return Validated::fail(ParsingFailure {
-                            partial_tree: proc_stack.to_proc_partial(),
-                            errors: some_errors,
-                        });
-                    }
-                    let last = proc_stack.to_proc();
-                    return Validated::Good(last);
+        let step = apply_cont(&mut cont_stack, &mut proc_stack, ast_builder);
+        match step {
+            Step::Done => {
+                if start_node.has_error() {
+                    // discover all the errors
+                    errors::query_errors(start_node, source, &mut errors);
                 }
-                Step::Continue(n) => {
-                    node = n;
-                    continue 'parse;
+                if let Some(some_errors) = NEVec::try_from_vec(errors) {
+                    return Validated::fail(ParsingFailure {
+                        partial_tree: proc_stack.to_proc_partial(),
+                        errors: some_errors,
+                    });
                 }
+                let last = proc_stack.to_proc();
+                return Validated::Good(last);
+            }
+            Step::Continue(n) => {
+                node = n;
+                continue 'parse;
             }
         }
     }
