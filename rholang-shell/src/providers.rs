@@ -292,22 +292,16 @@ impl InterpreterProvider for RholangParserInterpreterProvider {
                 // Create a parser locally in the task and parse the code
                 let parser = RholangParser::new();
                 let validated = parser.parse(&code_for_task);
+                // Match on the parser result: when it fails, return an Error with the source; otherwise pretty-print the AST
                 match validated {
-                    Validated::Good(procs) => {
-                        // Ensure output contains the word "source" to satisfy tests
-                        InterpretationResult::Success(format!(
-                            "Parsed successfully: source ({} top-level procs)",
-                            procs.len()
-                        ))
-                    }
                     Validated::Fail(_failure) => {
-                        // Return a parsing error without exposing internal details
                         InterpretationResult::Error(InterpreterError::parsing_error(
                             "Parsing failed",
                             None,
                             Some(code_for_task.clone()),
                         ))
                     }
+                    _ => InterpretationResult::Success(format!("{validated:#?}")),
                 }
             };
 

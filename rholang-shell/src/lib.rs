@@ -29,6 +29,110 @@ pub fn help_message() -> String {
 
 const DEFAULT_PROMPT: &str = ">>> ";
 
+// ANSI color helpers (enabled only when writing to a TTY)
+fn is_tty_stdout() -> bool { atty::is(atty::Stream::Stdout) }
+fn is_tty_stderr() -> bool { atty::is(atty::Stream::Stderr) }
+
+fn colorize(s: &str, code: &str, enable: bool) -> String {
+    if enable { format!("\x1b[{}m{}\x1b[0m", code, s) } else { s.to_string() }
+}
+
+fn label_info(s: &str) -> String { colorize(s, "36", is_tty_stdout()) }    // cyan
+fn label_ok(s: &str) -> String { colorize(s, "32", is_tty_stdout()) }      // green
+fn label_warn(s: &str) -> String { colorize(s, "33", is_tty_stdout()) }    // yellow
+fn label_err_out(s: &str) -> String { colorize(s, "31", is_tty_stdout()) } // red for stdout-bound errors
+fn label_err_err(s: &str) -> String { colorize(s, "31", is_tty_stderr()) } // red for stderr-bound errors
+
+// Heuristic AST highlighter for pretty-printed debug trees
+fn colorize_ast_tree(s: &str, enable: bool) -> String {
+    if !enable { return s.to_string(); }
+    // Only colorize multi-line, structured outputs to avoid touching normal outputs
+    if !s.contains('\n') { return s.to_string(); }
+
+    let mut out = String::with_capacity(s.len() + 32);
+    for line in s.lines() {
+        let mut i = 0usize;
+        let bytes = line.as_bytes();
+        // Copy leading whitespace/prefix indentation unchanged
+        while i < bytes.len() && (bytes[i] == b' ' || bytes[i] == b'\t' || bytes[i] == b'|' || bytes[i] == b'`' ) {
+            out.push(bytes[i] as char);
+            i += 1;
+        }
+        // After indentation, try to colorize tokens in a single pass
+        while i < bytes.len() {
+            let c = bytes[i] as char;
+            // Strings: "..."
+            if c == '"' {
+                let start = i;
+                i += 1;
+                while i < bytes.len() {
+                    let ch = bytes[i] as char;
+                    if ch == '\\' { // escape next
+                        if i + 1 < bytes.len() { i += 2; continue; } else { i += 1; break; }
+                    }
+                    if ch == '"' { i += 1; break; }
+                    i += 1;
+                }
+                let segment = &line[start..i.min(line.len())];
+                out.push_str(&colorize(segment, "32", true)); // green strings
+                continue;
+            }
+            // Numbers
+            if c.is_ascii_digit() || (c == '-' && i + 1 < bytes.len() && (bytes[i+1] as char).is_ascii_digit()) {
+                let start = i;
+                i += 1;
+                while i < bytes.len() && (bytes[i] as char).is_ascii_digit() { i += 1; }
+                // Optional decimal part
+                if i < bytes.len() && (bytes[i] as char) == '.' {
+                    i += 1;
+                    while i < bytes.len() && (bytes[i] as char).is_ascii_digit() { i += 1; }
+                }
+                let segment = &line[start..i];
+                out.push_str(&colorize(segment, "35", true)); // magenta numbers
+                continue;
+            }
+            // Booleans
+            if line[i..].starts_with("true") {
+                out.push_str(&colorize("true", "36", true)); // cyan
+                i += 4;
+                continue;
+            }
+            if line[i..].starts_with("false") {
+                out.push_str(&colorize("false", "36", true)); // cyan
+                i += 5;
+                continue;
+            }
+            // Field names of form ident: (until colon)
+            if c.is_ascii_alphabetic() || c == '_' {
+                let start = i;
+                i += 1;
+                while i < bytes.len() {
+                    let ch = bytes[i] as char;
+                    if ch.is_ascii_alphanumeric() || ch == '_' { i += 1; } else { break; }
+                }
+                // If followed by ':' we consider it a field label
+                if i < bytes.len() && (bytes[i] as char) == ':' {
+                    let ident = &line[start..i];
+                    out.push_str(&colorize(ident, "33", true)); // yellow field name
+                    out.push(':');
+                    i += 1;
+                    continue;
+                } else {
+                    // Otherwise it's likely a type/variant; color cyan
+                    let ident = &line[start..i];
+                    out.push_str(&colorize(ident, "36", true));
+                    continue;
+                }
+            }
+            // Default: copy char
+            out.push(c);
+            i += 1;
+        }
+        out.push('\n');
+    }
+    out
+}
+
 fn handle_kill_command<W: Write, I: InterpreterProvider>(
     arg: &str,
     stdout: &mut W,
@@ -89,6 +193,7 @@ pub fn process_special_command<W: Write, I: InterpreterProvider>(
 
     match cmd {
         ".help" => {
+            // Keep help text content the same; just color the header line if present
             writeln!(stdout, "{}", help_message())?;
         }
         ".mode" => {
@@ -249,10 +354,19 @@ pub async fn run_shell<I: InterpreterProvider>(args: Args, interpreter: I) -> Re
         let result = interpreter.interpret(&input).await;
         match result {
             InterpretationResult::Success(output) => {
-                println!("{}", output);
+                if is_tty_stdout() {
+                    let colored = colorize_ast_tree(&output, true);
+                    println!("{} {}", label_ok("Output:"), colored);
+                } else {
+                    println!("{}", output);
+                }
             }
             InterpretationResult::Error(e) => {
-                eprintln!("Error: {}", e);
+                if is_tty_stderr() {
+                    eprintln!("{} {}", label_err_err("Error:"), e);
+                } else {
+                    eprintln!("Error: {}", e);
+                }
                 // Non-zero exit if error in batch mode
                 // But since function returns Result, propagate as Ok to avoid panics for now
             }
@@ -314,11 +428,14 @@ pub async fn run_shell<I: InterpreterProvider>(args: Args, interpreter: I) -> Re
 
                     // Execute command if one is ready
                     if let Some(command) = command_option {
-                        writeln!(stdout, "Executing code: {command}")?;
+                        writeln!(stdout, "{} {command}", label_info("Executing code:"))?;
                         let result = interpreter.interpret(&command).await;
                         match result {
-                            InterpretationResult::Success(output) => writeln!(stdout, "Output: {output}")?,
-                            InterpretationResult::Error(e) => writeln!(stdout, "Error interpreting line: {e}")?,
+                            InterpretationResult::Success(output) => {
+                                let rendered = if is_tty_stdout() { colorize_ast_tree(&output, true) } else { output };
+                                writeln!(stdout, "{} {}", label_ok("Output:"), rendered)?
+                            }
+                            InterpretationResult::Error(e) => writeln!(stdout, "{} {e}", label_err_out("Error interpreting line:"))?,
                         }
                     }
                 }
@@ -336,7 +453,7 @@ pub async fn run_shell<I: InterpreterProvider>(args: Args, interpreter: I) -> Re
                     continue;
                 }
                 Err(e) => {
-                    writeln!(stdout, "Error: {e:?}")?;
+                    writeln!(stdout, "{} {e:?}", label_err_out("Error:"))?;
                     break;
                 }
             }
