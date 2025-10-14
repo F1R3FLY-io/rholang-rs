@@ -61,7 +61,7 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
         }
 
         // -- ground expressions that do not contain names --
-        Nil | Unit | BoolLiteral(_) | LongLiteral(_) | StringLiteral(_) | UriLiteral(_) => {}
+        Nil | Unit | BoolLiteral(_) | LongLiteral(_) | StringLiteral(_) | UriLiteral(_) | Bad => {}
 
         // -- variables --
         ProcVar(Id(id)) => {
@@ -308,7 +308,6 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
             });
         }
 
-        Bad => db.error(db[this], ErrorKind::BadCode, None),
         Select { branches: _ } => {
             unimplemented!("Select is not implemented in this version of Rholang")
         }
