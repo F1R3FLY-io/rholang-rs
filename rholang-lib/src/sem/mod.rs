@@ -479,7 +479,6 @@ pub enum ErrorKind {
     ConnectiveOutsidePattern,
     BundleInsidePattern,
     FreeVariable(SymbolOccurence),
-    BadCode,
 }
 
 impl ErrorKind {
