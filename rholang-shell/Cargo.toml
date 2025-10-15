@@ -7,6 +7,7 @@ edition = "2021"
 [lib]
 name = "rholang_shell"
 path = "src/lib.rs"
+crate-type = ["rlib"]
 
 [[bin]]
 name = "rhosh"
@@ -14,22 +15,30 @@ path = "src/main.rs"
 
 [features]
 with-file-history = []
+# Native (non-wasm) shell feature to include async runtime and line editor
+native = ["dep:tokio", "dep:rustyline-async", "dep:atty", "dep:rholang-parser", "dep:clap"]
+
+default = ["native"]
 
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-tokio = { workspace = true }
-rustyline-async = { workspace = true }
-clap = { workspace = true }
-bracket-parser = { workspace = true }
-rholang-parser = { path = "../rholang-parser" }
+# tokio and rustyline are not available on wasm32 target; include only with `native` feature.
+tokio = { workspace = true, optional = true }
+rustyline-async = { workspace = true, optional = true }
+clap = { workspace = true, optional = true }
+rholang-parser = { path = "../rholang-parser", optional = true }
 validated = { workspace = true }
-atty = "0.2"
+atty = { version = "0.2", optional = true }
 
+# Native-only deps
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+bracket-parser = { workspace = true }
 
 [[example]]
 name = "process_examples"
 path = "examples/process_examples.rs"
+
 
 [dev-dependencies]
 rstest = { workspace = true }

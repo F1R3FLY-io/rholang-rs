@@ -1,0 +1,83 @@
+# Multi-stage Dockerfile to build and serve the rholang-wasm WebAssembly demo (from rholang-wasm crate)
+# Usage (from repo root):
+#   docker build -f Dockerfile.wasm -t rholang-wasm .
+#   docker run --rm -p 8080:8080 rholang-wasm
+# Then open http://127.0.0.1:8080/www/index.html
+
+# ---------------------------
+# Builder: compile to WebAssembly via wasm-pack
+# ---------------------------
+FROM rust:bookworm as builder
+
+# Install Rust nightly matching repo's toolchain
+env RUSTUP_HOME=/usr/local/rustup CARGO_HOME=/usr/local/cargo
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/* \
+ && curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly-2025-08-04 \
+ && ln -s /usr/local/cargo/bin/* /usr/local/bin/
+ENV PATH="/usr/local/cargo/bin:${PATH}"
+
+# Avoid interactive tzdata etc
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install minimal build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config \
+    ca-certificates \
+    curl \
+    git \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install wasm-pack and a matching wasm-bindgen-cli to avoid version skew
+# Use --locked to force dependency versions compatible with the Rust toolchain in this image.
+RUN cargo install --locked wasm-pack@0.13.1 \
+ && cargo install --locked wasm-bindgen-cli --version 0.2.104
+
+WORKDIR /app
+
+# Copy only manifests first for better layer caching
+COPY Cargo.toml Cargo.lock ./
+COPY rholang-wasm/Cargo.toml rholang-wasm/Cargo.toml
+COPY rholang-shell/Cargo.toml rholang-shell/Cargo.toml
+COPY rholang-parser/Cargo.toml rholang-parser/Cargo.toml
+
+# Pre-create empty src to satisfy cargo when doing dep resolution for the workspace members
+RUN mkdir -p rholang-wasm/src rholang-shell/src rholang-parser/src
+RUN echo "pub fn _dummy() {}" > rholang-wasm/src/lib.rs \
+ && echo "pub fn _dummy() {}" > rholang-shell/src/lib.rs \
+ && echo "pub fn _dummy() {}" > rholang-parser/src/lib.rs
+
+# Fetch dependencies (cache layer)
+RUN wasm-pack build rholang-wasm --target web --no-default-features --features wasm || true
+
+# Now copy the full source
+COPY . .
+
+# Ensure potentially host-specific flags do not break cross compilation
+ENV RUSTFLAGS="" CARGO_ENCODED_RUSTFLAGS=""
+
+# Build the wasm package (outputs to rholang-wasm/pkg)
+RUN wasm-pack build rholang-wasm --target web --no-default-features --features wasm
+
+# Also build the native HTTP server binary
+RUN cargo build -p rholang-wasm --bin rholang-wasm-server --release
+
+# ---------------------------
+# Runtime: Self-contained HTTP server (Axum)
+# ---------------------------
+FROM debian:bookworm-slim as runtime
+
+# Minimal runtime deps
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy demo website and generated wasm pkg
+COPY --from=builder /app/rholang-wasm/www rholang-wasm/www
+COPY --from=builder /app/rholang-wasm/pkg rholang-wasm/pkg
+
+# Copy server binary built in the builder stage
+COPY --from=builder /app/target/release/rholang-wasm-server /usr/local/bin/rholang-wasm-server
+
+EXPOSE 8080
+
+CMD ["/usr/local/bin/rholang-wasm-server"]

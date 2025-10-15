@@ -28,3 +28,6 @@ tokio = { workspace = true }
 pretty_assertions = { workspace = true }
 validated = { workspace = true }
 test-macros = { path = "../test-macros/" }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+tokio = { version = "1.47.1", default-features = false, features = ["rt", "macros", "sync", "time"] }

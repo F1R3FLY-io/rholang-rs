@@ -17,3 +17,6 @@ path = "src/lib.rs"
 
 [features]
 parallel-exec = ["crossbeam", "num_cpus"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+tokio = { version = "1.47.1", default-features = false, features = ["rt", "macros", "sync", "time"] }

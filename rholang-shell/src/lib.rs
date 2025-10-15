@@ -1,12 +1,19 @@
+#[cfg(not(target_arch = "wasm32"))]
 pub mod providers;
 
 use anyhow::Result;
+#[cfg(not(target_arch = "wasm32"))]
 use bracket_parser::{BracketParser, BracketState};
+#[cfg(not(target_arch = "wasm32"))]
 use clap::Parser;
+#[cfg(not(target_arch = "wasm32"))]
 use providers::{InterpretationResult, InterpreterProvider};
+#[cfg(not(target_arch = "wasm32"))]
 use rustyline_async::{Readline, ReadlineEvent};
 use std::io::Write;
 
+
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
@@ -30,8 +37,14 @@ pub fn help_message() -> String {
 const DEFAULT_PROMPT: &str = ">>> ";
 
 // ANSI color helpers (enabled only when writing to a TTY)
+#[cfg(not(target_arch = "wasm32"))]
 fn is_tty_stdout() -> bool { atty::is(atty::Stream::Stdout) }
+#[cfg(not(target_arch = "wasm32"))]
 fn is_tty_stderr() -> bool { atty::is(atty::Stream::Stderr) }
+#[cfg(target_arch = "wasm32")]
+fn is_tty_stdout() -> bool { false }
+#[cfg(target_arch = "wasm32")]
+fn is_tty_stderr() -> bool { false }
 
 fn colorize(s: &str, code: &str, enable: bool) -> String {
     if enable { format!("\x1b[{}m{}\x1b[0m", code, s) } else { s.to_string() }
@@ -133,6 +146,7 @@ fn colorize_ast_tree(s: &str, enable: bool) -> String {
     out
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn handle_kill_command<W: Write, I: InterpreterProvider>(
     arg: &str,
     stdout: &mut W,
@@ -154,6 +168,7 @@ fn handle_kill_command<W: Write, I: InterpreterProvider>(
     Ok(())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn print_processes<W: Write, I: InterpreterProvider>(
     stdout: &mut W,
     interpreter: &I,
@@ -176,6 +191,7 @@ fn print_processes<W: Write, I: InterpreterProvider>(
 
 /// Process a special command (starting with '.')
 /// Returns true if the command was processed, false otherwise
+#[cfg(not(target_arch = "wasm32"))]
 pub fn process_special_command<W: Write, I: InterpreterProvider>(
     command: &str,
     buffer: &mut Vec<String>,
@@ -278,6 +294,7 @@ pub fn process_multiline_input(
 /// Process a line of input in single line mode
 /// Returns Some(command) if a command is ready to be executed, None otherwise
 /// If the line ends inside brackets, switches to multiline mode and returns None
+#[cfg(not(target_arch = "wasm32"))]
 pub fn process_single_line_input(
     line: String,
     buffer: &mut Vec<String>,
@@ -313,6 +330,7 @@ pub fn process_single_line_input(
 }
 
 /// Handle an interrupt event (Ctrl+C)
+#[cfg(not(target_arch = "wasm32"))]
 pub fn handle_interrupt<W: Write, I: InterpreterProvider>(
     buffer: &mut Vec<String>,
     multiline: bool,
@@ -341,6 +359,7 @@ pub fn handle_interrupt<W: Write, I: InterpreterProvider>(
 }
 
 /// Run the rholang-shell with the provided interpreter provider
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn run_shell<I: InterpreterProvider>(args: Args, interpreter: I) -> Result<()> {
     // If stdin is not a TTY, run in non-interactive (batch) mode and read from stdin
     if !atty::is(atty::Stream::Stdin) {

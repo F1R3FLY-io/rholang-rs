@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rholang Web (WASM Demo)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background: #0b0c10; color: #c5c6c7; }
+    header { background: #1f2833; padding: 12px 16px; }
+    header h1 { margin: 0; font-size: 18px; color: #66fcf1; }
+    main { padding: 16px; display: grid; gap: 12px; max-width: 980px; margin: 0 auto; }
+    .row { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    textarea { width: 100%; min-height: 140px; background: #0b0c10; color: #c5c6c7; border: 1px solid #45a29e55; border-radius: 6px; padding: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 14px; }
+    pre { background: #0b0c10; color: #c5c6c7; border: 1px solid #45a29e55; border-radius: 6px; padding: 10px; margin: 0; overflow: auto; }
+    .controls { display: flex; gap: 8px; align-items: center; }
+    button { background: #45a29e; color: #0b0c10; border: 0; padding: 8px 12px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+    .status { font-size: 12px; opacity: 0.8; }
+    a { color: #66fcf1; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Rholang – WebAssembly Demo</h1>
+  </header>
+  <main>
+    <div class="status" id="status">Loading...</div>
+
+    <div class="row">
+      <label for="input">Input</label>
+      <textarea id="input" placeholder="Type Rholang code or commands like .help ..."></textarea>
+      <div class="controls">
+        <button id="run">Run</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <label>Output</label>
+      <pre id="output"></pre>
+    </div>
+
+    <p class="status">
+      Notes: This demo page provides a simplified UI without multiline mode.
+    </p>
+  </main>
+
+  <script type="module">
+    const status = document.getElementById('status');
+    const input = document.getElementById('input');
+    const output = document.getElementById('output');
+    const runBtn = document.getElementById('run');
+
+    function setStatus(text) { status.textContent = text; }
+    function print(text) { output.textContent = String(text ?? ''); }
+
+    setStatus('Ready');
+
+    runBtn.addEventListener('click', async () => {
+      const code = input.value;
+      setStatus('Running...');
+      try {
+        const res = await fetch('/api/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code })
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          print('HTTP error: ' + res.status + ' ' + txt);
+          setStatus('Error');
+          return;
+        }
+        const data = await res.json();
+        if (data.ok) {
+          print(data.output);
+          setStatus('Done');
+        } else {
+          print(data.error || 'Unknown interpreter error');
+          setStatus('Error');
+        }
+      } catch (e) {
+        console.error(e);
+        print('Request failed: ' + e);
+        setStatus('Error');
+      }
+    });
+  </script>
+</body>
+</html>

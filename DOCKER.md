@@ -87,6 +87,31 @@ The development container includes:
 - OpenJDK 17 for JetBrains plugin development
 - All dependencies required for building and testing the project
 
+## Serving the rholang WebAssembly demo
+
+The WASM-related code lives in a dedicated crate `rholang-wasm`. You can build and serve the browser-based demo using Docker. This uses a multi-stage image to compile the WASM package with wasm-pack and then runs a small built-in HTTP server (Axum) that serves the static site and exposes an API to run code using the real interpreter.
+
+Quick start:
+
+```bash
+# From repository root
+docker build -f Dockerfile.wasm -t rholang-wasm .
+docker run --rm -p 8080:8080 rholang-wasm
+# Open the page:
+open http://127.0.0.1:8080/www/index.html
+```
+
+Helper script (builds image, runs it, and smoke-tests endpoints):
+
+```bash
+./scripts/docker_serve_wasm_shell.sh [--port 8080]
+```
+
+Notes:
+- The demo site is served under /www, with the generated JS/WASM under /pkg
+- The API endpoint is POST /api/run with JSON body { "code": "..." }; it returns { ok: bool, output: string, error: string|null }
+- Both the static site and the API are served from the same origin (port 8080)
+
 ## Troubleshooting
 
 ### Container Build Issues
@@ -115,3 +140,38 @@ If you encounter issues with the cargo cache:
 # Clear the cargo cache
 docker volume rm rholang_cargo-cache
 ```
+
+
+### Toolchain Notes
+
+- The WebAssembly build image (Dockerfile.wasm) uses the latest Rust nightly toolchain (`rust:nightly`) to ensure up-to-date wasm support in the ecosystem.
+- The wasm tooling (wasm-pack and wasm-bindgen-cli) installations are pinned with `--locked` to maintain compatible dependency resolution.
+
+## Running rholang-shell as a TCP service (port 8666)
+
+You can expose the interactive rholang-shell over TCP using the provided helper script. Each incoming connection gets an isolated shell session.
+
+Quick start:
+
+```bash
+# From repository root
+./scripts/run_shell_service.sh                 # listens on 0.0.0.0:8666
+# or choose a different port
+./scripts/run_shell_service.sh --port 7777
+# or via env
+PORT=9000 ./scripts/run_shell_service.sh
+```
+
+Connect from another terminal/machine:
+
+```bash
+nc 127.0.0.1 8666
+# or
+telnet 127.0.0.1 8666
+```
+
+Notes:
+- This script uses socat to bridge TCP <-> a pseudo‑TTY so line editing works.
+- Ensure `socat` is installed (macOS: `brew install socat`, Debian/Ubuntu: `sudo apt-get install -y socat`).
+- Each connection spawns a fresh `rhosh` process and ends when the client disconnects.
+- If you need to expose it in Docker, you can create a simple service that runs this script and publishes port 8666.
