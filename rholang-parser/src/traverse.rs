@@ -22,17 +22,43 @@ impl<'a, const S: usize> PreorderDfsIter<'a, S> {
         self.stack.push(right);
         self.stack.push(left);
     }
+
+    #[inline]
+    fn push_name(&mut self, name: &'a Name<'a>) {
+        if let Name::Quote(quoted) = name {
+            self.stack.push(quoted);
+        }
+    }
+
+    fn remember<I: IntoIterator<Item = &'a AnnProc<'a>, IntoIter: DoubleEndedIterator>>(
+        &mut self,
+        nodes: I,
+    ) {
+        self.stack.extend(nodes.into_iter().rev());
+    }
 }
 
-/// Helper: extract inputs from `ForComprehension` receipts.
+/// Helper: extract right-hand sides of let bindings
+fn let_rhss<'a>(
+    bindings: &'a [LetBinding<'a>],
+) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
+    bindings.iter().flat_map(|binding| &binding.rhs)
+}
+
+/// Helper: extract sources + their inputs from `ForComprehension` receipts.
 fn for_comprehension_inputs<'a>(
     receipts: &'a [Receipt<'a>],
 ) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
-    receipts
-        .iter()
-        .flatten()
-        .filter_map(|binding| binding.input())
-        .flatten()
+    receipts.iter().flatten().flat_map(|binding| {
+        let name_proc = if let Name::Quote(quoted) = binding.source_name() {
+            Some(quoted)
+        } else {
+            None
+        };
+        let quoted_iter = name_proc.into_iter();
+        let input_iter = binding.input().into_iter().flatten();
+        quoted_iter.chain(input_iter)
+    })
 }
 
 /// Helper: extract expression + cases from `Match`.
@@ -82,35 +108,45 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
 
             Proc::ForComprehension { receipts, proc } => {
                 self.stack.push(proc);
-                self.stack.extend(for_comprehension_inputs(receipts).rev());
+                self.remember(for_comprehension_inputs(receipts));
             }
 
             Proc::Let { bindings, body, .. } => {
-                for binding in bindings.iter().rev() {
-                    self.stack.extend(binding.rhs.iter().rev());
-                }
+                self.remember(let_rhss(bindings));
                 self.stack.push(body);
             }
 
-            Proc::Contract { body: inner, .. }
-            | Proc::New { proc: inner, .. }
+            Proc::Contract { name, body, .. } => {
+                self.stack.push(body);
+                self.push_name(name);
+            }
+            Proc::New { proc: inner, .. }
             | Proc::Bundle { proc: inner, .. }
             | Proc::UnaryExp { arg: inner, .. } => {
                 self.stack.push(inner);
             }
 
-            Proc::Send { inputs, .. } => {
-                self.stack.extend(inputs.iter().rev());
+            Proc::Send {
+                inputs, channel, ..
+            } => {
+                self.remember(inputs);
+                self.push_name(channel);
             }
-            Proc::SendSync { inputs, cont, .. } => {
+            Proc::SendSync {
+                channel,
+                inputs,
+                cont,
+                ..
+            } => {
                 if let SyncSendCont::NonEmpty(proc) = cont {
                     self.stack.push(proc);
                 }
-                self.stack.extend(inputs.iter().rev());
+                self.remember(inputs);
+                self.push_name(channel);
             }
 
             Proc::Match { expression, cases } => {
-                self.stack.extend(match_cases(cases).rev());
+                self.remember(match_cases(cases));
                 self.stack.push(expression);
             }
 
@@ -126,7 +162,7 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
             }
 
             Proc::Method { receiver, args, .. } => {
-                self.stack.extend(args.iter().rev());
+                self.remember(args);
                 self.stack.push(receiver);
             }
 
@@ -134,17 +170,20 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
                 Collection::List { elements, .. }
                 | Collection::Set { elements, .. }
                 | Collection::Tuple(elements) => {
-                    self.stack.extend(elements.iter().rev());
+                    self.remember(elements);
                 }
                 Collection::Map { elements, .. } => {
-                    self.stack.extend(map_elements(elements).rev());
+                    self.remember(map_elements(elements));
                 }
             },
 
             Proc::Select { branches } => {
-                self.stack.extend(select_branches(branches).rev());
+                self.remember(select_branches(branches));
             }
 
+            Proc::Eval { name } => {
+                self.push_name(name);
+            }
             // leaves
             Proc::Nil
             | Proc::Unit
@@ -154,7 +193,6 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
             | Proc::UriLiteral(_)
             | Proc::SimpleType(_)
             | Proc::ProcVar(_)
-            | Proc::Eval { .. }
             | Proc::VarRef { .. }
             | Proc::Bad => {}
         }
@@ -410,5 +448,119 @@ mod tests {
         assert_matches!(nodes[0].proc, Proc::UnaryExp { .. });
         // last node is the leaf
         assert_matches!(nodes.last().unwrap().proc, Proc::Nil);
+    }
+
+    #[test]
+    fn quoted_names() {
+        /*
+        for (_ <- @{arg1 | *table}) {
+          @{arg1 | *table}!(arg2) |
+          ack!(true)
+        }
+        */
+
+        let arg1_in_bind = Proc::ProcVar(Var::Id(Id {
+            name: "arg1",
+            pos: SourcePos::at_col(13),
+        }));
+        let eval_table_in_bind = Proc::Eval {
+            name: Id {
+                name: "table",
+                pos: SourcePos::at_col(21),
+            }
+            .into(),
+        };
+        let par_in_bind = Proc::Par {
+            left: arg1_in_bind.ann(SourcePos::at_col(13).span_of(4)),
+            right: eval_table_in_bind.ann(SourcePos::at_col(20).span_of(6)),
+        };
+
+        let bind = Bind::Linear {
+            lhs: Names::single(Name::NameVar(Var::Wildcard)),
+            rhs: Source::Simple {
+                name: Name::Quote(par_in_bind.ann(SourcePos::at_col(12).span_of(15))),
+            },
+        };
+
+        let arg1_in_send = Proc::ProcVar(Var::Id(Id {
+            name: "arg1",
+            pos: SourcePos { line: 2, col: 5 },
+        }));
+        let eval_table_in_send = Proc::Eval {
+            name: Id {
+                name: "table",
+                pos: SourcePos { line: 2, col: 13 },
+            }
+            .into(),
+        };
+        let par_in_send = Proc::Par {
+            left: arg1_in_send.ann(SourcePos::at_col(13).span_of(4)),
+            right: eval_table_in_send.ann(SourcePos { line: 2, col: 12 }.span_of(6)),
+        };
+
+        let arg2 = Proc::ProcVar(Var::Id(Id {
+            name: "arg2",
+            pos: SourcePos { line: 2, col: 21 },
+        }));
+        let first_send = Proc::Send {
+            channel: Name::Quote(par_in_send.ann(SourcePos { line: 2, col: 4 }.span_of(15))),
+            send_type: SendType::Single,
+            inputs: smallvec![arg2.ann(SourcePos { line: 2, col: 21 }.span_of(4))],
+        };
+
+        let true_lit = Proc::BoolLiteral(true);
+        let second_send = Proc::Send {
+            channel: Name::NameVar(Var::Id(Id {
+                name: "ack",
+                pos: SourcePos { line: 3, col: 3 },
+            })),
+            send_type: SendType::Single,
+            inputs: smallvec![true_lit.ann(SourcePos { line: 3, col: 8 }.span_of(4))],
+        };
+
+        let for_body = Proc::Par {
+            left: first_send.ann(SourcePos { line: 2, col: 3 }.span_of(23)),
+            right: second_send.ann(SourcePos { line: 3, col: 3 }.span_of(10)),
+        };
+
+        let for_comprehension = Proc::ForComprehension {
+            receipts: smallvec![smallvec![bind]],
+            proc: for_body.ann(SourceSpan {
+                start: SourcePos { line: 1, col: 29 },
+                end: SourcePos { line: 4, col: 2 },
+            }),
+        };
+
+        let root = for_comprehension.ann(SourceSpan {
+            start: SourcePos::default(),
+            end: SourcePos { line: 4, col: 1 },
+        });
+
+        let nodes: Vec<_> = (&root).iter_preorder_dfs().collect();
+
+        assert_eq!(nodes.len(), 12);
+        // preorder: for → quote → (par → arg → eval) →
+        //             for body → par → left send → quote → (par → arg → eval) → right send
+        assert_matches!(nodes[0].proc, Proc::ForComprehension { .. });
+        assert_matches!(nodes[1].proc, Proc::Par { .. });
+        assert_matches!(
+            nodes[2].proc,
+            Proc::ProcVar(Var::Id(Id { name: "arg1", .. }))
+        );
+        assert_matches!(nodes[3].proc, Proc::Eval { .. });
+        assert_matches!(nodes[4].proc, Proc::Par { .. });
+        assert_matches!(nodes[5].proc, Proc::Send { .. });
+        assert_matches!(nodes[6].proc, Proc::Par { .. });
+        assert_matches!(
+            nodes[7].proc,
+            Proc::ProcVar(Var::Id(Id { name: "arg1", .. }))
+        );
+        assert_matches!(nodes[8].proc, Proc::Eval { .. });
+        assert_matches!(
+            nodes[9].proc,
+            Proc::ProcVar(Var::Id(Id { name: "arg2", .. }))
+        );
+        assert_matches!(nodes[10].proc, Proc::Send { .. });
+        assert_matches!(nodes[11].proc, Proc::BoolLiteral(true));
     }
 }

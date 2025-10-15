@@ -374,16 +374,7 @@ fn resolve_name<'a>(
             }
         }
         Quote(p) => {
-            let quoted = db.build_index(p);
-            resolve(db, stack, quoted);
-            if db.has_free(quoted) {
-                let free = db.free_of(quoted).next().map(|bid| db[bid]).unwrap();
-                db.error(
-                    quoted,
-                    ErrorKind::FreeVariable(free.into()),
-                    Some(free.source_position),
-                );
-            }
+            resolve_unguarded(db, stack, p);
         }
     }
 }

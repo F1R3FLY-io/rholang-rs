@@ -478,7 +478,6 @@ pub enum ErrorKind {
     ProcInNamePosition(BinderId, Symbol),
     ConnectiveOutsidePattern,
     BundleInsidePattern,
-    FreeVariable(SymbolOccurence),
 }
 
 impl ErrorKind {
