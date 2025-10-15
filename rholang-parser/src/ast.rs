@@ -140,6 +140,12 @@ impl<'a> Proc<'a> {
     }
 }
 
+impl<'a> From<Var<'a>> for Proc<'a> {
+    fn from(value: Var<'a>) -> Self {
+        Proc::ProcVar(value)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct AnnProc<'ast> {
     pub proc: &'ast Proc<'ast>,
