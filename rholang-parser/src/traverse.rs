@@ -1,6 +1,6 @@
 use std::iter::{self, FusedIterator};
 
-use smallvec::SmallVec;
+use smallvec::{SmallVec, smallvec};
 
 use crate::ast::*;
 
@@ -12,9 +12,9 @@ pub(crate) struct PreorderDfsIter<'a, const S: usize> {
 impl<'a, const S: usize> PreorderDfsIter<'a, S> {
     /// Start traversal from the given root.
     pub(crate) fn new(root: &'a AnnProc<'a>) -> Self {
-        let mut stack = SmallVec::new();
-        stack.push(root);
-        Self { stack }
+        Self {
+            stack: smallvec![root],
+        }
     }
 
     #[inline]
@@ -38,62 +38,6 @@ impl<'a, const S: usize> PreorderDfsIter<'a, S> {
     }
 }
 
-/// Helper: extract right-hand sides of let bindings
-fn let_rhss<'a>(
-    bindings: &'a [LetBinding<'a>],
-) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
-    bindings.iter().flat_map(|binding| &binding.rhs)
-}
-
-/// Helper: extract sources + their inputs from `ForComprehension` receipts.
-fn for_comprehension_inputs<'a>(
-    receipts: &'a [Receipt<'a>],
-) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
-    receipts.iter().flatten().flat_map(|binding| {
-        let name_proc = if let Name::Quote(quoted) = binding.source_name() {
-            Some(quoted)
-        } else {
-            None
-        };
-        let quoted_iter = name_proc.into_iter();
-        let input_iter = binding.input().into_iter().flatten();
-        quoted_iter.chain(input_iter)
-    })
-}
-
-/// Helper: extract expression + cases from `Match`.
-fn match_cases<'a>(cases: &'a [Case<'a>]) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
-    cases
-        .iter()
-        .flat_map(|case| iter::once(&case.pattern).chain(iter::once(&case.proc)))
-}
-
-/// Helper: extract inputs + branch body from `Select`.
-fn select_branches<'a>(
-    branches: &'a [Branch<'a>],
-) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
-    branches.iter().flat_map(|branch| {
-        branch
-            .patterns
-            .iter()
-            .filter_map(|ptrn| match &ptrn.rhs {
-                Source::SendReceive { inputs, .. } => Some(inputs),
-                _ => None,
-            })
-            .flatten()
-            .chain(iter::once(&branch.proc))
-    })
-}
-
-/// Helper: extract key–value children from `Collection::Map`.
-fn map_elements<'a>(
-    elements: &'a [(AnnProc<'a>, AnnProc<'a>)],
-) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
-    elements
-        .iter()
-        .flat_map(|(k, v)| iter::once(k).chain(iter::once(v)))
-}
-
 impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
     type Item = &'a AnnProc<'a>;
 
@@ -107,8 +51,8 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
             }
 
             Proc::ForComprehension { receipts, proc } => {
-                self.stack.push(proc);
                 self.remember(for_comprehension_inputs(receipts));
+                self.stack.push(proc);
             }
 
             Proc::Let { bindings, body, .. } => {
@@ -202,6 +146,239 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
 }
 
 impl<'a, const S: usize> FusedIterator for PreorderDfsIter<'a, S> {}
+
+#[derive(Clone, Copy)]
+pub enum DfsEvent<'a> {
+    Enter(&'a AnnProc<'a>),
+    Exit(&'a AnnProc<'a>),
+}
+
+/* 
+`PreorderDfsIter`` can be implemented in terms of this iterator. But it might not be worth it:
+
+1. The `DfsEventIter`` adds an extra push for each node (`Exit` scheduling) and a branch per iteration.
+Current `PreorderDfsIter` is very branch-efficient — the CPU will love it in tight traversal code.
+So if you’re in a hot path and don’t need the Exit events, the hand-tuned version could be slightly faster.
+
+2. Inlining and branch prediction
+Current PreorderDfsIter is straightforward enough to inline well; wrapping it in another iterator layer might inhibit some of that in release builds.
+ */
+pub(crate) struct DfsEventIter<'a, const S: usize> {
+    stack: SmallVec<[Frame<'a>; S]>,
+}
+
+struct Frame<'a> {
+    node: &'a AnnProc<'a>,
+    stage: Stage,
+}
+
+#[derive(Copy, Clone)]
+enum Stage {
+    Enter,
+    Exit,
+}
+
+impl<'a, const S: usize> DfsEventIter<'a, S> {
+    pub fn new(root: &'a AnnProc<'a>) -> Self {
+        Self {
+            stack: smallvec![Frame {
+                node: root,
+                stage: Stage::Enter
+            }],
+        }
+    }
+
+    #[inline]
+    fn push_children<I: IntoIterator<Item = &'a AnnProc<'a>, IntoIter: DoubleEndedIterator>>(
+        &mut self,
+        children: I,
+    ) {
+        for child in children.into_iter().rev() {
+            self.stack.push(Frame {
+                node: child,
+                stage: Stage::Enter,
+            });
+        }
+    }
+}
+
+impl<'a, const S: usize> Iterator for DfsEventIter<'a, S> {
+    type Item = DfsEvent<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let Frame { node, stage } = self.stack.pop()?;
+
+        match stage {
+            Stage::Enter => {
+                // schedule exit *after* children
+                self.stack.push(Frame {
+                    node,
+                    stage: Stage::Exit,
+                });
+
+                // push children
+                match node.proc {
+                    Proc::Par { left, right } | Proc::BinaryExp { left, right, .. } => {
+                        self.push_children([left, right]);
+                    }
+                    Proc::ForComprehension { receipts, proc } => {
+                        self.push_children(
+                            iter::once(proc).chain(for_comprehension_inputs(receipts)),
+                        );
+                    }
+                    Proc::Let { bindings, body, .. } => {
+                        self.push_children(let_rhss(bindings).chain(iter::once(body)));
+                    }
+                    Proc::Contract { name, body, .. } => {
+                        let quoted = match name {
+                            Name::Quote(q) => Some(q),
+                            _ => None,
+                        };
+                        self.push_children(quoted.into_iter().chain(iter::once(body)));
+                    }
+                    Proc::New { proc: inner, .. }
+                    | Proc::Bundle { proc: inner, .. }
+                    | Proc::UnaryExp { arg: inner, .. } => {
+                        self.push_children(iter::once(inner));
+                    }
+                    Proc::Send {
+                        inputs, channel, ..
+                    } => {
+                        let quoted = match channel {
+                            Name::Quote(q) => Some(q),
+                            _ => None,
+                        };
+                        self.push_children(inputs.iter().chain(quoted));
+                    }
+                    Proc::SendSync {
+                        channel,
+                        inputs,
+                        cont,
+                        ..
+                    } => {
+                        let quoted = match channel {
+                            Name::Quote(q) => Some(q),
+                            _ => None,
+                        };
+                        let cont_iter = match cont {
+                            SyncSendCont::NonEmpty(p) => Some(p),
+                            _ => None,
+                        };
+                        self.push_children(
+                            inputs.iter().chain(quoted).chain(cont_iter.into_iter()),
+                        );
+                    }
+                    Proc::Match { expression, cases } => {
+                        self.push_children(iter::once(expression).chain(match_cases(cases)));
+                    }
+                    Proc::IfThenElse {
+                        condition,
+                        if_true,
+                        if_false,
+                    } => {
+                        let if_false_iter = if_false.into_iter();
+                        self.push_children(
+                            iter::once(condition)
+                                .chain(iter::once(if_true))
+                                .chain(if_false_iter),
+                        );
+                    }
+                    Proc::Method { receiver, args, .. } => {
+                        self.push_children(iter::once(receiver).chain(args));
+                    }
+                    Proc::Collection(collection) => match collection {
+                        Collection::List { elements, .. }
+                        | Collection::Set { elements, .. }
+                        | Collection::Tuple(elements) => {
+                            self.push_children(elements);
+                        }
+                        Collection::Map { elements, .. } => {
+                            self.push_children(map_elements(elements));
+                        }
+                    },
+                    Proc::Select { branches } => {
+                        self.push_children(select_branches(branches));
+                    }
+                    Proc::Eval { name } => {
+                        if let Name::Quote(q) = name {
+                            self.push_children(iter::once(q));
+                        }
+                    }
+                    Proc::Nil
+                    | Proc::Unit
+                    | Proc::BoolLiteral(_)
+                    | Proc::LongLiteral(_)
+                    | Proc::StringLiteral(_)
+                    | Proc::UriLiteral(_)
+                    | Proc::SimpleType(_)
+                    | Proc::ProcVar(_)
+                    | Proc::VarRef { .. }
+                    | Proc::Bad => {}
+                }
+
+                Some(DfsEvent::Enter(node))
+            }
+
+            Stage::Exit => Some(DfsEvent::Exit(node)),
+        }
+    }
+}
+
+/// Helper: extract right-hand sides of let bindings
+fn let_rhss<'a>(
+    bindings: &'a [LetBinding<'a>],
+) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
+    bindings.iter().flat_map(|binding| &binding.rhs)
+}
+
+/// Helper: extract sources + their inputs from `ForComprehension` receipts.
+fn for_comprehension_inputs<'a>(
+    receipts: &'a [Receipt<'a>],
+) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
+    receipts.iter().flatten().flat_map(|binding| {
+        let name_proc = if let Name::Quote(quoted) = binding.source_name() {
+            Some(quoted)
+        } else {
+            None
+        };
+        let quoted_iter = name_proc.into_iter();
+        let input_iter = binding.input().into_iter().flatten();
+        quoted_iter.chain(input_iter)
+    })
+}
+
+/// Helper: extract expression + cases from `Match`.
+fn match_cases<'a>(cases: &'a [Case<'a>]) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
+    cases
+        .iter()
+        .flat_map(|case| iter::once(&case.pattern).chain(iter::once(&case.proc)))
+}
+
+/// Helper: extract inputs + branch body from `Select`.
+fn select_branches<'a>(
+    branches: &'a [Branch<'a>],
+) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
+    branches.iter().flat_map(|branch| {
+        branch
+            .patterns
+            .iter()
+            .filter_map(|ptrn| match &ptrn.rhs {
+                Source::SendReceive { inputs, .. } => Some(inputs),
+                _ => None,
+            })
+            .flatten()
+            .chain(iter::once(&branch.proc))
+    })
+}
+
+/// Helper: extract key–value children from `Collection::Map`.
+fn map_elements<'a>(
+    elements: &'a [(AnnProc<'a>, AnnProc<'a>)],
+) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
+    elements
+        .iter()
+        .flat_map(|(k, v)| iter::once(k).chain(iter::once(v)))
+}
 
 #[cfg(test)]
 mod tests {
@@ -410,15 +587,15 @@ mod tests {
         assert_eq!(nodes.len(), 6);
         // ensure the outermost node is root
         assert_matches!(nodes[0].proc, Proc::ForComprehension { .. });
-        // then comes outer_rhs in preorder
+        // then the body
         assert_matches!(nodes[1].proc, Proc::LongLiteral(99));
-        assert_matches!(nodes[2].proc, Proc::ForComprehension { .. });
-        // then comes inner_rhs
-        assert_matches!(nodes[3].proc, Proc::LongLiteral(42));
-        assert_matches!(nodes[4].proc, Proc::LongLiteral(42));
-        // and the body
         // the traversal includes all inputs and procs in preorder
-        assert_matches!(nodes[5].proc, Proc::LongLiteral(99));
+        // then comes outer_rhs in preorder
+        assert_matches!(nodes[2].proc, Proc::LongLiteral(99));
+        assert_matches!(nodes[3].proc, Proc::ForComprehension { .. });
+        // then comes inner_rhs
+        assert_matches!(nodes[4].proc, Proc::LongLiteral(42));
+        assert_matches!(nodes[5].proc, Proc::LongLiteral(42));
     }
 
     #[test]
@@ -539,28 +716,29 @@ mod tests {
         let nodes: Vec<_> = (&root).iter_preorder_dfs().collect();
 
         assert_eq!(nodes.len(), 12);
-        // preorder: for → quote → (par → arg → eval) →
-        //             for body → par → left send → quote → (par → arg → eval) → right send
+        // preorder: for →
+        //             for body → par → left send → quote → (par → arg → eval) → right send  →
+        //           quote → (par → arg → eval)
         assert_matches!(nodes[0].proc, Proc::ForComprehension { .. });
         assert_matches!(nodes[1].proc, Proc::Par { .. });
+        assert_matches!(nodes[2].proc, Proc::Send { .. });
+        assert_matches!(nodes[3].proc, Proc::Par { .. });
         assert_matches!(
-            nodes[2].proc,
+            nodes[4].proc,
             Proc::ProcVar(Var::Id(Id { name: "arg1", .. }))
         );
-        assert_matches!(nodes[3].proc, Proc::Eval { .. });
-        assert_matches!(nodes[4].proc, Proc::Par { .. });
-        assert_matches!(nodes[5].proc, Proc::Send { .. });
-        assert_matches!(nodes[6].proc, Proc::Par { .. });
+        assert_matches!(nodes[5].proc, Proc::Eval { .. });
         assert_matches!(
-            nodes[7].proc,
-            Proc::ProcVar(Var::Id(Id { name: "arg1", .. }))
-        );
-        assert_matches!(nodes[8].proc, Proc::Eval { .. });
-        assert_matches!(
-            nodes[9].proc,
+            nodes[6].proc,
             Proc::ProcVar(Var::Id(Id { name: "arg2", .. }))
         );
-        assert_matches!(nodes[10].proc, Proc::Send { .. });
-        assert_matches!(nodes[11].proc, Proc::BoolLiteral(true));
+        assert_matches!(nodes[7].proc, Proc::Send { .. });
+        assert_matches!(nodes[8].proc, Proc::BoolLiteral(true));
+        assert_matches!(nodes[9].proc, Proc::Par { .. });
+        assert_matches!(
+            nodes[10].proc,
+            Proc::ProcVar(Var::Id(Id { name: "arg1", .. }))
+        );
+        assert_matches!(nodes[11].proc, Proc::Eval { .. });
     }
 }

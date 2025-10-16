@@ -52,6 +52,10 @@ pub type ProcRef<'a> = &'a ast::AnnProc<'a>;
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PID(u32);
 
+impl PID {
+    const TOP_LEVEL: PID = PID(u32::MAX);
+}
+
 impl Display for PID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
@@ -73,7 +77,7 @@ impl IntKey for PID {
 pub struct Symbol(u32);
 
 impl Symbol {
-    pub const DUMMY: Symbol = Symbol(u32::MAX);
+    const DUMMY: Symbol = Symbol(u32::MAX);
 }
 
 impl Display for Symbol {
