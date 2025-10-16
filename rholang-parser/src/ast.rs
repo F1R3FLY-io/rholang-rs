@@ -5,7 +5,7 @@ use std::{
 
 use smallvec::{SmallVec, smallvec};
 
-use crate::{SourcePos, SourceSpan, traverse::PreorderDfsIter};
+use crate::{SourcePos, SourceSpan, traverse::*};
 
 pub type ProcList<'a> = SmallVec<[AnnProc<'a>; 1]>;
 
@@ -155,6 +155,10 @@ pub struct AnnProc<'ast> {
 impl<'a> AnnProc<'a> {
     pub fn iter_preorder_dfs(&'a self) -> impl Iterator<Item = &'a Self> {
         PreorderDfsIter::<16>::new(self)
+    }
+
+    pub fn iter_dfs_event(&'a self) -> impl Iterator<Item = DfsEvent<'a>> {
+        DfsEventIter::<16>::new(self)
     }
 
     pub fn is_ground(&self) -> bool {
