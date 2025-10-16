@@ -85,9 +85,11 @@ impl<'a> SemanticDb<'a> {
 
         root.iter_preorder_dfs().enumerate().for_each(|(i, proc)| {
             let key = ByAddress(proc);
-            let next = (start_id + i)
-                .try_into()
-                .expect("Too many elements in the index");
+            let next = (start_id + i) as u32; // SAFETY: below we check if `next`` is equal to u32::MAX. So even the enumeration starts from u32::MAX, the first item will panic
+            if next == u32::MAX {
+                // u32::MAX is reserved for top-level (dummy) PID
+                panic!("Too many elements in the index");
+            }
             self.rev.insert(key, PID(next));
         });
 
