@@ -10,6 +10,7 @@ use rholang_parser::{SourcePos, SourceSpan, ast};
 
 pub mod db;
 pub mod diagnostics;
+mod elaborator;
 mod interner;
 pub mod pipeline;
 mod resolver;
@@ -45,6 +46,7 @@ pub trait DiagnosticPass: Pass + Send + Sync {
     fn run(&self, db: &SemanticDb) -> Vec<Diagnostic>;
 }
 
+pub use elaborator::ForCompElaborationPass;
 pub use resolver::ResolverPass;
 
 pub type ProcRef<'a> = &'a ast::AnnProc<'a>;
@@ -69,7 +71,7 @@ impl IntKey for PID {
 }
 
 /// Interned strings
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Symbol(u32);
 
 impl Symbol {
@@ -125,7 +127,7 @@ pub struct BoundOccurence {
 }
 
 /// ID of a binder (variable or name)
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BinderId(u32);
 
 impl BinderId {
