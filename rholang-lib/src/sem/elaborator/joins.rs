@@ -159,7 +159,6 @@ impl<'a, 'ast> JoinValidator<'a, 'ast> {
         Ok(())
     }
 
-
     /// Builds a dependency graph of channels and detects cycles that could lead to deadlocks
     pub fn detect_deadlocks(&self, receipts: &Receipts<'ast>) -> ValidationResult {
         let graph = self.build_dependency_graph(receipts)?;
@@ -189,26 +188,9 @@ impl<'a, 'ast> JoinValidator<'a, 'ast> {
     }
 
     /// Build a dependency graph from receipts
-    ///
-    /// ## Rholang Semantics:
-    /// - Sequential receipts (`for(@x <- ch1; @y <- ch2)`) execute in order
-    /// - Parallel bindings (`for(@x <- ch1 & @y <- ch2)`) execute atomically
-    /// - A true deadlock requires a cycle where channels wait on each other
-    ///
-    /// ## Dependency Modeling:
-    /// We don't model sequential dependencies as graph edges because:
-    /// 1. Sequential execution is guaranteed by Rholang semantics
-    /// 2. `for(@x <- ch1; @y <- ch2)` means "wait for ch1, THEN wait for ch2"
-    /// 3. This cannot deadlock unless ch1 or ch2 themselves are involved in cycles
-    ///
-    /// Real deadlocks occur when:
-    /// - Channel A waits for message from B
-    /// - Channel B waits for message from A
-    /// - This requires analyzing the *body* of for-comprehensions, not just receipts
-    ///
     /// ## Current Limitation:
     /// Static analysis of cross-for-comprehension dependencies requires global
-    /// program analysis which is beyond the scope of this validator. We focus on:
+    /// program analysis. We focus on:
     /// 1. Validating structural integrity
     /// 2. Detecting obvious same-channel conflicts in parallel joins
     fn build_dependency_graph(
@@ -232,11 +214,10 @@ impl<'a, 'ast> JoinValidator<'a, 'ast> {
             }
         }
 
-        // For now, return empty graph. True deadlock detection requires:
+        // For now, return empty graph. Deadlock detection requires:
         // 1. Control flow analysis across for-comprehensions
         // 2. Data flow analysis to track channel usage in bodies
         // 3. Global program analysis to find circular wait conditions
-        // These are future enhancements beyond current scope
         Ok(graph)
     }
 
@@ -589,7 +570,6 @@ mod tests {
         let validator = JoinValidator::new(&db);
         let result = validator.validate(pid, receipts);
 
-        // This is valid in Rholang - waiting for two messages from same channel
         assert!(
             result.is_ok(),
             "Multiple bindings on same channel should validate: {:?}",

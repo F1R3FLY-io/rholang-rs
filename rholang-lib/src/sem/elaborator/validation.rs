@@ -32,10 +32,18 @@ pub enum MessageType {
     /// Single name/quoted process
     Name,
     Process,
-    List { expected_len: Option<usize> },
-    Tuple { expected_len: usize },
-    Set { expected_len: Option<usize> },
-    Map { expected_pairs: Option<usize> },
+    List {
+        expected_len: Option<usize>,
+    },
+    Tuple {
+        expected_len: usize,
+    },
+    Set {
+        expected_len: Option<usize>,
+    },
+    Map {
+        expected_pairs: Option<usize>,
+    },
     Multiple,
     /// Unknown or complex type
     Unknown,
@@ -123,9 +131,7 @@ impl<'a, 'ast> TypeValidator<'a, 'ast> {
     /// Infer the type of a channel from its structure
     fn infer_channel_type(&self, channel: &Name<'ast>) -> ChannelType {
         match channel {
-            Name::Quote(_proc) => {
-                ChannelType::QuotedProcess
-            }
+            Name::Quote(_proc) => ChannelType::QuotedProcess,
             Name::NameVar(var) => match var {
                 ast::Var::Wildcard => ChannelType::Unknown,
                 ast::Var::Id(id) => {
@@ -638,7 +644,8 @@ impl<'a, 'ast> PatternQueryValidator<'a, 'ast> {
                 if let (Some(left_val), Some(right_val)) = (
                     self.extract_ground_value(left),
                     self.extract_ground_value(right),
-                ) && left_val != right_val {
+                ) && left_val != right_val
+                {
                     return Some(format!(
                         "Contradictory ground terms: {} AND {}",
                         left_val, right_val
@@ -686,7 +693,8 @@ impl<'a, 'ast> PatternQueryValidator<'a, 'ast> {
                 if let (Some(left_type), Some(right_type)) = (
                     self.extract_collection_type(left),
                     self.extract_collection_type(right),
-                ) && left_type != right_type {
+                ) && left_type != right_type
+                {
                     return Some(format!(
                         "Impossible collection constraint: {} AND {}",
                         left_type, right_type
@@ -697,7 +705,8 @@ impl<'a, 'ast> PatternQueryValidator<'a, 'ast> {
                 if let (Some(left_size), Some(right_size)) = (
                     self.extract_collection_size(left),
                     self.extract_collection_size(right),
-                ) && left_size != right_size {
+                ) && left_size != right_size
+                {
                     return Some(format!(
                         "Impossible collection size constraint: size {} AND size {}",
                         left_size, right_size
@@ -720,24 +729,32 @@ impl<'a, 'ast> PatternQueryValidator<'a, 'ast> {
                     ast::Collection::List { elements, .. }
                     | ast::Collection::Set { elements, .. } => {
                         for elem in elements.iter() {
-                            if let Some(impossible) = self.find_impossible_collection_constraint(elem) {
+                            if let Some(impossible) =
+                                self.find_impossible_collection_constraint(elem)
+                            {
                                 return Some(impossible);
                             }
                         }
                     }
                     ast::Collection::Tuple(elements) => {
                         for elem in elements.iter() {
-                            if let Some(impossible) = self.find_impossible_collection_constraint(elem) {
+                            if let Some(impossible) =
+                                self.find_impossible_collection_constraint(elem)
+                            {
                                 return Some(impossible);
                             }
                         }
                     }
                     ast::Collection::Map { elements, .. } => {
                         for (key, value) in elements.iter() {
-                            if let Some(impossible) = self.find_impossible_collection_constraint(key) {
+                            if let Some(impossible) =
+                                self.find_impossible_collection_constraint(key)
+                            {
                                 return Some(impossible);
                             }
-                            if let Some(impossible) = self.find_impossible_collection_constraint(value) {
+                            if let Some(impossible) =
+                                self.find_impossible_collection_constraint(value)
+                            {
                                 return Some(impossible);
                             }
                         }

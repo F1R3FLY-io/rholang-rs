@@ -16,11 +16,11 @@
 //! elaborator.elaborate_and_finalize(pid)?;
 //! ```
 
-use rholang_parser::ast::Proc;
-use crate::sem::{PID, SemanticDb, Diagnostic};
-use crate::sem::elaborator::joins::JoinValidator;
 use crate::sem::elaborator::consumption::ConsumptionValidator;
+use crate::sem::elaborator::joins::JoinValidator;
 use crate::sem::elaborator::validation::PatternQueryValidator;
+use crate::sem::{Diagnostic, PID, SemanticDb};
+use rholang_parser::ast::Proc;
 
 pub mod consumption;
 pub mod errors;
@@ -177,7 +177,7 @@ impl<'a, 'ast> ForComprehensionElaborator<'a, 'ast> {
 
         match proc.proc {
             Proc::ForComprehension { receipts, .. } => {
-                let mut validator = ConsumptionValidator::new(self.db);
+                let validator = ConsumptionValidator::new(self.db);
 
                 validator
                     .validate(pid, receipts)
@@ -203,7 +203,7 @@ impl<'a, 'ast> ForComprehensionElaborator<'a, 'ast> {
         match proc.proc {
             Proc::ForComprehension { receipts, .. } => {
                 let validator = JoinValidator::new(self.db);
-                
+
                 validator
                     .validate(pid, receipts)
                     .map_err(|e| self.convert_validation_error(pid, e))?;
