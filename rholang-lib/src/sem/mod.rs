@@ -10,6 +10,7 @@ use rholang_parser::{SourcePos, SourceSpan, ast};
 
 pub mod db;
 pub mod diagnostics;
+mod enclosure_analysis;
 mod interner;
 pub mod pipeline;
 mod resolver;
@@ -45,6 +46,7 @@ pub trait DiagnosticPass: Pass + Send + Sync {
     fn run(&self, db: &SemanticDb) -> Vec<Diagnostic>;
 }
 
+pub use enclosure_analysis::EnclosureAnalysisPass;
 pub use resolver::ResolverPass;
 
 pub type ProcRef<'a> = &'a ast::AnnProc<'a>;
@@ -428,6 +430,7 @@ pub struct SemanticDb<'a> {
     binder_is_name: BitVec,                // fast BinderId -> name or proc
     binders: Vec<Binder>,                  // semantic info about each binding
     proc_to_scope: IntMap<PID, ScopeInfo>, // PID -> semantic info about the scope
+    enclosing_pids: Vec<PID>,              // the enclosing scope for a given process
 
     var_to_binder: BTreeMap<SymbolOccurence, VarBinding>, // var -> where it is bound
 }
