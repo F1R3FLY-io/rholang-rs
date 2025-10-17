@@ -297,6 +297,9 @@ impl ScopeInfo {
         }
     }
 
+    /// # Safety
+    ///
+    /// The function does not check if the `idx` is valid
     #[inline(always)]
     pub unsafe fn mark_used_unchecked(&mut self, idx: usize) {
         unsafe {

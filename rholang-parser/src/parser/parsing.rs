@@ -678,7 +678,7 @@ pub(super) fn node_to_ast<'ast>(
                         errors: some_errors,
                     });
                 }
-                let last = proc_stack.to_proc();
+                let last = proc_stack.into_proc();
                 return Validated::Good(last);
             }
             Step::Continue(n) => {
@@ -1193,7 +1193,7 @@ impl<'a> ProcStack<'a> {
         self.quote_mask.push(false);
     }
 
-    fn to_proc(self) -> AnnProc<'a> {
+    fn into_proc(self) -> AnnProc<'a> {
         let stack = self.stack;
         assert!(
             stack.len() == 1,
