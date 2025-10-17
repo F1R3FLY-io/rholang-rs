@@ -1,6 +1,9 @@
 use std::{fs, path::PathBuf};
 
-use librho::sem::{ResolverPass, SemanticDb, diagnostics::UnusedVarsPass, pipeline::Pipeline};
+use librho::sem::{
+    EnclosureAnalysisPass, ResolverPass, SemanticDb, diagnostics::UnusedVarsPass,
+    pipeline::Pipeline,
+};
 use rholang_parser::RholangParser;
 
 fn main() {
@@ -25,7 +28,9 @@ fn sem_anal(bencher: divan::Bencher, arg: &PathBuf) {
             .iter()
             .fold(Pipeline::new(), |pipeline, ast| {
                 let root = db.build_index(ast);
-                pipeline.add_fact(ResolverPass::new(root))
+                pipeline
+                    .add_fact(ResolverPass::new(root))
+                    .add_fact(EnclosureAnalysisPass::new(root))
             })
             .add_diagnostic(UnusedVarsPass);
 

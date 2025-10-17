@@ -26,6 +26,7 @@ impl<'a> SemanticDb<'a> {
             binder_is_name: BitVec::with_capacity(DEFAULT_BINDERS_CAPACITY),
             binders: Vec::with_capacity(DEFAULT_BINDERS_CAPACITY),
             proc_to_scope: IntMap::with_capacity(DEFAULT_SCOPES_CAPACITY),
+            enclosing_pids: Vec::new(),
             var_to_binder: BTreeMap::new(),
         }
     }
@@ -80,12 +81,14 @@ impl<'a> SemanticDb<'a> {
     /// Builds an index for all processes in preorder DFS.
     /// Returns the [`PID`] of the root.
     pub fn build_index(&mut self, root: ProcRef<'a>) -> PID {
-        let start_id = self.rev.len();
+        let start_id = self.pid_count();
         let result = PID(start_id as u32); // SAFETY: we never allow to add more than u32 elements to the index
 
         root.iter_preorder_dfs().enumerate().for_each(|(i, proc)| {
             let key = ByAddress(proc);
-            let next = (start_id + i) as u32; // SAFETY: below we check if `next`` is equal to u32::MAX. So even the enumeration starts from u32::MAX, the first item will panic
+            // SAFETY: below we check if `next` is equal to u32::MAX. So even if the enumeration
+            // starts from u32::MAX, the first item will panic
+            let next = (start_id + i) as u32;
             if next == u32::MAX {
                 // u32::MAX is reserved for top-level (dummy) PID
                 panic!("Too many elements in the index");
@@ -106,6 +109,10 @@ impl<'a> SemanticDb<'a> {
         self.rev
             .get_index_of(&ByAddress(proc))
             .map(|i| PID(i as u32)) // SAFETY: we never allow to add more than u32 elements to the index
+    }
+
+    pub fn pid_count(&self) -> usize {
+        self.rev.len()
     }
 
     /// Iterate over all PIDs in indexing order
