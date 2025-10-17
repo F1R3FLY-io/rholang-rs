@@ -90,32 +90,40 @@ impl Display for Symbol {
 
 /// Symbol occurence in the source code (used to mark variables)
 #[derive(Copy, Clone, Debug)]
-pub struct SymbolOccurence {
+pub struct SymbolOccurrence {
     pub position: SourcePos,
     pub symbol: Symbol,
 }
 
-impl PartialEq for SymbolOccurence {
+impl SymbolOccurrence {
+    pub fn from_id(id: ast::Id, db: &SemanticDb) -> Self {
+        let symbol = db.intern(id.name);
+        let position = id.pos;
+        Self { position, symbol }
+    }
+}
+
+impl PartialEq for SymbolOccurrence {
     fn eq(&self, other: &Self) -> bool {
         self.position == other.position
     }
 }
 
-impl Eq for SymbolOccurence {}
+impl Eq for SymbolOccurrence {}
 
-impl PartialOrd for SymbolOccurence {
+impl PartialOrd for SymbolOccurrence {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for SymbolOccurence {
+impl Ord for SymbolOccurrence {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.position.cmp(&other.position)
     }
 }
 
-impl From<Binder> for SymbolOccurence {
+impl From<Binder> for SymbolOccurrence {
     fn from(value: Binder) -> Self {
         Self {
             symbol: value.name,
@@ -126,7 +134,7 @@ impl From<Binder> for SymbolOccurence {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct BoundOccurence {
-    pub occurence: SymbolOccurence,
+    pub occurence: SymbolOccurrence,
     pub binding: VarBinding,
 }
 
@@ -432,7 +440,7 @@ pub struct SemanticDb<'a> {
     proc_to_scope: IntMap<PID, ScopeInfo>, // PID -> semantic info about the scope
     enclosing_pids: Vec<PID>,              // the enclosing scope for a given process
 
-    var_to_binder: BTreeMap<SymbolOccurence, VarBinding>, // var -> where it is bound
+    var_to_binder: BTreeMap<SymbolOccurrence, VarBinding>, // var -> where it is bound
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -472,7 +480,7 @@ pub enum InfoKind {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WarningKind {
-    ShadowedVar { original: SymbolOccurence },
+    ShadowedVar { original: SymbolOccurrence },
     UnusedVariable(BinderId, Symbol),
     TopLevelPatternExpr { span: SourceSpan },
 }
@@ -480,7 +488,7 @@ pub enum WarningKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorKind {
     UnboundVariable,
-    DuplicateVarDef { original: SymbolOccurence },
+    DuplicateVarDef { original: SymbolOccurrence },
     NameInProcPosition(BinderId, Symbol),
     ProcInNamePosition(BinderId, Symbol),
     ConnectiveOutsidePattern,

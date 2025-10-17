@@ -504,7 +504,7 @@ impl PatternResolver {
             // Record the binder as used and add its symbol to the semantic db
             let idx = self.binder_index(binder);
             self.used.set(idx, true);
-            let occ = SymbolOccurence {
+            let occ = SymbolOccurrence {
                 symbol: sym,
                 position: var.pos,
             };
@@ -641,7 +641,7 @@ fn new_free(
     });
     assert!(
         db.map_symbol_as_free(
-            SymbolOccurence {
+            SymbolOccurrence {
                 symbol: name,
                 position: pos
             },
