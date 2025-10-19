@@ -682,4 +682,286 @@ mod tests {
             }
         }};
     }
+
+    pub mod expect {
+        use crate::sem::{
+            Binder, BinderId, BinderKind, DiagnosticKind, ErrorKind, ProcRef, ScopeInfo,
+            SemanticDb, Symbol, VarBinding, WarningKind,
+        };
+        use pretty_assertions::{assert_eq, assert_matches};
+        use rholang_parser::ast;
+
+        pub mod matches {
+            use crate::sem::{PID, ProcRef, SemanticDb};
+            use rholang_parser::ast;
+
+            pub trait ProcMatch<'a> {
+                fn resolve(self, db: &SemanticDb<'a>) -> Option<PID>;
+                fn matches(&self, db: &SemanticDb<'a>, pid: PID) -> bool;
+            }
+
+            pub fn proc_var<'a>(expected: &str) -> impl ProcMatch<'a> {
+                move |node: ProcRef<'a>| node.proc.is_ident(expected)
+            }
+
+            pub fn first_for_comprehension<'a>() -> impl ProcMatch<'a> {
+                |node: ProcRef<'a>| matches!(node.proc, ast::Proc::ForComprehension { .. })
+            }
+
+            pub fn for_with_channel<'a>(expected: &str) -> impl ProcMatch<'a> {
+                fn has_source_name<'x>(receipts: &[ast::Receipt], expected: &str) -> bool {
+                    receipts
+                        .iter()
+                        .flatten()
+                        .any(|bind| bind.source_name().is_ident(expected))
+                }
+                move |node: ProcRef<'a>| matches!(node.proc, ast::Proc::ForComprehension { receipts, .. } if has_source_name(receipts, expected))
+            }
+
+            pub fn contract_with_name<'a>(expected: &str) -> impl ProcMatch<'a> {
+                move |node: ProcRef<'a>| matches!(node.proc, ast::Proc::Contract { name, .. } if name.is_ident(expected))
+            }
+
+            impl ProcMatch<'_> for PID {
+                fn resolve(self, _db: &SemanticDb) -> Option<PID> {
+                    Some(self)
+                }
+
+                fn matches(&self, _db: &SemanticDb, pid: PID) -> bool {
+                    *self == pid
+                }
+            }
+
+            impl<'a, F> ProcMatch<'a> for F
+            where
+                F: Fn(ProcRef<'a>) -> bool,
+            {
+                fn resolve(self, db: &SemanticDb<'a>) -> Option<PID> {
+                    db.find_proc(|node| self(node)).map(|(pid, _)| pid)
+                }
+
+                fn matches(&self, db: &SemanticDb<'a>, pid: PID) -> bool {
+                    db.get(pid).is_some_and(|node| self(node))
+                }
+            }
+
+            impl<'a> ProcMatch<'a> for ProcRef<'a> {
+                fn resolve(self, db: &SemanticDb<'a>) -> Option<PID> {
+                    db.lookup(self)
+                }
+
+                fn matches(&self, db: &SemanticDb<'a>, pid: PID) -> bool {
+                    db.lookup(self).is_some_and(|from_db| from_db == pid)
+                }
+            }
+        }
+
+        use matches::ProcMatch;
+
+        pub fn node<'test, M: ProcMatch<'test>>(
+            db: &'test SemanticDb<'test>,
+            m: M,
+        ) -> ProcRef<'test> {
+            m.resolve(db)
+                .and_then(|proc| db.get(proc))
+                .expect("expect::node")
+        }
+
+        pub fn scope<'test, M: ProcMatch<'test>>(
+            db: &'test SemanticDb<'test>,
+            m: M,
+            expected_binders: usize,
+        ) -> &'test ScopeInfo {
+            let expected = m
+                .resolve(db)
+                .and_then(|proc| db.get_scope(proc))
+                .expect("expect::scope");
+            assert_eq!(
+                expected.num_binders(),
+                expected_binders,
+                "expect::scope {expected:#?} with {expected_binders} binder(s)"
+            );
+
+            expected
+        }
+
+        pub fn ground_scope<'test, M: ProcMatch<'test>>(db: &'test SemanticDb<'test>, m: M) {
+            let expected = scope(db, m, 0);
+            assert!(expected.is_ground(), "expect::ground_scope {expected:#?}");
+        }
+
+        pub fn name_decls<'test>(
+            db: &'test SemanticDb,
+            name_decls: &[ast::NameDecl],
+            scope: &ScopeInfo,
+        ) -> impl DoubleEndedIterator<Item = BinderId> + ExactSizeIterator {
+            let binders = db.binders(scope);
+            let expected_num_decls = name_decls.len();
+            assert_eq!(
+                binders.len(),
+                expected_num_decls,
+                "expect::name_decls {binders:#?} with {expected_num_decls} name declaration(s)"
+            );
+
+            for (i, (expected_decl, binder)) in name_decls.iter().zip(binders).enumerate() {
+                assert_matches!(
+                    binder,
+                    Binder {
+                        name,
+                        kind: BinderKind::Name(uri),
+                        scope: _,
+                        index,
+                        source_position: _
+                    } if *index == i && symbol_matches_string(db, *name, expected_decl.id.name) && opt_symbol_matches_string(db, *uri, expected_decl.uri.as_deref()),
+                    "expect::name_decls {expected_decl} at {i}"
+                );
+            }
+
+            scope.binder_range()
+        }
+
+        pub fn free<'test, const N: usize>(
+            db: &'test SemanticDb,
+            names_kinds: [(&'test str, BinderKind); N],
+            scope: &ScopeInfo,
+        ) -> [BinderId; N] {
+            let expected = names_kinds.iter();
+            let expected_len = N;
+
+            let free = db.free_binders_of(scope);
+            assert_eq!(
+                free.len(),
+                expected_len,
+                "expect::free {scope:#?} with {expected_len} binder(s)"
+            );
+
+            free.zip(expected)
+            .enumerate()
+            .map(|(i, ((bid, binder), (expected_name, expected_kind)))| {
+                assert_matches!(
+                    binder,
+                    Binder {
+                        name,
+                        kind,
+                        scope: _,
+                        index: _,
+                        source_position: _
+                    } if symbol_matches_string(db, *name, expected_name) && kind == expected_kind,
+                    "expect::free {expected_name} with {expected_kind:#?} at {i}"
+                );
+
+                bid
+            })
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap()
+        }
+
+        pub fn captures(expected: &[BinderId], scope: &ScopeInfo) {
+            let captures: Vec<BinderId> = scope.captures().collect();
+            assert_eq!(captures, expected, "expect::captures");
+        }
+
+        pub fn no_warnings_or_errors(db: &SemanticDb) {
+            assert_eq!(db.diagnostics(), &[], "expect::no_warning_or_errors");
+        }
+
+        pub fn binder(db: &SemanticDb, name: &str, scope: &ScopeInfo) -> BinderId {
+            let sym = db.intern(name);
+            db.find_binder_for_symbol(sym, scope)
+                .unwrap_or_else(|| panic!("expect::binder {:#?} with {sym}", db.binders(scope)))
+        }
+
+        pub fn bound(db: &SemanticDb, expected: &[VarBinding]) {
+            let actual_bindings: Vec<VarBinding> =
+                db.bound_positions().map(|bound| bound.binding).collect();
+            assert_eq!(actual_bindings, expected, "expect::bound");
+        }
+
+        pub fn bound_in_range(db: &SemanticDb, expected: &[VarBinding], node: ProcRef) {
+            let range = node.span;
+            let mut actual_bindings = Vec::with_capacity(expected.len());
+            actual_bindings.extend(db.bound_in_range(range).map(|bound| bound.binding));
+            assert_eq!(
+                actual_bindings, expected,
+                "expect::bound_in_range with {node:#?}"
+            );
+        }
+
+        pub fn bound_in_scope(db: &SemanticDb, expected: &[VarBinding], scope: &ScopeInfo) {
+            let mut actual_bindings = Vec::with_capacity(expected.len());
+            actual_bindings.extend(db.bound_in_scope(scope).map(|bound| bound.binding));
+            assert_eq!(
+                actual_bindings, expected,
+                "expect::bound_in_scope with {scope:#?}"
+            );
+        }
+
+        pub fn error<'test, M: ProcMatch<'test>>(
+            db: &'test SemanticDb<'test>,
+            expected: ErrorKind,
+            m: M,
+        ) {
+            db.errors()
+                .find(move |diagnostic| {
+                    matches!(diagnostic.kind, DiagnosticKind::Error(actual) if actual == expected)
+                        && m.matches(db, diagnostic.pid)
+                })
+                .or_else(|| panic!("expect::error #{expected:#?} in {:#?}", db.diagnostics()));
+        }
+
+        pub fn warning<'test, M: ProcMatch<'test>>(
+            db: &'test SemanticDb<'test>,
+            expected: WarningKind,
+            m: M,
+        ) {
+            db.warnings()
+                .find(move |diagnostic| {
+                    matches!(diagnostic.kind, DiagnosticKind::Warning(actual) if actual == expected)
+                        && m.matches(db, diagnostic.pid)
+                })
+                .or_else(|| panic!("expect::warning #{expected:#?} in {:#?}", db.diagnostics()));
+        }
+
+        pub fn unused_variable_warning<'test, M: ProcMatch<'test>>(
+            db: &'test SemanticDb<'test>,
+            expected_name: &str,
+            m: M,
+        ) {
+            let expected_sym = db.intern(expected_name);
+            m.resolve(db)
+                .and_then(|proc| db.get_scope(proc))
+                .and_then(|scope| db.find_binder_for_symbol(expected_sym, scope))
+                .and_then(|expected_binder| {
+                    let expected = DiagnosticKind::Warning(WarningKind::UnusedVariable(
+                        expected_binder,
+                        expected_sym,
+                    ));
+                    db.warnings().find(|diagnostic| diagnostic.kind == expected)
+                })
+                .or_else(|| {
+                    panic!(
+                        "expect::unused_variable_warning with #{expected_sym} in {:#?}",
+                        db.diagnostics()
+                    )
+                });
+        }
+
+        fn symbol_matches_string(db: &SemanticDb, sym: Symbol, expected: &str) -> bool {
+            db.resolve_symbol(sym) == Some(expected)
+        }
+
+        fn opt_symbol_matches_string(
+            db: &SemanticDb,
+            opt_sym: Option<Symbol>,
+            expected: Option<&str>,
+        ) -> bool {
+            match (opt_sym, expected) {
+                (None, None) => true,
+                (None, Some(_)) => false,
+                (Some(_), None) => false,
+                (Some(sym), expected) => db.resolve_symbol(sym) == expected,
+            }
+        }
+    }
 }
