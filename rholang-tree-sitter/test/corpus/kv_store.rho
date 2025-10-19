@@ -1,0 +1,236 @@
+======================
+Simple Key–Value Store
+======================
+
+new storeCh, stdout(`rho:io:stdout`) in {
+
+  // A persistent key-value store
+  new Store in {
+    contract Store(@req) = {
+        match req {
+        { "op": "put", "key": k, "val": v, "return": ret, "state": st } => {
+            // create a new version of the store that remembers the key/value
+            let st' = st.set(k, v)
+            in {
+                // forward all new requests to the updated store
+                @ret!("ok") |
+                for (@r <- storeCh) { Store!(r ++ st') }
+            }
+        }
+        { "op": "get", "key": k, "return": ret, "state": st } => @ret!(st.get(k))
+        }
+    } |
+    // Initialize the store with empty state (map)
+    for (@req <- storeCh) { Store!(req ++ { "state": {} }) }
+  } |
+
+  // A client that stores and retrieves a value
+  new ret1, ret2 in {
+    storeCh!({ "op": "put", "key": "foo", "val": "bar", "return": *ret1 }) |
+    for (_ <- ret1) {
+      storeCh!({ "op": "get", "key": "foo", "return": *ret2 }) |
+      for (@value <- ret2) {
+        stdout!("Value for 'foo': " ++ value)
+      }
+    }
+  }
+}
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var))
+      (name_decl
+        (var)
+        uri: (uri_literal)))
+    proc: (block
+      (par
+        (new
+          decls: (name_decls
+            (name_decl
+              (var)))
+          proc: (block
+            (par
+              (contract
+                name: (var)
+                formals: (names
+                  (quote
+                    (var)))
+                proc: (block
+                  (match
+                    expression: (var)
+                    cases: (cases
+                      (case
+                        pattern: (collection
+                          (map
+                            (key_value_pair
+                              key: (string_literal)
+                              value: (string_literal))
+                            (key_value_pair
+                              key: (string_literal)
+                              value: (var))
+                            (key_value_pair
+                              key: (string_literal)
+                              value: (var))
+                            (key_value_pair
+                              key: (string_literal)
+                              value: (var))
+                            (key_value_pair
+                              key: (string_literal)
+                              value: (var))))
+                        proc: (block
+                          (let
+                            decls: (linear_decls
+                              (let_var_decl
+                                (var)
+                                (method
+                                  receiver: (var)
+                                  name: (var)
+                                  args: (args
+                                    (var)
+                                    (var)))))
+                            proc: (block
+                              (par
+                                (send
+                                  channel: (quote
+                                    (var))
+                                  send_type: (send_single)
+                                  inputs: (inputs
+                                    (string_literal)))
+                                (input
+                                  receipts: (receipts
+                                    (receipt
+                                      (linear_bind
+                                        names: (names
+                                          (quote
+                                            (var)))
+                                        input: (simple_source
+                                          (var)))))
+                                  proc: (block
+                                    (send
+                                      channel: (var)
+                                      send_type: (send_single)
+                                      inputs: (inputs
+                                        (concat
+                                          (var)
+                                          (var)))))))))))
+                      (case
+                        pattern: (collection
+                          (map
+                            (key_value_pair
+                              key: (string_literal)
+                              value: (string_literal))
+                            (key_value_pair
+                              key: (string_literal)
+                              value: (var))
+                            (key_value_pair
+                              key: (string_literal)
+                              value: (var))
+                            (key_value_pair
+                              key: (string_literal)
+                              value: (var))))
+                        proc: (send
+                          channel: (quote
+                            (var))
+                          send_type: (send_single)
+                          inputs: (inputs
+                            (method
+                              receiver: (var)
+                              name: (var)
+                              args: (args
+                                (var))))))))))
+              (input
+                receipts: (receipts
+                  (receipt
+                    (linear_bind
+                      names: (names
+                        (quote
+                          (var)))
+                      input: (simple_source
+                        (var)))))
+                proc: (block
+                  (send
+                    channel: (var)
+                    send_type: (send_single)
+                    inputs: (inputs
+                      (concat
+                        (var)
+                        (collection
+                          (map
+                            (key_value_pair
+                              key: (string_literal)
+                              value: (collection
+                                (map)))))))))))))
+        (new
+          decls: (name_decls
+            (name_decl
+              (var))
+            (name_decl
+              (var)))
+          proc: (block
+            (par
+              (send
+                channel: (var)
+                send_type: (send_single)
+                inputs: (inputs
+                  (collection
+                    (map
+                      (key_value_pair
+                        key: (string_literal)
+                        value: (string_literal))
+                      (key_value_pair
+                        key: (string_literal)
+                        value: (string_literal))
+                      (key_value_pair
+                        key: (string_literal)
+                        value: (string_literal))
+                      (key_value_pair
+                        key: (string_literal)
+                        value: (eval
+                          (var)))))))
+              (input
+                receipts: (receipts
+                  (receipt
+                    (linear_bind
+                      names: (names
+                        (wildcard))
+                      input: (simple_source
+                        (var)))))
+                proc: (block
+                  (par
+                    (send
+                      channel: (var)
+                      send_type: (send_single)
+                      inputs: (inputs
+                        (collection
+                          (map
+                            (key_value_pair
+                              key: (string_literal)
+                              value: (string_literal))
+                            (key_value_pair
+                              key: (string_literal)
+                              value: (string_literal))
+                            (key_value_pair
+                              key: (string_literal)
+                              value: (eval
+                                (var)))))))
+                    (input
+                      receipts: (receipts
+                        (receipt
+                          (linear_bind
+                            names: (names
+                              (quote
+                                (var)))
+                            input: (simple_source
+                              (var)))))
+                      proc: (block
+                        (send
+                          channel: (var)
+                          send_type: (send_single)
+                          inputs: (inputs
+                            (concat
+                              (string_literal)
+                              (var))))))))))))))))

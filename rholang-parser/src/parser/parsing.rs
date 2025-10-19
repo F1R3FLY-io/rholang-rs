@@ -366,7 +366,7 @@ pub(super) fn node_to_ast<'ast>(
                     if let Some(formals_node) = node.child_by_field_id(field!("formals")) {
                         cont_stack.push(K::ConsumeContract {
                             arity: formals_node.named_child_count(),
-                            has_cont: formals_node.child_by_field_name("cont").is_some(),
+                            has_cont: formals_node.child_by_field_id(field!("cont")).is_some(),
                             span,
                         });
                         cont_stack.push(K::EvalList(formals_node.walk()));
@@ -678,7 +678,7 @@ pub(super) fn node_to_ast<'ast>(
                         errors: some_errors,
                     });
                 }
-                let last = proc_stack.to_proc();
+                let last = proc_stack.into_proc();
                 return Validated::Good(last);
             }
             Step::Continue(n) => {
@@ -713,16 +713,24 @@ fn apply_cont<'tree, 'ast>(
     proc_stack: &mut ProcStack<'ast>,
     ast_builder: &'ast ASTBuilder<'ast>,
 ) -> Step<'tree> {
-    fn move_cursor_to_named(cursor: &mut tree_sitter::TreeCursor) -> bool {
+    fn move_cursor_to_named<'a>(
+        cursor: &mut tree_sitter::TreeCursor<'a>,
+    ) -> Option<tree_sitter::Node<'a>> {
         let mut has_more = if cursor.depth() == 0 {
             cursor.goto_first_child()
         } else {
             cursor.goto_next_sibling()
         };
-        while has_more && !cursor.node().is_named() {
+
+        while has_more {
+            let node = cursor.node();
+            if node.is_named() {
+                return Some(node);
+            }
             has_more = cursor.goto_next_sibling();
         }
-        has_more
+
+        None
     }
 
     loop {
@@ -738,8 +746,8 @@ fn apply_cont<'tree, 'ast>(
                 return Step::Continue(next);
             }
             K::EvalList(cursor) => {
-                if move_cursor_to_named(cursor) {
-                    return Step::Continue(cursor.node());
+                if let Some(node) = move_cursor_to_named(cursor) {
+                    return Step::Continue(node);
                 }
                 cont_stack.pop();
             }
@@ -1185,7 +1193,7 @@ impl<'a> ProcStack<'a> {
         self.quote_mask.push(false);
     }
 
-    fn to_proc(self) -> AnnProc<'a> {
+    fn into_proc(self) -> AnnProc<'a> {
         let stack = self.stack;
         assert!(
             stack.len() == 1,

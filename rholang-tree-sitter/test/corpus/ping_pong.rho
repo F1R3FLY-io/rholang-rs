@@ -1,0 +1,135 @@
+==========
+Ping-Pong
+==========
+
+new server, stdout(`rho:io:stdout`) in {
+
+  new PingServer in {
+    // Define the ping server
+    contract PingServer(@req) = {
+      match req {
+        { "msg": msg, "return": ret } => {
+          stdout!("Server received: " ++ msg) |
+          @ret!("PONG from server")
+        }
+      }
+    } |
+
+    // Start the server
+    server!(*PingServer) 
+  } |
+
+  // Create a client that uses the server
+  new ret in {
+    for (ping <- server) {
+      // Send a message to the server with a return channel
+      ping!({ "msg": "PING from client", "return": *ret }) |
+      for (@response <- ret) {
+        stdout!("Client got: " ++ response)
+      }
+    }
+  }
+}
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var))
+      (name_decl
+        (var)
+        uri: (uri_literal)))
+    proc: (block
+      (par
+        (new
+          decls: (name_decls
+            (name_decl
+              (var)))
+          proc: (block
+            (par
+              (contract
+                name: (var)
+                formals: (names
+                  (quote
+                    (var)))
+                proc: (block
+                  (match
+                    expression: (var)
+                    cases: (cases
+                      (case
+                        pattern: (collection
+                          (map
+                            (key_value_pair
+                              key: (string_literal)
+                              value: (var))
+                            (key_value_pair
+                              key: (string_literal)
+                              value: (var))))
+                        proc: (block
+                          (par
+                            (send
+                              channel: (var)
+                              send_type: (send_single)
+                              inputs: (inputs
+                                (concat
+                                  (string_literal)
+                                  (var))))
+                            (send
+                              channel: (quote
+                                (var))
+                              send_type: (send_single)
+                              inputs: (inputs
+                                (string_literal))))))))))
+              (send
+                channel: (var)
+                send_type: (send_single)
+                inputs: (inputs
+                  (eval
+                    (var)))))))
+        (new
+          decls: (name_decls
+            (name_decl
+              (var)))
+          proc: (block
+            (input
+              receipts: (receipts
+                (receipt
+                  (linear_bind
+                    names: (names
+                      (var))
+                    input: (simple_source
+                      (var)))))
+              proc: (block
+                (par
+                  (send
+                    channel: (var)
+                    send_type: (send_single)
+                    inputs: (inputs
+                      (collection
+                        (map
+                          (key_value_pair
+                            key: (string_literal)
+                            value: (string_literal))
+                          (key_value_pair
+                            key: (string_literal)
+                            value: (eval
+                              (var)))))))
+                  (input
+                    receipts: (receipts
+                      (receipt
+                        (linear_bind
+                          names: (names
+                            (quote
+                              (var)))
+                          input: (simple_source
+                            (var)))))
+                    proc: (block
+                      (send
+                        channel: (var)
+                        send_type: (send_single)
+                        inputs: (inputs
+                          (concat
+                            (string_literal)
+                            (var)))))))))))))))

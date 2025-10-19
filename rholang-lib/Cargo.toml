@@ -8,6 +8,10 @@ edition = "2024"
 name = "librho"
 crate-type = ["cdylib", "rlib"]
 
+[[bench]]
+name = "sem_anal"
+harness = false
+
 [dependencies]
 ahash = { workspace = true }
 as-any = { workspace = true }
@@ -25,6 +29,7 @@ stacker = "0.1.21"
 tokio = { workspace = true }
 
 [dev-dependencies]
+divan = { workspace = true }
 pretty_assertions = { workspace = true }
 validated = { workspace = true }
 test-macros = { path = "../test-macros/" }

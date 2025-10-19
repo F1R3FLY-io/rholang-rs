@@ -4,8 +4,6 @@ members = [
     "rholang-tree-sitter",
     "rholang-parser",
     "rholang-tree-sitter-proc-macro",
-    "rholang-bytecode",
-    "rholang-vm",
     "rholang-shell",
     "rholang-lib",
     "test-macros"
@@ -32,8 +30,7 @@ intmap = "3.1.2"
 
 # Used by: rholang-shell, librho
 parking_lot = { version = "0.12.5" }
-tokio = { version = "1.47.1", features = ["rt", "rt-multi-thread", "test-util", "parking_lot", "sync", "full"] }
-
+tokio = { version = "1.47.1", features = ["rt", "rt-multi-thread", "test-util", "parking_lot", "sync", "macros"] }
 
 # Used by: rholang-shell
 rustyline-async = "0.4.6"
@@ -65,10 +62,10 @@ tree-sitter-language = "0.1.5"
 # Used by: rholang-parser
 validated = "1.0.0"
 
-# Used by: rholang-parser, rholang-jni-bridge
+# Used by: rholang-jni-bridge
 serde = { version = "1.0.188", features = ["derive"] }
 
-# Used by: rholang-parser, rholang-jni-bridge
+# Used by: rholang-jni-bridge
 serde_json = "1.0.107"
 
 # Used by: rholang-jni-bridge
@@ -83,8 +80,6 @@ is-terminal = "0.4.12"
 
 # Macros used everywhere
 pretty_assertions = { version = "1.4.1", features = ["unstable"] }
-
-rustyline = "*"
 
 [profile.dev]
 debug = true

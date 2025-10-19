@@ -1,5 +1,5 @@
 use anyhow::Result;
-use rholang_shell::providers::{
+use shell::providers::{
     InterpretationResult, InterpreterProvider, RholangParserInterpreterProvider,
 };
 use std::env;
@@ -58,9 +58,7 @@ async fn test_process_examples() -> Result<()> {
             }
         })
         .unwrap_or(&current_dir);
-    let tests_corpus = project_root.join("rholang-parser").join("tests").join("corpus");
-    let plain_corpus = project_root.join("rholang-parser").join("corpus");
-    let examples_dir = if tests_corpus.exists() { tests_corpus } else { plain_corpus };
+    let examples_dir = project_root.join("rholang-parser").join("tests").join("corpus");
     println!("Looking for Rholang files in: {}", examples_dir.display());
     let rholang_files = find_rholang_files(&examples_dir)?;
 
@@ -135,17 +133,11 @@ async fn test_process_hello_world() -> Result<()> {
             }
         })
         .unwrap_or(&current_dir);
-    // Prefer tests/corpus; fall back to corpus
-    let tests_hello = project_root
+    let file_path = project_root
         .join("rholang-parser")
         .join("tests")
         .join("corpus")
         .join("tut-hello.rho");
-    let plain_hello = project_root
-        .join("rholang-parser")
-        .join("corpus")
-        .join("tut-hello.rho");
-    let file_path = if tests_hello.exists() { tests_hello } else { plain_hello };
 
     // Make sure the file exists
     println!(
