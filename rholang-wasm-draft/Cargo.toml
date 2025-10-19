@@ -1,0 +1,34 @@
+[package]
+name = "rholang-wasm-draft"
+version = "0.1.0"
+authors = ["Rholang Team"]
+edition = "2021"
+license = "Apache-2.0"
+description = "WASM interface for Rholang interpreter"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = { version = "0.2.104" }
+wasm-bindgen-futures = "0.4.54"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["Window", "Document", "HtmlElement", "console", "HtmlTextAreaElement", "HtmlDivElement"] }
+
+# Keep this crate independent from heavy Tokio deps to build for wasm32
+anyhow = "1"
+async-trait = "0.1"
+
+# Parser-based interpreter only on non-wasm targets
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rholang-parser = { path = "../rholang-parser" }
+validated = { workspace = true }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread"] }
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false

@@ -1,4 +1,4 @@
-FROM rust:latest
+FROM rust:nightly
 
 # Install basic dependencies
 RUN apt-get update && apt-get install -y \
@@ -10,8 +10,10 @@ RUN apt-get update && apt-get install -y \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Rust components
-RUN rustup component add rustfmt clippy
+# Ensure nightly toolchain and components
+RUN rustup toolchain install nightly && \
+    rustup default nightly && \
+    rustup component add rustfmt clippy --toolchain nightly
 
 # Install cargo tools
 RUN cargo install cargo-audit cargo-tarpaulin
@@ -20,7 +22,8 @@ RUN cargo install cargo-audit cargo-tarpaulin
 WORKDIR /app
 
 # Set environment variables
-ENV RUST_BACKTRACE=1
+ENV RUST_BACKTRACE=1 \
+    RUSTUP_TOOLCHAIN=nightly
 
 # Default command
 CMD ["/bin/bash"]

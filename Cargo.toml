@@ -1,93 +1,84 @@
 [workspace]
-resolver = "3"
 members = [
-    "rholang-tree-sitter",
-    "rholang-parser",
-    "rholang-tree-sitter-proc-macro",
     "rholang-bytecode",
-    "rholang-vm",
-    "rholang-shell",
     "rholang-lib",
-    "test-macros"
+    "rholang-parser",
+    "rholang-shell",
+    "rholang-tree-sitter",
+    "rholang-tree-sitter-proc-macro",
+    "rholang-vm",
+    "rholang-wasm",
+    "test-macros",
 ]
+resolver = "3"
 
 [workspace.dependencies]
-# Used by: librho
 ahash = "0.8.12"
-
-# Used by: rholang-shell, rholang-jni-bridge
 anyhow = "1.0.98"
-
-# General purpose for dynamic metaprogramming
 as-any = "0.3.2"
-
-# Used by: rholang-shell, librho
-async-scoped = { version = "0.9.0", features = ["use-tokio"] }
 async-trait = "0.1.89"
-
-# General purpose, used mostly by librho
 bitvec = "1.0.1"
+bracket-parser = "0.1.0"
+divan = "0.1.21"
 indexmap = "2.11.0"
 intmap = "3.1.2"
-
-# Used by: rholang-shell, librho
-parking_lot = { version = "0.12.5" }
-tokio = { version = "1.47.1", features = ["rt", "rt-multi-thread", "test-util", "parking_lot", "sync", "full"] }
-
-
-# Used by: rholang-shell
-rustyline-async = "0.4.6"
-
-# Used by: rholang-shell, rholang-parser
+is-terminal = "0.4.12"
+jni = "0.21.1"
+quote = "1.0.36"
 rstest = "0.25.0"
-
-# Used by: rholang-shell
-clap = { version = "4.5.40", features = ["derive"] }
-
-# Used by: rholang-shell
-async-std = { version = "1.13.1", features = ["attributes"] }
-
-# Used by: rholang-shell
-bracket-parser = "0.1.0"
-
-# Library for benchmarking
-divan = "0.1.21"
-
-# Used by: rholang-parser, librho
-smallvec = { version = "1.15.1", features = ["union", "const_generics", "const_new", "may_dangle"] }
-
-# Used by: rholang-parser, rholang-tree-sitter
+rustyline = "*"
+rustyline-async = "0.4.6"
+serde_json = "1.0.107"
+syn = "2.0.58"
 tree-sitter = "0.25.10"
-
-# Used by: rholang-tree-sitter
 tree-sitter-language = "0.1.5"
-
-# Used by: rholang-parser
 validated = "1.0.0"
 
-# Used by: rholang-parser, rholang-jni-bridge
-serde = { version = "1.0.188", features = ["derive"] }
+[workspace.dependencies.async-scoped]
+version = "0.9.0"
+features = ["use-tokio"]
 
-# Used by: rholang-parser, rholang-jni-bridge
-serde_json = "1.0.107"
+[workspace.dependencies.async-std]
+version = "1.13.1"
+features = ["attributes"]
 
-# Used by: rholang-jni-bridge
-jni = "0.21.1"
+[workspace.dependencies.clap]
+version = "4.5.40"
+features = ["derive"]
 
-# Used by: rholang-tree-sitter-proc-macro
-quote = "1.0.36"
-syn = "2.0.58"
+[workspace.dependencies.parking_lot]
+version = "0.12.5"
 
-# Used by: rholang-tree-sitter-proc-macro examples
-is-terminal = "0.4.12"
+[workspace.dependencies.pretty_assertions]
+version = "1.4.1"
+features = ["unstable"]
 
-# Macros used everywhere
-pretty_assertions = { version = "1.4.1", features = ["unstable"] }
+[workspace.dependencies.serde]
+version = "1.0.188"
+features = ["derive"]
 
-rustyline = "*"
+[workspace.dependencies.smallvec]
+version = "1.15.1"
+features = [
+    "union",
+    "const_generics",
+    "const_new",
+    "may_dangle",
+]
 
-[profile.dev]
-debug = true
+[workspace.dependencies.tokio]
+version = "1.47.1"
+features = [
+    "rt",
+    "rt-multi-thread",
+    "test-util",
+    "parking_lot",
+    "sync",
+    "full",
+]
 
 [profile.bench]
 debug = "line-tables-only"
+
+[profile.dev]
+debug = 2
