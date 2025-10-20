@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # Base development environment with Quartus Prime
+  quartus:
+    image: rholang-fpga/quartus:latest
+    build:
+      context: .
+      dockerfile: docker/quartus.Dockerfile
+    volumes:
+      - .:/workspace
+      - quartus-cache:/root/.cache/quartus
+    working_dir: /workspace
+    environment:
+      - DISPLAY=${DISPLAY}
+    command: tail -f /dev/null  # Keep container running
+
+  # Build service for compiling the FPGA project
+  build:
+    image: rholang-fpga/quartus:latest
+    volumes:
+      - .:/workspace
+      - quartus-cache:/root/.cache/quartus
+    working_dir: /workspace
+    command: ./scripts/build.sh
+    profiles:
+      - build
+
+  # Test service for running simulations
+  test:
+    image: rholang-fpga/quartus:latest
+    volumes:
+      - .:/workspace
+      - quartus-cache:/root/.cache/quartus
+    working_dir: /workspace
+    command: ./scripts/test.sh
+    profiles:
+      - test
+
+  # Debug service for debugging the FPGA design
+  debug:
+    image: rholang-fpga/quartus:latest
+    volumes:
+      - .:/workspace
+      - quartus-cache:/root/.cache/quartus
+    working_dir: /workspace
+    environment:
+      - DISPLAY=${DISPLAY}
+    command: ./scripts/debug.sh
+    profiles:
+      - debug
+
+  # Deploy service for deploying to MiSTer FPGA
+  deploy:
+    image: rholang-fpga/deploy:latest
+    build:
+      context: .
+      dockerfile: docker/deploy.Dockerfile
+    volumes:
+      - .:/workspace
+      - ssh-keys:/root/.ssh
+    working_dir: /workspace
+    command: ./scripts/deploy.sh
+    profiles:
+      - deploy
+
+volumes:
+  quartus-cache:
+    driver: local
+  ssh-keys:
+    driver: local
