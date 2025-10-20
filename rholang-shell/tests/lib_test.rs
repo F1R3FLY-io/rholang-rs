@@ -562,3 +562,64 @@ fn test_validate_resolver_command() -> Result<()> {
     assert!(output.contains("Resolver validation produced") || output.contains("Validation successful") || output.contains("Parsing failed"));
     Ok(())
 }
+
+
+#[test]
+fn test_validate_commands_empty_buffer() -> anyhow::Result<()> {
+    use std::io::Cursor;
+    let interpreter = MockInterpreterProvider::new();
+
+    // .validate with empty buffer
+    let mut buffer: Vec<String> = Vec::new();
+    let mut stdout = Cursor::new(Vec::new());
+    let _ = process_special_command(
+        ".validate",
+        &mut buffer,
+        &mut stdout,
+        |_| Ok(()),
+        &interpreter,
+    )?;
+    let output = String::from_utf8(stdout.into_inner())?;
+    assert!(output.contains("Buffer is empty, nothing to validate"));
+
+    // .validate-unused with empty buffer
+    let mut buffer: Vec<String> = Vec::new();
+    let mut stdout = Cursor::new(Vec::new());
+    let _ = process_special_command(
+        ".validate-unused",
+        &mut buffer,
+        &mut stdout,
+        |_| Ok(()),
+        &interpreter,
+    )?;
+    let output = String::from_utf8(stdout.into_inner())?;
+    assert!(output.contains("Buffer is empty, nothing to validate"));
+
+    // .validate-elab with empty buffer
+    let mut buffer: Vec<String> = Vec::new();
+    let mut stdout = Cursor::new(Vec::new());
+    let _ = process_special_command(
+        ".validate-elab",
+        &mut buffer,
+        &mut stdout,
+        |_| Ok(()),
+        &interpreter,
+    )?;
+    let output = String::from_utf8(stdout.into_inner())?;
+    assert!(output.contains("Buffer is empty, nothing to validate"));
+
+    // .validate-resolver with empty buffer
+    let mut buffer: Vec<String> = Vec::new();
+    let mut stdout = Cursor::new(Vec::new());
+    let _ = process_special_command(
+        ".validate-resolver",
+        &mut buffer,
+        &mut stdout,
+        |_| Ok(()),
+        &interpreter,
+    )?;
+    let output = String::from_utf8(stdout.into_inner())?;
+    assert!(output.contains("Buffer is empty, nothing to validate"));
+
+    Ok(())
+}
