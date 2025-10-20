@@ -7,21 +7,21 @@ use providers::{InterpretationResult, InterpreterProvider};
 use rustyline_async::{Readline, ReadlineEvent};
 use std::io::Write;
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
-    /// Enable multiline mode
-    #[arg(short, long, default_value_t = false)]
-    pub multiline: bool,
+    /// Load code from file into the buffer at startup
+    #[arg(short = 'l', long = "load", value_name = "FILE")]
+    pub load: Option<std::path::PathBuf>,
 }
 
 pub fn help_message() -> String {
     "Available commands:".to_string()
         + "\n  .help, - Show this help message"
-        + "\n  .mode - Toggle between multiline and single line modes"
         + "\n  .list - List all edited lines"
         + "\n  .delete or .del - Remove the last edited line"
-        + "\n  .reset or Ctrl+C - Interrupt current input (in multiline mode: clear buffer)"
+        + "\n  .reset or Ctrl+C - Interrupt current input (clear buffer)"
+        + "\n  .load <file> - Load code from file into the buffer"
         + "\n  .ps - List all running processes"
         + "\n  .kill <index> - Kill a running process by index"
         + "\n  .quit - Exit the rholang-shell"
@@ -174,12 +174,38 @@ fn print_processes<W: Write, I: InterpreterProvider>(
     Ok(())
 }
 
+fn load_file_into_buffer<W: Write>(
+    path: &str,
+    buffer: &mut Vec<String>,
+    stdout: &mut W,
+    update_prompt: impl FnOnce(&str) -> Result<()>,
+) -> Result<()> {
+    match std::fs::read_to_string(path) {
+        Ok(contents) => {
+            let trimmed = contents.trim_end_matches(['\n', '\r']);
+            buffer.clear();
+            if trimmed.is_empty() {
+                update_prompt(DEFAULT_PROMPT)?;
+                writeln!(stdout, "Loaded 0 lines (file is empty): {}", path)?;
+            } else {
+                buffer.extend(trimmed.split('\n').map(|s| s.to_string()));
+                update_prompt("... ")?;
+                writeln!(stdout, "Loaded {} lines from: {}", buffer.len(), path)?;
+                writeln!(stdout, "Press Enter to execute; if brackets are unbalanced, continue typing.")?;
+            }
+        }
+        Err(e) => {
+            writeln!(stdout, "Error loading file '{}': {}", path, e)?;
+        }
+    }
+    Ok(())
+}
+
 /// Process a special command (starting with '.')
 /// Returns true if the command was processed, false otherwise
 pub fn process_special_command<W: Write, I: InterpreterProvider>(
     command: &str,
     buffer: &mut Vec<String>,
-    multiline: &mut bool,
     stdout: &mut W,
     update_prompt: impl FnOnce(&str) -> Result<()>,
     interpreter: &I,
@@ -197,18 +223,6 @@ pub fn process_special_command<W: Write, I: InterpreterProvider>(
         ".help" => {
             // Keep help text content the same; just color the header line if present
             writeln!(stdout, "{}", help_message())?;
-        }
-        ".mode" => {
-            // Toggle multiline mode
-            *multiline = !*multiline;
-            let mode_msg = if *multiline {
-                "Switched to multiline mode (enter twice to execute)"
-            } else {
-                buffer.clear();
-                update_prompt(DEFAULT_PROMPT)?;
-                "Switched to single line mode"
-            };
-            writeln!(stdout, "{mode_msg}")?;
         }
         ".quit" => {
             writeln!(stdout, "Exiting rholang-shell...")?;
@@ -241,6 +255,14 @@ pub fn process_special_command<W: Write, I: InterpreterProvider>(
         ".kill" => {
             handle_kill_command(arg, stdout, interpreter)?;
         }
+        ".load" => {
+            let path = arg.trim();
+            if path.is_empty() {
+                writeln!(stdout, "Usage: .load <file>")?;
+            } else {
+                load_file_into_buffer(path, buffer, stdout, update_prompt)?;
+            }
+        }
         _ => {
             writeln!(stdout, "Unknown command: {command}")?;
         }
@@ -257,6 +279,7 @@ pub fn process_multiline_input(
     buffer: &mut Vec<String>,
     update_prompt: impl FnOnce(&str) -> Result<()>,
 ) -> Result<Option<String>> {
+    // If buffer is empty, ignore a leading empty line
     if buffer.is_empty() {
         if line.is_empty() {
             return Ok(None);
@@ -266,67 +289,76 @@ pub fn process_multiline_input(
         return Ok(None);
     }
 
+    // Any non-empty line just gets appended (including if the previous line was empty)
     if !line.is_empty() {
         buffer.push(line);
         return Ok(None);
     }
 
-    let command = buffer.join("\n");
-    buffer.clear();
-    update_prompt(">>> ")?;
-    Ok(Some(command))
-}
-
-/// Process a line of input in single line mode
-/// Returns Some(command) if a command is ready to be executed, None otherwise
-/// If the line ends inside brackets, switches to multiline mode and returns None
-pub fn process_single_line_input(
-    line: String,
-    buffer: &mut Vec<String>,
-    multiline: &mut bool,
-    update_prompt: impl FnOnce(&str) -> Result<()>,
-) -> Result<Option<String>> {
-    if line.is_empty() {
-        return Ok(None);
-    }
-
-    // Check if the line ends inside brackets
+    // Empty line with non-empty buffer: only execute on DOUBLE empty lines when brackets are balanced
     let mut bracket_parser = match BracketParser::new() {
         Ok(parser) => parser,
-        Err(_e) => {
-            // If we can't create the parser, just execute the line normally
-            // This is a fallback in case of an error
-            return Ok(Some(line));
+        Err(_) => {
+            // Fallback: if parser cannot be created, keep previous behavior and execute on double empty
+            if buffer.last().map(|s| s.is_empty()).unwrap_or(false) {
+                // Second empty: execute (exclude the marker empty)
+                let _ = buffer.pop();
+                let command = buffer.join("\n");
+                // Keep buffer after execution for future processing
+                update_prompt(DEFAULT_PROMPT)?;
+                return Ok(Some(command));
+            } else {
+                // First empty: remember it and wait for another empty
+                buffer.push(String::new());
+                update_prompt("... ")?;
+                return Ok(None);
+            }
         }
     };
 
-    let state = bracket_parser.get_final_state(&line);
+    // Build the joined input without any trailing empty marker for bracket parsing
+    let joined_no_trailing_empty = if buffer.last().map(|s| s.is_empty()).unwrap_or(false) {
+        // There is already a pending empty marker; don't include it in parsing
+        buffer[..buffer.len()-1].join("\n")
+    } else {
+        buffer.join("\n")
+    };
+
+    let state = bracket_parser.get_final_state(&joined_no_trailing_empty);
 
     if state == BracketState::Inside {
-        // Line ends inside brackets, switch to multiline mode
-        *multiline = true;
-        buffer.push(line);
+        // Brackets are still open; stay in multiline mode and do not execute
         update_prompt("... ")?;
         return Ok(None);
     }
 
-    // Line doesn't end inside brackets, execute it immediately
-    Ok(Some(line))
+    // Brackets are balanced here. Execute only on second consecutive empty line.
+    if buffer.last().map(|s| s.is_empty()).unwrap_or(false) {
+        // This is the second empty; execute now, excluding the marker
+        let _ = buffer.pop();
+        let command = buffer.join("\n");
+        // Keep buffer after execution for future processing
+        update_prompt(DEFAULT_PROMPT)?;
+        Ok(Some(command))
+    } else {
+        // First empty after balanced buffer: remember and wait for another empty
+        buffer.push(String::new());
+        update_prompt("... ")?;
+        Ok(None)
+    }
 }
+
 
 /// Handle an interrupt event (Ctrl+C)
 pub fn handle_interrupt<W: Write, I: InterpreterProvider>(
     buffer: &mut Vec<String>,
-    multiline: bool,
     stdout: &mut W,
     update_prompt: impl FnOnce(&str) -> Result<()>,
     interpreter: &I,
 ) -> Result<()> {
-    // Clear buffer in multiline mode
-    if multiline {
-        buffer.clear();
-        update_prompt(">>> ")?;
-    }
+    // Always clear buffer (single line mode removed)
+    buffer.clear();
+    update_prompt(DEFAULT_PROMPT)?;
 
     // Kill all running processes
     match interpreter.kill_all_processes() {
@@ -382,9 +414,19 @@ pub async fn run_shell<I: InterpreterProvider>(args: Args, interpreter: I) -> Re
 
     let (mut rl, mut stdout) = Readline::new(prompt.clone())?;
     let mut buffer: Vec<String> = Vec::new();
-    let mut multiline = args.multiline;
 
     rl.should_print_line_on(true, false);
+
+    // If a file was provided via CLI, load it into the buffer now
+    if let Some(path) = args.load.as_ref() {
+        let path_str = path.to_string_lossy().to_string();
+        load_file_into_buffer(
+            &path_str,
+            &mut buffer,
+            &mut stdout,
+            |prompt| Ok(rl.update_prompt(prompt)?),
+        )?;
+    }
 
     loop {
         tokio::select! {
@@ -396,7 +438,6 @@ pub async fn run_shell<I: InterpreterProvider>(args: Args, interpreter: I) -> Re
                     let should_exit = process_special_command(
                         &line,
                         &mut buffer,
-                        &mut multiline,
                         &mut stdout,
                         |prompt| Ok(rl.update_prompt(prompt)?),
                         &interpreter,
@@ -412,21 +453,12 @@ pub async fn run_shell<I: InterpreterProvider>(args: Args, interpreter: I) -> Re
 
                     rl.add_history_entry(line.clone());
 
-                    // Process input based on mode
-                    let command_option = if multiline {
-                        process_multiline_input(
-                            line,
-                            &mut buffer,
-                            |prompt| Ok(rl.update_prompt(prompt)?),
-                        )?
-                    } else {
-                        process_single_line_input(
-                            line,
-                            &mut buffer,
-                            &mut multiline,
-                            |prompt| Ok(rl.update_prompt(prompt)?),
-                        )?
-                    };
+                    // Process input (single line mode removed; always multiline)
+                    let command_option = process_multiline_input(
+                        line,
+                        &mut buffer,
+                        |prompt| Ok(rl.update_prompt(prompt)?),
+                    )?;
 
                     // Execute command if one is ready
                     if let Some(command) = command_option {
@@ -447,7 +479,6 @@ pub async fn run_shell<I: InterpreterProvider>(args: Args, interpreter: I) -> Re
                 Ok(ReadlineEvent::Interrupted) => {
                     handle_interrupt(
                         &mut buffer,
-                        multiline,
                         &mut stdout,
                         |prompt| Ok(rl.update_prompt(prompt)?),
                         &interpreter,

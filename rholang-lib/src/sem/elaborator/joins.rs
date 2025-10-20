@@ -197,27 +197,21 @@ impl<'a, 'ast> JoinValidator<'a, 'ast> {
         &self,
         receipts: &Receipts<'ast>,
     ) -> ValidationResult<DependencyGraph> {
-        let graph = DependencyGraph::new();
+        let mut graph = DependencyGraph::new();
 
-        // Check for parallel bindings on the same channel (potential issue)
+        // Add all referenced channels as nodes in the graph so it's not empty for valid receipts
         for receipt in receipts.iter() {
-            if receipt.len() > 1 {
-                let mut channels_in_parallel = HashSet::new();
-                for bind in receipt.iter() {
-                    let channel = self.get_channel_symbol(bind.source_name());
-                    if channel != Symbol::DUMMY {
-                        channels_in_parallel.insert(channel);
-                        // Note: Same channel appearing multiple times in parallel join
-                        // is valid in Rholang (waiting for N messages)
-                    }
+            for bind in receipt.iter() {
+                let channel = self.get_channel_symbol(bind.source_name());
+                if channel != Symbol::DUMMY {
+                    graph.add_channel(channel);
                 }
             }
         }
 
-        // For now, return empty graph. Deadlock detection requires:
-        // 1. Control flow analysis across for-comprehensions
-        // 2. Data flow analysis to track channel usage in bodies
-        // 3. Global program analysis to find circular wait conditions
+        // NOTE: We intentionally do not add edges yet. Proper deadlock detection would
+        // require inter-receipt control/data-flow analysis. The presence of nodes is
+        // sufficient for current structural validations and tests.
         Ok(graph)
     }
 

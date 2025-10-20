@@ -10,10 +10,6 @@ fn test_help_message_content() {
         "Help message should mention .help command"
     );
     assert!(
-        message.contains(".mode"),
-        "Help message should mention .mode command"
-    );
-    assert!(
         message.contains(".list"),
         "Help message should mention .list command"
     );
@@ -37,15 +33,15 @@ fn test_help_message_content() {
         message.contains(".quit"),
         "Help message should mention .quit command"
     );
+    assert!(
+        message.contains(".load"),
+        "Help message should mention .load command"
+    );
 
     // Check that the message contains descriptions for each command
     assert!(
         message.contains("Show this help message"),
         "Help message should describe .help command"
-    );
-    assert!(
-        message.contains("Toggle between multiline and single line modes"),
-        "Help message should describe .mode command"
     );
     assert!(
         message.contains("List all edited lines"),
@@ -58,6 +54,10 @@ fn test_help_message_content() {
     assert!(
         message.contains("Interrupt current input"),
         "Help message should describe .reset command"
+    );
+    assert!(
+        message.contains("Load code from file"),
+        "Help message should describe .load command"
     );
     assert!(
         message.contains("Exit the rholang-shell"),
