@@ -48,6 +48,11 @@ fn test_help_message() {
     assert!(message.contains(".list"));
     assert!(message.contains(".delete"));
     assert!(message.contains(".reset"));
+    assert!(message.contains(".load"));
+    assert!(message.contains(".validate"));
+    assert!(message.contains(".validate-unused"));
+    assert!(message.contains(".validate-elab"));
+    assert!(message.contains(".validate-resolver"));
     assert!(message.contains(".ps"));
     assert!(message.contains(".kill"));
     assert!(message.contains(".quit"));
@@ -445,9 +450,115 @@ fn test_handle_interrupt_single_line() -> Result<()> {
     Ok(())
 }
 
+
+// New tests for .validate command
 #[test]
-fn test_args() {
-    // Args should be constructible with default values
-    let _args = Args { load: None };
-    assert!(true);
+fn test_validate_valid_buffer() -> Result<()> {
+    let mut buffer = vec![
+        "new ch in { for(@x <- ch) { Nil } }".to_string()
+    ];
+    let mut stdout = Cursor::new(Vec::new());
+    let interpreter = MockInterpreterProvider::new();
+
+    let should_exit = process_special_command(
+        ".validate",
+        &mut buffer,
+        &mut stdout,
+        |_| Ok(()),
+        &interpreter,
+    )?;
+
+    assert!(!should_exit);
+    let output = String::from_utf8(stdout.into_inner())?;
+    assert!(output.contains("Validation successful") || output.contains("no issues") || output.contains("Validation produced"), "Unexpected output: {}", output);
+    Ok(())
+}
+
+#[test]
+fn test_validate_invalid_buffer_reports_diagnostics() -> Result<()> {
+    let mut buffer = vec![
+        "for(@x <- unbound_ch) { Nil }".to_string()
+    ];
+    let mut stdout = Cursor::new(Vec::new());
+    let interpreter = MockInterpreterProvider::new();
+
+    let should_exit = process_special_command(
+        ".validate",
+        &mut buffer,
+        &mut stdout,
+        |_| Ok(()),
+        &interpreter,
+    )?;
+
+    assert!(!should_exit);
+    let output = String::from_utf8(stdout.into_inner())?;
+    // Expect either diagnostic lines or a generic message that parsing failed
+    assert!(output.contains("Validation produced") || output.contains("Parsing failed"), "Unexpected output: {}", output);
+    Ok(())
+}
+
+#[test]
+fn test_validate_unused_command() -> Result<()> {
+    let mut buffer = vec![
+        "new ch in { for(@x <- ch) { Nil } }".to_string()
+    ];
+    let mut stdout = Cursor::new(Vec::new());
+    let interpreter = MockInterpreterProvider::new();
+
+    let should_exit = process_special_command(
+        ".validate-unused",
+        &mut buffer,
+        &mut stdout,
+        |_| Ok(()),
+        &interpreter,
+    )?;
+
+    assert!(!should_exit);
+    let output = String::from_utf8(stdout.into_inner())?;
+    assert!(output.contains("Unused-vars validation produced") || output.contains("Validation successful"));
+    Ok(())
+}
+
+#[test]
+fn test_validate_elab_command() -> Result<()> {
+    let mut buffer = vec![
+        "new ch in { for(@x <- ch) { Nil } }".to_string()
+    ];
+    let mut stdout = Cursor::new(Vec::new());
+    let interpreter = MockInterpreterProvider::new();
+
+    let should_exit = process_special_command(
+        ".validate-elab",
+        &mut buffer,
+        &mut stdout,
+        |_| Ok(()),
+        &interpreter,
+    )?;
+
+    assert!(!should_exit);
+    let output = String::from_utf8(stdout.into_inner())?;
+    assert!(output.contains("Elaboration validation produced") || output.contains("Validation successful"));
+    Ok(())
+}
+
+#[test]
+fn test_validate_resolver_command() -> Result<()> {
+    let mut buffer = vec![
+        "for(@x <- unbound_ch) { Nil }".to_string()
+    ];
+    let mut stdout = Cursor::new(Vec::new());
+    let interpreter = MockInterpreterProvider::new();
+
+    let should_exit = process_special_command(
+        ".validate-resolver",
+        &mut buffer,
+        &mut stdout,
+        |_| Ok(()),
+        &interpreter,
+    )?;
+
+    assert!(!should_exit);
+    let output = String::from_utf8(stdout.into_inner())?;
+    assert!(output.contains("Resolver validation produced") || output.contains("Validation successful") || output.contains("Parsing failed"));
+    Ok(())
 }

@@ -22,6 +22,10 @@ pub fn help_message() -> String {
         + "\n  .delete or .del - Remove the last edited line"
         + "\n  .reset or Ctrl+C - Interrupt current input (clear buffer)"
         + "\n  .load <file> - Load code from file into the buffer"
+        + "\n  .validate - Validate code in buffer with all rholang-lib validators"
+        + "\n  .unused - Validate only unused-variable diagnostics"
+        + "\n  .elab - Validate only elaboration diagnostics (types/joins/consumption/patterns)"
+        + "\n  .resolver - Run resolver and show its diagnostics only"
         + "\n  .ps - List all running processes"
         + "\n  .kill <index> - Kill a running process by index"
         + "\n  .quit - Exit the rholang-shell"
@@ -263,6 +267,38 @@ pub fn process_special_command<W: Write, I: InterpreterProvider>(
                 load_file_into_buffer(path, buffer, stdout, update_prompt)?;
             }
         }
+        ".validate" => {
+            let code = buffer.join("\n");
+            if code.trim().is_empty() {
+                writeln!(stdout, "Buffer is empty, nothing to validate")?;
+            } else {
+                run_all_validators_on_code(&code, stdout)?;
+            }
+        }
+        ".validate-unused" => {
+            let code = buffer.join("\n");
+            if code.trim().is_empty() {
+                writeln!(stdout, "Buffer is empty, nothing to validate")?;
+            } else {
+                run_validation_subset(&code, stdout, ValidationMode::UnusedOnly)?;
+            }
+        }
+        ".validate-elab" => {
+            let code = buffer.join("\n");
+            if code.trim().is_empty() {
+                writeln!(stdout, "Buffer is empty, nothing to validate")?;
+            } else {
+                run_validation_subset(&code, stdout, ValidationMode::ElabOnly)?;
+            }
+        }
+        ".validate-resolver" => {
+            let code = buffer.join("\n");
+            if code.trim().is_empty() {
+                writeln!(stdout, "Buffer is empty, nothing to validate")?;
+            } else {
+                run_validation_subset(&code, stdout, ValidationMode::ResolverOnly)?;
+            }
+        }
         _ => {
             writeln!(stdout, "Unknown command: {command}")?;
         }
@@ -494,4 +530,110 @@ pub async fn run_shell<I: InterpreterProvider>(args: Args, interpreter: I) -> Re
     }
     rl.flush()?;
     Ok(())
+}
+
+
+// ---- Validation support using rholang-lib validators ----
+#[derive(Copy, Clone, Debug)]
+enum ValidationMode {
+    All,
+    UnusedOnly,
+    ElabOnly,
+    ResolverOnly,
+}
+
+fn print_diagnostics<W: Write>(stdout: &mut W, diags: &[librho::sem::Diagnostic], header: &str) -> Result<()> {
+    if diags.is_empty() {
+        writeln!(stdout, "Validation successful: no issues found")?;
+        return Ok(());
+    }
+    writeln!(stdout, "{} {} diagnostic(s):", header, diags.len())?;
+    for (i, d) in diags.iter().enumerate() {
+        use librho::sem::DiagnosticKind;
+        let kind = match d.kind {
+            DiagnosticKind::Error(_) => "Error",
+            DiagnosticKind::Warning(_) => "Warning",
+            DiagnosticKind::Info(_) => "Info",
+        };
+        writeln!(
+            stdout,
+            "  {}. {} at pid {}{}: {:?}",
+            i + 1,
+            kind,
+            d.pid,
+            match d.exact_position {
+                Some(pos) => format!(" @{}:{}", pos.line, pos.col),
+                None => String::new(),
+            },
+            d.kind
+        )?;
+    }
+    Ok(())
+}
+
+fn run_validation_subset<W: Write>(code: &str, stdout: &mut W, mode: ValidationMode) -> Result<()> {
+    use librho::sem::{diagnostics::UnusedVarsPass, ResolverPass, SemanticDb, ForCompElaborationPass, FactPass, DiagnosticPass};
+    use rholang_parser::RholangParser;
+
+    // Parse code safely using Validated without panicking
+    let parser = RholangParser::new();
+    let validated = parser.parse(code);
+
+    let ast_vec = match validated {
+        validated::Validated::Good(ast) => ast,
+        validated::Validated::Fail(_err) => {
+            writeln!(stdout, "Parsing failed: unable to build AST. Please fix syntax errors and try again.")?;
+            return Ok(());
+        }
+    };
+
+    if ast_vec.is_empty() {
+        writeln!(stdout, "No code to validate (empty AST)")?;
+        return Ok(())
+    }
+
+    let mut db = SemanticDb::new();
+
+    // Index and validate each top-level proc independently
+    for proc in ast_vec.iter() {
+        let root = db.build_index(proc);
+        // Always run resolver first; it may emit diagnostics itself
+        let resolver = ResolverPass::new(root);
+        resolver.run(&mut db);
+
+        match mode {
+            ValidationMode::ResolverOnly => {
+                // only resolver diagnostics, do nothing extra
+            }
+            ValidationMode::UnusedOnly => {
+                let unused = UnusedVarsPass;
+                let diags = unused.run(&db);
+                db.push_diagnostics(diags);
+            }
+            ValidationMode::ElabOnly => {
+                let forcomp = ForCompElaborationPass::new(root);
+                forcomp.run(&mut db);
+            }
+            ValidationMode::All => {
+                let unused = UnusedVarsPass;
+                let diags = unused.run(&db);
+                db.push_diagnostics(diags);
+                let forcomp = ForCompElaborationPass::new(root);
+                forcomp.run(&mut db);
+            }
+        }
+    }
+
+    let header = match mode {
+        ValidationMode::All => "Validation produced",
+        ValidationMode::UnusedOnly => "Unused-vars validation produced",
+        ValidationMode::ElabOnly => "Elaboration validation produced",
+        ValidationMode::ResolverOnly => "Resolver validation produced",
+    };
+
+    print_diagnostics(stdout, db.diagnostics(), header)
+}
+
+fn run_all_validators_on_code<W: Write>(code: &str, stdout: &mut W) -> Result<()> {
+    run_validation_subset(code, stdout, ValidationMode::All)
 }
