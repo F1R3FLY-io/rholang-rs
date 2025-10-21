@@ -158,7 +158,7 @@ impl<'a> AnnProc<'a> {
     }
 
     pub fn iter_dfs_event(&'a self) -> impl Iterator<Item = DfsEvent<'a>> {
-        DfsEventIter::<16>::new(self)
+        DfsEventIter::<32>::new(self)
     }
 
     pub fn is_ground(&self) -> bool {
