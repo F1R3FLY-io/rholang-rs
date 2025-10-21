@@ -290,12 +290,7 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
                     SyncSendCont::NonEmpty(p) => Some(p),
                     _ => None,
                 };
-                self.push_children(
-                    quoted
-                        .into_iter()
-                        .chain(inputs)
-                        .chain(cont_iter.into_iter()),
-                );
+                self.push_children(quoted.into_iter().chain(inputs).chain(cont_iter));
             }
 
             Proc::Method { receiver, args, .. } => {
