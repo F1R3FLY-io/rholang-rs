@@ -139,6 +139,10 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
             | Proc::ProcVar(_)
             | Proc::VarRef { .. }
             | Proc::Bad => {}
+
+            Proc::Select { .. } => {
+                unimplemented!("Select is not implemented in this version of Rholang")
+            }
         }
 
         Some(node)
@@ -354,22 +358,22 @@ fn match_cases<'a>(cases: &'a [Case<'a>]) -> impl DoubleEndedIterator<Item = &'a
         .flat_map(|case| iter::once(&case.pattern).chain(iter::once(&case.proc)))
 }
 
-/// Helper: extract inputs + branch body from `Select`.
-fn select_branches<'a>(
-    branches: &'a [Branch<'a>],
-) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
-    branches.iter().flat_map(|branch| {
-        branch
-            .patterns
-            .iter()
-            .filter_map(|ptrn| match &ptrn.rhs {
-                Source::SendReceive { inputs, .. } => Some(inputs),
-                _ => None,
-            })
-            .flatten()
-            .chain(iter::once(&branch.proc))
-    })
-}
+// /// Helper: extract inputs + branch body from `Select`.
+// fn select_branches<'a>(
+//     branches: &'a [Branch<'a>],
+// ) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
+//     branches.iter().flat_map(|branch| {
+//         branch
+//             .patterns
+//             .iter()
+//             .filter_map(|ptrn| match &ptrn.rhs {
+//                 Source::SendReceive { inputs, .. } => Some(inputs),
+//                 _ => None,
+//             })
+//             .flatten()
+//             .chain(iter::once(&branch.proc))
+//     })
+// }
 
 /// Helper: extract key–value children from `Collection::Map`.
 fn map_elements<'a>(
