@@ -493,6 +493,7 @@ impl<'a> SemanticDb<'a> {
     /// - If `pid` introduces a scope, it is yielded first.
     /// - Then, ascends through each enclosing process that has a scope.
     /// - Stops when the top-level is reached.
+    #[inline]
     pub fn process_scope_chain(&self, pid: PID) -> impl Iterator<Item = (PID, &ScopeInfo)> {
         let mut first = true;
         let mut next_pid: Option<PID> = self.enclosing_process(pid);
@@ -527,7 +528,8 @@ impl<'a> SemanticDb<'a> {
             // A “free variable” is free relative to its binder, not globally.
             VarBinding::Free { index } => {
                 let scope = self
-                    .get_scope(pid)
+                    .scope_chain(pid)
+                    .next()
                     .unwrap_or_else(|| panic!("Free var in non-scoped process"));
 
                 scope
