@@ -4,6 +4,9 @@ mod builder;
 use super::PID;
 use builder::Builder;
 
+#[cfg(test)]
+mod tests;
+
 /// Computes the *enclosure relation* between processes and their nearest enclosing scope.
 ///
 /// This pass performs a depth-first traversal of the process tree,

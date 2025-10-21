@@ -683,10 +683,26 @@ mod tests {
         }};
     }
 
+    /// Runs a loop over an iterator and asserts that exactly `$expected` iterations happened.
+    #[macro_export]
+    macro_rules! count_tests {
+    ($expected:expr, for $pat:pat in $iter:expr => $body:block) => {{
+        let mut __tests = 0;
+        for $pat in $iter {
+            $body
+            __tests += 1;
+        }
+        pretty_assertions::assert_eq!(
+            __tests, $expected,
+            "expected {} tests", $expected
+        );
+    }};
+}
+
     pub mod expect {
         use crate::sem::{
-            Binder, BinderId, BinderKind, DiagnosticKind, ErrorKind, ProcRef, ScopeInfo,
-            SemanticDb, Symbol, VarBinding, WarningKind,
+            Binder, BinderId, BinderKind, DiagnosticKind, ErrorKind, PID, ProcRef, ScopeInfo,
+            SemanticDb, Symbol, SymbolOccurrence, VarBinding, WarningKind,
         };
         use pretty_assertions::{assert_eq, assert_matches};
         use rholang_parser::ast;
@@ -720,6 +736,10 @@ mod tests {
 
             pub fn contract_with_name<'a>(expected: &str) -> impl ProcMatch<'a> {
                 move |node: ProcRef<'a>| matches!(node.proc, ast::Proc::Contract { name, .. } if name.is_ident(expected))
+            }
+
+            pub fn send_on_channel<'a>(expected: &str) -> impl ProcMatch<'a> {
+                move |node: ProcRef<'a>| matches!(node.proc, ast::Proc::Send { channel, .. } if channel.is_ident(expected))
             }
 
             impl ProcMatch<'_> for PID {
@@ -945,6 +965,74 @@ mod tests {
                         db.diagnostics()
                     )
                 });
+        }
+
+        pub fn symbol_resolution<'test, M: ProcMatch<'test>>(
+            db: &'test SemanticDb<'test>,
+            ident: &str,
+            from_pid: PID,
+            m: M,
+            expected_index: usize,
+        ) -> Binder {
+            let expected_symbol = db.intern(ident);
+            let bid = db
+                .lookup_in_scope_chain(expected_symbol, from_pid)
+                .unwrap_or_else(|| panic!("expect::symbol_resolution for {ident} from {from_pid}"));
+
+            let actual_binder = db[bid];
+            assert_matches!(
+                actual_binder,
+                Binder {
+                    name,
+                    kind: _,
+                    scope,
+                    index,
+                    source_position: _
+                } if symbol_matches_string(db, name, ident) && index == expected_index && m.matches(db, scope),
+                "expect::symbol_resolution for {ident} at {expected_index}"
+            );
+
+            actual_binder
+        }
+
+        pub fn enclosing_process(db: &SemanticDb, of: PID) -> PID {
+            db.enclosing_process(of).expect("expect::enclosing_process")
+        }
+
+        pub fn enclosing_scope<'test>(db: &'test SemanticDb<'test>, of: PID) -> &'test ScopeInfo {
+            db.enclosing_scope(of).expect("expect::enclosing_scope")
+        }
+
+        pub fn var_resolution(db: &SemanticDb, var: ast::Var, from_pid: PID, expected: &Binder) {
+            match var {
+                ast::Var::Wildcard => {
+                    panic!("expect::var_resolution {expected:#?} is not a wildcard")
+                }
+                ast::Var::Id(id) => {
+                    if let Some(bid) =
+                        db.resolve_occurence(SymbolOccurrence::from_id(id, db), from_pid)
+                    {
+                        let actual = &db[bid];
+                        assert_eq!(actual, expected, "expect::var_resolution for {var}");
+                        return;
+                    }
+                    panic!("expect::var_resolution for {var}");
+                }
+            }
+        }
+
+        pub fn process_scope_chain<'test, const N: usize>(
+            db: &'test SemanticDb<'test>,
+            from_pid: PID,
+        ) -> [(PID, &'test ScopeInfo); N] {
+            let mut temp = Vec::with_capacity(N);
+            temp.extend(db.process_scope_chain(from_pid));
+            assert_eq!(
+                temp.len(),
+                N,
+                "expect::process_scope_chain from {from_pid} with {N}"
+            );
+            temp.try_into().unwrap()
         }
 
         fn symbol_matches_string(db: &SemanticDb, sym: Symbol, expected: &str) -> bool {
