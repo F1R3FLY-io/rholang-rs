@@ -121,10 +121,6 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
                 }
             },
 
-            Proc::Select { branches } => {
-                self.remember(select_branches(branches));
-            }
-
             Proc::Eval { name } => {
                 self.push_name(name);
             }
@@ -151,13 +147,13 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
 
 impl<'a, const S: usize> FusedIterator for PreorderDfsIter<'a, S> {}
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum DfsEvent<'a> {
     Enter(&'a AnnProc<'a>),
     Exit(&'a AnnProc<'a>),
 }
 
-/* 
+/*
 `PreorderDfsIter`` can be implemented in terms of this iterator. But it might not be worth it:
 
 1. The `DfsEventIter`` adds an extra push for each node (`Exit` scheduling) and a branch per iteration.
@@ -171,38 +167,185 @@ pub(crate) struct DfsEventIter<'a, const S: usize> {
     stack: SmallVec<[Frame<'a>; S]>,
 }
 
-struct Frame<'a> {
-    node: &'a AnnProc<'a>,
-    stage: Stage,
-}
-
+/// Stack item: either a node to expand, or an already-built event.
 #[derive(Copy, Clone)]
-enum Stage {
-    Enter,
-    Exit,
+enum Frame<'a> {
+    Node(&'a AnnProc<'a>),
+    Event(DfsEvent<'a>),
 }
 
 impl<'a, const S: usize> DfsEventIter<'a, S> {
     pub fn new(root: &'a AnnProc<'a>) -> Self {
         Self {
-            stack: smallvec![Frame {
-                node: root,
-                stage: Stage::Enter
-            }],
+            stack: smallvec![Frame::Node(root)],
         }
     }
 
+    /// Push children of `node` as `Node(child)` in reverse order so they are visited left->right.
     #[inline]
     fn push_children<I: IntoIterator<Item = &'a AnnProc<'a>, IntoIter: DoubleEndedIterator>>(
         &mut self,
         children: I,
     ) {
         for child in children.into_iter().rev() {
-            self.stack.push(Frame {
-                node: child,
-                stage: Stage::Enter,
-            });
+            self.stack.push(Frame::Node(child));
         }
+    }
+
+    fn expand_node_naked(&mut self, node: &'a AnnProc<'a>) {
+        match node.proc {
+            Proc::Par { left, right } | Proc::BinaryExp { left, right, .. } => {
+                self.push_children([left, right]);
+            }
+
+            Proc::ForComprehension { receipts, proc } => {
+                self.push_children(iter::once(proc).chain(for_comprehension_inputs(receipts)));
+            }
+
+            Proc::Let { bindings, body, .. } => {
+                self.push_children(iter::once(body).chain(let_rhss(bindings)));
+            }
+
+            Proc::Contract { name, body, .. } => {
+                // pattern/name may be a quoted proc, include it before body if present
+                let quoted = match name {
+                    Name::Quote(q) => Some(q),
+                    _ => None,
+                };
+                self.push_children(quoted.into_iter().chain(iter::once(body)));
+            }
+
+            // --- Important: CASE handling ---
+            Proc::Match { expression, cases } => {
+                // Visit the match expression first
+                // Then for each case we must treat the case node as the *parent* of its body:
+                // order: Enter(case) -> pattern children -> Enter(body) ... Exit(body) -> Exit(case)
+                // so children of Match node are: expression, then for each case we push the Case node,
+                // and when the Case node is expanded it should push its pattern children then its body.
+                // Here we treat Case itself as an AnnProc-like node whose children() returns [pattern*, body].
+
+                // Exit(Match) will be pushed by expand_node()
+                // expand children manually:
+                for case in cases.iter().rev() {
+                    let Case {
+                        pattern,
+                        proc: body,
+                    } = case;
+
+                    // pattern begins
+                    self.stack.push(Frame::Event(DfsEvent::Exit(pattern)));
+                    // now push body expansion (normal node)
+                    self.expand_node(body);
+                    // expand pattern children inline
+                    self.expand_node_naked(pattern);
+                    // pattern enter
+                    self.stack.push(Frame::Event(DfsEvent::Enter(pattern)));
+                }
+                self.push_children(iter::once(expression));
+
+                // Enter(Match) will be pushed by expand_node()
+            }
+
+            Proc::IfThenElse {
+                condition,
+                if_true,
+                if_false: None,
+            } => {
+                self.push_children([condition, if_true]);
+            }
+            Proc::IfThenElse {
+                condition,
+                if_true,
+                if_false: Some(if_false),
+            } => {
+                self.push_children([condition, if_true, if_false]);
+            }
+
+            Proc::New { proc: inner, .. }
+            | Proc::Bundle { proc: inner, .. }
+            | Proc::UnaryExp { arg: inner, .. } => {
+                self.push_children(iter::once(inner));
+            }
+
+            Proc::Send {
+                inputs, channel, ..
+            } => {
+                let quoted = match channel {
+                    Name::Quote(q) => Some(q),
+                    _ => None,
+                };
+                self.push_children(quoted.into_iter().chain(inputs));
+            }
+            Proc::SendSync {
+                channel,
+                inputs,
+                cont,
+                ..
+            } => {
+                let quoted = match channel {
+                    Name::Quote(q) => Some(q),
+                    _ => None,
+                };
+                let cont_iter = match cont {
+                    SyncSendCont::NonEmpty(p) => Some(p),
+                    _ => None,
+                };
+                self.push_children(
+                    quoted
+                        .into_iter()
+                        .chain(inputs)
+                        .chain(cont_iter.into_iter()),
+                );
+            }
+
+            Proc::Method { receiver, args, .. } => {
+                self.push_children(iter::once(receiver).chain(args));
+            }
+
+            Proc::Collection(collection) => match collection {
+                Collection::List { elements, .. }
+                | Collection::Set { elements, .. }
+                | Collection::Tuple(elements) => {
+                    self.push_children(elements);
+                }
+                Collection::Map { elements, .. } => {
+                    self.push_children(map_elements(elements));
+                }
+            },
+
+            Proc::Eval { name } => {
+                if let Name::Quote(q) = name {
+                    self.push_children(iter::once(q));
+                }
+            }
+
+            // leaves: no children
+            Proc::Nil
+            | Proc::Unit
+            | Proc::BoolLiteral(_)
+            | Proc::LongLiteral(_)
+            | Proc::StringLiteral(_)
+            | Proc::UriLiteral(_)
+            | Proc::SimpleType(_)
+            | Proc::ProcVar(_)
+            | Proc::VarRef { .. }
+            | Proc::Bad => {}
+
+            Proc::Select { .. } => {
+                unimplemented!("Select is not implemented in this version of Rholang")
+            }
+        }
+    }
+
+    /// Expand a node by pushing Exit(node), its children (Node(...)), and Enter(node).
+    fn expand_node(&mut self, node: &'a AnnProc<'a>) {
+        // push Exit first (it should be at bottom)
+        self.stack.push(Frame::Event(DfsEvent::Exit(node)));
+
+        self.expand_node_naked(node);
+
+        // finally push Enter on top so it's the next popped item
+        self.stack.push(Frame::Event(DfsEvent::Enter(node)));
     }
 }
 
@@ -210,121 +353,18 @@ impl<'a, const S: usize> Iterator for DfsEventIter<'a, S> {
     type Item = DfsEvent<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let Frame { node, stage } = self.stack.pop()?;
-
-        match stage {
-            Stage::Enter => {
-                // schedule exit *after* children
-                self.stack.push(Frame {
-                    node,
-                    stage: Stage::Exit,
-                });
-
-                // push children
-                match node.proc {
-                    Proc::Par { left, right } | Proc::BinaryExp { left, right, .. } => {
-                        self.push_children([left, right]);
-                    }
-                    Proc::ForComprehension { receipts, proc } => {
-                        self.push_children(
-                            iter::once(proc).chain(for_comprehension_inputs(receipts)),
-                        );
-                    }
-                    Proc::Let { bindings, body, .. } => {
-                        self.push_children(let_rhss(bindings).chain(iter::once(body)));
-                    }
-                    Proc::Contract { name, body, .. } => {
-                        let quoted = match name {
-                            Name::Quote(q) => Some(q),
-                            _ => None,
-                        };
-                        self.push_children(quoted.into_iter().chain(iter::once(body)));
-                    }
-                    Proc::New { proc: inner, .. }
-                    | Proc::Bundle { proc: inner, .. }
-                    | Proc::UnaryExp { arg: inner, .. } => {
-                        self.push_children(iter::once(inner));
-                    }
-                    Proc::Send {
-                        inputs, channel, ..
-                    } => {
-                        let quoted = match channel {
-                            Name::Quote(q) => Some(q),
-                            _ => None,
-                        };
-                        self.push_children(inputs.iter().chain(quoted));
-                    }
-                    Proc::SendSync {
-                        channel,
-                        inputs,
-                        cont,
-                        ..
-                    } => {
-                        let quoted = match channel {
-                            Name::Quote(q) => Some(q),
-                            _ => None,
-                        };
-                        let cont_iter = match cont {
-                            SyncSendCont::NonEmpty(p) => Some(p),
-                            _ => None,
-                        };
-                        self.push_children(
-                            inputs.iter().chain(quoted).chain(cont_iter.into_iter()),
-                        );
-                    }
-                    Proc::Match { expression, cases } => {
-                        self.push_children(iter::once(expression).chain(match_cases(cases)));
-                    }
-                    Proc::IfThenElse {
-                        condition,
-                        if_true,
-                        if_false,
-                    } => {
-                        let if_false_iter = if_false.into_iter();
-                        self.push_children(
-                            iter::once(condition)
-                                .chain(iter::once(if_true))
-                                .chain(if_false_iter),
-                        );
-                    }
-                    Proc::Method { receiver, args, .. } => {
-                        self.push_children(iter::once(receiver).chain(args));
-                    }
-                    Proc::Collection(collection) => match collection {
-                        Collection::List { elements, .. }
-                        | Collection::Set { elements, .. }
-                        | Collection::Tuple(elements) => {
-                            self.push_children(elements);
-                        }
-                        Collection::Map { elements, .. } => {
-                            self.push_children(map_elements(elements));
-                        }
-                    },
-                    Proc::Select { branches } => {
-                        self.push_children(select_branches(branches));
-                    }
-                    Proc::Eval { name } => {
-                        if let Name::Quote(q) = name {
-                            self.push_children(iter::once(q));
-                        }
-                    }
-                    Proc::Nil
-                    | Proc::Unit
-                    | Proc::BoolLiteral(_)
-                    | Proc::LongLiteral(_)
-                    | Proc::StringLiteral(_)
-                    | Proc::UriLiteral(_)
-                    | Proc::SimpleType(_)
-                    | Proc::ProcVar(_)
-                    | Proc::VarRef { .. }
-                    | Proc::Bad => {}
+        while let Some(item) = self.stack.pop() {
+            match item {
+                Frame::Event(ev) => return Some(ev),
+                Frame::Node(node) => {
+                    // expand node into Event::Enter, Node(children), Event::Exit
+                    self.expand_node(node);
+                    // and loop: the next iteration will pop the Enter event we just pushed
+                    continue;
                 }
-
-                Some(DfsEvent::Enter(node))
             }
-
-            Stage::Exit => Some(DfsEvent::Exit(node)),
         }
+        None
     }
 }
 
@@ -387,7 +427,7 @@ fn map_elements<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{SourcePos, SourceSpan, ast::Proc, parser::ast_builder::ASTBuilder};
+    use crate::{SourcePos, SourceSpan, ast::AnnProc, ast::Proc, parser::ast_builder::ASTBuilder};
     use pretty_assertions::{assert_eq, assert_matches};
     use smallvec::smallvec;
 
@@ -417,6 +457,38 @@ mod tests {
         assert_matches!(nodes[0].proc, Proc::Par { .. });
         assert_matches!(nodes[1].proc, Proc::BoolLiteral(true));
         assert_matches!(nodes[2].proc, Proc::BoolLiteral(false));
+
+        // events
+        let events: Vec<_> = (&root).iter_dfs_event().collect();
+        assert_matches!(
+            events.as_slice(),
+            [
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::Par { .. },
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::BoolLiteral(true),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::BoolLiteral(true),
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::BoolLiteral(false),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::BoolLiteral(false),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::Par { .. },
+                    ..
+                })
+            ]
+        );
     }
 
     #[test]
@@ -446,6 +518,38 @@ mod tests {
         assert_matches!(nodes[0].proc, Proc::Let { .. });
         assert_matches!(nodes[1].proc, Proc::Unit);
         assert_matches!(nodes[2].proc, Proc::LongLiteral(42));
+
+        // events
+        let events: Vec<_> = (&root).iter_dfs_event().collect();
+        assert_matches!(
+            events.as_slice(),
+            [
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::Let { .. },
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::Unit,
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::Unit,
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::LongLiteral(42),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::LongLiteral(42),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::Let { .. },
+                    ..
+                })
+            ]
+        );
     }
 
     #[test]
@@ -472,6 +576,45 @@ mod tests {
         assert_matches!(nodes[1].proc, Proc::BoolLiteral(true));
         assert_matches!(nodes[2].proc, Proc::StringLiteral("yes"));
         assert_matches!(nodes[3].proc, Proc::StringLiteral("no"));
+
+        let events: Vec<_> = (&root).iter_dfs_event().collect();
+        assert_matches!(
+            events.as_slice(),
+            [
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::IfThenElse { .. },
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::BoolLiteral(true),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::BoolLiteral(true),
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::StringLiteral("yes"),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::StringLiteral("yes"),
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::StringLiteral("no"),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::StringLiteral("no"),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::IfThenElse { .. },
+                    ..
+                })
+            ]
+        );
     }
 
     #[test]
@@ -496,6 +639,53 @@ mod tests {
         assert_matches!(nodes[2].proc, Proc::LongLiteral(1));
         assert_matches!(nodes[3].proc, Proc::StringLiteral("k2"));
         assert_matches!(nodes[4].proc, Proc::LongLiteral(2));
+
+        let events: Vec<_> = (&root).iter_dfs_event().collect();
+        assert_matches!(
+            events.as_slice(),
+            [
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::Collection(Collection::Map { .. }),
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::StringLiteral("k1"),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::StringLiteral("k1"),
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::LongLiteral(1),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::LongLiteral(1),
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::StringLiteral("k2"),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::StringLiteral("k2"),
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::LongLiteral(2),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::LongLiteral(2),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::Collection(Collection::Map { .. }),
+                    ..
+                })
+            ]
+        );
     }
 
     #[test]
@@ -532,6 +722,53 @@ mod tests {
         assert_matches!(nodes[2].proc, Proc::Let { .. });
         assert_matches!(nodes[3].proc, Proc::Unit);
         assert_matches!(nodes[4].proc, Proc::LongLiteral(7));
+
+        let events: Vec<_> = (&root).iter_dfs_event().collect();
+        assert_matches!(
+            events.as_slice(),
+            [
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::Par { .. },
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::BoolLiteral(true),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::BoolLiteral(true),
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::Let { .. },
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::Unit,
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::Unit,
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::LongLiteral(7),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::LongLiteral(7),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::Let { .. },
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::Par { .. },
+                    ..
+                })
+            ]
+        );
     }
 
     #[test]
@@ -600,6 +837,61 @@ mod tests {
         // then comes inner_rhs
         assert_matches!(nodes[4].proc, Proc::LongLiteral(42));
         assert_matches!(nodes[5].proc, Proc::LongLiteral(42));
+
+        let events: Vec<_> = (&root).iter_dfs_event().collect();
+        assert_matches!(
+            events.as_slice(),
+            [
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::ForComprehension { .. },
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::LongLiteral(99),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::LongLiteral(99),
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::LongLiteral(99),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::LongLiteral(99),
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::ForComprehension { .. },
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::LongLiteral(42),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::LongLiteral(42),
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::LongLiteral(42),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::LongLiteral(42),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::ForComprehension { .. },
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::ForComprehension { .. },
+                    ..
+                })
+            ]
+        );
     }
 
     #[test]
@@ -744,5 +1036,224 @@ mod tests {
             Proc::ProcVar(Var::Id(Id { name: "arg1", .. }))
         );
         assert_matches!(nodes[11].proc, Proc::Eval { .. });
+
+        let events: Vec<_> = (&root).iter_dfs_event().collect();
+        assert_matches!(
+            events.as_slice(),
+            [
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::ForComprehension { .. },
+                    ..
+                }),
+                // Enter(for body)
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::Par { .. },
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::Send { .. },
+                    ..
+                }),
+                // Enter (quote)
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::Par { .. },
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "arg1", .. })),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "arg1", .. })),
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::Eval { .. },
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::Eval { .. },
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::Par { .. },
+                    ..
+                }),
+                // Exit (quote)
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "arg2", .. })),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "arg2", .. })),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::Send { .. },
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::Send { .. },
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::BoolLiteral(true),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::BoolLiteral(true),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::Send { .. },
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::Par { .. },
+                    ..
+                }),
+                // Exit(for body)
+
+                // Enter (quote)
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::Par { .. },
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "arg1", .. })),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "arg1", .. })),
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::Eval { .. },
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::Eval { .. },
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::Par { .. },
+                    ..
+                }),
+                // Exit (quote)
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::ForComprehension { .. },
+                    ..
+                })
+            ]
+        );
+    }
+
+    #[test]
+    fn match_expression() {
+        /* match x { p1 => y1; p2 => y2 } */
+        let x = Proc::ProcVar(Var::Id(Id {
+            name: "x",
+            pos: SourcePos::at_col(7),
+        }));
+        let p1 = Proc::ProcVar(Var::Id(Id {
+            name: "p1",
+            pos: SourcePos::at_col(11),
+        }));
+        let y1 = Proc::ProcVar(Var::Id(Id {
+            name: "y1",
+            pos: SourcePos::at_col(17),
+        }));
+        let p2 = Proc::ProcVar(Var::Id(Id {
+            name: "p2",
+            pos: SourcePos::at_col(21),
+        }));
+        let y2 = Proc::ProcVar(Var::Id(Id {
+            name: "y2",
+            pos: SourcePos::at_col(27),
+        }));
+
+        let match_exp = Proc::Match {
+            expression: x.ann(SourcePos::at_col(7).span_of(1)),
+            cases: vec![
+                Case {
+                    pattern: p1.ann(SourcePos::at_col(11).span_of(2)),
+                    proc: y1.ann(SourcePos::at_col(17).span_of(2)),
+                },
+                Case {
+                    pattern: p2.ann(SourcePos::at_col(21).span_of(2)),
+                    proc: y2.ann(SourcePos::at_col(27).span_of(2)),
+                },
+            ],
+        };
+        let root = match_exp.ann(SourceSpan {
+            start: SourcePos::default(),
+            end: SourcePos { line: 1, col: 31 },
+        });
+
+        let nodes: Vec<_> = (&root).iter_preorder_dfs().collect();
+        assert_eq!(nodes.len(), 6);
+        assert_matches!(nodes[0].proc, Proc::Match { .. });
+        // expression
+        assert_matches!(nodes[1].proc, Proc::ProcVar(Var::Id(Id { name: "x", .. })));
+        // cases
+        assert_matches!(nodes[2].proc, Proc::ProcVar(Var::Id(Id { name: "p1", .. })));
+        assert_matches!(nodes[3].proc, Proc::ProcVar(Var::Id(Id { name: "y1", .. })));
+        assert_matches!(nodes[4].proc, Proc::ProcVar(Var::Id(Id { name: "p2", .. })));
+        assert_matches!(nodes[5].proc, Proc::ProcVar(Var::Id(Id { name: "y2", .. })));
+
+        let events: Vec<_> = (&root).iter_dfs_event().collect();
+        assert_matches!(
+            events.as_slice(),
+            [
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::Match { .. },
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "x", .. })),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "x", .. })),
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "p1", .. })),
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "y1", .. })),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "y1", .. })),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "p1", .. })),
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "p2", .. })),
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "y2", .. })),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "y2", .. })),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "p2", .. })),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::Match { .. },
+                    ..
+                })
+            ]
+        );
     }
 }
