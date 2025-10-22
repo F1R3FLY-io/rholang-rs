@@ -528,8 +528,8 @@ impl<'a> SemanticDb<'a> {
             // A “free variable” is free relative to its binder, not globally.
             VarBinding::Free { index } => {
                 let scope = self
-                    .scope_chain(pid)
-                    .next()
+                    .get_scope(pid)
+                    .or_else(|| self.enclosing_scope(pid))
                     .unwrap_or_else(|| panic!("Free var in non-scoped process"));
 
                 scope
