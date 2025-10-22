@@ -79,7 +79,9 @@ impl IntKey for PID {
 pub struct Symbol(u32);
 
 impl Symbol {
-    const DUMMY: Symbol = Symbol(u32::MAX);
+    const MIN: Symbol = Symbol(u32::MIN);
+    #[allow(dead_code)]
+    const MAX: Symbol = Symbol(u32::MAX);
 }
 
 impl Display for Symbol {
@@ -89,7 +91,7 @@ impl Display for Symbol {
 }
 
 /// Symbol occurence in the source code (used to mark variables)
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SymbolOccurrence {
     pub position: SourcePos,
     pub symbol: Symbol,
@@ -100,26 +102,6 @@ impl SymbolOccurrence {
         let symbol = db.intern(id.name);
         let position = id.pos;
         Self { position, symbol }
-    }
-}
-
-impl PartialEq for SymbolOccurrence {
-    fn eq(&self, other: &Self) -> bool {
-        self.position == other.position
-    }
-}
-
-impl Eq for SymbolOccurrence {}
-
-impl PartialOrd for SymbolOccurrence {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for SymbolOccurrence {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.position.cmp(&other.position)
     }
 }
 

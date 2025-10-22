@@ -401,11 +401,11 @@ impl<'a> SemanticDb<'a> {
         // Construct range bounds for the BTreeMap key type
         let start_key = SymbolOccurrence {
             position: span.start,
-            symbol: Symbol::DUMMY, // any dummy symbol, ordering ignores it
+            symbol: Symbol::MIN,
         };
         let end_key = SymbolOccurrence {
             position: span.end,
-            symbol: Symbol::DUMMY,
+            symbol: Symbol::MIN,
         };
 
         self.var_to_binder
