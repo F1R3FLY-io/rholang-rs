@@ -29,6 +29,7 @@ new stdout(`rho:io:stdout`) in {
         (var)
         uri: (uri_literal)))
     proc: (block
+      (line_comment)
       (par
         (par
           (par
@@ -41,6 +42,7 @@ new stdout(`rho:io:stdout`) in {
                     receiver: (string_literal)
                     name: (var)
                     args: (args))))
+              (line_comment)
               (send
                 channel: (var)
                 send_type: (send_single)
@@ -51,6 +53,7 @@ new stdout(`rho:io:stdout`) in {
                     args: (args
                       (long_literal)
                       (long_literal))))))
+            (line_comment)
             (send
               channel: (var)
               send_type: (send_single)
@@ -58,6 +61,7 @@ new stdout(`rho:io:stdout`) in {
                 (concat
                   (string_literal)
                   (string_literal)))))
+          (line_comment)
           (send
             channel: (var)
             send_type: (send_single)
@@ -66,6 +70,7 @@ new stdout(`rho:io:stdout`) in {
                 receiver: (string_literal)
                 name: (var)
                 args: (args)))))
+        (line_comment)
         (send
           channel: (var)
           send_type: (send_single)

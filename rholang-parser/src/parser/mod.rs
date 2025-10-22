@@ -41,7 +41,8 @@ impl<'a> RholangParser<'a> {
         }
         let mut walker = tree.walk();
 
-        root.named_children(&mut walker)
+        // Skip comment nodes at the top level
+        parsing::named_children_no_comments(&root, &mut walker)
             .map(|node| parsing::node_to_ast(&node, &self.ast_builder, code))
             .collect()
     }
