@@ -724,7 +724,7 @@ fn apply_cont<'tree, 'ast>(
             let node = cursor.node();
             let kind_id = node.kind_id();
             // Skip unnamed nodes and comments
-            if node.is_named() && kind_id != kind!("line_comment") && kind_id != kind!("block_comment") {
+            if node.is_named() && !is_comment(kind_id) {
                 break;
             }
             has_more = cursor.goto_next_sibling();
@@ -1481,17 +1481,23 @@ fn named_children_of_kind<'a>(
         .filter(move |child| child.kind_id() == kind)
 }
 
+/// Check if a node is a comment (inline for zero-cost abstraction)
+#[inline(always)]
+const fn is_comment(kind_id: u16) -> bool {
+    kind_id == kind!("line_comment") || kind_id == kind!("block_comment")
+}
+
 /// Returns named children excluding comment nodes
+#[inline]
 pub(super) fn named_children_no_comments<'a>(
     node: &tree_sitter::Node<'a>,
     cursor: &mut tree_sitter::TreeCursor<'a>,
 ) -> impl Iterator<Item = tree_sitter::Node<'a>> {
-    node.named_children(cursor).filter(|child| {
-        child.kind_id() != kind!("line_comment") && child.kind_id() != kind!("block_comment")
-    })
+    node.named_children(cursor).filter(|child| !is_comment(child.kind_id()))
 }
 
 /// Returns count of named children excluding comments
+#[inline]
 fn named_child_count_no_comments(node: &tree_sitter::Node) -> usize {
     named_children_no_comments(node, &mut node.walk()).count()
 }
