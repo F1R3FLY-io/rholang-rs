@@ -5,7 +5,7 @@ use std::{
 
 use smallvec::{SmallVec, smallvec};
 
-use crate::{SourcePos, SourceSpan, traverse::PreorderDfsIter};
+use crate::{SourcePos, SourceSpan, traverse::*};
 
 pub type ProcList<'a> = SmallVec<[AnnProc<'a>; 1]>;
 
@@ -140,6 +140,12 @@ impl<'a> Proc<'a> {
     }
 }
 
+impl<'a> From<Var<'a>> for Proc<'a> {
+    fn from(value: Var<'a>) -> Self {
+        Proc::ProcVar(value)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct AnnProc<'ast> {
     pub proc: &'ast Proc<'ast>,
@@ -151,12 +157,23 @@ impl<'a> AnnProc<'a> {
         PreorderDfsIter::<16>::new(self)
     }
 
+    pub fn iter_dfs_event(&'a self) -> impl Iterator<Item = DfsEvent<'a>> {
+        DfsEventIter::<32>::new(self)
+    }
+
     pub fn is_ground(&self) -> bool {
         self.proc.is_ground()
     }
 
     pub fn is_ident(&self, expected: &str) -> bool {
         self.proc.is_ident(expected)
+    }
+
+    pub fn iter_proc_var(&'a self) -> impl Iterator<Item = Var<'a>> {
+        PreorderDfsIter::<4>::new(self).filter_map(|ann_proc| match ann_proc.proc {
+            Proc::ProcVar(var) => Some(*var),
+            _ => None,
+        })
     }
 }
 
@@ -194,7 +211,7 @@ pub enum Var<'ast> {
     Id(Id<'ast>),
 }
 
-impl Var<'_> {
+impl<'a> Var<'a> {
     pub fn get_position(self) -> Option<SourcePos> {
         match self {
             Var::Wildcard => None,
@@ -204,8 +221,15 @@ impl Var<'_> {
 
     pub fn is_ident(self, expected: &str) -> bool {
         match self {
-            Var::Wildcard => false,
+            Var::Wildcard => expected == "_",
             Var::Id(id) => id.name == expected,
+        }
+    }
+
+    pub fn into_ident(self) -> &'a str {
+        match self {
+            Var::Wildcard => "_",
+            Var::Id(id) => id.name,
         }
     }
 }

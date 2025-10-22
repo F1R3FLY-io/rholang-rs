@@ -61,7 +61,7 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
         }
 
         // -- ground expressions that do not contain names --
-        Nil | Unit | BoolLiteral(_) | LongLiteral(_) | StringLiteral(_) | UriLiteral(_) => {}
+        Nil | Unit | BoolLiteral(_) | LongLiteral(_) | StringLiteral(_) | UriLiteral(_) | Bad => {}
 
         // -- variables --
         ProcVar(Id(id)) => {
@@ -308,7 +308,6 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
             });
         }
 
-        Bad => db.error(db[this], ErrorKind::BadCode, None),
         Select { branches: _ } => {
             unimplemented!("Select is not implemented in this version of Rholang")
         }
@@ -375,16 +374,7 @@ fn resolve_name<'a>(
             }
         }
         Quote(p) => {
-            let quoted = db.build_index(p);
-            resolve(db, stack, quoted);
-            if db.has_free(quoted) {
-                let free = db.free_of(quoted).next().map(|bid| db[bid]).unwrap();
-                db.error(
-                    quoted,
-                    ErrorKind::FreeVariable(free.into()),
-                    Some(free.source_position),
-                );
-            }
+            resolve_unguarded(db, stack, p);
         }
     }
 }

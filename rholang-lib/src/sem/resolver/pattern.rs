@@ -32,7 +32,7 @@ pub(super) fn resolve_proc_pattern<'a>(
         // go into recursive mode for complex
         _ => {
             let mut res = PatternResolver::new(pid, first_binder, 0);
-            resolve_proc_pattern_rec(db, env, &mut res, pattern, 0);
+            resolve_proc_pattern_rec(db, env, &mut res, pattern);
             res.take(span)
         }
     }
@@ -109,7 +109,7 @@ fn resolve_single_name<'a>(
             res.resolve_or_introduce_var(*var, BinderKind::Name(None), db);
         }
         Name::Quote(quoted) => {
-            resolve_proc_pattern_rec(db, env, res, quoted, 0);
+            resolve_proc_pattern_rec(db, env, res, quoted);
         }
     }
 }
@@ -119,7 +119,6 @@ fn resolve_proc_pattern_rec<'a>(
     env: &mut BindingStack,
     res: &mut PatternResolver,
     pattern: ProcRef<'a>,
-    depth: usize,
 ) {
     match pattern.proc {
         Nil
@@ -146,15 +145,10 @@ fn resolve_proc_pattern_rec<'a>(
             right: pattern,
             op: BinaryExpOp::Matches,
         } => {
-            resolve_proc_pattern_rec(db, env, res, target, depth + 1);
-            res.with_subpattern(
-                SubPattern::Proc(pattern),
-                db,
-                env,
-                |_, _, _| { /*forget it immediately */ },
-            );
+            resolve_proc_pattern_rec(db, env, res, target);
+            res.with_fresh_scope(|f| resolve_proc_pattern_rec(db, env, f, pattern));
 
-            if depth == 0 {
+            if res.top_level() {
                 db.warning(
                     res.id,
                     WarningKind::TopLevelPatternExpr { span: pattern.span },
@@ -162,14 +156,23 @@ fn resolve_proc_pattern_rec<'a>(
                 );
             }
         }
-        BinaryExp { left, right, op } => {
-            let connective = op.is_connective();
-            let sub_depth = depth + if connective { 0 } else { 1 };
+        BinaryExp { left, right, op } if op.is_connective() => {
+            if *op == BinaryExpOp::Conjunction {
+                res.with_fresh_scope(|f| resolve_proc_pattern_rec(db, env, f, left));
+                res.with_fresh_scope(|f| resolve_proc_pattern_rec(db, env, f, right));
+            } else {
+                // here the trick is we want to allow expressions like: [x] \/ [1, x]
+                res.with_fresh_scope(|f| {
+                    resolve_proc_pattern_rec(db, env, f, left);
+                    resolve_proc_pattern_rec(db, env, f, right);
+                })
+            }
+        }
+        BinaryExp { left, right, op: _ } => {
+            resolve_proc_pattern_rec(db, env, res, left);
+            resolve_proc_pattern_rec(db, env, res, right);
 
-            resolve_proc_pattern_rec(db, env, res, left, sub_depth);
-            resolve_proc_pattern_rec(db, env, res, right, sub_depth);
-
-            if depth == 0 && !connective {
+            if res.top_level() {
                 db.warning(
                     res.id,
                     WarningKind::TopLevelPatternExpr { span: pattern.span },
@@ -180,9 +183,13 @@ fn resolve_proc_pattern_rec<'a>(
         UnaryExp { arg, op } => {
             let connective = op.is_connective();
 
-            resolve_proc_pattern_rec(db, env, res, arg, depth + if connective { 0 } else { 1 });
+            if connective {
+                res.with_fresh_scope(|f| resolve_proc_pattern_rec(db, env, f, arg));
+            } else {
+                resolve_proc_pattern_rec(db, env, res, arg);
+            }
 
-            if depth == 0 && !connective {
+            if res.top_level() && !connective {
                 db.warning(
                     res.id,
                     WarningKind::TopLevelPatternExpr { span: pattern.span },
@@ -191,21 +198,21 @@ fn resolve_proc_pattern_rec<'a>(
             }
         }
         Par { left, right } => {
-            resolve_proc_pattern_rec(db, env, res, left, depth);
-            resolve_proc_pattern_rec(db, env, res, right, depth);
+            resolve_proc_pattern_rec(db, env, res, left);
+            resolve_proc_pattern_rec(db, env, res, right);
         }
         IfThenElse {
             condition,
             if_true,
             if_false,
         } => {
-            resolve_proc_pattern_rec(db, env, res, condition, depth + 1);
-            resolve_proc_pattern_rec(db, env, res, if_true, depth + 1);
+            resolve_proc_pattern_rec(db, env, res, condition);
+            resolve_proc_pattern_rec(db, env, res, if_true);
             if let Some(branch) = if_false {
-                resolve_proc_pattern_rec(db, env, res, branch, depth + 1);
+                resolve_proc_pattern_rec(db, env, res, branch);
             }
 
-            if depth == 0 {
+            if res.top_level() {
                 db.warning(
                     res.id,
                     WarningKind::TopLevelPatternExpr { span: pattern.span },
@@ -214,12 +221,12 @@ fn resolve_proc_pattern_rec<'a>(
             }
         }
         Method { receiver, args, .. } => {
-            resolve_proc_pattern_rec(db, env, res, receiver, depth + 1);
+            resolve_proc_pattern_rec(db, env, res, receiver);
             for arg in args {
-                resolve_proc_pattern_rec(db, env, res, arg, depth + 1);
+                resolve_proc_pattern_rec(db, env, res, arg);
             }
 
-            if depth == 0 {
+            if res.top_level() {
                 db.warning(
                     res.id,
                     WarningKind::TopLevelPatternExpr { span: pattern.span },
@@ -228,14 +235,14 @@ fn resolve_proc_pattern_rec<'a>(
             }
         }
         Match { expression, cases } => {
-            resolve_proc_pattern_rec(db, env, res, expression, depth + 1);
+            resolve_proc_pattern_rec(db, env, res, expression);
             for ast::Case { pattern, proc } in cases {
                 res.with_subpattern(SubPattern::Proc(pattern), db, env, |db, env, res| {
-                    resolve_proc_pattern_rec(db, env, res, proc, depth + 1);
+                    resolve_proc_pattern_rec(db, env, res, proc);
                 });
             }
 
-            if depth == 0 {
+            if res.top_level() {
                 db.warning(
                     res.id,
                     WarningKind::TopLevelPatternExpr { span: pattern.span },
@@ -249,13 +256,13 @@ fn resolve_proc_pattern_rec<'a>(
             match collection {
                 List { elements, .. } | Set { elements, .. } | Tuple(elements) => {
                     for elt in elements {
-                        resolve_proc_pattern_rec(db, env, res, elt, depth);
+                        resolve_proc_pattern_rec(db, env, res, elt);
                     }
                 }
                 Map { elements, .. } => {
                     for (k, v) in elements {
-                        resolve_proc_pattern_rec(db, env, res, k, depth);
-                        resolve_proc_pattern_rec(db, env, res, v, depth);
+                        resolve_proc_pattern_rec(db, env, res, k);
+                        resolve_proc_pattern_rec(db, env, res, v);
                     }
                 }
             }
@@ -266,7 +273,7 @@ fn resolve_proc_pattern_rec<'a>(
         }
         Eval { name } => {
             resolve_single_name(db, env, res, name);
-            if depth == 0 {
+            if res.top_level() {
                 db.warning(
                     res.id,
                     WarningKind::TopLevelPatternExpr { span: pattern.span },
@@ -284,14 +291,14 @@ fn resolve_proc_pattern_rec<'a>(
             inputs,
             cont: SyncSendCont::Empty,
         } => {
-            resolve_send_pattern(channel, inputs, None, db, env, res, depth);
+            resolve_send_pattern(channel, inputs, None, db, env, res);
         }
         SendSync {
             channel,
             inputs,
             cont: SyncSendCont::NonEmpty(cont),
         } => {
-            resolve_send_pattern(channel, inputs, Some(cont), db, env, res, depth);
+            resolve_send_pattern(channel, inputs, Some(cont), db, env, res);
         }
 
         // for-comprehension
@@ -304,7 +311,6 @@ fn resolve_proc_pattern_rec<'a>(
                 db,
                 env,
                 res,
-                depth,
                 proc,
                 |db, env, res, bind| {
                     // 1. Resolve the source name
@@ -313,7 +319,7 @@ fn resolve_proc_pattern_rec<'a>(
                     // 2. Resolve inputs if present
                     if let Some(inputs) = bind.input() {
                         for input_pattern in inputs {
-                            resolve_proc_pattern_rec(db, env, res, input_pattern, depth);
+                            resolve_proc_pattern_rec(db, env, res, input_pattern);
                         }
                     }
 
@@ -329,7 +335,7 @@ fn resolve_proc_pattern_rec<'a>(
         } => {
             resolve_single_name(db, env, res, name);
             res.with_subpattern(SubPattern::Name(formals), db, env, |db, env, res| {
-                resolve_proc_pattern_rec(db, env, res, body, depth + 1)
+                resolve_proc_pattern_rec(db, env, res, body)
             })
         }
 
@@ -340,12 +346,11 @@ fn resolve_proc_pattern_rec<'a>(
                 db,
                 env,
                 res,
-                depth,
                 body,
                 |db, env, res, let_binding| {
                     // 1. Resolve RHS
                     for rhs in &let_binding.rhs {
-                        resolve_proc_pattern_rec(db, env, res, rhs, depth);
+                        resolve_proc_pattern_rec(db, env, res, rhs);
                     }
 
                     // 2. Return LHS
@@ -360,7 +365,7 @@ fn resolve_proc_pattern_rec<'a>(
                 let interned_uri = n.uri.map(|uri| db.intern(&uri));
                 res.introduce_free(n.id, BinderKind::Name(interned_uri), db);
             }
-            resolve_proc_pattern_rec(db, env, res, proc, depth);
+            resolve_proc_pattern_rec(db, env, res, proc);
         }
 
         Bundle { .. } => {
@@ -370,12 +375,10 @@ fn resolve_proc_pattern_rec<'a>(
                 Some(pattern.span.start),
             );
         }
-        Bad => {
-            db.error(res.id, ErrorKind::BadCode, Some(pattern.span.start));
-        }
         Select { branches: _ } => {
             unimplemented!("Select is not implemented in this version of Rholang")
         }
+        Bad => unreachable!(),
     }
 }
 
@@ -386,15 +389,14 @@ fn resolve_send_pattern<'a>(
     db: &mut SemanticDb<'a>,
     env: &mut BindingStack,
     res: &mut PatternResolver,
-    depth: usize,
 ) {
     resolve_single_name(db, env, res, channel);
     for input in inputs {
-        resolve_proc_pattern_rec(db, env, res, input, depth);
+        resolve_proc_pattern_rec(db, env, res, input);
     }
 
     if let Some(cont) = continuation {
-        resolve_proc_pattern_rec(db, env, res, cont, depth)
+        resolve_proc_pattern_rec(db, env, res, cont)
     }
 }
 
@@ -411,7 +413,6 @@ fn resolve_pattern_chain<'a, I, F>(
     db: &mut SemanticDb<'a>,
     env: &mut BindingStack,
     res: &mut PatternResolver,
-    depth: usize,
     rem: ProcRef<'a>,
     resolve: F,
 ) where
@@ -425,17 +426,18 @@ fn resolve_pattern_chain<'a, I, F>(
 
         // Step 2: open subpattern scope, recurse
         res.with_subpattern(sub_pattern, db, env, |db, env, res| {
-            resolve_pattern_chain(iter, db, env, res, depth, rem, resolve);
+            resolve_pattern_chain(iter, db, env, res, rem, resolve);
         });
     } else {
         // No more patterns → resolve the remainder
-        resolve_proc_pattern_rec(db, env, res, rem, depth + 1);
+        resolve_proc_pattern_rec(db, env, res, rem);
     }
 }
 
 struct PatternResolver {
     id: PID,
     first_binder: BinderId,
+    depth: usize,
     var_index: usize,
     scope_guard: usize,
     env: Env,
@@ -449,6 +451,7 @@ impl PatternResolver {
         Self {
             id: pattern_id,
             first_binder,
+            depth: 0,
             var_index,
             scope_guard: 0,
             env: Env::new(),
@@ -462,6 +465,10 @@ impl PatternResolver {
         let mut result = ScopeInfo::from_parts(self.first_binder, self.free, self.refs, span);
         result.set_uses(self.used);
         result
+    }
+
+    fn top_level(&self) -> bool {
+        self.depth == 0
     }
 
     fn binder_index(&self, binder: BinderId) -> usize {
@@ -497,7 +504,7 @@ impl PatternResolver {
             // Record the binder as used and add its symbol to the semantic db
             let idx = self.binder_index(binder);
             self.used.set(idx, true);
-            let occ = SymbolOccurence {
+            let occ = SymbolOccurrence {
                 symbol: sym,
                 position: var.pos,
             };
@@ -554,6 +561,17 @@ impl PatternResolver {
         fresh
     }
 
+    fn with_fresh_scope<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        let old_guard = self.set_guard(self.free.len());
+        let result = f(self);
+        self.set_guard(old_guard);
+
+        result
+    }
+
     #[inline(never)]
     fn with_subpattern<'a, F, R>(
         &mut self,
@@ -565,23 +583,27 @@ impl PatternResolver {
     where
         F: FnOnce(&mut SemanticDb<'a>, &mut BindingStack, &mut Self) -> R,
     {
-        let old_guard = self.set_guard(self.free.len());
-        let start_bound = self.env.len();
+        let sub_range = self.with_fresh_scope(|fresh| {
+            let scope_guard = fresh.scope_guard;
 
-        sub.call(self, db, bindings);
+            let start_bound = fresh.env.len();
+            sub.call(fresh, db, bindings);
+            let end_bound = fresh.env.len();
 
-        let end_bound = self.env.len();
+            // Mark new subpattern binders as non-free for the duration of the callback:
+            // the callback resolves expressions that may reference these binders
+            fresh.free[scope_guard..].fill(false);
 
-        // Mark new subpattern binders as non-free for the duration of the callback:
-        // the callback resolves expressions that may reference these binders
-        self.free[self.scope_guard..].fill(false);
-        self.set_guard(old_guard);
+            start_bound..end_bound
+        });
 
         // let caller work inside that subpattern scope
+        self.depth += 1;
         let result = f(db, bindings, self);
+        self.depth -= 1;
 
         // We have a contiguous range of binders we want to forget
-        self.env.forget(start_bound..end_bound);
+        self.env.forget(sub_range);
         result
     }
 }
@@ -594,7 +616,7 @@ enum SubPattern<'p> {
 impl<'p> SubPattern<'p> {
     fn call(self, res: &mut PatternResolver, db: &mut SemanticDb<'p>, bindings: &mut BindingStack) {
         match self {
-            SubPattern::Proc(proc) => resolve_proc_pattern_rec(db, bindings, res, proc, 0),
+            SubPattern::Proc(proc) => resolve_proc_pattern_rec(db, bindings, res, proc),
             SubPattern::Name(names) => resolve_names(db, bindings, res, names),
         }
     }
@@ -619,7 +641,7 @@ fn new_free(
     });
     assert!(
         db.map_symbol_as_free(
-            SymbolOccurence {
+            SymbolOccurrence {
                 symbol: name,
                 position: pos
             },

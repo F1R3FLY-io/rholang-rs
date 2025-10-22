@@ -26,12 +26,12 @@ async-trait = "0.1.89"
 
 # General purpose, used mostly by librho
 bitvec = "1.0.1"
-indexmap = "2.11.0"
+indexmap = "2.12.0"
 intmap = "3.1.2"
 
 # Used by: rholang-shell, librho
 parking_lot = { version = "0.12.5" }
-tokio = { version = "1.47.1", features = ["rt", "rt-multi-thread", "test-util", "parking_lot", "sync", "macros"] }
+tokio = { version = "1.48.0", features = ["rt", "rt-multi-thread", "test-util", "parking_lot", "sync", "macros"] }
 
 # Used by: rholang-shell
 rustyline-async = "0.4.6"
