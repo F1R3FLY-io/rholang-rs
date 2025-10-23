@@ -41,6 +41,8 @@ jobs:
 
       - name: Build wasm
         run: npm run build:wasm
+        env:
+          RHOLANG_NAMED_COMMENTS: 1
 
       - name: Collect artifact
         run: mv tree-sitter-rholang.wasm bindings/js/tree-sitter-rholang.wasm

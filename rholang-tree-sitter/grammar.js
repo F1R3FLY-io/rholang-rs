@@ -1,9 +1,14 @@
+// Read environment variable to determine if comments should be named nodes
+// Set RHOLANG_NAMED_COMMENTS=1 to include comments as named nodes (for LSP features)
+// Unset or RHOLANG_NAMED_COMMENTS=0 for unnamed comments (smaller trees, less overhead)
+const namedComments = process.env.RHOLANG_NAMED_COMMENTS === '1';
+
 module.exports = grammar({
     name: 'rholang',
 
     extras: $ => [
-        $.line_comment,
-        $.block_comment,
+        namedComments ? $.line_comment : $._line_comment,
+        namedComments ? $.block_comment : $._block_comment,
         /\s/,
     ],
     word: $ => $.var,
@@ -317,9 +322,17 @@ module.exports = grammar({
         _name_remainder: $ => seq('...', '@', field('cont', $._proc_var)),
 
         // comments
+        // Define both named and unnamed versions to support conditional compilation
 
         line_comment: $ => token(seq('//', /[^\n]*/)),
+        _line_comment: $ => token(seq('//', /[^\n]*/)),
+
         block_comment: $ => token(seq(
+            '/*',
+            /[^*]*\*+([^/*][^*]*\*+)*/,
+            '/',
+        )),
+        _block_comment: $ => token(seq(
             '/*',
             /[^*]*\*+([^/*][^*]*\*+)*/,
             '/',

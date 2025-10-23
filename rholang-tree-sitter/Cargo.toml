@@ -10,6 +10,24 @@ include = ["bindings/rust/*", "grammar.js", "queries/*", "src/*"]
 [lib]
 path = "bindings/rust/lib.rs"
 
+[features]
+default = []
+# Include line_comment and block_comment as named nodes in the AST.
+# When enabled, comments are visible in tree queries and accessible for LSP features.
+# When disabled (default), comments are unnamed nodes and automatically excluded.
+#
+# Enable this for:
+# - LSP/language servers (hover, syntax highlighting, folding)
+# - IDE integration (IntelliJ, VSCode, Emacs, Vim)
+# - WASM builds for editors (Lightning Bug)
+#
+# Disable this for:
+# - Performance-critical CLI tools (rhosh)
+# - Production parsers without LSP needs
+#
+# Performance impact: ~10-15% parsing overhead when enabled
+named-comments = []
+
 [dependencies]
 tree-sitter-language = { workspace = true }
 
