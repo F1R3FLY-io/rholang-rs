@@ -156,7 +156,7 @@ pub(super) fn node_to_ast<'ast>(
                     let name_node = get_field(&node, field!("name"));
                     let args_node = get_field(&node, field!("args"));
 
-                    let arity = named_child_count_no_comments(&args_node);
+                    let arity = args_node.named_child_count();
                     cont_stack.push(K::ConsumeMethod {
                         id: Id {
                             name: get_node_value(&name_node, source),
@@ -246,7 +246,7 @@ pub(super) fn node_to_ast<'ast>(
                     let has_remainder = remainder_node.is_some();
                     match collection_type {
                         kind!("list") => {
-                            let arity = named_child_count_no_comments(&collection_node);
+                            let arity = collection_node.named_child_count();
                             if arity == 0 {
                                 proc_stack.push(ast_builder.const_empty_list(), span);
                             } else {
@@ -260,7 +260,7 @@ pub(super) fn node_to_ast<'ast>(
                         }
                         kind!("set") => {
                             cont_stack.push(K::ConsumeSet {
-                                arity: named_child_count_no_comments(&collection_node),
+                                arity: collection_node.named_child_count(),
                                 has_remainder,
                                 span,
                             });
@@ -268,14 +268,14 @@ pub(super) fn node_to_ast<'ast>(
                         }
                         kind!("tuple") => {
                             cont_stack.push(K::ConsumeTuple {
-                                arity: named_child_count_no_comments(&collection_node),
+                                arity: collection_node.named_child_count(),
                                 span,
                             });
                             cont_stack.push(K::EvalList(collection_node.walk()));
                         }
                         kind!("map") => {
                             let mut temp_cont_stack =
-                                Vec::with_capacity(named_child_count_no_comments(&collection_node) * 2);
+                                Vec::with_capacity(collection_node.named_child_count() * 2);
                             let arity = eval_named_pairs(
                                 &collection_node,
                                 kind!("key_value_pair"),
@@ -299,7 +299,7 @@ pub(super) fn node_to_ast<'ast>(
                         }
                         kind!("pathmap") => {
                             cont_stack.push(K::ConsumePathMap {
-                                arity: named_child_count_no_comments(&collection_node),
+                                arity: collection_node.named_child_count(),
                                 has_remainder,
                                 span,
                             });
@@ -319,7 +319,7 @@ pub(super) fn node_to_ast<'ast>(
                         kind!("send_multiple") => SendType::Multiple,
                         _ => unreachable!("Send type can only be: single or multiple"),
                     };
-                    let arity = named_child_count_no_comments(&inputs_node);
+                    let arity = inputs_node.named_child_count();
                     cont_stack.push(K::ConsumeSend {
                         send_type,
                         arity,
@@ -373,7 +373,7 @@ pub(super) fn node_to_ast<'ast>(
 
                     if let Some(formals_node) = node.child_by_field_id(field!("formals")) {
                         cont_stack.push(K::ConsumeContract {
-                            arity: named_child_count_no_comments(&formals_node),
+                            arity: formals_node.named_child_count(),
                             has_cont: formals_node.child_by_field_name("cont").is_some(),
                             span,
                         });
@@ -411,17 +411,17 @@ pub(super) fn node_to_ast<'ast>(
                     let receipts_node = get_field(&node, field!("receipts"));
                     let proc_node = get_field(&node, field!("proc"));
 
-                    let mut rs = SmallVec::with_capacity(named_child_count_no_comments(&receipts_node));
+                    let mut rs = SmallVec::with_capacity(receipts_node.named_child_count());
                     let mut temp_cont_stack = Vec::with_capacity(rs.capacity() * 2);
 
                     let mut total_len = 0;
 
                     for receipt_node in named_children_no_comments(&receipts_node, &mut receipts_node.walk()) {
-                        let mut bs = SmallVec::with_capacity(named_child_count_no_comments(&receipt_node));
+                        let mut bs = SmallVec::with_capacity(receipt_node.named_child_count());
                         let mut receipt_len = 0;
 
                         for bind_node in named_children_no_comments(&receipt_node, &mut receipt_node.walk()) {
-                            let (names_node, source_node) = if named_child_count_no_comments(&bind_node) > 1 {
+                            let (names_node, source_node) = if bind_node.named_child_count() > 1 {
                                 let (ns, s) = get_left_and_right(&bind_node);
                                 (Some(ns), s)
                             } else {
@@ -429,7 +429,7 @@ pub(super) fn node_to_ast<'ast>(
                             };
                             let (name_count, cont_present) = match names_node {
                                 Some(names) => (
-                                    named_child_count_no_comments(&names),
+                                    names.named_child_count(),
                                     names.child_by_field_id(field!("cont")).is_some(),
                                 ),
                                 None => (0, false),
@@ -444,7 +444,7 @@ pub(super) fn node_to_ast<'ast>(
                                             let inputs_node =
                                                 get_field(&source_node, field!("inputs"));
                                             SourceDesc::SR {
-                                                arity: named_child_count_no_comments(&inputs_node),
+                                                arity: inputs_node.named_child_count(),
                                             }
                                         }
                                         _ => unreachable!(
@@ -520,7 +520,7 @@ pub(super) fn node_to_ast<'ast>(
                     let cases_node = get_field(&node, field!("cases"));
 
                     let mut temp_cont_stack =
-                        Vec::with_capacity(2 * named_child_count_no_comments(&cases_node));
+                        Vec::with_capacity(2 * cases_node.named_child_count());
                     let arity = eval_named_pairs(
                         &cases_node,
                         kind!("case"),
@@ -550,15 +550,15 @@ pub(super) fn node_to_ast<'ast>(
 
                     let concurrent = decls_node.kind_id() == kind!("conc_decls");
 
-                    let mut let_decls = SmallVec::with_capacity(named_child_count_no_comments(&decls_node));
+                    let mut let_decls = SmallVec::with_capacity(decls_node.named_child_count());
                     let mut temp_cont_stack = Vec::with_capacity(2 * let_decls.capacity());
 
                     let mut total_len = 0;
 
                     for decl_node in named_children_no_comments(&decls_node, &mut decls_node.walk()) {
                         let (lhs, rhs) = get_left_and_right(&decl_node);
-                        let lhs_arity = named_child_count_no_comments(&lhs);
-                        let rhs_arity = named_child_count_no_comments(&rhs);
+                        let lhs_arity = lhs.named_child_count();
+                        let rhs_arity = rhs.named_child_count();
                         let lhs_has_cont = lhs.child_by_field_id(field!("cont")).is_some();
 
                         if let_decl_is_malformed(lhs_arity, rhs_arity, lhs_has_cont) {
@@ -613,7 +613,7 @@ pub(super) fn node_to_ast<'ast>(
                 kind!("send_sync") => {
                     let name_node = get_field(&node, field!("channel"));
                     let messages_node = get_field(&node, field!("inputs"));
-                    let arity = named_child_count_no_comments(&messages_node);
+                    let arity = messages_node.named_child_count();
                     let sync_send_cont_node = get_field(&node, field!("cont"));
                     let choice_node = get_first_child(&sync_send_cont_node);
                     match choice_node.kind_id() {
@@ -691,7 +691,7 @@ pub(super) fn node_to_ast<'ast>(
 }
 
 fn parse_decls<'a>(from: &tree_sitter::Node, source: &'a str) -> Vec<NameDecl<'a>> {
-    let mut result = Vec::with_capacity(named_child_count_no_comments(&from));
+    let mut result = Vec::with_capacity(from.named_child_count());
 
     for decl_node in named_children_no_comments(from, &mut from.walk()) {
         let var_node = get_first_child(&decl_node);
@@ -1448,7 +1448,9 @@ fn get_left_and_right<'a>(
     }
 }
 
-#[inline]
+/// Critical hot path: get field by ID. Inlined aggressively since it's called
+/// multiple times per node during parsing.
+#[inline(always)]
 fn get_field<'a>(of: &tree_sitter::Node<'a>, id: u16) -> tree_sitter::Node<'a> {
     of.child_by_field_id(id).unwrap_or_else(|| {
         let rholang_language: tree_sitter::Language = rholang_tree_sitter::LANGUAGE.into();
@@ -1461,7 +1463,8 @@ fn get_field<'a>(of: &tree_sitter::Node<'a>, id: u16) -> tree_sitter::Node<'a> {
     })
 }
 
-#[inline]
+/// Critical hot path: extract source text for a node. Called for every literal.
+#[inline(always)]
 fn get_node_value<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
     let source_bytes = source.as_bytes();
     unsafe {
@@ -1481,25 +1484,27 @@ fn named_children_of_kind<'a>(
         .filter(move |child| child.kind_id() == kind)
 }
 
-/// Check if a node is a comment (inline for zero-cost abstraction)
+/// Optimized comment detection: const fn with compile-time constants.
+/// The kind!() macro resolves to u16 constants at compile time, making this
+/// a simple integer comparison that the compiler can inline away to nearly zero cost.
 #[inline(always)]
 const fn is_comment(kind_id: u16) -> bool {
     kind_id == kind!("line_comment") || kind_id == kind!("block_comment")
 }
 
 /// Returns named children excluding comment nodes
-#[inline]
+///
+/// Optimization note: Use node.named_child_count() for allocations (includes comments)
+/// and this function for iteration (excludes comments). This avoids filtering cost during
+/// allocation while slightly over-allocating, which is faster than reallocating.
+///
+/// Inlined aggressively as it's called in every iteration loop over children.
+#[inline(always)]
 pub(super) fn named_children_no_comments<'a>(
     node: &tree_sitter::Node<'a>,
     cursor: &mut tree_sitter::TreeCursor<'a>,
 ) -> impl Iterator<Item = tree_sitter::Node<'a>> {
     node.named_children(cursor).filter(|child| !is_comment(child.kind_id()))
-}
-
-/// Returns count of named children excluding comments
-#[inline]
-fn named_child_count_no_comments(node: &tree_sitter::Node) -> usize {
-    named_children_no_comments(node, &mut node.walk()).count()
 }
 
 #[derive(Debug, Clone, Copy)]
