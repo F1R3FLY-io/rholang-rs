@@ -5,6 +5,14 @@ use smallvec::{SmallVec, smallvec};
 use crate::ast::*;
 
 /// Preorder DFS traversal over `AnnProc`.
+///
+/// ### Note:
+/// - This iterator **only expands process positions**.
+/// - It does **not** descend into names appearing inside processes
+///   (e.g., name variables, for-comprehension bindings, contract formal arguments).
+/// - It descends into quoted sub-processes appearing in channel names and evals
+/// - Use a higher-level iterator (such as `NameAwareDfsEventIter`)
+///   if you need to see [`Name`] occurrences as well.
 pub(crate) struct PreorderDfsIter<'a, const S: usize> {
     stack: SmallVec<[&'a AnnProc<'a>; S]>,
 }
@@ -163,6 +171,19 @@ So if you’re in a hot path and don’t need the Exit events, the hand-tuned ve
 2. Inlining and branch prediction
 Current PreorderDfsIter is straightforward enough to inline well; wrapping it in another iterator layer might inhibit some of that in release builds.
  */
+/// Depth-first traversal over the *process structure* of the AST.
+///
+/// This iterator visits each process position in depth-first order,
+/// emitting `Enter(proc)` before descending into its sub-processes
+/// and `Exit(proc)` after all children have been processed.
+///
+/// ### Note:
+/// - This iterator **only expands process positions**.
+/// - It does **not** descend into names appearing inside processes
+///   (e.g., name variables, for-comprehension bindings, contract formal arguments).
+/// - It descends into quoted sub-processes appearing in channel names and evals
+/// - Use a higher-level iterator (such as `NameAwareDfsEventIter`)
+///   if you need to see [`Name`] occurrences as well.
 pub(crate) struct DfsEventIter<'a, const S: usize> {
     stack: SmallVec<[Frame<'a>; S]>,
 }
