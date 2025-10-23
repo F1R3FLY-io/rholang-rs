@@ -187,9 +187,8 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
         &mut self,
         children: I,
     ) {
-        for child in children.into_iter().rev() {
-            self.stack.push(Frame::Node(child));
-        }
+        self.stack
+            .extend(children.into_iter().map(Frame::Node).rev());
     }
 
     fn expand_node_naked(&mut self, node: &'a AnnProc<'a>) {
@@ -241,7 +240,7 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
                     // pattern enter
                     self.stack.push(Frame::Event(DfsEvent::Enter(pattern)));
                 }
-                self.push_children(iter::once(expression));
+                self.stack.push(Frame::Node(expression));
 
                 // Enter(Match) will be pushed by expand_node()
             }
@@ -264,7 +263,7 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
             Proc::New { proc: inner, .. }
             | Proc::Bundle { proc: inner, .. }
             | Proc::UnaryExp { arg: inner, .. } => {
-                self.push_children(iter::once(inner));
+                self.stack.push(Frame::Node(inner));
             }
 
             Proc::Send {
@@ -310,7 +309,7 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
 
             Proc::Eval { name } => {
                 if let Name::Quote(q) = name {
-                    self.push_children(iter::once(q));
+                    self.stack.push(Frame::Node(q));
                 }
             }
 
@@ -348,14 +347,19 @@ impl<'a, const S: usize> Iterator for DfsEventIter<'a, S> {
     type Item = DfsEvent<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(item) = self.stack.pop() {
+        if let Some(item) = self.stack.pop() {
             match item {
                 Frame::Event(ev) => return Some(ev),
                 Frame::Node(node) => {
                     // expand node into Event::Enter, Node(children), Event::Exit
-                    self.expand_node(node);
-                    // and loop: the next iteration will pop the Enter event we just pushed
-                    continue;
+
+                    // push Exit first (it should be at bottom)
+                    self.stack.push(Frame::Event(DfsEvent::Exit(node)));
+
+                    self.expand_node_naked(node);
+
+                    // finally return Enter
+                    return Some(DfsEvent::Enter(node));
                 }
             }
         }
