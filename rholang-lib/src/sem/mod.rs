@@ -14,6 +14,7 @@ mod enclosure_analysis;
 mod interner;
 pub mod pipeline;
 mod resolver;
+mod elaborator;
 
 /// A generic semantic analysis pass.
 ///
@@ -83,6 +84,8 @@ impl Symbol {
     const MIN: Symbol = Symbol(u32::MIN);
     #[allow(dead_code)]
     const MAX: Symbol = Symbol(u32::MAX);
+    /// Sentinel symbol used for wildcards and quoted-process channels in analyses
+    pub const DUMMY: Symbol = Symbol(u32::MAX);
 }
 
 impl Display for Symbol {
@@ -476,7 +479,7 @@ pub enum ErrorKind {
     ProcInNamePosition(BinderId, Symbol),
     ConnectiveOutsidePattern,
     BundleInsidePattern,
-    FreeVariable(SymbolOccurence),
+    FreeVariable(SymbolOccurrence),
     BadCode,
 }
 
