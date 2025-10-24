@@ -1,5 +1,5 @@
 use anyhow::Result;
-use shell::providers::{
+use rholang_shell::providers::{
     InterpretationResult, InterpreterProvider, RholangParserInterpreterProvider,
 };
 use std::env;

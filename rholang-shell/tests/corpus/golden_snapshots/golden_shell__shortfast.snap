@@ -1,0 +1,77 @@
+---
+source: rholang-shell/tests/golden_shell.rs
+expression: output
+---
+Good(
+    [
+        AnnProc {
+            proc: New {
+                decls: [
+                    NameDecl {
+                        id: Id {
+                            name: "x",
+                            pos: SourcePos {
+                                line: 1,
+                                col: 5,
+                            },
+                        },
+                        uri: None,
+                    },
+                ],
+                proc: AnnProc {
+                    proc: Send {
+                        channel: NameVar(
+                            Id(
+                                Id {
+                                    name: "x",
+                                    pos: SourcePos {
+                                        line: 1,
+                                        col: 12,
+                                    },
+                                },
+                            ),
+                        ),
+                        send_type: Single,
+                        inputs: [
+                            AnnProc {
+                                proc: LongLiteral(
+                                    0,
+                                ),
+                                span: SourceSpan {
+                                    start: SourcePos {
+                                        line: 1,
+                                        col: 15,
+                                    },
+                                    end: SourcePos {
+                                        line: 1,
+                                        col: 16,
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 1,
+                            col: 12,
+                        },
+                        end: SourcePos {
+                            line: 1,
+                            col: 17,
+                        },
+                    },
+                },
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 1,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 1,
+                    col: 19,
+                },
+            },
+        },
+    ],
+)

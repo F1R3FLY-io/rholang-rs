@@ -1,0 +1,19 @@
+[package]
+name = "rholang-vm"
+version = "0.2.0"
+edition = "2021"
+description = "New Rholang VM (from scratch) based on rholang-bytecode"
+
+[dependencies]
+anyhow = { workspace = true }
+tokio = { workspace = true }
+rholang-bytecode = { path = "../rholang-bytecode" }
+crossbeam = { version = "0.8", optional = true }
+num_cpus = { version = "1", optional = true }
+
+[lib]
+name = "rholang_vm"
+path = "src/lib.rs"
+
+[features]
+parallel-exec = ["crossbeam", "num_cpus"]

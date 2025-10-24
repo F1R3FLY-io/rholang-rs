@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use shell::providers::{
+use rholang_shell::providers::{
     InterpretationResult, InterpreterProvider, RholangParserInterpreterProvider,
 };
 use std::fs;
@@ -61,8 +61,31 @@ async fn main() -> Result<()> {
     // Create the interpreter
     let interpreter = RholangParserInterpreterProvider::new()?;
 
-    // Find all Rholang files in the corpus directory
-    let examples_dir = Path::new("rholang-parser/corpus");
+    // Locate the workspace root by finding a Cargo.toml with a [workspace] section
+    let current_dir = std::env::current_dir()?;
+    let project_root = current_dir
+        .ancestors()
+        .find(|p| {
+            let cargo_toml = p.join("Cargo.toml");
+            if cargo_toml.exists() {
+                if let Ok(content) = fs::read_to_string(&cargo_toml) {
+                    content.contains("[workspace]")
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        })
+        .unwrap_or(&current_dir)
+        .to_path_buf();
+
+    // Prefer tests/corpus (where examples are stored in this repo); fall back to corpus
+    let tests_corpus = project_root.join("rholang-parser").join("tests").join("corpus");
+    let plain_corpus = project_root.join("rholang-parser").join("corpus");
+    let examples_dir = if tests_corpus.exists() { &tests_corpus } else { &plain_corpus };
+
+    println!("Looking for Rholang files in: {}", examples_dir.display());
     let rholang_files = find_rholang_files(examples_dir)?;
 
     println!("Found {} Rholang files", rholang_files.len());
