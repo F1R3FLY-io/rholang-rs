@@ -1,6 +1,13 @@
 use test_macros::test_rholang_code;
 
-use crate::{match_proc, sem::pipeline::Pipeline, sem::tests::expect, sem::tests::expect::matches};
+use crate::{
+    match_proc,
+    sem::{
+        diagnostics::DisjunctionConsistencyCheck,
+        pipeline::Pipeline,
+        tests::expect::{self, matches},
+    },
+};
 
 use super::{
     BinderId, BinderKind, ErrorKind, PID, ProcRef, ResolverPass, SemanticDb, VarBinding,
@@ -17,7 +24,8 @@ where
         .fold(Pipeline::new(), |pipeline, root| {
             pipeline.add_fact(ResolverPass::new(root))
         })
-        .add_diagnostic(UnusedVarsPass);
+        .add_diagnostic(UnusedVarsPass)
+        .add_diagnostic(DisjunctionConsistencyCheck);
     pipeline
 }
 
@@ -1171,4 +1179,22 @@ fn test_error_proc_name<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'
         ErrorKind::NameInProcPosition(unused_rtn, unused_rtn_info.name),
         matches::proc_var("unused_rtn"),
     )
+}
+
+#[test_rholang_code(
+    r#"
+new StudentGradeLevel, stdout(`rho:io:stdout`) in {
+    StudentGradeLevel!(@"grade"!(10)) |
+    for(@{ 10 \/ 20 /\ x } <- @"chan"){ stdout!(x) } |
+    for(@{ @"grade"!(x) \/ @y!(10) } <- StudentGradeLevel) { stdout!(x) }
+}"#, pipeline = pipeline
+)]
+fn test_disjunctions<'test>(_tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+    let first_for = expect::node(db, matches::first_for_comprehension());
+    let second_for = expect::node(db, matches::for_with_channel("StudentGradeLevel"));
+    let x = db.intern("x");
+    let y = db.intern("y");
+    expect::error(db, ErrorKind::UnmatchedVarInDisjunction(x), first_for);
+    expect::error(db, ErrorKind::UnmatchedVarInDisjunction(x), second_for);
+    expect::error(db, ErrorKind::UnmatchedVarInDisjunction(y), second_for);
 }

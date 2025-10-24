@@ -410,6 +410,15 @@ pub enum VarBinding {
     Free { index: usize },
 }
 
+impl VarBinding {
+    pub fn is_free(self) -> bool {
+        match self {
+            VarBinding::Bound(_) => false,
+            VarBinding::Free { .. } => true,
+        }
+    }
+}
+
 pub struct SemanticDb<'a> {
     rev: IndexMap<ByAddress<ProcRef<'a>>, PID, ahash::RandomState>, // ref <-> PID
     interner: interner::Interner,                                   // name <-> Symbol
@@ -475,6 +484,7 @@ pub enum ErrorKind {
     ProcInNamePosition(BinderId, Symbol),
     ConnectiveOutsidePattern,
     BundleInsidePattern,
+    UnmatchedVarInDisjunction(Symbol),
 }
 
 impl ErrorKind {

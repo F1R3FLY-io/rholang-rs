@@ -395,7 +395,10 @@ impl<'a> SemanticDb<'a> {
     /// Returns an iterator over variable bindings that occur within a given source span.
     ///
     /// The range is inclusive–exclusive: `[span.start, span.end)`.
-    pub fn bound_in_range(&self, span: SourceSpan) -> impl Iterator<Item = BoundOccurence> {
+    pub fn bound_in_range(
+        &self,
+        span: SourceSpan,
+    ) -> impl DoubleEndedIterator<Item = BoundOccurence> {
         use std::ops::Bound::*;
 
         // Construct range bounds for the BTreeMap key type
@@ -417,8 +420,19 @@ impl<'a> SemanticDb<'a> {
     }
 
     /// Returns an iterator over all variable bindings within the given scope.
-    pub fn bound_in_scope(&self, scope: &ScopeInfo) -> impl Iterator<Item = BoundOccurence> {
+    pub fn bound_in_scope(
+        &self,
+        scope: &ScopeInfo,
+    ) -> impl DoubleEndedIterator<Item = BoundOccurence> {
         self.bound_in_range(scope.span)
+    }
+
+    /// Returns an iterator over free variables that occur within a given source span.
+    ///
+    /// The range is inclusive–exclusive: `[span.start, span.end)`.
+    pub fn free_in_range(&self, span: SourceSpan) -> impl DoubleEndedIterator<Item = VarBinding> {
+        self.bound_in_range(span)
+            .filter_map(|occ| occ.binding.is_free().then_some(occ.binding))
     }
 
     /// Finds the binder corresponding to a given symbol within a specific scope.
