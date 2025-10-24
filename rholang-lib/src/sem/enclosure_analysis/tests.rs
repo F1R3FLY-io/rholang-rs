@@ -45,16 +45,18 @@ fn test_symbol_lookup<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'te
     );
 
     count_tests!(3, for (i, (send_pid, send_node)) in stdout_sends_iter.enumerate() => {
+        // check if send symbols bind to corresponding binders in the enclosing scope
+        let mut send_vars = send_node.iter_vars();
+        let stdout_var = send_vars.next().expect("<expected_var_here>!(...)");
+        let input_var = send_vars.next().expect("stdout!(<expected_var_here>)");
         // check if `stdout` resolves correctly to the last binder in the root scope
-        expect::symbol_resolution(db, "stdout", send_pid, root, 2);
-
-        // check if input symbols bind to corresponding binders in the enclosing scope
-        let input_var = send_node.iter_proc_var().next().expect("stdout!(<expected_var_here>)");
-        let resolved =
-            expect::symbol_resolution(db, input_var.into_ident(), send_pid, expect::enclosing_process(db, send_pid), i);
+        let stdout_resolved = expect::symbol_resolution(db, stdout_var.as_ident(), send_pid, root, 2);
+        let input_resolved =
+            expect::symbol_resolution(db, input_var.as_ident(), send_pid, expect::enclosing_process(db, send_pid), i);
 
         // and we can also ask "precisely" for the same thing
-        expect::var_resolution(db, input_var, send_pid, &resolved);
+        expect::var_resolution(db, stdout_var, send_pid, &stdout_resolved);
+        expect::var_resolution(db, input_var, send_pid, &input_resolved);
     });
 }
 
@@ -94,9 +96,27 @@ fn test_process_scope_chain<'test>(_tree: ProcRef<'test>, db: &'test mut Semanti
     ] = expect::process_scope_chain::<4>(db, prime_check_call_pid);
 
     // resolve all the symbols from `primeCheck!(head, *ret)`
-    expect::symbol_resolution(db, "primeCheck", prime_check_call_pid, root_pid, 1);
-    expect::symbol_resolution(db, "head", prime_check_call_pid, match_arm_pid, 0);
-    expect::symbol_resolution(db, "ret", prime_check_call_pid, new_pid, 0);
+    let mut vars = prime_check_call_node.iter_vars();
+    let prime_check_var = vars.next().expect("<expected_var_here>!(head, *ret)");
+    let head_var = vars.next().expect("primeCheck!(<expected_var_here>, *ret)");
+    let ret_var = vars
+        .next()
+        .expect("primeCheck!(head, *<expected_var_here>)");
+    expect::symbol_resolution(
+        db,
+        prime_check_var.as_ident(),
+        prime_check_call_pid,
+        root_pid,
+        1,
+    );
+    expect::symbol_resolution(
+        db,
+        head_var.as_ident(),
+        prime_check_call_pid,
+        match_arm_pid,
+        0,
+    );
+    expect::symbol_resolution(db, ret_var.as_ident(), prime_check_call_pid, new_pid, 0);
 }
 
 #[test_rholang_code(r#"
@@ -126,7 +146,7 @@ fn test_free_var_resolution_in_proc_pattern<'test>(
 
     count_tests!(2, for (i, (pid, node)) in conjunctions_iter.enumerate() => {
         let free_var = node
-            .iter_proc_var()
+            .iter_proc_vars()
             .next()
             .expect("{ <expected_var_here> /\\ _}");
         let proc_pattern_scope = expect::enclosing_scope(db, pid);
