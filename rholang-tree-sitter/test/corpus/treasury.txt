@@ -130,7 +130,6 @@ in {
       (name_decl
         (var)))
     proc: (block
-      (line_comment)
       (par
         (par
           (par
@@ -146,7 +145,6 @@ in {
                             send_type: (send_single)
                             inputs: (inputs
                               (long_literal)))
-                          (line_comment)
                           (send
                             channel: (var)
                             send_type: (send_single)
@@ -156,14 +154,12 @@ in {
                                   (string_literal)
                                   (string_literal)
                                   (string_literal))))))
-                        (line_comment)
                         (send
                           channel: (var)
                           send_type: (send_single)
                           inputs: (inputs
                             (collection
                               (list)))))
-                      (line_comment)
                       (contract
                         name: (var)
                         formals: (names
@@ -223,8 +219,7 @@ in {
                                                     key: (string_literal)
                                                     value: (collection
                                                       (set
-                                                        (var))))
-                                                  (line_comment))))))
+                                                        (var)))))))))
                                         proc: (block
                                           (par
                                             (send
@@ -247,7 +242,6 @@ in {
                                     send_type: (send_single)
                                     inputs: (inputs
                                       (string_literal))))))))))
-                    (line_comment)
                     (contract
                       name: (var)
                       formals: (names
@@ -343,7 +337,6 @@ in {
                                   send_type: (send_single)
                                   inputs: (inputs
                                     (string_literal))))))))))
-                  (line_comment)
                   (contract
                     name: (var)
                     formals: (names
@@ -484,7 +477,6 @@ in {
                                         send_type: (send_single)
                                         inputs: (inputs
                                           (string_literal))))))))))))))
-                (line_comment)
                 (contract
                   name: (var)
                   formals: (names
@@ -510,8 +502,6 @@ in {
                                 receiver: (var)
                                 name: (var)
                                 args: (args))))))))))
-              (line_comment)
-              (line_comment)
               (send
                 channel: (var)
                 send_type: (send_single)
@@ -521,7 +511,6 @@ in {
                   (string_literal)
                   (eval
                     (var)))))
-            (line_comment)
             (send
               channel: (var)
               send_type: (send_single)
@@ -530,7 +519,6 @@ in {
                 (long_literal)
                 (eval
                   (var)))))
-          (line_comment)
           (send
             channel: (var)
             send_type: (send_single)
@@ -538,7 +526,6 @@ in {
               (long_literal)
               (eval
                 (var)))))
-        (line_comment)
         (send
           channel: (var)
           send_type: (send_single)

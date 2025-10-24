@@ -39,6 +39,11 @@ jobs:
       - name: Install tree-sitter
         run: npm install tree-sitter
 
+      - name: Generate grammar with named comments
+        run: npx tree-sitter generate
+        env:
+          RHOLANG_NAMED_COMMENTS: 1
+
       - name: Build wasm
         run: npm run build:wasm
         env:

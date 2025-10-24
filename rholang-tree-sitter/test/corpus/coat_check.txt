@@ -203,7 +203,6 @@ new MakeCoatCheck in {
                               send_type: (send_single)
                               inputs: (inputs
                                 (bool_literal)))))))))))))
-        (line_comment)
         (new
           decls: (name_decls
             (name_decl
@@ -297,7 +296,6 @@ new MakeCoatCheck in {
                                   input: (simple_source
                                     (var)))))
                             proc: (block
-                              (line_comment)
                               (par
                                 (send
                                   channel: (var)
@@ -332,5 +330,4 @@ new MakeCoatCheck in {
                                               input: (simple_source
                                                 (var)))))
                                         proc: (block
-                                          (line_comment)
                                           (nil))))))))))))))))))))))

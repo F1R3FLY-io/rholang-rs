@@ -7,19 +7,11 @@ fn main() {
     #[cfg(target_env = "msvc")]
     c_config.flag("-utf-8");
 
-    // Select parser variant based on named-comments feature
-    #[cfg(feature = "named-comments")]
-    let parser_file = "parser.c";
-    #[cfg(not(feature = "named-comments"))]
-    let parser_file = "parser_without_comments.c";
-
-    let parser_path = src_dir.join(parser_file);
+    let parser_path = src_dir.join("parser.c");
     c_config.file(&parser_path);
     println!("cargo:rerun-if-changed={}", parser_path.to_str().unwrap());
 
-    // Also watch both parser variants and grammar.js for changes
-    println!("cargo:rerun-if-changed=src/parser.c");
-    println!("cargo:rerun-if-changed=src/parser_without_comments.c");
+    // Watch grammar.js for changes
     println!("cargo:rerun-if-changed=grammar.js");
 
     let scanner_path = src_dir.join("scanner.c");
