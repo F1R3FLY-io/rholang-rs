@@ -1,7 +1,8 @@
 use std::{fs, path::PathBuf};
 
 use librho::sem::{
-    EnclosureAnalysisPass, ResolverPass, SemanticDb, diagnostics::UnusedVarsPass,
+    EnclosureAnalysisPass, ResolverPass, SemanticDb,
+    diagnostics::{DisjunctionConsistencyCheck, UnusedVarsPass},
     pipeline::Pipeline,
 };
 use rholang_parser::RholangParser;
@@ -32,13 +33,14 @@ fn sem_anal(bencher: divan::Bencher, arg: &PathBuf) {
                     .add_fact(ResolverPass::new(root))
                     .add_fact(EnclosureAnalysisPass::new(root))
             })
-            .add_diagnostic(UnusedVarsPass);
+            .add_diagnostic(UnusedVarsPass)
+            .add_diagnostic(DisjunctionConsistencyCheck);
 
         runtime.block_on(pipeline.run(&mut db));
 
         assert!(
             !db.has_errors(),
-            "Benchamrk finished with errors:\n{:?}",
+            "Benchmark finished with errors:\n{:?}",
             db.diagnostics()
         );
         divan::black_box_drop(db);
