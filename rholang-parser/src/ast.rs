@@ -195,6 +195,13 @@ impl<'a> AnnProc<'a> {
             DfsEventExt::Exit(_) => None,
         })
     }
+
+    pub fn iter_names_direct(&'a self) -> impl Iterator<Item = &'a Name<'a>> {
+        NameAwareDfsEventIter::<4>::new(self)
+            .skip(1) // skip Enter(self)
+            .take_while(|ev| ev.as_proc().is_none()) // stop before entering any sub-process
+            .filter_map(|ev| ev.as_name())
+    }
 }
 
 // process variables and names
@@ -301,6 +308,14 @@ impl<'a> Name<'a> {
         match self {
             Name::NameVar(var) => var.is_ident(expected),
             Name::Quote(ann_proc) => ann_proc.is_ident(expected),
+        }
+    }
+
+    pub fn is_ground(&self) -> bool {
+        match self {
+            Name::NameVar(Var::Wildcard) => true,
+            Name::Quote(quoted) => quoted.is_ground(),
+            _ => false,
         }
     }
 

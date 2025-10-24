@@ -4,7 +4,7 @@ use crate::{
     count_tests,
     sem::{
         EnclosureAnalysisPass, PID, ProcRef, ResolverPass, SemanticDb,
-        diagnostics::UnusedVarsPass,
+        diagnostics::{DisjunctionConsistencyCheck, UnusedVarsPass},
         pipeline::Pipeline,
         tests::expect::{self, matches},
     },
@@ -22,7 +22,8 @@ where
                 .add_fact(ResolverPass::new(root))
                 .add_fact(EnclosureAnalysisPass::new(root))
         })
-        .add_diagnostic(UnusedVarsPass);
+        .add_diagnostic(UnusedVarsPass)
+        .add_diagnostic(DisjunctionConsistencyCheck);
     pipeline
 }
 
