@@ -137,6 +137,7 @@ fn check_disjunction<'a>(
         // it's an error — disjunction branches must share the same variable interface.
         if rb.binding.is_free() {
             result.push(error(site, rb.occurence));
+            continue;
         }
 
         // If the RHS binds to an existing LHS variable, mark it as "seen".
