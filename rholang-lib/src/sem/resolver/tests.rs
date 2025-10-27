@@ -37,7 +37,7 @@ where
       }
     }"#, pipeline = pipeline
 )]
-fn test_scope_nested<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+fn test_scope_nested<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     let root = db[tree];
     let root_scope = expect::scope(db, root, 2);
     let (root_binders, inner_scope) = match_proc!(tree.proc, ast::Proc::New { proc: inner_for, decls } => {
@@ -73,7 +73,7 @@ new blockData(`rho:block:data`), retCh, stdout(`rho:io:stdout`) in {
   }
 }"#, pipeline = pipeline
 )]
-fn test_pattern_many_names<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+fn test_pattern_many_names<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     let root = db[tree];
     let root_scope = expect::scope(db, root, 3);
     let (root_binders, inner_scope) = match_proc!(tree.proc, ast::Proc::New {
@@ -140,7 +140,7 @@ fn test_pattern_many_names<'test>(tree: ProcRef<'test>, db: &'test mut SemanticD
   }
 }"#, pipeline = pipeline
 )]
-fn test_scope_deeply_nested<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+fn test_scope_deeply_nested<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     let root = db[tree];
     let root_scope = expect::scope(db, root, 4);
 
@@ -211,7 +211,7 @@ new dupe in {
     }
   } | dupe!(2)
 }"#, pipeline = pipeline)]
-fn test_contract<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+fn test_contract<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     let root = db[tree];
     let root_scope = expect::scope(db, root, 1);
     let dupe = expect::binder(db, "dupe", root_scope);
@@ -273,7 +273,7 @@ new loop, primeCheck, stdoutAck(`rho:io:stdoutAck`) in {
   loop!([Nil, 7, 7 | 8, 9 | Nil, 9 | 10, Nil, 9])
 }"#, pipeline = pipeline
 )]
-fn test_match<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+fn test_match<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     let root = db[tree];
     let root_scope = expect::scope(db, root, 3);
     let root_binders: Vec<BinderId> = root_scope.binder_range().collect();
@@ -339,7 +339,7 @@ contract Cell( get, set, state ) = {
   }
 }"#, pipeline = pipeline
 )]
-fn test_pattern_sequence<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+fn test_pattern_sequence<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     let root = db[tree];
     let root_scope = expect::scope(db, root, 3);
     let contract_binders = expect::free(
@@ -439,7 +439,7 @@ new orExample, stdout(`rho:io:stdout`) in {
   orExample!({"name" : "Joe", "age": 40}) |
   orExample!({"name": "Bob", "age": "41"})
 }"#, pipeline = pipeline)]
-fn test_connectives<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+fn test_connectives<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     let root = db[tree];
     let root_scope = expect::scope(db, root, 2);
     let root_binders: Vec<BinderId> = root_scope.binder_range().collect();
@@ -492,7 +492,7 @@ new helloNameAge, getOlder, stdout(`rho:io:stdout`) in {
   getOlder!(@"name"!("Joe") | @"age"!(39), *helloNameAge)
 }"#, pipeline = pipeline
 )]
-fn test_pattern_recursive<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+fn test_pattern_recursive<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     let root = db[tree];
     let root_scope = expect::scope(db, root, 3);
     let root_binders: Vec<BinderId> = root_scope.binder_range().collect();
@@ -556,7 +556,7 @@ fn test_pattern_recursive<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb
   for (@{x!(P)}, @{for(y <- z) { y!(Q) }} <- chan) { z!(P) | x!(Q) }
 }"#, pipeline = pipeline
 )]
-fn test_pattern_within_pattern<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+fn test_pattern_within_pattern<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     let root = db[tree];
     let root_scope = expect::scope(db, root, 1);
     let var_chan = expect::binder(db, "chan", root_scope);
@@ -607,10 +607,7 @@ fn test_pattern_within_pattern<'test>(tree: ProcRef<'test>, db: &'test mut Seman
   for (@{x!(P)}, @{for(y <- z) { y!(Q) }} <- chan) { x!(P, Q, *y) }
 }"#, pipeline = pipeline
 )]
-fn test_pattern_within_pattern_scoping<'test>(
-    _tree: ProcRef<'test>,
-    db: &'test mut SemanticDb<'test>,
-) {
+fn test_pattern_within_pattern_scoping<'test>(_tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     expect::error(
         db,
         ErrorKind::UnboundVariable,
@@ -630,7 +627,7 @@ new x, y in {
     }
 }"#, pipeline = pipeline
 )]
-fn test_var_ref<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+fn test_var_ref<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     let root = db[tree];
     let root_scope = expect::scope(db, root, 2);
     match_proc!(tree.proc,
@@ -676,7 +673,7 @@ fn test_var_ref<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
         }
     }"#, pipeline = pipeline
 )]
-fn test_pattern_sequence_captures<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+fn test_pattern_sequence_captures<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     let root = db[tree];
     let root_scope = expect::scope(db, root, 2);
     match_proc!(tree.proc,
@@ -736,10 +733,7 @@ fn test_pattern_sequence_captures<'test>(tree: ProcRef<'test>, db: &'test mut Se
         }
     }"#, pipeline = pipeline
 )]
-fn test_pattern_concurrent_captures<'test>(
-    _tree: ProcRef<'test>,
-    db: &'test mut SemanticDb<'test>,
-) {
+fn test_pattern_concurrent_captures<'test>(_tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     expect::error(db, ErrorKind::UnboundVariable, matches::proc_var("arg"));
 }
 
@@ -751,10 +745,7 @@ fn test_pattern_concurrent_captures<'test>(
         }
     }"#, pipeline = pipeline
 )]
-fn test_pattern_within_pattern_captures<'test>(
-    tree: ProcRef<'test>,
-    db: &'test mut SemanticDb<'test>,
-) {
+fn test_pattern_within_pattern_captures<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     let root = db[tree];
     let root_scope = expect::scope(db, root, 1);
     match_proc!(tree.proc,
@@ -823,7 +814,7 @@ fn test_pattern_within_pattern_captures<'test>(
 )]
 fn test_pattern_within_pattern_concurrent_scoping<'test>(
     tree: ProcRef<'test>,
-    db: &'test mut SemanticDb<'test>,
+    db: &'test SemanticDb<'test>,
 ) {
     match_proc!(tree.proc,
         ast::Proc::New {
@@ -865,7 +856,7 @@ fn test_pattern_within_pattern_concurrent_scoping<'test>(
 )]
 fn test_pattern_within_pattern_sequential_captures<'test>(
     tree: ProcRef<'test>,
-    db: &'test mut SemanticDb<'test>,
+    db: &'test SemanticDb<'test>,
 ) {
     let root = db[tree];
     let root_scope = expect::scope(db, root, 1);
@@ -937,7 +928,7 @@ fn test_pattern_within_pattern_sequential_captures<'test>(
 )]
 fn test_pattern_within_pattern_with_var_ref<'test>(
     tree: ProcRef<'test>,
-    db: &'test mut SemanticDb<'test>,
+    db: &'test SemanticDb<'test>,
 ) {
     let root = db[tree];
     let root_scope = expect::scope(db, root, 1);
@@ -1016,7 +1007,7 @@ new boardMembers, executeProposal, proposals, treasuryBalance in {
     }
   }
 }"#, pipeline = pipeline)]
-fn test_let<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+fn test_let<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     let root = db[tree];
     let root_scope = expect::scope(db, root, 4);
 
@@ -1149,7 +1140,7 @@ new anyone, unused_rtn in {
     }
 }"#, pipeline = pipeline
 )]
-fn test_error_proc_name<'test>(tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+fn test_error_proc_name<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     let root = db[tree];
     let root_scope = expect::scope(db, root, 2);
     let anyone = expect::binder(db, "anyone", root_scope);
@@ -1189,7 +1180,7 @@ new StudentGradeLevel, stdout(`rho:io:stdout`) in {
     for(@{ @"grade"!(x) \/ @y!(10) } <- StudentGradeLevel) { stdout!(x) }
 }"#, pipeline = pipeline
 )]
-fn test_disjunctions<'test>(_tree: ProcRef<'test>, db: &'test mut SemanticDb<'test>) {
+fn test_disjunctions<'test>(_tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     let first_for = expect::node(db, matches::first_for_comprehension());
     let second_for = expect::node(db, matches::for_with_channel("StudentGradeLevel"));
     let x = db.intern("x");
