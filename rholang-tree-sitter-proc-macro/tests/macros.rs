@@ -1,23 +1,23 @@
 // Tests for the rholang-tree-sitter-proc-macro macros
 use rholang_tree_sitter_proc_macro::{field, kind, kw};
 
-// Static values for node kinds
-const NEW_KIND: u16 = 79;
-const SEND_KIND: u16 = 87;
-const BUNDLE_KIND: u16 = 82;
-const BRANCH_KIND: u16 = 129;
-const CASE_KIND: u16 = 128;
+// Static values for node kinds (derived at compile time to avoid brittleness)
+const NEW_KIND: u16 = kind!("new");
+const SEND_KIND: u16 = kind!("send");
+const BUNDLE_KIND: u16 = kind!("bundle");
+const BRANCH_KIND: u16 = kind!("branch");
+const CASE_KIND: u16 = kind!("case");
 
-// Static values for keywords
-const NEW_KW: u16 = 4;
-const FOR_KW: u16 = 17;
-const IN_KW: u16 = 5;
+// Static values for keywords (derived at compile time)
+const NEW_KW: u16 = kw!("new");
+const FOR_KW: u16 = kw!("for");
+const IN_KW: u16 = kw!("in");
 
-// Static values for fields
-const PATTERN_FIELD: u16 = 19;
-const PROC_FIELD: u16 = 20;
-const DECLS_FIELD: u16 = 10;
-const BUNDLE_TYPE_FIELD: u16 = 4;
+// Static values for fields (derived at compile time)
+const PATTERN_FIELD: u16 = field!("pattern");
+const PROC_FIELD: u16 = field!("proc");
+const DECLS_FIELD: u16 = field!("decls");
+const BUNDLE_TYPE_FIELD: u16 = field!("bundle_type");
 
 #[test]
 fn test_kind_macro() {

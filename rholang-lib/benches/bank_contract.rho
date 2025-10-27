@@ -1,0 +1,72 @@
+new
+  stdout(`rho:io:stdout`),
+  registry(`rho:registry:lookup`),
+  registryInsert(`rho:registry:insert`),
+  makeBank,
+  return in {
+
+  contract makeBank(@initialBalances, ret) = {
+
+    new bank, balances, loop in {
+
+      // Initialize account balances
+      for (@[(name, balance) ... tl] <- loop) {
+          balances!((name, balance)) |
+          loop!(tl)
+      } |
+
+      loop!(initialBalances) |
+
+      // Define the bank contract
+      contract bank(@"deposit", @name, @amount, ack) = {
+        for (@(=name, old) <- balances) {
+            let newBalance = old + amount in {
+                balances!((name, newBalance)) |
+                ack!("Deposited " ++ amount.toString() ++ " into " ++ name)
+            }
+        }
+      } |
+
+      contract bank(@"withdraw", @name, @amount, ack) = {
+        for (@(=name, old) <- balances) {
+            match old >= amount {
+                true => {
+                    let newBalance = old - amount in {
+                        balances!((name, newBalance)) |
+                        ack!("Withdrew " ++ amount.toString() ++ " from " ++ name)
+                    }
+                }
+                false => {
+                    ack!("Insufficient funds")
+                }
+            }
+        }
+      } |
+
+      contract bank(@"getBalance", @name, ack) = {
+        for (@(=name, balance) <- balances) {
+            ack!(balance)
+        }
+      } |
+
+      ret!(*bank)
+    }
+  } |
+
+  // Example usage:
+  makeBank!([("Alice", 100), ("Bob", 50)], *return) |
+
+  for (bank <- return) {
+    new ack1, ack2, ack3, ack4 in {
+      bank!("deposit", "Alice", 25, *ack1) |
+      bank!("withdraw", "Bob", 20, *ack2) |
+      bank!("getBalance", "Alice", *ack3) |
+      bank!("getBalance", "Charlie", *ack4) |
+
+      for (@msg <- ack1) { stdout!(msg) } |
+      for (@msg <- ack2) { stdout!(msg) } |
+      for (@msg <- ack3) { stdout!("Alice's balance: " ++ msg.toString()) } |
+      for (@msg <- ack4) { stdout!(msg) }
+    }
+  }
+}

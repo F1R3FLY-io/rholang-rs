@@ -1,0 +1,33 @@
+new storeCh, stdout(`rho:io:stdout`) in {
+
+  // A persistent key-value store
+  new Store in {
+    contract Store(@req) = {
+        match req {
+        { "op": "put", "key": k, "val": v, "return": ret, "state": st } => {
+            // create a new version of the store that remembers the key/value
+            let st' = st.set(k, v)
+            in {
+                // forward all new requests to the updated store
+                @ret!("ok") |
+                for (@r <- storeCh) { Store!(r ++ st') }
+            }
+        }
+        { "op": "get", "key": k, "return": ret, "state": st } => @ret!(st.get(k))
+        }
+    } |
+    // Initialize the store with empty state (map)
+    for (@req <- storeCh) { Store!(req ++ { "state": {} }) }
+  } |
+
+  // A client that stores and retrieves a value
+  new ret1, ret2 in {
+    storeCh!({ "op": "put", "key": "foo", "val": "bar", "return": *ret1 }) |
+    for (_ <- ret1) {
+      storeCh!({ "op": "get", "key": "foo", "return": *ret2 }) |
+      for (@value <- ret2) {
+        stdout!("Value for 'foo': " ++ value)
+      }
+    }
+  }
+}
