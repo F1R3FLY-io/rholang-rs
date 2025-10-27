@@ -3,7 +3,7 @@ use test_macros::test_rholang_code;
 use crate::{
     count_tests,
     sem::{
-        EnclosureAnalysisPass, PID, ProcRef, ResolverPass, SemanticDb,
+        EnclosureAnalysisPass, ErrorKind, PID, ProcRef, ResolverPass, SemanticDb,
         diagnostics::{DisjunctionConsistencyCheck, UnusedVarsPass},
         pipeline::Pipeline,
         tests::expect::{self, matches},
@@ -154,4 +154,87 @@ fn test_free_var_resolution_in_proc_pattern<'test>(
         let binders = db.binders(proc_pattern_scope);
         expect::var_resolution(db, free_var, pid, &binders[i]);
     });
+}
+
+#[test_rholang_code(
+    r#"
+new stdout(`rho:io:stdout`) in {
+  // Case 1: valid disjunction — same variable set (x, y)
+  match [1, 2] {
+    [x, y] \/ [x, y] => stdout!("valid 1")
+  } |
+
+  // Case 2: invalid — variable mismatch (x vs y)
+  match [42] {
+    [x] \/ [y]  => stdout!("invalid 2")
+  } |
+
+  // Case 3: nested invalid — right branch missing variable b
+  match [1, 2] {
+    ([a, b] \/ [a])  => stdout!("invalid 3")
+  } |
+
+  // Case 4: valid quoted disjunction — both quotes have same free vars
+  new ch in {
+    ch!([0, 1]) |
+    ch!([0, 2]) |
+    for (@([x, 1] \/ [x, 2]) <- ch) {
+      stdout!("valid 4")
+    }
+  } |
+
+  // Case 5: invalid quoted disjunction — disjoint variable sets
+  new bad in {
+    bad!([0, 1]) |
+    bad!([0, 2]) |
+    for (@([x, 1] \/ [y, 2]) <- bad) {
+      stdout!("invalid 5")
+    }
+  } |
+
+  // Case 6: valid nested quote disjunction (recursion-style)
+  new deep in {
+    deep!(@([42])!(Nil)) |
+    deep!(@Nil!(Nil)) |
+    for (@(@([p] \/ p)!(_)) <- deep) {
+      stdout!("valid 6")
+    }
+  } |
+
+  // Case 7: invalid nested quote disjunction (different vars)
+  new deepBad in {
+    deepBad!(@([42])!(Nil)) |
+    deepBad!(@Nil!(Nil)) |
+    for (@(@([p] \/ q)!(_)) <- deepBad) {
+      stdout!("invalid 7")
+    }
+  }
+}
+"#, pipeline = pipeline)]
+fn test_disjunctions_deep<'test>(_tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
+    let case_2 = expect::node(db, matches::send_string_to_stdout("invalid 2"));
+    let case_3 = expect::node(db, matches::send_string_to_stdout("invalid 3"));
+    let case_5 = expect::node(db, matches::for_with_channel("bad"));
+    let case_7 = expect::node(db, matches::for_with_channel("deepBad"));
+
+    let x = db.intern("x");
+    let y = db.intern("y");
+    let b = db.intern("b");
+    let p = db.intern("p");
+    let q = db.intern("q");
+
+    let match_2 = expect::enclosing_process(db, db[case_2]);
+    expect::error(db, ErrorKind::UnmatchedVarInDisjunction(y), match_2);
+    expect::error(db, ErrorKind::UnmatchedVarInDisjunction(x), match_2);
+
+    let match_3 = expect::enclosing_process(db, db[case_3]);
+    expect::error(db, ErrorKind::UnmatchedVarInDisjunction(b), match_3);
+
+    expect::error(db, ErrorKind::UnmatchedVarInDisjunction(y), case_5);
+    expect::error(db, ErrorKind::UnmatchedVarInDisjunction(x), case_5);
+
+    expect::error(db, ErrorKind::UnmatchedVarInDisjunction(q), case_7);
+    expect::error(db, ErrorKind::UnmatchedVarInDisjunction(p), case_7);
+
+    expect::errors(db, 7);
 }
