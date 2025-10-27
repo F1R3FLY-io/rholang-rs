@@ -17,13 +17,8 @@ async fn test_process_special_command_help() -> Result<()> {
     let mut stdout = Cursor::new(Vec::new());
     let interpreter = create_fake_interpreter();
 
-    let should_exit = process_special_command(
-        ".help",
-        &mut buffer,
-        &mut stdout,
-        |_| Ok(()),
-        &interpreter,
-    )?;
+    let should_exit =
+        process_special_command(".help", &mut buffer, &mut stdout, |_| Ok(()), &interpreter)?;
 
     assert!(!should_exit, "Help command should not exit");
 
@@ -39,21 +34,14 @@ async fn test_process_special_command_help() -> Result<()> {
     Ok(())
 }
 
-
-
 #[tokio::test]
 async fn test_process_special_command_quit() -> Result<()> {
     let mut buffer = Vec::new();
     let mut stdout = Cursor::new(Vec::new());
     let interpreter = create_fake_interpreter();
 
-    let should_exit = process_special_command(
-        ".quit",
-        &mut buffer,
-        &mut stdout,
-        |_| Ok(()),
-        &interpreter,
-    )?;
+    let should_exit =
+        process_special_command(".quit", &mut buffer, &mut stdout, |_| Ok(()), &interpreter)?;
 
     assert!(should_exit, "Quit command should exit");
 
@@ -75,13 +63,8 @@ async fn test_process_special_command_list() -> Result<()> {
     let mut stdout = Cursor::new(Vec::new());
     let interpreter = create_fake_interpreter();
 
-    let should_exit = process_special_command(
-        ".list",
-        &mut buffer,
-        &mut stdout,
-        |_| Ok(()),
-        &interpreter,
-    )?;
+    let should_exit =
+        process_special_command(".list", &mut buffer, &mut stdout, |_| Ok(()), &interpreter)?;
 
     assert!(!should_exit, "List command should not exit");
 
@@ -108,7 +91,6 @@ async fn test_process_special_command_delete() -> Result<()> {
     let should_exit = process_special_command(
         ".delete",
         &mut buffer,
-        
         &mut stdout,
         |_| Ok(()),
         &interpreter,
@@ -139,7 +121,6 @@ async fn test_process_special_command_delete_empty() -> Result<()> {
     let should_exit = process_special_command(
         ".delete",
         &mut buffer,
-        
         &mut stdout,
         |_| Ok(()),
         &interpreter,
@@ -165,14 +146,8 @@ async fn test_process_special_command_reset() -> Result<()> {
     let mut stdout = Cursor::new(Vec::new());
     let interpreter = create_fake_interpreter();
 
-    let should_exit = process_special_command(
-        ".reset",
-        &mut buffer,
-        
-        &mut stdout,
-        |_| Ok(()),
-        &interpreter,
-    )?;
+    let should_exit =
+        process_special_command(".reset", &mut buffer, &mut stdout, |_| Ok(()), &interpreter)?;
 
     assert!(!should_exit, "Reset command should not exit");
     assert!(buffer.is_empty(), "Buffer should be empty after reset");
@@ -198,7 +173,6 @@ async fn test_process_special_command_buffer() -> Result<()> {
     let should_exit = process_special_command(
         ".buffer",
         &mut buffer,
-        
         &mut stdout,
         |_| Ok(()),
         &interpreter,
@@ -229,7 +203,6 @@ async fn test_process_special_command_unknown() -> Result<()> {
     let should_exit = process_special_command(
         ".unknown",
         &mut buffer,
-        
         &mut stdout,
         |_| Ok(()),
         &interpreter,
@@ -258,7 +231,6 @@ async fn test_process_special_command_not_special() -> Result<()> {
     let should_exit = process_special_command(
         "not_special",
         &mut buffer,
-        
         &mut stdout,
         |_| Ok(()),
         &interpreter,
@@ -327,13 +299,20 @@ async fn test_process_multiline_input_execute() -> Result<()> {
     // Second consecutive empty line should execute
     let command = process_multiline_input("".to_string(), &mut buffer, |_| Ok(()))?;
 
-    assert!(command.is_some(), "Second empty line should produce a command");
+    assert!(
+        command.is_some(),
+        "Second empty line should produce a command"
+    );
     assert_eq!(
         command.unwrap(),
         "line1\nline2",
         "Command should be all lines joined with newlines"
     );
-    assert_eq!(buffer, vec!["line1".to_string(), "line2".to_string()], "Buffer should be kept after execution");
+    assert_eq!(
+        buffer,
+        vec!["line1".to_string(), "line2".to_string()],
+        "Buffer should be kept after execution"
+    );
 
     Ok(())
 }
@@ -345,26 +324,38 @@ async fn test_process_multiline_input_open_bracket_not_execute() -> Result<()> {
 
     let command = process_multiline_input("".to_string(), &mut buffer, |_| Ok(()))?;
 
-    assert!(command.is_none(), "Should not execute when brackets are open");
+    assert!(
+        command.is_none(),
+        "Should not execute when brackets are open"
+    );
     assert_eq!(buffer.len(), 1, "Buffer should remain with the open line");
 
     // Now close the bracket. First empty should be ignored, second should execute
     let _ = process_multiline_input("}".to_string(), &mut buffer, |_| Ok(()))?;
     let first_empty = process_multiline_input("".to_string(), &mut buffer, |_| Ok(()))?;
-    assert!(first_empty.is_none(), "First empty after balancing should not execute");
+    assert!(
+        first_empty.is_none(),
+        "First empty after balancing should not execute"
+    );
     let command2 = process_multiline_input("".to_string(), &mut buffer, |_| Ok(()))?;
 
-    assert!(command2.is_some(), "Second empty should execute after brackets are balanced");
+    assert!(
+        command2.is_some(),
+        "Second empty should execute after brackets are balanced"
+    );
     assert_eq!(
         command2.unwrap(),
         "for (x <- y) {\n}",
         "Command should include both lines"
     );
-    assert_eq!(buffer, vec!["for (x <- y) {".to_string(), "}".to_string()], "Buffer should be kept after execution");
+    assert_eq!(
+        buffer,
+        vec!["for (x <- y) {".to_string(), "}".to_string()],
+        "Buffer should be kept after execution"
+    );
 
     Ok(())
 }
-
 
 #[tokio::test]
 async fn test_handle_interrupt_multiline() -> Result<()> {
@@ -373,12 +364,7 @@ async fn test_handle_interrupt_multiline() -> Result<()> {
     let mut stdout = Cursor::new(Vec::new());
     let interpreter = create_fake_interpreter();
 
-    handle_interrupt(
-        &mut buffer,
-        &mut stdout,
-        |_| Ok(()),
-        &interpreter,
-    )?;
+    handle_interrupt(&mut buffer, &mut stdout, |_| Ok(()), &interpreter)?;
 
     assert!(
         buffer.is_empty(),
@@ -397,8 +383,6 @@ async fn test_handle_interrupt_multiline() -> Result<()> {
     Ok(())
 }
 
-
-
 #[tokio::test]
 async fn test_process_special_command_load_success() -> Result<()> {
     let mut buffer = Vec::new();
@@ -409,17 +393,14 @@ async fn test_process_special_command_load_success() -> Result<()> {
     let path = "../rholang-parser/tests/corpus/bank_contract.rho";
     let cmd = format!(".load {}", path);
 
-    let should_exit = process_special_command(
-        &cmd,
-        &mut buffer,
-        
-        &mut stdout,
-        |_| Ok(()),
-        &interpreter,
-    )?;
+    let should_exit =
+        process_special_command(&cmd, &mut buffer, &mut stdout, |_| Ok(()), &interpreter)?;
 
     assert!(!should_exit, ".load should not exit");
-    assert!(!buffer.is_empty(), "Buffer should be populated after loading a file");
+    assert!(
+        !buffer.is_empty(),
+        "Buffer should be populated after loading a file"
+    );
 
     // Verify output mentions loading
     stdout.set_position(0);
@@ -435,14 +416,8 @@ async fn test_process_special_command_load_usage() -> Result<()> {
     let mut stdout = Cursor::new(Vec::new());
     let interpreter = create_fake_interpreter();
 
-    let should_exit = process_special_command(
-        ".load",
-        &mut buffer,
-        
-        &mut stdout,
-        |_| Ok(()),
-        &interpreter,
-    )?;
+    let should_exit =
+        process_special_command(".load", &mut buffer, &mut stdout, |_| Ok(()), &interpreter)?;
 
     assert!(!should_exit, ".load with no args should not exit");
     stdout.set_position(0);
@@ -460,7 +435,6 @@ async fn test_process_special_command_load_nonexistent() -> Result<()> {
     let should_exit = process_special_command(
         ".load /no/such/file/definitely_missing.rho",
         &mut buffer,
-        
         &mut stdout,
         |_| Ok(()),
         &interpreter,
@@ -473,7 +447,6 @@ async fn test_process_special_command_load_nonexistent() -> Result<()> {
     Ok(())
 }
 
-
 #[tokio::test]
 async fn test_process_multiline_input_open_square_bracket_not_execute() -> Result<()> {
     // Buffer with an unmatched opening square bracket should not execute on empty line
@@ -481,22 +454,35 @@ async fn test_process_multiline_input_open_square_bracket_not_execute() -> Resul
 
     let command = process_multiline_input("".to_string(), &mut buffer, |_| Ok(()))?;
 
-    assert!(command.is_none(), "Should not execute when square bracket is open");
+    assert!(
+        command.is_none(),
+        "Should not execute when square bracket is open"
+    );
     assert_eq!(buffer.len(), 1, "Buffer should remain with the open line");
 
     // Now close the square bracket. First empty should be ignored, second should execute
     let _ = process_multiline_input("]".to_string(), &mut buffer, |_| Ok(()))?;
     let first_empty = process_multiline_input("".to_string(), &mut buffer, |_| Ok(()))?;
-    assert!(first_empty.is_none(), "First empty after balancing should not execute");
+    assert!(
+        first_empty.is_none(),
+        "First empty after balancing should not execute"
+    );
     let command2 = process_multiline_input("".to_string(), &mut buffer, |_| Ok(()))?;
 
-    assert!(command2.is_some(), "Second empty should execute after square bracket is closed");
+    assert!(
+        command2.is_some(),
+        "Second empty should execute after square bracket is closed"
+    );
     assert_eq!(
         command2.unwrap(),
         "let x = [1, 2, 3\n]",
         "Command should include both lines"
     );
-    assert_eq!(buffer, vec!["let x = [1, 2, 3".to_string(), "]".to_string()], "Buffer should be kept after execution");
+    assert_eq!(
+        buffer,
+        vec!["let x = [1, 2, 3".to_string(), "]".to_string()],
+        "Buffer should be kept after execution"
+    );
 
     Ok(())
 }
@@ -508,20 +494,33 @@ async fn test_process_multiline_input_mixed_brackets_all_types() -> Result<()> {
 
     // Empty line should NOT execute because brackets are unbalanced
     let command = process_multiline_input("".to_string(), &mut buffer, |_| Ok(()))?;
-    assert!(command.is_none(), "Should not execute when mixed brackets are open");
+    assert!(
+        command.is_none(),
+        "Should not execute when mixed brackets are open"
+    );
 
     // Close both curly and square
     let _ = process_multiline_input("}]".to_string(), &mut buffer, |_| Ok(()))?;
 
     // Now, the first empty should be ignored and the second should execute
     let first_empty = process_multiline_input("".to_string(), &mut buffer, |_| Ok(()))?;
-    assert!(first_empty.is_none(), "First empty after balancing should not execute");
+    assert!(
+        first_empty.is_none(),
+        "First empty after balancing should not execute"
+    );
     let command2 = process_multiline_input("".to_string(), &mut buffer, |_| Ok(()))?;
-    assert!(command2.is_some(), "Second empty should execute after all brackets are balanced");
+    assert!(
+        command2.is_some(),
+        "Second empty should execute after all brackets are balanced"
+    );
 
     let expected = "A [B {C\n}]".to_string();
     assert_eq!(command2.unwrap(), expected);
-    assert_eq!(buffer, vec!["A [B {C".to_string(), "}]".to_string()], "Buffer should be kept after execution");
+    assert_eq!(
+        buffer,
+        vec!["A [B {C".to_string(), "}]".to_string()],
+        "Buffer should be kept after execution"
+    );
 
     Ok(())
 }

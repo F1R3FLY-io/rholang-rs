@@ -38,7 +38,11 @@ async fn test_rholang_parser_interpreter_with_invalid_code() -> Result<()> {
 
     match result {
         rholang_shell::providers::InterpretationResult::Success(output) => {
-            assert!(output.starts_with("Fail("), "Expected Fail(...) output, got: {}", output);
+            assert!(
+                output.starts_with("Fail("),
+                "Expected Fail(...) output, got: {}",
+                output
+            );
         }
         rholang_shell::providers::InterpretationResult::Error(err) => {
             panic!("Expected pretty-printed Fail, got error: {}", err);

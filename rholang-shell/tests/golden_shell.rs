@@ -20,7 +20,9 @@ fn strip_sourcepos(input: &str) -> String {
             let opens = line.matches('{').count() as i32;
             let closes = line.matches('}').count() as i32;
             skip_depth += opens - closes;
-            if skip_depth <= 0 { skip_depth = 0; }
+            if skip_depth <= 0 {
+                skip_depth = 0;
+            }
             continue;
         }
         let trimmed = line.trim_start();
@@ -30,13 +32,19 @@ fn strip_sourcepos(input: &str) -> String {
             skip_depth = 1 + (opens - closes - 1).max(0);
             continue;
         }
-        if trimmed.starts_with("pos:") || trimmed.starts_with("start: SourcePos") || trimmed.starts_with("end: SourcePos") || trimmed.starts_with("span:") {
+        if trimmed.starts_with("pos:")
+            || trimmed.starts_with("start: SourcePos")
+            || trimmed.starts_with("end: SourcePos")
+            || trimmed.starts_with("span:")
+        {
             continue;
         }
         out.push_str(line);
         out.push('\n');
     }
-    if out.ends_with('\n') { out.pop(); }
+    if out.ends_with('\n') {
+        out.pop();
+    }
     out
 }
 
@@ -46,11 +54,7 @@ fn golden_shell_test(
     #[files("*.rho")]
     path: PathBuf,
 ) {
-    let name = path
-        .file_stem()
-        .unwrap()
-        .to_string_lossy()
-        .to_string();
+    let name = path.file_stem().unwrap().to_string_lossy().to_string();
 
     let input = fs::read_to_string(&path).expect("Failed to read input file");
 
@@ -58,7 +62,8 @@ fn golden_shell_test(
     // format as the parser golden tests, but without source positions
     let rt = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
     let output_or_err = rt.block_on(async {
-        let interpreter = RholangParserInterpreterProvider::new().expect("Failed to create interpreter");
+        let interpreter =
+            RholangParserInterpreterProvider::new().expect("Failed to create interpreter");
         match interpreter.interpret(input.as_str()).await {
             rholang_shell::providers::InterpretationResult::Success(out) => out,
             rholang_shell::providers::InterpretationResult::Error(err) => {
@@ -78,5 +83,10 @@ fn golden_shell_test(
     let expected = strip_sourcepos(&golden);
     let actual = strip_sourcepos(&output_or_err);
 
-    assert_eq!(actual.trim(), expected.trim(), "Output mismatch for {}", name);
+    assert_eq!(
+        actual.trim(),
+        expected.trim(),
+        "Output mismatch for {}",
+        name
+    );
 }

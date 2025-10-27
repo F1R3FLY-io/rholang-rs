@@ -72,7 +72,11 @@ async fn test_rholang_parser_interpreter_provider_invalid_code() -> Result<()> {
     let result = provider.interpret(input).await;
     match result {
         InterpretationResult::Success(output) => {
-            assert!(output.starts_with("Fail("), "Expected Fail(...) output, got: {}", output);
+            assert!(
+                output.starts_with("Fail("),
+                "Expected Fail(...) output, got: {}",
+                output
+            );
         }
         InterpretationResult::Error(err) => {
             panic!("Expected pretty-printed Fail, got error: {}", err);

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use rholang_shell::{
-    handle_interrupt, help_message, process_multiline_input,
-    process_special_command, providers::InterpretationResult, Args,
+    handle_interrupt, help_message, process_multiline_input, process_special_command,
+    providers::InterpretationResult, Args,
 };
 use std::io::Cursor;
 
@@ -64,14 +64,8 @@ fn test_process_special_command_help() -> Result<()> {
     let mut stdout = Cursor::new(Vec::new());
     let interpreter = MockInterpreterProvider::new();
 
-    let should_exit = process_special_command(
-        ".help",
-        &mut buffer,
-        
-        &mut stdout,
-        |_| Ok(()),
-        &interpreter,
-    )?;
+    let should_exit =
+        process_special_command(".help", &mut buffer, &mut stdout, |_| Ok(()), &interpreter)?;
 
     assert!(!should_exit);
     let output = String::from_utf8(stdout.into_inner())?;
@@ -80,21 +74,14 @@ fn test_process_special_command_help() -> Result<()> {
     Ok(())
 }
 
-
 #[test]
 fn test_process_special_command_quit() -> Result<()> {
     let mut buffer = Vec::new();
     let mut stdout = Cursor::new(Vec::new());
     let interpreter = MockInterpreterProvider::new();
 
-    let should_exit = process_special_command(
-        ".quit",
-        &mut buffer,
-        
-        &mut stdout,
-        |_| Ok(()),
-        &interpreter,
-    )?;
+    let should_exit =
+        process_special_command(".quit", &mut buffer, &mut stdout, |_| Ok(()), &interpreter)?;
 
     assert!(should_exit); // Should signal to exit
     let output = String::from_utf8(stdout.into_inner())?;
@@ -109,14 +96,8 @@ fn test_process_special_command_list() -> Result<()> {
     let mut stdout = Cursor::new(Vec::new());
     let interpreter = MockInterpreterProvider::new();
 
-    let should_exit = process_special_command(
-        ".list",
-        &mut buffer,
-        
-        &mut stdout,
-        |_| Ok(()),
-        &interpreter,
-    )?;
+    let should_exit =
+        process_special_command(".list", &mut buffer, &mut stdout, |_| Ok(()), &interpreter)?;
 
     assert!(!should_exit);
     let output = String::from_utf8(stdout.into_inner())?;
@@ -136,7 +117,6 @@ fn test_process_special_command_delete() -> Result<()> {
     let should_exit = process_special_command(
         ".delete",
         &mut buffer,
-        
         &mut stdout,
         |_| Ok(()),
         &interpreter,
@@ -159,7 +139,6 @@ fn test_process_special_command_delete_empty() -> Result<()> {
     let should_exit = process_special_command(
         ".delete",
         &mut buffer,
-        
         &mut stdout,
         |_| Ok(()),
         &interpreter,
@@ -178,14 +157,8 @@ fn test_process_special_command_reset() -> Result<()> {
     let mut stdout = Cursor::new(Vec::new());
     let interpreter = MockInterpreterProvider::new();
 
-    let should_exit = process_special_command(
-        ".reset",
-        &mut buffer,
-        
-        &mut stdout,
-        |_| Ok(()),
-        &interpreter,
-    )?;
+    let should_exit =
+        process_special_command(".reset", &mut buffer, &mut stdout, |_| Ok(()), &interpreter)?;
 
     assert!(!should_exit);
     assert!(buffer.is_empty()); // Buffer should be cleared
@@ -204,14 +177,8 @@ fn test_process_special_command_ps() -> Result<()> {
         (2, "process2".to_string()),
     ]);
 
-    let should_exit = process_special_command(
-        ".ps",
-        &mut buffer,
-        
-        &mut stdout,
-        |_| Ok(()),
-        &interpreter,
-    )?;
+    let should_exit =
+        process_special_command(".ps", &mut buffer, &mut stdout, |_| Ok(()), &interpreter)?;
 
     assert!(!should_exit);
     let output = String::from_utf8(stdout.into_inner())?;
@@ -228,14 +195,8 @@ fn test_process_special_command_ps_empty() -> Result<()> {
     let mut stdout = Cursor::new(Vec::new());
     let interpreter = MockInterpreterProvider::new();
 
-    let should_exit = process_special_command(
-        ".ps",
-        &mut buffer,
-        
-        &mut stdout,
-        |_| Ok(()),
-        &interpreter,
-    )?;
+    let should_exit =
+        process_special_command(".ps", &mut buffer, &mut stdout, |_| Ok(()), &interpreter)?;
 
     assert!(!should_exit);
     let output = String::from_utf8(stdout.into_inner())?;
@@ -256,7 +217,6 @@ fn test_process_special_command_kill() -> Result<()> {
     let should_exit = process_special_command(
         ".kill 1",
         &mut buffer,
-        
         &mut stdout,
         |_| Ok(()),
         &interpreter,
@@ -278,7 +238,6 @@ fn test_process_special_command_kill_nonexistent() -> Result<()> {
     let should_exit = process_special_command(
         ".kill 999",
         &mut buffer,
-        
         &mut stdout,
         |_| Ok(()),
         &interpreter,
@@ -300,7 +259,6 @@ fn test_process_special_command_kill_invalid() -> Result<()> {
     let should_exit = process_special_command(
         ".kill abc",
         &mut buffer,
-        
         &mut stdout,
         |_| Ok(()),
         &interpreter,
@@ -322,7 +280,6 @@ fn test_process_special_command_unknown() -> Result<()> {
     let should_exit = process_special_command(
         ".unknown",
         &mut buffer,
-        
         &mut stdout,
         |_| Ok(()),
         &interpreter,
@@ -344,7 +301,6 @@ fn test_process_special_command_not_special() -> Result<()> {
     let should_exit = process_special_command(
         "not a special command",
         &mut buffer,
-        
         &mut stdout,
         |_| Ok(()),
         &interpreter,
@@ -397,9 +353,6 @@ fn test_process_multiline_input_nonempty_buffer_empty_line() -> Result<()> {
     Ok(())
 }
 
-
-
-
 #[test]
 fn test_handle_interrupt() -> Result<()> {
     let mut buffer = vec!["line1".to_string(), "line2".to_string()];
@@ -410,12 +363,7 @@ fn test_handle_interrupt() -> Result<()> {
         (2, "process2".to_string()),
     ]);
 
-    handle_interrupt(
-        &mut buffer,
-        &mut stdout,
-        |_| Ok(()),
-        &interpreter,
-    )?;
+    handle_interrupt(&mut buffer, &mut stdout, |_| Ok(()), &interpreter)?;
 
     assert!(buffer.is_empty()); // Buffer should be cleared in multiline mode
     let output = String::from_utf8(stdout.into_inner())?;
@@ -435,12 +383,7 @@ fn test_handle_interrupt_single_line() -> Result<()> {
         (2, "process2".to_string()),
     ]);
 
-    handle_interrupt(
-        &mut buffer,
-        &mut stdout,
-        |_| Ok(()),
-        &interpreter,
-    )?;
+    handle_interrupt(&mut buffer, &mut stdout, |_| Ok(()), &interpreter)?;
 
     assert!(buffer.is_empty()); // Buffer should be cleared (single line mode removed)
     let output = String::from_utf8(stdout.into_inner())?;
@@ -450,13 +393,10 @@ fn test_handle_interrupt_single_line() -> Result<()> {
     Ok(())
 }
 
-
 // New tests for .validate command
 #[test]
 fn test_validate_valid_buffer() -> Result<()> {
-    let mut buffer = vec![
-        "new ch in { for(@x <- ch) { Nil } }".to_string()
-    ];
+    let mut buffer = vec!["new ch in { for(@x <- ch) { Nil } }".to_string()];
     let mut stdout = Cursor::new(Vec::new());
     let interpreter = MockInterpreterProvider::new();
 
@@ -470,15 +410,19 @@ fn test_validate_valid_buffer() -> Result<()> {
 
     assert!(!should_exit);
     let output = String::from_utf8(stdout.into_inner())?;
-    assert!(output.contains("Validation successful") || output.contains("no issues") || output.contains("Validation produced"), "Unexpected output: {}", output);
+    assert!(
+        output.contains("Validation successful")
+            || output.contains("no issues")
+            || output.contains("Validation produced"),
+        "Unexpected output: {}",
+        output
+    );
     Ok(())
 }
 
 #[test]
 fn test_validate_invalid_buffer_reports_diagnostics() -> Result<()> {
-    let mut buffer = vec![
-        "for(@x <- unbound_ch) { Nil }".to_string()
-    ];
+    let mut buffer = vec!["for(@x <- unbound_ch) { Nil }".to_string()];
     let mut stdout = Cursor::new(Vec::new());
     let interpreter = MockInterpreterProvider::new();
 
@@ -493,15 +437,17 @@ fn test_validate_invalid_buffer_reports_diagnostics() -> Result<()> {
     assert!(!should_exit);
     let output = String::from_utf8(stdout.into_inner())?;
     // Expect either diagnostic lines or a generic message that parsing failed
-    assert!(output.contains("Validation produced") || output.contains("Parsing failed"), "Unexpected output: {}", output);
+    assert!(
+        output.contains("Validation produced") || output.contains("Parsing failed"),
+        "Unexpected output: {}",
+        output
+    );
     Ok(())
 }
 
 #[test]
 fn test_validate_unused_command() -> Result<()> {
-    let mut buffer = vec![
-        "new ch in { for(@x <- ch) { Nil } }".to_string()
-    ];
+    let mut buffer = vec!["new ch in { for(@x <- ch) { Nil } }".to_string()];
     let mut stdout = Cursor::new(Vec::new());
     let interpreter = MockInterpreterProvider::new();
 
@@ -515,15 +461,16 @@ fn test_validate_unused_command() -> Result<()> {
 
     assert!(!should_exit);
     let output = String::from_utf8(stdout.into_inner())?;
-    assert!(output.contains("Unused-vars validation produced") || output.contains("Validation successful"));
+    assert!(
+        output.contains("Unused-vars validation produced")
+            || output.contains("Validation successful")
+    );
     Ok(())
 }
 
 #[test]
 fn test_validate_elab_command() -> Result<()> {
-    let mut buffer = vec![
-        "new ch in { for(@x <- ch) { Nil } }".to_string()
-    ];
+    let mut buffer = vec!["new ch in { for(@x <- ch) { Nil } }".to_string()];
     let mut stdout = Cursor::new(Vec::new());
     let interpreter = MockInterpreterProvider::new();
 
@@ -537,15 +484,16 @@ fn test_validate_elab_command() -> Result<()> {
 
     assert!(!should_exit);
     let output = String::from_utf8(stdout.into_inner())?;
-    assert!(output.contains("Elaboration validation produced") || output.contains("Validation successful"));
+    assert!(
+        output.contains("Elaboration validation produced")
+            || output.contains("Validation successful")
+    );
     Ok(())
 }
 
 #[test]
 fn test_validate_resolver_command() -> Result<()> {
-    let mut buffer = vec![
-        "for(@x <- unbound_ch) { Nil }".to_string()
-    ];
+    let mut buffer = vec!["for(@x <- unbound_ch) { Nil }".to_string()];
     let mut stdout = Cursor::new(Vec::new());
     let interpreter = MockInterpreterProvider::new();
 
@@ -559,10 +507,13 @@ fn test_validate_resolver_command() -> Result<()> {
 
     assert!(!should_exit);
     let output = String::from_utf8(stdout.into_inner())?;
-    assert!(output.contains("Resolver validation produced") || output.contains("Validation successful") || output.contains("Parsing failed"));
+    assert!(
+        output.contains("Resolver validation produced")
+            || output.contains("Validation successful")
+            || output.contains("Parsing failed")
+    );
     Ok(())
 }
-
 
 #[test]
 fn test_validate_commands_empty_buffer() -> anyhow::Result<()> {

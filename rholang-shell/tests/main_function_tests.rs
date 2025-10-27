@@ -32,4 +32,3 @@ async fn test_main_function_code_path() -> Result<()> {
 
     Ok(())
 }
-

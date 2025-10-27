@@ -2,10 +2,7 @@ use anyhow::Result;
 use std::io::Cursor;
 use std::path::Path;
 
-use rholang_shell::{
-    process_special_command,
-    providers::FakeInterpreterProvider,
-};
+use rholang_shell::{process_special_command, providers::FakeInterpreterProvider};
 
 // Helper to collect top-level corpus .rho files from rholang-parser
 fn corpus_files() -> Vec<&'static str> {
@@ -37,14 +34,8 @@ async fn test_load_corpus_files() -> Result<()> {
         let mut stdout = Cursor::new(Vec::new());
 
         let cmd = format!(".load {}", file);
-        let should_exit = process_special_command(
-            &cmd,
-            &mut buffer,
-            
-            &mut stdout,
-            |_| Ok(()),
-            &interpreter,
-        )?;
+        let should_exit =
+            process_special_command(&cmd, &mut buffer, &mut stdout, |_| Ok(()), &interpreter)?;
 
         assert!(!should_exit, ".load should not cause exit: {}", file);
         assert!(

@@ -34,31 +34,55 @@ pub fn help_message() -> String {
 const DEFAULT_PROMPT: &str = ">>> ";
 
 // ANSI color helpers (enabled only when writing to a TTY)
-fn is_tty_stdout() -> bool { atty::is(atty::Stream::Stdout) }
-fn is_tty_stderr() -> bool { atty::is(atty::Stream::Stderr) }
-
-fn colorize(s: &str, code: &str, enable: bool) -> String {
-    if enable { format!("\x1b[{}m{}\x1b[0m", code, s) } else { s.to_string() }
+fn is_tty_stdout() -> bool {
+    atty::is(atty::Stream::Stdout)
+}
+fn is_tty_stderr() -> bool {
+    atty::is(atty::Stream::Stderr)
 }
 
-fn label_info(s: &str) -> String { colorize(s, "36", is_tty_stdout()) }    // cyan
-fn label_ok(s: &str) -> String { colorize(s, "32", is_tty_stdout()) }      // green
-fn label_warn(s: &str) -> String { colorize(s, "33", is_tty_stdout()) }    // yellow
-fn label_err_out(s: &str) -> String { colorize(s, "31", is_tty_stdout()) } // red for stdout-bound errors
-fn label_err_err(s: &str) -> String { colorize(s, "31", is_tty_stderr()) } // red for stderr-bound errors
+fn colorize(s: &str, code: &str, enable: bool) -> String {
+    if enable {
+        format!("\x1b[{}m{}\x1b[0m", code, s)
+    } else {
+        s.to_string()
+    }
+}
+
+fn label_info(s: &str) -> String {
+    colorize(s, "36", is_tty_stdout())
+} // cyan
+fn label_ok(s: &str) -> String {
+    colorize(s, "32", is_tty_stdout())
+} // green
+fn label_warn(s: &str) -> String {
+    colorize(s, "33", is_tty_stdout())
+} // yellow
+fn label_err_out(s: &str) -> String {
+    colorize(s, "31", is_tty_stdout())
+} // red for stdout-bound errors
+fn label_err_err(s: &str) -> String {
+    colorize(s, "31", is_tty_stderr())
+} // red for stderr-bound errors
 
 // Heuristic AST highlighter for pretty-printed debug trees
 fn colorize_ast_tree(s: &str, enable: bool) -> String {
-    if !enable { return s.to_string(); }
+    if !enable {
+        return s.to_string();
+    }
     // Only colorize multi-line, structured outputs to avoid touching normal outputs
-    if !s.contains('\n') { return s.to_string(); }
+    if !s.contains('\n') {
+        return s.to_string();
+    }
 
     let mut out = String::with_capacity(s.len() + 32);
     for line in s.lines() {
         let mut i = 0usize;
         let bytes = line.as_bytes();
         // Copy leading whitespace/prefix indentation unchanged
-        while i < bytes.len() && (bytes[i] == b' ' || bytes[i] == b'\t' || bytes[i] == b'|' || bytes[i] == b'`' ) {
+        while i < bytes.len()
+            && (bytes[i] == b' ' || bytes[i] == b'\t' || bytes[i] == b'|' || bytes[i] == b'`')
+        {
             out.push(bytes[i] as char);
             i += 1;
         }
@@ -71,10 +95,20 @@ fn colorize_ast_tree(s: &str, enable: bool) -> String {
                 i += 1;
                 while i < bytes.len() {
                     let ch = bytes[i] as char;
-                    if ch == '\\' { // escape next
-                        if i + 1 < bytes.len() { i += 2; continue; } else { i += 1; break; }
+                    if ch == '\\' {
+                        // escape next
+                        if i + 1 < bytes.len() {
+                            i += 2;
+                            continue;
+                        } else {
+                            i += 1;
+                            break;
+                        }
                     }
-                    if ch == '"' { i += 1; break; }
+                    if ch == '"' {
+                        i += 1;
+                        break;
+                    }
                     i += 1;
                 }
                 let segment = &line[start..i.min(line.len())];
@@ -82,14 +116,20 @@ fn colorize_ast_tree(s: &str, enable: bool) -> String {
                 continue;
             }
             // Numbers
-            if c.is_ascii_digit() || (c == '-' && i + 1 < bytes.len() && (bytes[i+1] as char).is_ascii_digit()) {
+            if c.is_ascii_digit()
+                || (c == '-' && i + 1 < bytes.len() && (bytes[i + 1] as char).is_ascii_digit())
+            {
                 let start = i;
                 i += 1;
-                while i < bytes.len() && (bytes[i] as char).is_ascii_digit() { i += 1; }
+                while i < bytes.len() && (bytes[i] as char).is_ascii_digit() {
+                    i += 1;
+                }
                 // Optional decimal part
                 if i < bytes.len() && (bytes[i] as char) == '.' {
                     i += 1;
-                    while i < bytes.len() && (bytes[i] as char).is_ascii_digit() { i += 1; }
+                    while i < bytes.len() && (bytes[i] as char).is_ascii_digit() {
+                        i += 1;
+                    }
                 }
                 let segment = &line[start..i];
                 out.push_str(&colorize(segment, "35", true)); // magenta numbers
@@ -112,7 +152,11 @@ fn colorize_ast_tree(s: &str, enable: bool) -> String {
                 i += 1;
                 while i < bytes.len() {
                     let ch = bytes[i] as char;
-                    if ch.is_ascii_alphanumeric() || ch == '_' { i += 1; } else { break; }
+                    if ch.is_ascii_alphanumeric() || ch == '_' {
+                        i += 1;
+                    } else {
+                        break;
+                    }
                 }
                 // If followed by ':' we consider it a field label
                 if i < bytes.len() && (bytes[i] as char) == ':' {
@@ -195,7 +239,10 @@ fn load_file_into_buffer<W: Write>(
                 buffer.extend(trimmed.split('\n').map(|s| s.to_string()));
                 update_prompt("... ")?;
                 writeln!(stdout, "Loaded {} lines from: {}", buffer.len(), path)?;
-                writeln!(stdout, "Press Enter to execute; if brackets are unbalanced, continue typing.")?;
+                writeln!(
+                    stdout,
+                    "Press Enter to execute; if brackets are unbalanced, continue typing."
+                )?;
             }
         }
         Err(e) => {
@@ -355,7 +402,7 @@ pub fn process_multiline_input(
     // Build the joined input without any trailing empty marker for bracket parsing
     let joined_no_trailing_empty = if buffer.last().map(|s| s.is_empty()).unwrap_or(false) {
         // There is already a pending empty marker; don't include it in parsing
-        buffer[..buffer.len()-1].join("\n")
+        buffer[..buffer.len() - 1].join("\n")
     } else {
         buffer.join("\n")
     };
@@ -383,7 +430,6 @@ pub fn process_multiline_input(
         Ok(None)
     }
 }
-
 
 /// Handle an interrupt event (Ctrl+C)
 pub fn handle_interrupt<W: Write, I: InterpreterProvider>(
@@ -456,12 +502,9 @@ pub async fn run_shell<I: InterpreterProvider>(args: Args, interpreter: I) -> Re
     // If a file was provided via CLI, load it into the buffer now
     if let Some(path) = args.load.as_ref() {
         let path_str = path.to_string_lossy().to_string();
-        load_file_into_buffer(
-            &path_str,
-            &mut buffer,
-            &mut stdout,
-            |prompt| Ok(rl.update_prompt(prompt)?),
-        )?;
+        load_file_into_buffer(&path_str, &mut buffer, &mut stdout, |prompt| {
+            Ok(rl.update_prompt(prompt)?)
+        })?;
     }
 
     loop {
@@ -532,7 +575,6 @@ pub async fn run_shell<I: InterpreterProvider>(args: Args, interpreter: I) -> Re
     Ok(())
 }
 
-
 // ---- Validation support using rholang-lib validators ----
 #[derive(Copy, Clone, Debug)]
 enum ValidationMode {
@@ -542,7 +584,11 @@ enum ValidationMode {
     ResolverOnly,
 }
 
-fn print_diagnostics<W: Write>(stdout: &mut W, diags: &[librho::sem::Diagnostic], header: &str) -> Result<()> {
+fn print_diagnostics<W: Write>(
+    stdout: &mut W,
+    diags: &[librho::sem::Diagnostic],
+    header: &str,
+) -> Result<()> {
     if diags.is_empty() {
         writeln!(stdout, "Validation successful: no issues found")?;
         return Ok(());
@@ -572,7 +618,10 @@ fn print_diagnostics<W: Write>(stdout: &mut W, diags: &[librho::sem::Diagnostic]
 }
 
 fn run_validation_subset<W: Write>(code: &str, stdout: &mut W, mode: ValidationMode) -> Result<()> {
-    use librho::sem::{diagnostics::UnusedVarsPass, ResolverPass, SemanticDb, ForCompElaborationPass, FactPass, DiagnosticPass};
+    use librho::sem::{
+        diagnostics::UnusedVarsPass, DiagnosticPass, FactPass, ForCompElaborationPass,
+        ResolverPass, SemanticDb,
+    };
     use rholang_parser::RholangParser;
 
     // Parse code safely using Validated without panicking
@@ -582,14 +631,17 @@ fn run_validation_subset<W: Write>(code: &str, stdout: &mut W, mode: ValidationM
     let ast_vec = match validated {
         validated::Validated::Good(ast) => ast,
         validated::Validated::Fail(_err) => {
-            writeln!(stdout, "Parsing failed: unable to build AST. Please fix syntax errors and try again.")?;
+            writeln!(
+                stdout,
+                "Parsing failed: unable to build AST. Please fix syntax errors and try again."
+            )?;
             return Ok(());
         }
     };
 
     if ast_vec.is_empty() {
         writeln!(stdout, "No code to validate (empty AST)")?;
-        return Ok(())
+        return Ok(());
     }
 
     let mut db = SemanticDb::new();
