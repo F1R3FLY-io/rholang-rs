@@ -658,7 +658,21 @@ pub(super) fn node_to_ast<'ast>(
                     proc_stack.push(ast_builder.alloc_var_ref(var_ref_kind, var), span);
                 }
 
-                _ => unimplemented!(),
+                kind!("choice") => {
+                    unimplemented!("Select is not implemented in this version of Rholang")
+                }
+
+                _ => {
+                    let text = get_node_value(&node, source);
+                    if text == "(" {
+                        if let Some(next_sibling) = node.next_named_sibling() {
+                            node = next_sibling;
+                            continue 'parse;
+                        }
+                    }
+
+                    unimplemented!("{node}");
+                }
             }
         }
 
