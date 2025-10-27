@@ -1,5 +1,5 @@
 use anyhow::Result;
-use shell::providers::{
+use rholang_shell::providers::{
     InterpretationResult, InterpreterProvider, RholangParserInterpreterProvider,
 };
 use std::env;
@@ -58,7 +58,10 @@ async fn test_process_examples() -> Result<()> {
             }
         })
         .unwrap_or(&current_dir);
-    let examples_dir = project_root.join("rholang-parser").join("tests").join("corpus");
+    let examples_dir = project_root
+        .join("rholang-parser")
+        .join("tests")
+        .join("corpus");
     println!("Looking for Rholang files in: {}", examples_dir.display());
     let rholang_files = find_rholang_files(&examples_dir)?;
 
