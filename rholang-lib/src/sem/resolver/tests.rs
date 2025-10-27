@@ -1188,4 +1188,5 @@ fn test_disjunctions<'test>(_tree: ProcRef<'test>, db: &'test SemanticDb<'test>)
     expect::error(db, ErrorKind::UnmatchedVarInDisjunction(x), first_for);
     expect::error(db, ErrorKind::UnmatchedVarInDisjunction(x), second_for);
     expect::error(db, ErrorKind::UnmatchedVarInDisjunction(y), second_for);
+    expect::errors(db, 3);
 }
