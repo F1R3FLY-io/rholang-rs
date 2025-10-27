@@ -76,7 +76,7 @@ fn check_deep<'a>(
     let mut stack: SmallVec<[_; 4]> = smallvec![this_iter];
 
     while let Some(top) = stack.last_mut() {
-        if let Some(ev) = top.next() {
+        while let Some(ev) = top.next() {
             match ev {
                 DfsEventExt::Enter(node) => {
                     if let ast::Proc::BinaryExp {
@@ -91,15 +91,15 @@ fn check_deep<'a>(
                 DfsEventExt::Name(name) if !is_atom(name) => {
                     // Descend into the quoted process
                     stack.push(name.iter_into());
+                    break;
                 }
                 _ => {
                     // nothing to do — we only act on entry and quotes
                 }
             }
-        } else {
-            // current iterator exhausted
-            stack.pop();
         }
+        // current iterator exhausted
+        stack.pop();
     }
 }
 
