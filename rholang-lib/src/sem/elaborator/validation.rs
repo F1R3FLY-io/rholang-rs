@@ -100,7 +100,7 @@ impl<'a, 'ast> TypeValidator<'a, 'ast> {
     }
 
     /// Validate a single receipt (sequence of bindings)
-    fn validate_receipt(&self, for_comp_pid: PID, receipt: &[Bind<'ast>]) -> ValidationResult {
+    fn validate_receipt(&self, for_comp_pid: PID, receipt: &'ast [Bind<'ast>]) -> ValidationResult {
         for bind in receipt.iter() {
             self.validate_bind(for_comp_pid, bind)?;
         }
@@ -108,7 +108,7 @@ impl<'a, 'ast> TypeValidator<'a, 'ast> {
     }
 
     /// Validate a single binding
-    fn validate_bind(&self, for_comp_pid: PID, bind: &Bind<'ast>) -> ValidationResult {
+    fn validate_bind(&self, for_comp_pid: PID, bind: &'ast Bind<'ast>) -> ValidationResult {
         // Get the pattern (LHS) and channel (RHS)
         let pattern = bind.names();
         let channel = bind.source_name();
@@ -342,7 +342,7 @@ impl<'a, 'ast> TypeValidator<'a, 'ast> {
     fn validate_pattern_structure(
         &self,
         for_comp_pid: PID,
-        pattern: &Names<'ast>,
+        pattern: &'ast Names<'ast>,
     ) -> ValidationResult {
         if pattern.is_empty() {
             // Empty patterns are valid (match anything)
@@ -363,7 +363,11 @@ impl<'a, 'ast> TypeValidator<'a, 'ast> {
     }
 
     /// Validate a single name in a pattern
-    fn validate_name_in_pattern(&self, for_comp_pid: PID, name: &Name<'ast>) -> ValidationResult {
+    fn validate_name_in_pattern(
+        &self,
+        for_comp_pid: PID,
+        name: &'ast Name<'ast>,
+    ) -> ValidationResult {
         match name {
             Name::Quote(proc) => {
                 // Validate the quoted process pattern
@@ -377,28 +381,94 @@ impl<'a, 'ast> TypeValidator<'a, 'ast> {
     }
 
     /// Validate a quoted process in a pattern
-    fn validate_quoted_pattern(&self, for_comp_pid: PID, proc: &AnnProc<'ast>) -> ValidationResult {
+    fn validate_quoted_pattern(
+        &self,
+        for_comp_pid: PID,
+        proc: &'ast AnnProc<'ast>,
+    ) -> ValidationResult {
         match proc.proc {
             // These are explicitly not allowed in patterns
-            Proc::Bundle { .. } => Err(ValidationError::InvalidPatternStructure {
-                pid: for_comp_pid,
-                position: Some(proc.span.start),
-                reason: "Bundle cannot appear in pattern".to_string(),
-            }),
+            Proc::Bundle { .. } => {
+                return Err(ValidationError::InvalidPatternStructure {
+                    pid: for_comp_pid,
+                    position: Some(proc.span.start),
+                    reason: "Bundle cannot appear in pattern".to_string(),
+                });
+            }
 
             // Connectives should be caught by ResolverPass, but double-check
             Proc::BinaryExp { op, .. } if op.is_connective() => {
-                Err(ValidationError::ConnectiveOutsidePattern {
+                return Err(ValidationError::ConnectiveOutsidePattern {
                     pos: proc.span.start,
+                });
+            }
+            Proc::UnaryExp { op, .. } if op.is_connective() => {
+                return Err(ValidationError::ConnectiveOutsidePattern {
+                    pos: proc.span.start,
+                });
+            }
+
+            _ => {}
+        }
+
+        // Deep validation using name-aware traversal
+        // This catches issues in deeply nested quoted patterns that surface-level checks miss
+        self.validate_deep_pattern_constraints(for_comp_pid, proc)?;
+
+        Ok(())
+    }
+
+    /// Validate deeply nested pattern constraints using name-aware traversal
+    fn validate_deep_pattern_constraints(
+        &self,
+        for_comp_pid: PID,
+        pattern_proc: &'ast AnnProc<'ast>,
+    ) -> ValidationResult {
+        for event in pattern_proc.iter_dfs_event_and_names() {
+            match event {
+                rholang_parser::DfsEventExt::Enter(node) => {
+                    self.validate_process_in_pattern(for_comp_pid, node)?;
+                }
+                rholang_parser::DfsEventExt::Name(_name) => {
+                    // Name validation is handled by ResolverPass during scope construction
+                    // No additional validation needed here
+                }
+                rholang_parser::DfsEventExt::Exit(_) => {
+                    // Exit events can be used for scope tracking in future
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Validate a process node within a pattern context
+    fn validate_process_in_pattern(
+        &self,
+        for_comp_pid: PID,
+        node: &AnnProc<'ast>,
+    ) -> ValidationResult {
+        match node.proc {
+            // Bundles are never allowed in patterns (at any depth)
+            Proc::Bundle { .. } => Err(ValidationError::InvalidPatternStructure {
+                pid: for_comp_pid,
+                position: Some(node.span.start),
+                reason: "Bundle cannot appear in pattern".to_string(),
+            }),
+
+            // Connectives must only appear in valid pattern contexts
+            Proc::BinaryExp { op, .. } if op.is_connective() => {
+                Err(ValidationError::ConnectiveOutsidePattern {
+                    pos: node.span.start,
                 })
             }
             Proc::UnaryExp { op, .. } if op.is_connective() => {
                 Err(ValidationError::ConnectiveOutsidePattern {
-                    pos: proc.span.start,
+                    pos: node.span.start,
                 })
             }
 
-            // All other patterns are valid
+            // All other processes are valid in patterns
             _ => Ok(()),
         }
     }
@@ -685,7 +755,7 @@ impl<'a, 'ast> PatternQueryValidator<'a, 'ast> {
     /// 3. Impossible set/map constraints
     ///
     /// Note: We only detect structural impossibilities. Type-level conflicts
-    /// within collection elements are handled by find_type_conflict.
+    /// within collection elements are handled by find_type_conflict
     fn find_impossible_collection_constraint(&self, pattern: &AnnProc<'ast>) -> Option<String> {
         match pattern.proc {
             Proc::BinaryExp { op, left, right } if op.is_and_connective() => {
@@ -1146,6 +1216,290 @@ mod type_validator_tests {
         assert!(
             result.is_ok(),
             "Mixed bind types should validate: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_detects_deeply_nested_bundle() {
+        // Bundle hidden deep in a pattern should be detected
+        let code = r#"
+            new ch in {
+                for(@{ x | bundle+ { y } } <- ch) { Nil }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let validator = TypeValidator::new(&db);
+
+        let result = validator.validate_channel_usage(pid);
+        assert!(
+            result.is_err(),
+            "Should detect deeply nested bundle in pattern"
+        );
+
+        match result.unwrap_err() {
+            ValidationError::InvalidPatternStructure { reason, .. } => {
+                assert!(
+                    reason.contains("Bundle"),
+                    "Error should mention Bundle, got: {}",
+                    reason
+                );
+            }
+            err => panic!("Expected InvalidPatternStructure, got: {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_detects_bundle_in_par_pattern() {
+        // Bundle in parallel composition within pattern
+        let code = r#"
+            new ch in {
+                for(@{ Nil | bundle+ { x } } <- ch) { Nil }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let validator = TypeValidator::new(&db);
+
+        let result = validator.validate_channel_usage(pid);
+        assert!(
+            result.is_err(),
+            "Should detect bundle in parallel composition pattern"
+        );
+    }
+
+    #[test]
+    fn test_detects_bundle_in_list_pattern() {
+        // Bundle nested in list pattern
+        let code = r#"
+            new ch in {
+                for(@[x, bundle+ { y }, z] <- ch) { Nil }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let validator = TypeValidator::new(&db);
+
+        let result = validator.validate_channel_usage(pid);
+        assert!(
+            result.is_err(),
+            "Should detect bundle in list pattern element"
+        );
+    }
+
+    #[test]
+    fn test_validates_complex_nested_valid_patterns() {
+        // Complex but valid nested pattern should pass
+        let code = r#"
+            new ch in {
+                for(@[x, @{y | z}, (a, b, c)] <- ch) {
+                    @x!(y)
+                }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let validator = TypeValidator::new(&db);
+
+        let result = validator.validate_channel_usage(pid);
+        assert!(
+            result.is_ok(),
+            "Complex valid pattern should validate: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_validates_deeply_quoted_patterns() {
+        // Deeply nested quoted patterns should validate if they're valid
+        let code = r#"
+            new ch in {
+                for(@{ @{ @{ x } } } <- ch) { Nil }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let validator = TypeValidator::new(&db);
+
+        let result = validator.validate_channel_usage(pid);
+        assert!(
+            result.is_ok(),
+            "Deeply quoted valid pattern should validate: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_validates_collection_with_quoted_elements() {
+        // Collections containing quoted processes
+        let code = r#"
+            new ch in {
+                for(@[@{a | b}, @{c | d}, x] <- ch) { Nil }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let validator = TypeValidator::new(&db);
+
+        let result = validator.validate_channel_usage(pid);
+        assert!(
+            result.is_ok(),
+            "Collection with quoted elements should validate: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_validates_map_pattern_with_quoted_keys() {
+        // Map patterns with quoted process keys
+        let code = r#"
+            new ch in {
+                for(@{@{x}: y, @{a}: b} <- ch) { Nil }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let validator = TypeValidator::new(&db);
+
+        let result = validator.validate_channel_usage(pid);
+        assert!(
+            result.is_ok(),
+            "Map pattern with quoted keys should validate: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_validates_set_pattern() {
+        // Set patterns should validate
+        let code = r#"
+            new ch in {
+                for(@Set(x, y, z) <- ch) { Nil }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let validator = TypeValidator::new(&db);
+
+        let result = validator.validate_channel_usage(pid);
+        assert!(result.is_ok(), "Set pattern should validate: {:?}", result);
+    }
+
+    #[test]
+    fn test_surface_level_bundle_still_detected() {
+        // Ensure surface-level bundles are still caught (regression test)
+        let code = r#"
+            new ch in {
+                for(@bundle+ { x } <- ch) { Nil }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let validator = TypeValidator::new(&db);
+
+        let result = validator.validate_channel_usage(pid);
+        assert!(
+            result.is_err(),
+            "Surface-level bundle should still be detected"
+        );
+    }
+
+    #[test]
+    fn test_validates_send_pattern() {
+        // Send patterns in for-comprehensions
+        let code = r#"
+            new ch in {
+                for(@{ x!(y) } <- ch) { Nil }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let validator = TypeValidator::new(&db);
+
+        let result = validator.validate_channel_usage(pid);
+        assert!(result.is_ok(), "Send pattern should validate: {:?}", result);
+    }
+
+    #[test]
+    fn test_validates_contract_pattern() {
+        // Contract patterns should validate
+        let code = r#"
+            new ch in {
+                for(@contract foo(x) = { Nil } <- ch) { Nil }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let validator = TypeValidator::new(&db);
+
+        let result = validator.validate_channel_usage(pid);
+        assert!(
+            result.is_ok(),
+            "Contract pattern should validate: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_validates_new_pattern() {
+        // New declarations in patterns
+        let code = r#"
+            new ch in {
+                for(@new x in { Nil } <- ch) { Nil }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let validator = TypeValidator::new(&db);
+
+        let result = validator.validate_channel_usage(pid);
+        assert!(result.is_ok(), "New pattern should validate: {:?}", result);
+    }
+
+    #[test]
+    fn test_multiple_patterns_with_deep_validation() {
+        // Multiple bindings, each with complex patterns
+        let code = r#"
+            new ch1, ch2, ch3 in {
+                for(@[x, @{y}] <- ch1; @(a, b) <- ch2; @{c | d} <- ch3) {
+                    Nil
+                }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let validator = TypeValidator::new(&db);
+
+        let result = validator.validate_channel_usage(pid);
+        assert!(
+            result.is_ok(),
+            "Multiple complex patterns should validate: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_validates_wildcard_in_nested_pattern() {
+        // Wildcards in nested positions
+        let code = r#"
+            new ch in {
+                for(@[_, @{_}, (_, x)] <- ch) { @x!(1) }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let validator = TypeValidator::new(&db);
+
+        let result = validator.validate_channel_usage(pid);
+        assert!(
+            result.is_ok(),
+            "Wildcards in nested patterns should validate: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_validates_ground_terms_in_nested_patterns() {
+        // Ground terms at various nesting levels
+        let code = r#"
+            new ch in {
+                for(@[42, @{true}, ("hello", Nil)] <- ch) { Nil }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let validator = TypeValidator::new(&db);
+
+        let result = validator.validate_channel_usage(pid);
+        assert!(
+            result.is_ok(),
+            "Ground terms in nested patterns should validate: {:?}",
             result
         );
     }

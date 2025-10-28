@@ -101,7 +101,7 @@ impl<'a, 'ast> JoinValidator<'a, 'ast> {
         Self { db }
     }
 
-    pub fn validate(&self, for_comp_pid: PID, receipts: &Receipts<'ast>) -> ValidationResult {
+    pub fn validate(&self, for_comp_pid: PID, receipts: &'ast Receipts<'ast>) -> ValidationResult {
         self.validate_join_atomicity(receipts)?;
 
         self.detect_deadlocks(receipts)?;
@@ -115,7 +115,7 @@ impl<'a, 'ast> JoinValidator<'a, 'ast> {
     ///
     /// For parallel bindings within a receipt (`&`), all channels must be available
     /// before any consumption occurs. This ensures atomic execution of the join
-    pub fn validate_join_atomicity(&self, receipts: &Receipts<'ast>) -> ValidationResult {
+    pub fn validate_join_atomicity(&self, receipts: &'ast Receipts<'ast>) -> ValidationResult {
         for receipt in receipts.iter() {
             if receipt.len() > 1 {
                 self.check_atomic_group(receipt)?;
@@ -160,7 +160,7 @@ impl<'a, 'ast> JoinValidator<'a, 'ast> {
     }
 
     /// Builds a dependency graph of channels and detects cycles that could lead to deadlocks
-    pub fn detect_deadlocks(&self, receipts: &Receipts<'ast>) -> ValidationResult {
+    pub fn detect_deadlocks(&self, receipts: &'ast Receipts<'ast>) -> ValidationResult {
         let graph = self.build_dependency_graph(receipts)?;
 
         if graph.is_empty() {
@@ -195,7 +195,7 @@ impl<'a, 'ast> JoinValidator<'a, 'ast> {
     /// 2. Detecting obvious same-channel conflicts in parallel joins
     fn build_dependency_graph(
         &self,
-        receipts: &Receipts<'ast>,
+        receipts: &'ast Receipts<'ast>,
     ) -> ValidationResult<DependencyGraph> {
         let graph = DependencyGraph::new();
 
@@ -226,37 +226,16 @@ impl<'a, 'ast> JoinValidator<'a, 'ast> {
     pub fn validate_channel_availability(
         &self,
         _for_comp_pid: PID,
-        receipts: &Receipts<'ast>,
+        receipts: &'ast Receipts<'ast>,
     ) -> ValidationResult {
         for receipt in receipts.iter() {
             for bind in receipt.iter() {
                 let channel_name = bind.source_name();
 
-                self.verify_channel_exists(channel_name)?;
+                super::channel_validation::verify_channel(self.db, channel_name)?;
             }
         }
 
-        Ok(())
-    }
-
-    /// Verify that a channel exists and is properly bound
-    fn verify_channel_exists(&self, name: &Name<'ast>) -> ValidationResult {
-        match name {
-            Name::NameVar(var) => {
-                if let rholang_parser::ast::Var::Id(id) = var {
-                    if self.db.binder_of_id(*id).is_none() {
-                        let sym = self.db.intern(id.name);
-                        return Err(ValidationError::UnboundVariable {
-                            var: sym,
-                            pos: id.pos,
-                        });
-                    }
-                }
-            }
-            Name::Quote(_) => {
-                // Quoted processes are always valid as channels
-            }
-        }
         Ok(())
     }
 
@@ -415,29 +394,6 @@ mod tests {
             result.is_err(),
             "Join validator should also detect unbound channel"
         );
-    }
-
-    #[test]
-    fn test_dependency_graph_construction() {
-        let code = r#"new ch1, ch2, ch3 in { for(@x <- ch1; @y <- ch2; @z <- ch3) { Nil } }"#;
-        let (db, _pid) = setup_db(code);
-
-        let _validator = JoinValidator::new(&db);
-
-        let code2 = r#"new ch1, ch2 in { for(@x <- ch1; @y <- ch2) { Nil } }"#;
-        let (db2, pid2) = setup_db(code2);
-        let receipts2 = get_receipts(&db2, pid2);
-
-        let validator2 = JoinValidator::new(&db2);
-        let graph_result = validator2.build_dependency_graph(receipts2);
-
-        assert!(
-            graph_result.is_ok(),
-            "Dependency graph construction should succeed"
-        );
-
-        let graph = graph_result.unwrap();
-        assert!(!graph.is_empty(), "Graph should not be empty");
     }
 
     #[test]

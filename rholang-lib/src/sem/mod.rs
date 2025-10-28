@@ -10,6 +10,7 @@ use rholang_parser::{SourcePos, SourceSpan, ast};
 
 pub mod db;
 pub mod diagnostics;
+mod elaborator;
 mod enclosure_analysis;
 mod interner;
 pub mod pipeline;
@@ -75,13 +76,15 @@ impl IntKey for PID {
 }
 
 /// Interned strings
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Symbol(u32);
 
 impl Symbol {
     const MIN: Symbol = Symbol(u32::MIN);
     #[allow(dead_code)]
     const MAX: Symbol = Symbol(u32::MAX);
+    /// A dummy symbol used for placeholders (e.g., wildcards, quotes)
+    pub const DUMMY: Symbol = Symbol(u32::MAX);
 }
 
 impl Display for Symbol {
@@ -485,6 +488,7 @@ pub enum ErrorKind {
     ConnectiveOutsidePattern,
     BundleInsidePattern,
     UnmatchedVarInDisjunction(Symbol),
+    BadCode,
 }
 
 impl ErrorKind {

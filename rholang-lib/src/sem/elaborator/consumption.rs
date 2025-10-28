@@ -33,7 +33,7 @@ impl ConsumptionTracker {
             channel_usages: HashMap::new(),
         }
     }
-    
+
     fn record_usage(
         &mut self,
         channel: Symbol,
@@ -108,7 +108,7 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
     pub fn new(db: &'a SemanticDb<'ast>) -> Self {
         Self { db }
     }
-    
+
     /// This method validates consumption patterns by:
     /// 1. Tracking all channel usages and their consumption modes
     /// 2. Validating linear consumption (channels consumed exactly once)
@@ -116,18 +116,18 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
     /// 4. Validating repeated binds (persistent/contract-like behavior)
     /// 5. Detecting potential reentrancy vulnerabilities
     /// 6. Verifying channel existence and binding
-    pub fn validate(&self, _for_comp_pid: PID, receipts: &Receipts<'ast>) -> ValidationResult {
+    pub fn validate(&self, _for_comp_pid: PID, receipts: &'ast Receipts<'ast>) -> ValidationResult {
         let tracker = self.track_consumption_patterns(receipts)?;
-        
+
         tracker.validate_linear_consumption()?;
-        
+
         self.detect_reentrancy_patterns(receipts)?;
-        
+
         self.verify_all_channels(receipts)?;
 
         Ok(())
     }
-    
+
     /// Builds a consumption tracker that records how each channel is used
     /// throughout the for-comprehension
     fn track_consumption_patterns(
@@ -163,7 +163,7 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
 
         Ok(tracker)
     }
-    
+
     fn extract_name_from_source<'b>(&self, source: &'b Source<'ast>) -> &'b Name<'ast> {
         match source {
             Source::Simple { name } => name,
@@ -181,7 +181,7 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
             Name::Quote(_) => None,
         }
     }
-    
+
     fn get_name_position(&self, name: &Name<'ast>) -> rholang_parser::SourcePos {
         match name {
             Name::NameVar(var) => match var {
@@ -217,7 +217,7 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
 
         Ok(())
     }
-    
+
     fn is_reentrancy_pattern(&self, source: &Source<'ast>) -> bool {
         matches!(
             source,
@@ -226,7 +226,7 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
     }
 
     /// Verify all channels in receipts exist and are properly bound
-    fn verify_all_channels(&self, receipts: &Receipts<'ast>) -> ValidationResult {
+    fn verify_all_channels(&self, receipts: &'ast Receipts<'ast>) -> ValidationResult {
         for receipt in receipts.iter() {
             for bind in receipt.iter() {
                 let name = match bind {
@@ -235,24 +235,9 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
                     Bind::Peek { rhs, .. } => rhs,
                 };
 
-                self.verify_channel_exists(name)?;
+                super::channel_validation::verify_channel(self.db, name)?;
             }
         }
-        Ok(())
-    }
-
-    /// Verify that a channel exists and is properly bound
-    fn verify_channel_exists(&self, name: &Name<'ast>) -> ValidationResult {
-        if let Name::NameVar(rholang_parser::ast::Var::Id(id)) = name {
-            if self.db.binder_of_id(*id).is_none() {
-                let sym = self.db.intern(id.name);
-                return Err(ValidationError::UnboundVariable {
-                    var: sym,
-                    pos: id.pos,
-                });
-            }
-        }
-        // Wildcards and quoted processes are always valid as channels
         Ok(())
     }
 }
@@ -278,7 +263,7 @@ mod tests {
                 .map(|(channel, _)| *channel)
                 .collect()
         }
-        
+
         fn get_consumed_channels(&self) -> HashSet<Symbol> {
             self.channel_usages
                 .iter()
@@ -768,5 +753,211 @@ mod tests {
                 reason
             );
         }
+    }
+
+    #[test]
+    fn test_quoted_channel_with_bound_name() {
+        // Quoted channel referencing a bound name should validate
+        let code = r#"
+            new stdout in {
+                for(@msg <- @{ stdout!("test") }) {
+                    Nil
+                }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let receipts = get_receipts(&db, pid);
+
+        let validator = ConsumptionValidator::new(&db);
+        let result = validator.validate(pid, receipts);
+
+        assert!(
+            result.is_ok(),
+            "Quoted channel with bound name should validate: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_quoted_channel_with_unbound_name() {
+        // Quoted channel referencing an unbound name should fail
+        let code = r#"
+            new ch in {
+                for(@msg <- @{ undefined_channel!(42) }) {
+                    Nil
+                }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let receipts = get_receipts(&db, pid);
+
+        let validator = ConsumptionValidator::new(&db);
+        let result = validator.validate(pid, receipts);
+
+        assert!(
+            result.is_err(),
+            "Quoted channel with unbound name should fail"
+        );
+
+        match result.unwrap_err() {
+            ValidationError::UnboundVariable { var, .. } => {
+                let var_name = db.resolve_symbol(var).expect("Symbol should exist");
+                assert_eq!(
+                    var_name, "undefined_channel",
+                    "Should report the unbound variable"
+                );
+            }
+            err => panic!("Expected UnboundVariable error, got: {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_quoted_channel_with_multiple_names() {
+        // Quoted channel with multiple name references
+        let code = r#"
+            new stdout, stderr, ch in {
+                for(@msg <- @{ stdout!("info") | stderr!("error") }) {
+                    Nil
+                }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let receipts = get_receipts(&db, pid);
+
+        let validator = ConsumptionValidator::new(&db);
+        let result = validator.validate(pid, receipts);
+
+        assert!(
+            result.is_ok(),
+            "Quoted channel with multiple bound names should validate: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_quoted_channel_in_repeated_bind() {
+        // Quoted channel used with repeated bind (<=)
+        let code = r#"
+            new logger in {
+                for(@msg <= @{ logger!("repeat") }) {
+                    Nil
+                }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let receipts = get_receipts(&db, pid);
+
+        let validator = ConsumptionValidator::new(&db);
+        let result = validator.validate(pid, receipts);
+
+        assert!(
+            result.is_ok(),
+            "Quoted channel in repeated bind should validate: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_quoted_channel_in_peek_bind() {
+        // Quoted channel used with peek bind (<<-)
+        let code = r#"
+            new monitor in {
+                for(@msg <<- @{ monitor!("peek") }) {
+                    Nil
+                }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let receipts = get_receipts(&db, pid);
+
+        let validator = ConsumptionValidator::new(&db);
+        let result = validator.validate(pid, receipts);
+
+        assert!(
+            result.is_ok(),
+            "Quoted channel in peek bind should validate: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_quoted_channel_complex_expression() {
+        // Complex expression in quoted channel
+        let code = r#"
+            new ch1, ch2, ch3 in {
+                for(@result <- @{
+                    ch1!(1) | ch2!(2) | ch3!(3)
+                }) {
+                    Nil
+                }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let receipts = get_receipts(&db, pid);
+
+        let validator = ConsumptionValidator::new(&db);
+        let result = validator.validate(pid, receipts);
+
+        assert!(
+            result.is_ok(),
+            "Complex quoted channel expression should validate: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_regression_simple_channel_still_works() {
+        // Regression: ensure simple channels still work after Phase 2
+        let code = r#"new ch in { for(@x <- ch) { Nil } }"#;
+        let (db, pid) = setup_db(code);
+        let receipts = get_receipts(&db, pid);
+
+        let validator = ConsumptionValidator::new(&db);
+        let result = validator.validate(pid, receipts);
+
+        assert!(
+            result.is_ok(),
+            "Simple channel should still validate after Phase 2: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_regression_unbound_simple_channel_still_detected() {
+        // Regression: ensure unbound simple channels are still detected
+        let code = r#"for(@x <- unbound_channel) { Nil }"#;
+        let (db, pid) = setup_db(code);
+        let receipts = get_receipts(&db, pid);
+
+        let validator = ConsumptionValidator::new(&db);
+        let result = validator.validate(pid, receipts);
+
+        assert!(
+            result.is_err(),
+            "Unbound simple channel should still be detected after Phase 2"
+        );
+    }
+
+    #[test]
+    fn test_wildcard_in_quoted_channel() {
+        // Quoted channel with wildcard should validate
+        let code = r#"
+            new ch in {
+                for(@msg <- @{ _!(42) }) {
+                    Nil
+                }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let receipts = get_receipts(&db, pid);
+
+        let validator = ConsumptionValidator::new(&db);
+        let result = validator.validate(pid, receipts);
+
+        assert!(
+            result.is_ok(),
+            "Wildcard in quoted channel should validate: {:?}",
+            result
+        );
     }
 }

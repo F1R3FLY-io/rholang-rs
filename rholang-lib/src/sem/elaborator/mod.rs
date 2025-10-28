@@ -372,6 +372,49 @@ impl crate::sem::FactPass for ForCompElaborationPass {
     }
 }
 
+/// Shared helper functions for channel validation (ConsumptionValidator, JoinValidator)
+pub(crate) mod channel_validation {
+    use super::errors::{ValidationError, ValidationResult};
+    use crate::sem::SemanticDb;
+    use rholang_parser::ast::{AnnProc, Name};
+
+    /// Verify that a channel exists and is properly bound, including quoted process channels
+    pub fn verify_channel<'ast>(db: &SemanticDb<'ast>, name: &'ast Name<'ast>) -> ValidationResult {
+        match name {
+            Name::NameVar(rholang_parser::ast::Var::Id(id)) => {
+                // Verify that the name variable is bound
+                if db.binder_of_id(*id).is_none() {
+                    let sym = db.intern(id.name);
+                    return Err(ValidationError::UnboundVariable {
+                        var: sym,
+                        pos: id.pos,
+                    });
+                }
+                Ok(())
+            }
+            Name::Quote(proc) => {
+                // For quoted process channels, verify all names within the process
+                verify_names_in_quoted_channel(db, proc)
+            }
+            Name::NameVar(rholang_parser::ast::Var::Wildcard) => {
+                // Wildcards are always valid as channels
+                Ok(())
+            }
+        }
+    }
+
+    /// Verify all names within a quoted process channel
+    fn verify_names_in_quoted_channel<'ast>(
+        db: &SemanticDb<'ast>,
+        proc: &'ast AnnProc<'ast>,
+    ) -> ValidationResult {
+        for name in proc.iter_names_direct() {
+            verify_channel(db, name)?;
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
