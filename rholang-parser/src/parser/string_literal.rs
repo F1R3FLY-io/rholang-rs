@@ -21,83 +21,94 @@ pub enum StringLitError {
 }
 
 pub fn parse_string_literal(raw: &str) -> Result<String, StringLitError> {
-    // Trim surrounding double quotes if present
-    let s = crate::trim_byte(raw, b'"');
-
-    // Fast path: no backslashes, return as is
+    let s = trim_quotes(raw);
     if !s.as_bytes().contains(&b'\\') {
         return Ok(s.to_string());
     }
+    decode_with_escapes(s)
+}
 
+fn trim_quotes(raw: &str) -> &str {
+    crate::trim_byte(raw, b'"')
+}
+
+fn decode_with_escapes(s: &str) -> Result<String, StringLitError> {
     let mut out = String::with_capacity(s.len());
-    let mut chars = s.chars().peekable();
-
-    while let Some(ch) = chars.next() {
+    let mut it = s.chars().peekable();
+    while let Some(ch) = it.next() {
         if ch != '\\' {
             out.push(ch);
             continue;
         }
-
-        // Escape sequence
-        let Some(next) = chars.peek().copied() else {
-            return Err(StringLitError::InvalidEscape);
-        };
-
-        match next {
-            '\\' => {
-                chars.next();
-                out.push('\\');
-            }
-            '"' => {
-                chars.next();
-                out.push('"');
-            }
-            'n' => {
-                chars.next();
-                out.push('\n');
-            }
-            'r' => {
-                chars.next();
-                out.push('\r');
-            }
-            't' => {
-                chars.next();
-                out.push('\t');
-            }
-            '0'..='9' => {
-                // Collect consecutive digits
-                let mut num: u32 = 0;
-                let mut consumed = 0usize;
-                while let Some(d) = chars.peek().and_then(|c| c.to_digit(10)) {
-                    chars.next();
-                    consumed += 1;
-                    num = match num.checked_mul(10).and_then(|v| v.checked_add(d)) {
-                        Some(v) => v,
-                        None => return Err(StringLitError::InvalidCodePoint),
-                    };
-                }
-                if consumed == 0 {
-                    // Shouldn't happen because branch already matched '0'..='9'
-                    return Err(StringLitError::InvalidEscape);
-                }
-                // Validate Unicode scalar value
-                if num > 0x10FFFF || (0xD800..=0xDFFF).contains(&num) {
-                    return Err(StringLitError::InvalidCodePoint);
-                }
-                if let Some(c) = char::from_u32(num) {
-                    out.push(c);
-                } else {
-                    return Err(StringLitError::InvalidCodePoint);
-                }
-            }
-            _ => {
-                // Unknown escape
-                return Err(StringLitError::InvalidEscape);
-            }
+        match parse_escape(&mut it)? {
+            ParsedEscape::Char(c) => out.push(c),
         }
     }
-
     Ok(out)
+}
+
+enum ParsedEscape {
+    Char(char),
+}
+
+fn parse_escape<I>(it: &mut std::iter::Peekable<I>) -> Result<ParsedEscape, StringLitError>
+where
+    I: Iterator<Item = char>,
+{
+    let Some(next) = it.peek().copied() else {
+        return Err(StringLitError::InvalidEscape);
+    };
+    match next {
+        '\\' => {
+            it.next();
+            Ok(ParsedEscape::Char('\\'))
+        }
+        '"' => {
+            it.next();
+            Ok(ParsedEscape::Char('"'))
+        }
+        'n' => {
+            it.next();
+            Ok(ParsedEscape::Char('\n'))
+        }
+        'r' => {
+            it.next();
+            Ok(ParsedEscape::Char('\r'))
+        }
+        't' => {
+            it.next();
+            Ok(ParsedEscape::Char('\t'))
+        }
+        '0'..='9' => parse_decimal_escape(it).map(ParsedEscape::Char),
+        _ => Err(StringLitError::InvalidEscape),
+    }
+}
+
+fn parse_decimal_escape<I>(it: &mut std::iter::Peekable<I>) -> Result<char, StringLitError>
+where
+    I: Iterator<Item = char>,
+{
+    let mut num: u32 = 0;
+    let mut consumed = 0usize;
+    while let Some(d) = it.peek().and_then(|c| c.to_digit(10)) {
+        it.next();
+        consumed += 1;
+        num = match num.checked_mul(10).and_then(|v| v.checked_add(d)) {
+            Some(v) => v,
+            None => return Err(StringLitError::InvalidCodePoint),
+        };
+    }
+    if consumed == 0 {
+        return Err(StringLitError::InvalidEscape);
+    }
+    validate_scalar(num)
+}
+
+fn validate_scalar(num: u32) -> Result<char, StringLitError> {
+    if num > 0x10FFFF || (0xD800..=0xDFFF).contains(&num) {
+        return Err(StringLitError::InvalidCodePoint);
+    }
+    char::from_u32(num).ok_or(StringLitError::InvalidCodePoint)
 }
 
 #[cfg(test)]

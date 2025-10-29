@@ -20,7 +20,7 @@ use crate::{
     parser::{
         ast_builder::ASTBuilder,
         errors::{AnnParsingError, ParsingError},
-        string_lit::{parse_string_literal, StringLitError},
+        string_literal::{parse_string_literal, StringLitError},
     },
 };
 
