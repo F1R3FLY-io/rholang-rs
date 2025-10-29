@@ -14,7 +14,7 @@ pub(super) fn resolve_proc_pattern<'a>(
     let first_binder = db.next_binder();
     // shortcut, we can return right away for simple patterns
     let pattern_proc = pattern.proc;
-    if pattern_proc.is_ground() {
+    if pattern_proc.is_trivially_ground() {
         return ScopeInfo::ground(first_binder, span);
     }
     match pattern_proc {
@@ -60,7 +60,7 @@ pub(super) fn resolve_name_pattern<'a>(
             new_free(scope, *var, BinderKind::Name(None), proc_var_index, db);
             ScopeInfo::free_var(first_binder, span)
         }
-        NamesKind::SingleName(Name::Quote(quoted)) if quoted.is_ground() => {
+        NamesKind::SingleName(Name::Quote(quoted)) if quoted.is_trivially_ground() => {
             ScopeInfo::ground(first_binder, span)
         }
         NamesKind::SingleName(Name::Quote(ast::AnnProc {
