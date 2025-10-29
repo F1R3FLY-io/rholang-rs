@@ -41,9 +41,20 @@ impl<'a> RholangParser<'a> {
         }
         let mut walker = tree.walk();
 
-        root.named_children(&mut walker)
-            .map(|node| parsing::node_to_ast(&node, &self.ast_builder, code))
-            .collect()
+        #[cfg(feature = "named-comments")]
+        {
+            // Skip comment nodes at the top level when named-comments is enabled
+            parsing::named_children_no_comments(&root, &mut walker)
+                .map(|node| parsing::node_to_ast(&node, &self.ast_builder, code))
+                .collect()
+        }
+        #[cfg(not(feature = "named-comments"))]
+        {
+            // When named-comments is disabled, comments are unnamed and automatically excluded
+            root.named_children(&mut walker)
+                .map(|node| parsing::node_to_ast(&node, &self.ast_builder, code))
+                .collect()
+        }
     }
 
     // Expose AST builder for accessing const_nil

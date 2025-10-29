@@ -8,6 +8,17 @@ edition = "2024"
 name = "rholang_parser"
 crate-type = ["cdylib", "rlib"]
 
+[features]
+default = []
+# Controls whether comments appear as named nodes in the tree-sitter syntax tree.
+# Note: This feature is primarily for documentation. To toggle comment visibility:
+#   1. Set RHOLANG_NAMED_COMMENTS=1 (for named) or =0 (for unnamed)
+#   2. Run: cd rholang-tree-sitter && npx tree-sitter generate
+#   3. Rebuild the project
+# Named comments enable LSP features (hover, folding) but add ~10-15% parsing overhead.
+# The Rust parser always filters comments when building the AST regardless of this setting.
+named-comments = []
+
 [[bench]]
 name = "parsing"
 harness = false
