@@ -93,6 +93,31 @@ fn integration_backslash_via_decimal_escape() {
 }
 
 #[test]
+fn integration_double_quote_escape() {
+    // simple \" inside string
+    let parser = RholangParser::new();
+    let src1 = r#"stdout!("\"")"#;
+    match parser.parse(src1).ok() {
+        Ok(procs) => {
+            let s = extract_first_string_literal(&procs[0]).unwrap();
+            assert_eq!(s, "\"");
+        }
+        Err(errors) => panic!("unexpected parse failure: {:?}", errors),
+    }
+
+    // in context a\"b -> a"b
+    let parser = RholangParser::new();
+    let src2 = r#"stdout!("a\"b")"#;
+    match parser.parse(src2).ok() {
+        Ok(procs) => {
+            let s = extract_first_string_literal(&procs[0]).unwrap();
+            assert_eq!(s, "a\"b");
+        }
+        Err(errors) => panic!("unexpected parse failure: {:?}", errors),
+    }
+}
+
+#[test]
 fn integration_invalid_escape_reports_error() {
     let src = r#"stdout!("\x")"#;
     let parser = RholangParser::new();

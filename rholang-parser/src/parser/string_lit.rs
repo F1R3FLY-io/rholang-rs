@@ -1,10 +1,15 @@
 //! String literal parsing and unescaping
 //!
 //! Supports escape sequences:
+//! - \\ backslash
+//! - \" double quote
 //! - \n newline
 //! - \r carriage return
 //! - \t tab
 //! - \\ [0-9]+: decimal Unicode code point producing a single UTF-8 char
+//!
+//! Unicode policy: Only valid Unicode scalar values are accepted. Surrogate code points (0xD800..=0xDFFF)
+//! and values above 0x10FFFF are rejected with `StringLitError::InvalidCodePoint`.
 //!
 //! Input is expected to be the raw literal as it appears in source, including
 //! the surrounding quotes. The function will trim the outer quotes if present.
@@ -42,6 +47,10 @@ pub fn parse_string_literal(raw: &str) -> Result<String, StringLitError> {
             '\\' => {
                 chars.next();
                 out.push('\\');
+            }
+            '"' => {
+                chars.next();
+                out.push('"');
             }
             'n' => {
                 chars.next();
@@ -124,18 +133,28 @@ mod tests {
     }
 
     #[test]
-        fn test_backslash_escape_simple_and_context() {
-            // \\ -> \
-            assert_eq!(parse_string_literal("\"\\\\\"").unwrap(), "\\");
-            // in context
-            assert_eq!(parse_string_literal("\"a\\\\b\"").unwrap(), "a\\b");
-        }
+    fn test_backslash_escape_simple_and_context() {
+        // \\\\ -> \\
+        assert_eq!(parse_string_literal("\"\\\\\"").unwrap(), "\\");
+        // in context
+        assert_eq!(parse_string_literal("\"a\\\\b\"").unwrap(), "a\\b");
+    }
 
-        #[test]
-        fn test_invalid_trailing_backslash() {
-            // Lone trailing backslash
-            assert!(matches!(parse_string_literal("\"abc\\\""), Err(StringLitError::InvalidEscape)));
-        }
+    #[test]
+    fn test_double_quote_escape_simple_and_context() {
+        // \" -> "
+        assert_eq!(parse_string_literal("\"\\\"\"").unwrap(), "\"");
+        // in context
+        assert_eq!(parse_string_literal("\"a\\\"b\"").unwrap(), "a\"b");
+        // mixed with others
+        assert_eq!(parse_string_literal("\"x\\\"\\n\"\"").unwrap(), "x\"\n\"");
+    }
+
+    #[test]
+    fn test_invalid_trailing_backslash() {
+        // Lone trailing backslash
+        assert!(matches!(parse_string_literal("\"abc\\\""), Err(StringLitError::InvalidEscape)));
+    }
 
     #[test]
     fn test_invalid_escape() {
