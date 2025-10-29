@@ -8,7 +8,7 @@ plugins {
 }
 
 group 'org.rholang'
-version '1.0-SNAPSHOT'
+version '1.0.1'
 
 // Set Java compatibility
 java {
@@ -36,13 +36,13 @@ dependencies {
 
 // See https://github.com/JetBrains/gradle-intellij-plugin/
 intellij {
-    version = '2024.3'
+    version = '2025.2'
     type = 'RR' // Target RustRover platform
     plugins = []
 }
 
 patchPluginXml {
-    sinceBuild = "243"
+    sinceBuild = "252"
     changeNotes = """
       Initial release of the Rholang plugin.<br>
       <em>Features:</em>
@@ -131,3 +131,9 @@ task copyRholangParser(type: Copy, dependsOn: [createLibDir, buildRholangParser]
 
 // Make the plugin build depend on the copyRholangParser task
 processResources.dependsOn copyRholangParser
+
+// Disable building searchable options to avoid headless indexing issues in CI/local
+// See https://github.com/JetBrains/gradle-intellij-plugin/issues/2046
+tasks.named('buildSearchableOptions') {
+    enabled = false
+}
