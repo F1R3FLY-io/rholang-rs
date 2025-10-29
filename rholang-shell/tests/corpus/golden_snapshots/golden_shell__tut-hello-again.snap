@@ -1,7 +1,7 @@
 ---
-source: rholang-parser/tests/golden.rs
-assertion_line: 23
-expression: result
+source: rholang-shell/tests/golden_shell.rs
+assertion_line: 40
+expression: output_or_err
 ---
 Good(
     [
@@ -11,20 +11,12 @@ Good(
                     NameDecl {
                         id: Id {
                             name: "helloAgain",
-                            pos: SourcePos {
-                                line: 1,
-                                col: 5,
-                            },
                         },
                         uri: None,
                     },
                     NameDecl {
                         id: Id {
                             name: "stdout",
-                            pos: SourcePos {
-                                line: 1,
-                                col: 17,
-                            },
                         },
                         uri: Some(
                             Uri(
@@ -35,10 +27,6 @@ Good(
                     NameDecl {
                         id: Id {
                             name: "stdoutAck",
-                            pos: SourcePos {
-                                line: 1,
-                                col: 42,
-                            },
                         },
                         uri: Some(
                             Uri(
@@ -57,10 +45,6 @@ Good(
                                             Id(
                                                 Id {
                                                     name: "helloAgain",
-                                                    pos: SourcePos {
-                                                        line: 2,
-                                                        col: 12,
-                                                    },
                                                 },
                                             ),
                                         ),
@@ -78,10 +62,6 @@ Good(
                                                     NameDecl {
                                                         id: Id {
                                                             name: "chan",
-                                                            pos: SourcePos {
-                                                                line: 3,
-                                                                col: 9,
-                                                            },
                                                         },
                                                         uri: None,
                                                     },
@@ -94,10 +74,6 @@ Good(
                                                                     Id(
                                                                         Id {
                                                                             name: "chan",
-                                                                            pos: SourcePos {
-                                                                                line: 4,
-                                                                                col: 7,
-                                                                            },
                                                                         },
                                                                     ),
                                                                 ),
@@ -108,27 +84,11 @@ Good(
                                                                             "Hello again, world!",
                                                                         ),
                                                                         span: SourceSpan {
-                                                                            start: SourcePos {
-                                                                                line: 4,
-                                                                                col: 13,
-                                                                            },
-                                                                            end: SourcePos {
-                                                                                line: 4,
-                                                                                col: 34,
-                                                                            },
                                                                         },
                                                                     },
                                                                 ],
                                                             },
                                                             span: SourceSpan {
-                                                                start: SourcePos {
-                                                                    line: 4,
-                                                                    col: 7,
-                                                                },
-                                                                end: SourcePos {
-                                                                    line: 4,
-                                                                    col: 35,
-                                                                },
                                                             },
                                                         },
                                                         right: AnnProc {
@@ -144,22 +104,10 @@ Good(
                                                                                                 Id(
                                                                                                     Id {
                                                                                                         name: "text",
-                                                                                                        pos: SourcePos {
-                                                                                                            line: 5,
-                                                                                                            col: 13,
-                                                                                                        },
                                                                                                     },
                                                                                                 ),
                                                                                             ),
                                                                                             span: SourceSpan {
-                                                                                                start: SourcePos {
-                                                                                                    line: 5,
-                                                                                                    col: 13,
-                                                                                                },
-                                                                                                end: SourcePos {
-                                                                                                    line: 5,
-                                                                                                    col: 17,
-                                                                                                },
                                                                                             },
                                                                                         },
                                                                                     ),
@@ -171,10 +119,6 @@ Good(
                                                                                     Id(
                                                                                         Id {
                                                                                             name: "chan",
-                                                                                            pos: SourcePos {
-                                                                                                line: 5,
-                                                                                                col: 21,
-                                                                                            },
                                                                                         },
                                                                                     ),
                                                                                 ),
@@ -188,10 +132,6 @@ Good(
                                                                             NameDecl {
                                                                                 id: Id {
                                                                                     name: "ack",
-                                                                                    pos: SourcePos {
-                                                                                        line: 6,
-                                                                                        col: 13,
-                                                                                    },
                                                                                 },
                                                                                 uri: None,
                                                                             },
@@ -204,10 +144,6 @@ Good(
                                                                                             Id(
                                                                                                 Id {
                                                                                                     name: "stdoutAck",
-                                                                                                    pos: SourcePos {
-                                                                                                        line: 7,
-                                                                                                        col: 11,
-                                                                                                    },
                                                                                                 },
                                                                                             ),
                                                                                         ),
@@ -218,22 +154,10 @@ Good(
                                                                                                     Id(
                                                                                                         Id {
                                                                                                             name: "text",
-                                                                                                            pos: SourcePos {
-                                                                                                                line: 7,
-                                                                                                                col: 22,
-                                                                                                            },
                                                                                                         },
                                                                                                     ),
                                                                                                 ),
                                                                                                 span: SourceSpan {
-                                                                                                    start: SourcePos {
-                                                                                                        line: 7,
-                                                                                                        col: 22,
-                                                                                                    },
-                                                                                                    end: SourcePos {
-                                                                                                        line: 7,
-                                                                                                        col: 26,
-                                                                                                    },
                                                                                                 },
                                                                                             },
                                                                                             AnnProc {
@@ -242,36 +166,16 @@ Good(
                                                                                                         Id(
                                                                                                             Id {
                                                                                                                 name: "ack",
-                                                                                                                pos: SourcePos {
-                                                                                                                    line: 7,
-                                                                                                                    col: 29,
-                                                                                                                },
                                                                                                             },
                                                                                                         ),
                                                                                                     ),
                                                                                                 },
                                                                                                 span: SourceSpan {
-                                                                                                    start: SourcePos {
-                                                                                                        line: 7,
-                                                                                                        col: 28,
-                                                                                                    },
-                                                                                                    end: SourcePos {
-                                                                                                        line: 7,
-                                                                                                        col: 32,
-                                                                                                    },
                                                                                                 },
                                                                                             },
                                                                                         ],
                                                                                     },
                                                                                     span: SourceSpan {
-                                                                                        start: SourcePos {
-                                                                                            line: 7,
-                                                                                            col: 11,
-                                                                                        },
-                                                                                        end: SourcePos {
-                                                                                            line: 7,
-                                                                                            col: 33,
-                                                                                        },
                                                                                     },
                                                                                 },
                                                                                 right: AnnProc {
@@ -292,10 +196,6 @@ Good(
                                                                                                             Id(
                                                                                                                 Id {
                                                                                                                     name: "ack",
-                                                                                                                    pos: SourcePos {
-                                                                                                                        line: 8,
-                                                                                                                        col: 21,
-                                                                                                                    },
                                                                                                                 },
                                                                                                             ),
                                                                                                         ),
@@ -309,10 +209,6 @@ Good(
                                                                                                     Id(
                                                                                                         Id {
                                                                                                             name: "stdout",
-                                                                                                            pos: SourcePos {
-                                                                                                                line: 9,
-                                                                                                                col: 13,
-                                                                                                            },
                                                                                                         },
                                                                                                     ),
                                                                                                 ),
@@ -320,114 +216,42 @@ Good(
                                                                                                 inputs: [
                                                                                                     AnnProc {
                                                                                                         proc: StringLiteral(
-                                                                                                            "\n",
+                                                                                                            "\\n",
                                                                                                         ),
                                                                                                         span: SourceSpan {
-                                                                                                            start: SourcePos {
-                                                                                                                line: 9,
-                                                                                                                col: 21,
-                                                                                                            },
-                                                                                                            end: SourcePos {
-                                                                                                                line: 9,
-                                                                                                                col: 25,
-                                                                                                            },
                                                                                                         },
                                                                                                     },
                                                                                                 ],
                                                                                             },
                                                                                             span: SourceSpan {
-                                                                                                start: SourcePos {
-                                                                                                    line: 9,
-                                                                                                    col: 13,
-                                                                                                },
-                                                                                                end: SourcePos {
-                                                                                                    line: 9,
-                                                                                                    col: 26,
-                                                                                                },
                                                                                             },
                                                                                         },
                                                                                     },
                                                                                     span: SourceSpan {
-                                                                                        start: SourcePos {
-                                                                                            line: 8,
-                                                                                            col: 11,
-                                                                                        },
-                                                                                        end: SourcePos {
-                                                                                            line: 10,
-                                                                                            col: 12,
-                                                                                        },
                                                                                     },
                                                                                 },
                                                                             },
                                                                             span: SourceSpan {
-                                                                                start: SourcePos {
-                                                                                    line: 7,
-                                                                                    col: 11,
-                                                                                },
-                                                                                end: SourcePos {
-                                                                                    line: 10,
-                                                                                    col: 12,
-                                                                                },
                                                                             },
                                                                         },
                                                                     },
                                                                     span: SourceSpan {
-                                                                        start: SourcePos {
-                                                                            line: 6,
-                                                                            col: 9,
-                                                                        },
-                                                                        end: SourcePos {
-                                                                            line: 11,
-                                                                            col: 10,
-                                                                        },
                                                                     },
                                                                 },
                                                             },
                                                             span: SourceSpan {
-                                                                start: SourcePos {
-                                                                    line: 5,
-                                                                    col: 7,
-                                                                },
-                                                                end: SourcePos {
-                                                                    line: 12,
-                                                                    col: 8,
-                                                                },
                                                             },
                                                         },
                                                     },
                                                     span: SourceSpan {
-                                                        start: SourcePos {
-                                                            line: 4,
-                                                            col: 7,
-                                                        },
-                                                        end: SourcePos {
-                                                            line: 12,
-                                                            col: 8,
-                                                        },
                                                     },
                                                 },
                                             },
                                             span: SourceSpan {
-                                                start: SourcePos {
-                                                    line: 3,
-                                                    col: 5,
-                                                },
-                                                end: SourcePos {
-                                                    line: 13,
-                                                    col: 6,
-                                                },
                                             },
                                         },
                                     },
                                     span: SourceSpan {
-                                        start: SourcePos {
-                                            line: 2,
-                                            col: 3,
-                                        },
-                                        end: SourcePos {
-                                            line: 14,
-                                            col: 4,
-                                        },
                                     },
                                 },
                                 right: AnnProc {
@@ -436,10 +260,6 @@ Good(
                                             Id(
                                                 Id {
                                                     name: "helloAgain",
-                                                    pos: SourcePos {
-                                                        line: 15,
-                                                        col: 3,
-                                                    },
                                                 },
                                             ),
                                         ),
@@ -448,39 +268,15 @@ Good(
                                             AnnProc {
                                                 proc: Nil,
                                                 span: SourceSpan {
-                                                    start: SourcePos {
-                                                        line: 15,
-                                                        col: 15,
-                                                    },
-                                                    end: SourcePos {
-                                                        line: 15,
-                                                        col: 18,
-                                                    },
                                                 },
                                             },
                                         ],
                                     },
                                     span: SourceSpan {
-                                        start: SourcePos {
-                                            line: 15,
-                                            col: 3,
-                                        },
-                                        end: SourcePos {
-                                            line: 15,
-                                            col: 19,
-                                        },
                                     },
                                 },
                             },
                             span: SourceSpan {
-                                start: SourcePos {
-                                    line: 2,
-                                    col: 3,
-                                },
-                                end: SourcePos {
-                                    line: 15,
-                                    col: 19,
-                                },
                             },
                         },
                         right: AnnProc {
@@ -489,10 +285,6 @@ Good(
                                     Id(
                                         Id {
                                             name: "helloAgain",
-                                            pos: SourcePos {
-                                                line: 16,
-                                                col: 3,
-                                            },
                                         },
                                     ),
                                 ),
@@ -501,51 +293,19 @@ Good(
                                     AnnProc {
                                         proc: Nil,
                                         span: SourceSpan {
-                                            start: SourcePos {
-                                                line: 16,
-                                                col: 15,
-                                            },
-                                            end: SourcePos {
-                                                line: 16,
-                                                col: 18,
-                                            },
                                         },
                                     },
                                 ],
                             },
                             span: SourceSpan {
-                                start: SourcePos {
-                                    line: 16,
-                                    col: 3,
-                                },
-                                end: SourcePos {
-                                    line: 16,
-                                    col: 19,
-                                },
                             },
                         },
                     },
                     span: SourceSpan {
-                        start: SourcePos {
-                            line: 2,
-                            col: 3,
-                        },
-                        end: SourcePos {
-                            line: 16,
-                            col: 19,
-                        },
                     },
                 },
             },
             span: SourceSpan {
-                start: SourcePos {
-                    line: 1,
-                    col: 1,
-                },
-                end: SourcePos {
-                    line: 17,
-                    col: 2,
-                },
             },
         },
     ],
