@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>org.rholang.lang</id>
     <name>Rholang</name>
-    <vendor>Rholang Community</vendor>
+    <vendor url="https://github.com/rchain/rholang">Rholang Community</vendor>
     <description><![CDATA[
         Support for the Rholang programming language.
         <br>
@@ -12,7 +12,7 @@
         </ul>
     ]]></description>
 
-    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lang</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <fileType name="Rholang" implementationClass="org.rholang.lang.RholangFileType" 
