@@ -274,8 +274,9 @@ pub(super) fn node_to_ast<'ast>(
                             cont_stack.push(K::EvalList(collection_node.walk()));
                         }
                         kind!("map") => {
-                            let mut temp_cont_stack =
-                                Vec::with_capacity(named_child_count_no_comments(&collection_node) * 2);
+                            let mut temp_cont_stack = Vec::with_capacity(
+                                named_child_count_no_comments(&collection_node) * 2,
+                            );
                             let arity = eval_named_pairs(
                                 &collection_node,
                                 kind!("key_value_pair"),
@@ -658,11 +659,7 @@ pub(super) fn node_to_ast<'ast>(
                     // Skip comments - they're parsed for syntax highlighting but not part of AST
                 }
 
-                #[cfg(not(feature = "named-comments"))]
                 _ => unimplemented!(),
-
-                #[cfg(feature = "named-comments")]
-                _ => unreachable!("all node kinds should be handled when named-comments is enabled"),
             }
         }
 
@@ -731,7 +728,10 @@ fn apply_cont<'tree, 'ast>(
             #[cfg(feature = "named-comments")]
             {
                 let kind_id = node.kind_id();
-                if node.is_named() && kind_id != kind!("line_comment") && kind_id != kind!("block_comment") {
+                if node.is_named()
+                    && kind_id != kind!("line_comment")
+                    && kind_id != kind!("block_comment")
+                {
                     break;
                 }
             }
@@ -1426,9 +1426,9 @@ impl Debug for ProcStack<'_> {
     }
 }
 
+#[cfg(feature = "named-comments")]
 #[inline]
 fn get_first_child<'a>(of: &tree_sitter::Node<'a>) -> tree_sitter::Node<'a> {
-    // Skip comment nodes when getting first child
     let mut cursor = of.walk();
     let mut children = named_children_no_comments(of, &mut cursor);
     children.next().unwrap_or_else(|| {
@@ -1440,11 +1440,23 @@ fn get_first_child<'a>(of: &tree_sitter::Node<'a>) -> tree_sitter::Node<'a> {
     })
 }
 
+#[cfg(not(feature = "named-comments"))]
+#[inline(always)]
+fn get_first_child<'a>(of: &tree_sitter::Node<'a>) -> tree_sitter::Node<'a> {
+    of.named_child(0).unwrap_or_else(|| {
+        panic!(
+            "{:?} is expected to have a child node < {:?} >",
+            of.kind(),
+            of.to_sexp()
+        )
+    })
+}
+
+#[cfg(feature = "named-comments")]
 #[inline]
 fn get_left_and_right<'a>(
     of: &tree_sitter::Node<'a>,
 ) -> (tree_sitter::Node<'a>, tree_sitter::Node<'a>) {
-    // Skip comment nodes when getting left and right children
     let mut cursor = of.walk();
     let mut children = named_children_no_comments(of, &mut cursor);
     let left = children.next();
@@ -1456,7 +1468,25 @@ fn get_left_and_right<'a>(
             "{:?} is expected to have two child nodes - left and right < {:?} >",
             of.kind(),
             of.to_sexp()
-        )
+        ),
+    }
+}
+
+#[cfg(not(feature = "named-comments"))]
+#[inline(always)]
+fn get_left_and_right<'a>(
+    of: &tree_sitter::Node<'a>,
+) -> (tree_sitter::Node<'a>, tree_sitter::Node<'a>) {
+    let left = of.named_child(0);
+    let right = of.named_child(1);
+
+    match (left, right) {
+        (Some(l), Some(r)) => (l, r),
+        _ => panic!(
+            "{:?} is expected to have two child nodes - left and right < {:?} >",
+            of.kind(),
+            of.to_sexp()
+        ),
     }
 }
 
@@ -1500,7 +1530,8 @@ pub(super) fn named_children_no_comments<'a>(
     cursor: &mut tree_sitter::TreeCursor<'a>,
 ) -> impl Iterator<Item = tree_sitter::Node<'a>> {
     node.named_children(cursor).filter(|child| {
-        child.kind_id() != kind!("line_comment") && child.kind_id() != kind!("block_comment")
+        let kind_id = child.kind_id();
+        kind_id != kind!("line_comment") && kind_id != kind!("block_comment")
     })
 }
 
