@@ -76,7 +76,7 @@ fn check_deep<'a>(
     let mut stack: SmallVec<[_; 4]> = smallvec![this_iter];
 
     while let Some(top) = stack.last_mut() {
-        while let Some(ev) = top.next() {
+        for ev in top {
             match ev {
                 DfsEventExt::Enter(node) => {
                     if let ast::Proc::BinaryExp {
