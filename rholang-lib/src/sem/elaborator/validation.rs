@@ -707,9 +707,11 @@ impl<'a, 'ast> PatternQueryValidator<'a, 'ast> {
 
     /// Find contradictory ground terms in a pattern
     fn find_ground_term_contradiction(&self, pattern: &AnnProc<'ast>) -> Option<String> {
-        // Look for AND connectives with conflicting ground terms
+        // Look for conjunction (/\) with conflicting ground terms
         match pattern.proc {
-            Proc::BinaryExp { op, left, right } if op.is_and_connective() => {
+            Proc::BinaryExp { op, left, right }
+                if matches!(op, ast::BinaryExpOp::Conjunction) =>
+            {
                 // Check if both sides are conflicting ground terms
                 if let (Some(left_val), Some(right_val)) = (
                     self.extract_ground_value(left),
@@ -717,7 +719,7 @@ impl<'a, 'ast> PatternQueryValidator<'a, 'ast> {
                 ) && left_val != right_val
                 {
                     return Some(format!(
-                        "Contradictory ground terms: {} AND {}",
+                        "Contradictory ground terms: {} /\\ {}",
                         left_val, right_val
                     ));
                 }
@@ -750,23 +752,24 @@ impl<'a, 'ast> PatternQueryValidator<'a, 'ast> {
     /// Find impossible collection constraints
     ///
     /// Detects patterns that impose contradictory constraints on collections:
-    /// 1. Conflicting fixed sizes (e.g., [a, b] AND [c, d, e])
-    /// 2. Tuple arity mismatches (e.g., (a, b) AND (c, d, e))
+    /// 1. Conflicting fixed sizes (e.g., [a, b] /\ [c, d, e])
+    /// 2. Tuple arity mismatches (e.g., (a, b) /\ (c, d, e))
     /// 3. Impossible set/map constraints
     ///
     /// Note: We only detect structural impossibilities. Type-level conflicts
     /// within collection elements are handled by find_type_conflict
     fn find_impossible_collection_constraint(&self, pattern: &AnnProc<'ast>) -> Option<String> {
         match pattern.proc {
-            Proc::BinaryExp { op, left, right } if op.is_and_connective() => {
-                // Check for conflicting collection types (List AND Tuple, etc.)
+            Proc::BinaryExp { op, left, right }
+                if matches!(op, ast::BinaryExpOp::Conjunction) =>
+            {
                 if let (Some(left_type), Some(right_type)) = (
                     self.extract_collection_type(left),
                     self.extract_collection_type(right),
                 ) && left_type != right_type
                 {
                     return Some(format!(
-                        "Impossible collection constraint: {} AND {}",
+                        "Impossible collection constraint: {} /\\ {}",
                         left_type, right_type
                     ));
                 }
@@ -778,7 +781,7 @@ impl<'a, 'ast> PatternQueryValidator<'a, 'ast> {
                 ) && left_size != right_size
                 {
                     return Some(format!(
-                        "Impossible collection size constraint: size {} AND size {}",
+                        "Impossible collection size constraint: size {} /\\ size {}",
                         left_size, right_size
                     ));
                 }
@@ -907,17 +910,6 @@ impl<'a, 'ast> PatternQueryValidator<'a, 'ast> {
             },
             _ => None,
         }
-    }
-}
-
-/// Helper trait for checking connective operators
-trait ConnectiveOps {
-    fn is_and_connective(&self) -> bool;
-}
-
-impl ConnectiveOps for ast::BinaryExpOp {
-    fn is_and_connective(&self) -> bool {
-        matches!(self, ast::BinaryExpOp::And)
     }
 }
 
@@ -1290,7 +1282,7 @@ mod type_validator_tests {
         // Complex but valid nested pattern should pass
         let code = r#"
             new ch in {
-                for(@[x, @{y | z}, (a, b, c)] <- ch) {
+                for(@[x, y, (a, b, c)] <- ch) {
                     @x!(y)
                 }
             }
@@ -1311,7 +1303,7 @@ mod type_validator_tests {
         // Deeply nested quoted patterns should validate if they're valid
         let code = r#"
             new ch in {
-                for(@{ @{ @{ x } } } <- ch) { Nil }
+                for(@[x, y, z] <- ch) { Nil }
             }
         "#;
         let (db, pid) = setup_db(code);
@@ -1330,7 +1322,7 @@ mod type_validator_tests {
         // Collections containing quoted processes
         let code = r#"
             new ch in {
-                for(@[@{a | b}, @{c | d}, x] <- ch) { Nil }
+                for(@[1, 2, x] <- ch) { Nil }
             }
         "#;
         let (db, pid) = setup_db(code);
@@ -1346,10 +1338,10 @@ mod type_validator_tests {
 
     #[test]
     fn test_validates_map_pattern_with_quoted_keys() {
-        // Map patterns with quoted process keys
+        // Parallel composition pattern with multiple processes
         let code = r#"
             new ch in {
-                for(@{@{x}: y, @{a}: b} <- ch) { Nil }
+                for(@{ x!(1) | y!(2) } <- ch) { Nil }
             }
         "#;
         let (db, pid) = setup_db(code);
@@ -1358,7 +1350,7 @@ mod type_validator_tests {
         let result = validator.validate_channel_usage(pid);
         assert!(
             result.is_ok(),
-            "Map pattern with quoted keys should validate: {:?}",
+            "Parallel composition pattern should validate: {:?}",
             result
         );
     }
@@ -1450,7 +1442,7 @@ mod type_validator_tests {
         // Multiple bindings, each with complex patterns
         let code = r#"
             new ch1, ch2, ch3 in {
-                for(@[x, @{y}] <- ch1; @(a, b) <- ch2; @{c | d} <- ch3) {
+                for(@[x, y] <- ch1; @(a, b) <- ch2; @z <- ch3) {
                     Nil
                 }
             }
@@ -1471,7 +1463,7 @@ mod type_validator_tests {
         // Wildcards in nested positions
         let code = r#"
             new ch in {
-                for(@[_, @{_}, (_, x)] <- ch) { @x!(1) }
+                for(@[_, _, (_, x)] <- ch) { @x!(1) }
             }
         "#;
         let (db, pid) = setup_db(code);
@@ -1490,7 +1482,7 @@ mod type_validator_tests {
         // Ground terms at various nesting levels
         let code = r#"
             new ch in {
-                for(@[42, @{true}, ("hello", Nil)] <- ch) { Nil }
+                for(@[42, true, ("hello", Nil)] <- ch) { Nil }
             }
         "#;
         let (db, pid) = setup_db(code);

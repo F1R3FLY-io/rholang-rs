@@ -3,7 +3,7 @@
 //! - Linear consumption (`<-`) consumes channels exactly once
 //! - Peek semantics (`<<-`) perform non-consuming reads
 //! - Repeated binds (`<=`) maintain persistence/contract-like behavior
-//! - Reentrancy vulnerabilities are detected and reported
+//! - Channels are properly bound and accessible
 
 use crate::sem::{PID, SemanticDb, Symbol};
 use rholang_parser::ast::{Bind, Name, Receipts, Source};
@@ -114,14 +114,15 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
     /// 2. Validating linear consumption (channels consumed exactly once)
     /// 3. Validating peek semantics (non-consuming reads)
     /// 4. Validating repeated binds (persistent/contract-like behavior)
-    /// 5. Detecting potential reentrancy vulnerabilities
-    /// 6. Verifying channel existence and binding
+    /// 5. Verifying channel existence and binding
+    ///
+    /// Note: Reentrancy analysis is not performed as it requires inter-procedural
+    /// data flow analysis to track which channels receive messages in the body.
+    /// Such analysis is beyond the scope of static pattern validation.
     pub fn validate(&self, _for_comp_pid: PID, receipts: &'ast Receipts<'ast>) -> ValidationResult {
         let tracker = self.track_consumption_patterns(receipts)?;
 
         tracker.validate_linear_consumption()?;
-
-        self.detect_reentrancy_patterns(receipts)?;
 
         self.verify_all_channels(receipts)?;
 
@@ -190,39 +191,6 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
             },
             Name::Quote(proc) => proc.span.start,
         }
-    }
-
-    /// Detect potential reentrancy vulnerabilities
-    /// Note: We only detect structural patterns here
-    /// Full reentrancy analysis requires runtime state tracking
-    fn detect_reentrancy_patterns(&self, receipts: &Receipts<'ast>) -> ValidationResult {
-        for receipt in receipts.iter() {
-            for bind in receipt.iter() {
-                let source = match bind {
-                    Bind::Linear { rhs, .. } => rhs,
-                    Bind::Repeated { .. } | Bind::Peek { .. } => {
-                        // Repeated and Peek only have Name, not Source
-                        // So they cannot have reentrancy patterns
-                        continue;
-                    }
-                };
-
-                // Check if source pattern could enable reentrancy
-                if self.is_reentrancy_pattern(source) {
-                    // TODO: emit warning diagnostic
-                    // For now, we just validate the structure exists
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    fn is_reentrancy_pattern(&self, source: &Source<'ast>) -> bool {
-        matches!(
-            source,
-            Source::SendReceive { .. } | Source::ReceiveSend { .. }
-        )
     }
 
     /// Verify all channels in receipts exist and are properly bound
@@ -654,24 +622,6 @@ mod tests {
 
         assert_eq!(peeked.len(), 1, "Should have one peeked channel");
         assert_eq!(consumed.len(), 1, "Should have one consumed channel");
-    }
-
-    #[test]
-    fn test_reentrancy_detection_logic() {
-        // Test the reentrancy pattern detection logic directly
-        let code = r#"new ch in { for(@x <- ch) { Nil } }"#;
-        let (db, pid) = setup_db(code);
-        let receipts = get_receipts(&db, pid);
-
-        let validator = ConsumptionValidator::new(&db);
-
-        // Reentrancy detection should not fail validation for now, we expect only warning
-        let result = validator.detect_reentrancy_patterns(receipts);
-        assert!(
-            result.is_ok(),
-            "Reentrancy detection should not fail validation: {:?}",
-            result
-        );
     }
 
     #[test]

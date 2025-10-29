@@ -1,7 +1,7 @@
 //! This module validates join semantics in for-comprehensions
 //! It ensures that:
 //! - Join operations maintain atomicity (all-or-nothing semantics)
-//! - Deadlocks are detected via circular dependency analysis
+//! - Parallel bindings have valid structure
 //! - Channel availability is validated before blocking operations
 
 use crate::sem::{PID, SemanticDb, Symbol};
@@ -126,34 +126,15 @@ impl<'a, 'ast> JoinValidator<'a, 'ast> {
     }
 
     /// Validates that all channels in the parallel group can be consumed atomically
+    /// The actual channel binding validation is performed by `validate_channel_availability`,
+    /// so this method only validates the structural integrity of the atomic group.
     fn check_atomic_group(&self, receipt: &[Bind<'ast>]) -> ValidationResult {
-        let channels: Vec<Symbol> = receipt
-            .iter()
-            .map(|bind| self.get_channel_symbol(bind.source_name()))
-            .filter(|sym| *sym != Symbol::DUMMY)
-            .collect();
-
-        let mut seen = HashSet::new();
-        for &channel in &channels {
-            if !seen.insert(channel) {
-                // Same channel used multiple times in parallel join
-                // This is actually valid in Rholang (waiting for multiple messages)
-            }
-        }
-
-        // Validate that all channels are bound variables (not free)
-        for &channel in &channels {
-            if channel != Symbol::DUMMY {
-                // Check if channel is properly bound
-                let channel_str = self
-                    .db
-                    .resolve_symbol(channel)
-                    .unwrap_or("<unknown channel>");
-                if channel_str == "<unknown channel>" {
-                    // Channel symbol not in interner - this shouldn't happen
-                    continue;
-                }
-            }
+        if receipt.is_empty() {
+            return Err(ValidationError::InvalidPatternStructure {
+                pid: PID(0),
+                position: None,
+                reason: "Parallel join group cannot be empty".to_string(),
+            });
         }
 
         Ok(())
