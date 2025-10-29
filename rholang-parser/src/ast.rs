@@ -116,7 +116,7 @@ impl<'a> Proc<'a> {
         AnnProc { proc: self, span }
     }
 
-    pub fn is_ground(&self) -> bool {
+    pub fn is_trivially_ground(&self) -> bool {
         match self {
             Proc::Nil
             | Proc::Unit
@@ -172,8 +172,8 @@ impl<'a> AnnProc<'a> {
         NameAwareDfsEventIter::<32>::new(self)
     }
 
-    pub fn is_ground(&self) -> bool {
-        self.proc.is_ground()
+    pub fn is_trivially_ground(&self) -> bool {
+        self.proc.is_trivially_ground()
     }
 
     pub fn is_ident(&self, expected: &str) -> bool {
@@ -311,10 +311,10 @@ impl<'a> Name<'a> {
         }
     }
 
-    pub fn is_ground(&self) -> bool {
+    pub fn is_trivially_ground(&self) -> bool {
         match self {
             Name::NameVar(Var::Wildcard) => true,
-            Name::Quote(quoted) => quoted.is_ground(),
+            Name::Quote(quoted) => quoted.is_trivially_ground(),
             _ => false,
         }
     }
