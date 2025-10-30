@@ -56,7 +56,7 @@ fn check_deep<'a>(
     result: &mut Vec<Diagnostic>,
 ) {
     fn is_atom<'x>(name: &'x ast::Name<'x>) -> bool {
-        name.is_ground()
+        name.is_trivially_ground()
             || name.as_var().is_some()
             || name.as_quote().is_some_and(|q| q.as_var().is_some())
     }
@@ -76,7 +76,7 @@ fn check_deep<'a>(
     let mut stack: SmallVec<[_; 4]> = smallvec![this_iter];
 
     while let Some(top) = stack.last_mut() {
-        while let Some(ev) = top.next() {
+        for ev in top {
             match ev {
                 DfsEventExt::Enter(node) => {
                     if let ast::Proc::BinaryExp {
