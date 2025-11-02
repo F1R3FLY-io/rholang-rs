@@ -709,9 +709,7 @@ impl<'a, 'ast> PatternQueryValidator<'a, 'ast> {
     fn find_ground_term_contradiction(&self, pattern: &AnnProc<'ast>) -> Option<String> {
         // Look for conjunction (/\) with conflicting ground terms
         match pattern.proc {
-            Proc::BinaryExp { op, left, right }
-                if matches!(op, ast::BinaryExpOp::Conjunction) =>
-            {
+            Proc::BinaryExp { op, left, right } if matches!(op, ast::BinaryExpOp::Conjunction) => {
                 // Check if both sides are conflicting ground terms
                 if let (Some(left_val), Some(right_val)) = (
                     self.extract_ground_value(left),
@@ -760,9 +758,7 @@ impl<'a, 'ast> PatternQueryValidator<'a, 'ast> {
     /// within collection elements are handled by find_type_conflict
     fn find_impossible_collection_constraint(&self, pattern: &AnnProc<'ast>) -> Option<String> {
         match pattern.proc {
-            Proc::BinaryExp { op, left, right }
-                if matches!(op, ast::BinaryExpOp::Conjunction) =>
-            {
+            Proc::BinaryExp { op, left, right } if matches!(op, ast::BinaryExpOp::Conjunction) => {
                 if let (Some(left_type), Some(right_type)) = (
                     self.extract_collection_type(left),
                     self.extract_collection_type(right),

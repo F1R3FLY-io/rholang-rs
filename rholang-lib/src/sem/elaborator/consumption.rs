@@ -6,9 +6,10 @@
 //! - Channels are properly bound and accessible
 
 use crate::sem::{PID, SemanticDb, Symbol};
-use rholang_parser::ast::{Bind, Name, Receipts, Source};
-use std::collections::HashMap;
+use rholang_parser::ast::{Bind, Name, Receipts};
+use smallvec::SmallVec;
 
+use super::channel_validation::{extract_name_from_source, get_name_position};
 use super::errors::{ValidationError, ValidationResult};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -22,15 +23,13 @@ enum ConsumptionMode {
 #[derive(Debug)]
 struct ConsumptionTracker {
     /// Maps channel symbols to their consumption modes and positions
-    /// Key: channel symbol
-    /// Value: list of (mode, source_position) for each usage
-    channel_usages: HashMap<Symbol, Vec<(ConsumptionMode, rholang_parser::SourcePos)>>,
+    channel_usages: SmallVec<[(Symbol, Vec<(ConsumptionMode, rholang_parser::SourcePos)>); 8]>,
 }
 
 impl ConsumptionTracker {
     fn new() -> Self {
         Self {
-            channel_usages: HashMap::new(),
+            channel_usages: SmallVec::new(),
         }
     }
 
@@ -40,15 +39,22 @@ impl ConsumptionTracker {
         mode: ConsumptionMode,
         pos: rholang_parser::SourcePos,
     ) {
-        self.channel_usages
-            .entry(channel)
-            .or_default()
-            .push((mode, pos));
+        // Linear search - find existing entry or create new one
+        match self
+            .channel_usages
+            .iter_mut()
+            .find(|(ch, _)| *ch == channel)
+        {
+            Some((_, usages)) => usages.push((mode, pos)),
+            None => {
+                self.channel_usages.push((channel, vec![(mode, pos)]));
+            }
+        }
     }
 
     /// Validate that linear channels are only consumed once
     fn validate_linear_consumption(&self) -> ValidationResult {
-        for usages in self.channel_usages.values() {
+        for (_, usages) in &self.channel_usages {
             // Count linear consumptions (excluding peeks which don't consume)
             let linear_consumptions: Vec<_> = usages
                 .iter()
@@ -133,7 +139,7 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
     /// throughout the for-comprehension
     fn track_consumption_patterns(
         &self,
-        receipts: &Receipts<'ast>,
+        receipts: &'ast Receipts<'ast>,
     ) -> ValidationResult<ConsumptionTracker> {
         let mut tracker = ConsumptionTracker::new();
 
@@ -141,16 +147,16 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
             for bind in receipt.iter() {
                 let (mode, source_name, pos) = match bind {
                     Bind::Linear { rhs, .. } => {
-                        let name = self.extract_name_from_source(rhs);
-                        let pos = self.get_name_position(name);
+                        let name = extract_name_from_source(rhs);
+                        let pos = get_name_position(name);
                         (ConsumptionMode::Linear, name, pos)
                     }
                     Bind::Repeated { rhs, .. } => {
-                        let pos = self.get_name_position(rhs);
+                        let pos = get_name_position(rhs);
                         (ConsumptionMode::Repeated, rhs, pos)
                     }
                     Bind::Peek { rhs, .. } => {
-                        let pos = self.get_name_position(rhs);
+                        let pos = get_name_position(rhs);
                         (ConsumptionMode::Peek, rhs, pos)
                     }
                 };
@@ -165,14 +171,6 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
         Ok(tracker)
     }
 
-    fn extract_name_from_source<'b>(&self, source: &'b Source<'ast>) -> &'b Name<'ast> {
-        match source {
-            Source::Simple { name } => name,
-            Source::ReceiveSend { name } => name,
-            Source::SendReceive { name, .. } => name,
-        }
-    }
-
     fn get_channel_symbol(&self, name: &Name<'ast>) -> Option<Symbol> {
         match name {
             Name::NameVar(var) => match var {
@@ -183,22 +181,12 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
         }
     }
 
-    fn get_name_position(&self, name: &Name<'ast>) -> rholang_parser::SourcePos {
-        match name {
-            Name::NameVar(var) => match var {
-                rholang_parser::ast::Var::Id(id) => id.pos,
-                rholang_parser::ast::Var::Wildcard => rholang_parser::SourcePos::default(),
-            },
-            Name::Quote(proc) => proc.span.start,
-        }
-    }
-
     /// Verify all channels in receipts exist and are properly bound
     fn verify_all_channels(&self, receipts: &'ast Receipts<'ast>) -> ValidationResult {
         for receipt in receipts.iter() {
             for bind in receipt.iter() {
                 let name = match bind {
-                    Bind::Linear { rhs, .. } => self.extract_name_from_source(rhs),
+                    Bind::Linear { rhs, .. } => extract_name_from_source(rhs),
                     Bind::Repeated { rhs, .. } => rhs,
                     Bind::Peek { rhs, .. } => rhs,
                 };
@@ -215,12 +203,12 @@ mod tests {
     use super::*;
     use crate::sem::{FactPass, SemanticDb, resolver::ResolverPass};
     use rholang_parser::{RholangParser, ast::Proc};
-    use std::collections::HashSet;
+    use std::collections::BTreeSet;
 
     // Test-specific helper methods for ConsumptionTracker
     impl ConsumptionTracker {
         /// Get channels that are peeked (non-consuming reads)
-        fn get_peeked_channels(&self) -> HashSet<Symbol> {
+        fn get_peeked_channels(&self) -> BTreeSet<Symbol> {
             self.channel_usages
                 .iter()
                 .filter(|(_, usages)| {
@@ -232,7 +220,7 @@ mod tests {
                 .collect()
         }
 
-        fn get_consumed_channels(&self) -> HashSet<Symbol> {
+        fn get_consumed_channels(&self) -> BTreeSet<Symbol> {
             self.channel_usages
                 .iter()
                 .filter(|(_, usages)| {
@@ -360,22 +348,6 @@ mod tests {
         assert!(
             result.is_ok(),
             "Sequential receipts should validate: {:?}",
-            result
-        );
-    }
-
-    #[test]
-    fn test_parallel_bindings() {
-        let code = r#"new ch1, ch2, ch3 in { for(@a <- ch1 & @b <- ch2 & @c <= ch3) { Nil } }"#;
-        let (db, pid) = setup_db(code);
-        let receipts = get_receipts(&db, pid);
-
-        let validator = ConsumptionValidator::new(&db);
-        let result = validator.validate(pid, receipts);
-
-        assert!(
-            result.is_ok(),
-            "Parallel bindings should validate: {:?}",
             result
         );
     }

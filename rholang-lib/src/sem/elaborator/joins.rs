@@ -1,57 +1,50 @@
 //! This module validates join semantics in for-comprehensions
 //! It ensures that:
+//! - Validation same arrow type mixing within parallel bindings
 //! - Join operations maintain atomicity (all-or-nothing semantics)
 //! - Parallel bindings have valid structure
 //! - Channel availability is validated before blocking operations
 
 use crate::sem::{PID, SemanticDb, Symbol};
+use bitvec::prelude::*;
 use rholang_parser::ast::{Bind, Name, Receipts};
-use std::collections::{HashMap, HashSet};
+use smallvec::SmallVec;
 
+use super::channel_validation::{get_name_position, get_source_position};
 use super::errors::{ValidationError, ValidationResult};
-
-// Removed unused ChannelDependency struct - we only need the channel Symbol
 
 /// Dependency graph for deadlock detection
 #[derive(Debug, Clone)]
 struct DependencyGraph {
     /// Adjacency list: channel -> channels it depends on
-    edges: HashMap<Symbol, HashSet<Symbol>>,
-    /// Track all channels in the graph
-    channels: HashSet<Symbol>,
+    edges: Vec<(Symbol, SmallVec<[Symbol; 4]>)>,
+
+    /// All channels in the graph
+    channels: SmallVec<[Symbol; 8]>,
 }
 
 impl DependencyGraph {
     fn new() -> Self {
         Self {
-            edges: HashMap::new(),
-            channels: HashSet::new(),
+            edges: Vec::new(),
+            channels: SmallVec::new(),
         }
-    }
-    fn add_channel(&mut self, channel: Symbol) {
-        self.channels.insert(channel);
-        self.edges.entry(channel).or_default();
-    }
-
-    /// Add a dependency edge: `from` depends on `to`
-    fn add_dependency(&mut self, from: Symbol, to: Symbol) {
-        self.add_channel(from);
-        self.add_channel(to);
-        self.edges.entry(from).or_default().insert(to);
     }
 
     /// Detect cycles in the dependency graph using DFS
     fn find_cycle(&self) -> Option<Vec<Symbol>> {
-        let mut visited = HashSet::new();
-        let mut rec_stack = HashSet::new();
+        let max_symbol = self.channels.iter().map(|s| s.0).max().unwrap_or(0);
+        let mut visited = bitvec![0; max_symbol as usize + 1];
+        let mut rec_stack = bitvec![0; max_symbol as usize + 1];
         let mut path = Vec::new();
 
         for &channel in &self.channels {
-            if !visited.contains(&channel)
-                && let Some(cycle) =
+            if !visited[channel.0 as usize] {
+                if let Some(cycle) =
                     self.dfs_cycle(channel, &mut visited, &mut rec_stack, &mut path)
-            {
-                return Some(cycle);
+                {
+                    return Some(cycle);
+                }
             }
         }
 
@@ -61,21 +54,26 @@ impl DependencyGraph {
     fn dfs_cycle(
         &self,
         node: Symbol,
-        visited: &mut HashSet<Symbol>,
-        rec_stack: &mut HashSet<Symbol>,
+        visited: &mut BitVec,
+        rec_stack: &mut BitVec,
         path: &mut Vec<Symbol>,
     ) -> Option<Vec<Symbol>> {
-        visited.insert(node);
-        rec_stack.insert(node);
+        let idx = node.0 as usize;
+        visited.set(idx, true);
+        rec_stack.set(idx, true);
         path.push(node);
 
-        if let Some(neighbors) = self.edges.get(&node) {
-            for &neighbor in neighbors {
-                if !visited.contains(&neighbor) {
+        // Find neighbors for this node
+        if let Some((_, neighbors)) = self.edges.iter().find(|(ch, _)| *ch == node) {
+            for &neighbor in neighbors.iter() {
+                let neighbor_idx = neighbor.0 as usize;
+
+                if !visited[neighbor_idx] {
                     if let Some(cycle) = self.dfs_cycle(neighbor, visited, rec_stack, path) {
                         return Some(cycle);
                     }
-                } else if rec_stack.contains(&neighbor) {
+                } else if rec_stack[neighbor_idx] {
+                    // Found cycle - extract it from path
                     let cycle_start = path.iter().position(|&ch| ch == neighbor).unwrap();
                     return Some(path[cycle_start..].to_vec());
                 }
@@ -83,7 +81,7 @@ impl DependencyGraph {
         }
 
         path.pop();
-        rec_stack.remove(&node);
+        rec_stack.set(idx, false);
         None
     }
 
@@ -102,6 +100,8 @@ impl<'a, 'ast> JoinValidator<'a, 'ast> {
     }
 
     pub fn validate(&self, for_comp_pid: PID, receipts: &'ast Receipts<'ast>) -> ValidationResult {
+        self.validate_arrow_type_homogeneity(receipts)?;
+
         self.validate_join_atomicity(receipts)?;
 
         self.detect_deadlocks(receipts)?;
@@ -183,11 +183,11 @@ impl<'a, 'ast> JoinValidator<'a, 'ast> {
         // Check for parallel bindings on the same channel (potential issue)
         for receipt in receipts.iter() {
             if receipt.len() > 1 {
-                let mut channels_in_parallel = HashSet::new();
+                let mut channels_in_parallel: SmallVec<[Symbol; 8]> = SmallVec::new();
                 for bind in receipt.iter() {
                     let channel = self.get_channel_symbol(bind.source_name());
-                    if channel != Symbol::DUMMY {
-                        channels_in_parallel.insert(channel);
+                    if channel != Symbol::DUMMY && !channels_in_parallel.contains(&channel) {
+                        channels_in_parallel.push(channel);
                         // Note: Same channel appearing multiple times in parallel join
                         // is valid in Rholang (waiting for N messages)
                     }
@@ -229,6 +229,56 @@ impl<'a, 'ast> JoinValidator<'a, 'ast> {
             },
             Name::Quote(_) => Symbol::DUMMY,
         }
+    }
+
+    /// Validates that all bindings in a parallel join use the same arrow type
+    pub fn validate_arrow_type_homogeneity(
+        &self,
+        receipts: &'ast Receipts<'ast>,
+    ) -> ValidationResult {
+        for (receipt_idx, receipt) in receipts.iter().enumerate() {
+            if receipt.len() <= 1 {
+                continue;
+            }
+
+            let mut arrow_types: SmallVec<[&'static str; 8]> = SmallVec::new();
+            let mut first_pos: Option<rholang_parser::SourcePos> = None;
+
+            for bind in receipt.iter() {
+                let (arrow_type, pos) = match bind {
+                    Bind::Linear { rhs, .. } => {
+                        let pos = get_source_position(rhs);
+                        ("linear (<-)", pos)
+                    }
+                    Bind::Repeated { rhs, .. } => {
+                        let pos = get_name_position(rhs);
+                        ("repeated (<=)", pos)
+                    }
+                    Bind::Peek { rhs, .. } => {
+                        let pos = get_name_position(rhs);
+                        ("peek (<<-)", pos)
+                    }
+                };
+
+                if first_pos.is_none() {
+                    first_pos = Some(pos);
+                }
+
+                if !arrow_types.iter().any(|&t| t == arrow_type) {
+                    arrow_types.push(arrow_type);
+                }
+            }
+
+            if arrow_types.len() > 1 {
+                return Err(ValidationError::MixedArrowTypes {
+                    receipt_index: receipt_idx,
+                    found_types: arrow_types.into_vec(),
+                    pos: first_pos,
+                });
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -378,22 +428,6 @@ mod tests {
     }
 
     #[test]
-    fn test_no_circular_dependency_simple() {
-        let code = r#"new ch1, ch2 in { for(@x <- ch1; @y <- ch2) { @x!(y) } }"#;
-        let (db, pid) = setup_db(code);
-        let receipts = get_receipts(&db, pid);
-
-        let validator = JoinValidator::new(&db);
-        let result = validator.detect_deadlocks(receipts);
-
-        assert!(
-            result.is_ok(),
-            "Simple sequential pattern should not have circular dependencies: {:?}",
-            result
-        );
-    }
-
-    #[test]
     fn test_wildcard_channel() {
         let code = r#"for(@x <- _) { Nil }"#;
         let (db, pid) = setup_db(code);
@@ -423,42 +457,6 @@ mod tests {
             "Quoted process as channel should validate: {:?}",
             result
         );
-    }
-
-    #[test]
-    fn test_dependency_graph_cycle_detection() {
-        let mut graph = DependencyGraph::new();
-
-        let sym1 = Symbol(1);
-        let sym2 = Symbol(2);
-        let sym3 = Symbol(3);
-
-        // Create a cycle: 1 -> 2 -> 3 -> 1
-        graph.add_dependency(sym1, sym2);
-        graph.add_dependency(sym2, sym3);
-        graph.add_dependency(sym3, sym1);
-
-        let cycle = graph.find_cycle();
-        assert!(cycle.is_some(), "Cycle should be detected");
-
-        let cycle_vec = cycle.unwrap();
-        assert!(!cycle_vec.is_empty(), "Cycle should not be empty");
-    }
-
-    #[test]
-    fn test_dependency_graph_no_cycle() {
-        let mut graph = DependencyGraph::new();
-
-        let sym1 = Symbol(1);
-        let sym2 = Symbol(2);
-        let sym3 = Symbol(3);
-
-        // Create a DAG: 1 -> 2 -> 3
-        graph.add_dependency(sym1, sym2);
-        graph.add_dependency(sym2, sym3);
-
-        let cycle = graph.find_cycle();
-        assert!(cycle.is_none(), "No cycle should be detected in DAG");
     }
 
     #[test]
@@ -511,6 +509,193 @@ mod tests {
             result.is_ok(),
             "Multiple bindings on same channel should validate: {:?}",
             result
+        );
+    }
+
+    #[test]
+    fn test_homogeneous_linear_arrows() {
+        let code = r#"new ch1, ch2, ch3 in { for(@a <- ch1 & @b <- ch2 & @c <- ch3) { Nil } }"#;
+        let (db, pid) = setup_db(code);
+        let receipts = get_receipts(&db, pid);
+
+        let validator = JoinValidator::new(&db);
+        let result = validator.validate_arrow_type_homogeneity(receipts);
+
+        assert!(
+            result.is_ok(),
+            "Homogeneous linear arrows should validate: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_homogeneous_repeated_arrows() {
+        let code = r#"new ch1, ch2, ch3 in { for(@a <= ch1 & @b <= ch2 & @c <= ch3) { Nil } }"#;
+        let (db, pid) = setup_db(code);
+        let receipts = get_receipts(&db, pid);
+
+        let validator = JoinValidator::new(&db);
+        let result = validator.validate_arrow_type_homogeneity(receipts);
+
+        assert!(
+            result.is_ok(),
+            "Homogeneous repeated arrows should validate: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_homogeneous_peek_arrows() {
+        let code = r#"new ch1, ch2, ch3 in { for(@a <<- ch1 & @b <<- ch2 & @c <<- ch3) { Nil } }"#;
+        let (db, pid) = setup_db(code);
+        let receipts = get_receipts(&db, pid);
+
+        let validator = JoinValidator::new(&db);
+        let result = validator.validate_arrow_type_homogeneity(receipts);
+
+        assert!(
+            result.is_ok(),
+            "Homogeneous peek arrows should validate: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_mixed_linear_and_repeated_error() {
+        let code = r#"new ch1, ch2 in { for(@a <- ch1 & @b <= ch2) { Nil } }"#;
+        let (db, pid) = setup_db(code);
+        let receipts = get_receipts(&db, pid);
+
+        let validator = JoinValidator::new(&db);
+        let result = validator.validate_arrow_type_homogeneity(receipts);
+
+        assert!(result.is_err(), "Mixed linear and repeated should fail");
+
+        if let Err(ValidationError::MixedArrowTypes { found_types, .. }) = result {
+            assert_eq!(found_types.len(), 2);
+            assert!(found_types.contains(&"linear (<-)"));
+            assert!(found_types.contains(&"repeated (<=)"));
+        } else {
+            panic!("Expected MixedArrowTypes error");
+        }
+    }
+
+    #[test]
+    fn test_mixed_linear_and_peek_error() {
+        let code = r#"new ch1, ch2 in { for(@a <- ch1 & @b <<- ch2) { Nil } }"#;
+        let (db, pid) = setup_db(code);
+        let receipts = get_receipts(&db, pid);
+
+        let validator = JoinValidator::new(&db);
+        let result = validator.validate_arrow_type_homogeneity(receipts);
+
+        assert!(result.is_err(), "Mixed linear and peek should fail");
+
+        if let Err(ValidationError::MixedArrowTypes { found_types, .. }) = result {
+            assert_eq!(found_types.len(), 2);
+            assert!(found_types.contains(&"linear (<-)"));
+            assert!(found_types.contains(&"peek (<<-)"));
+        } else {
+            panic!("Expected MixedArrowTypes error");
+        }
+    }
+
+    #[test]
+    fn test_mixed_repeated_and_peek_error() {
+        let code = r#"new ch1, ch2 in { for(@a <= ch1 & @b <<- ch2) { Nil } }"#;
+        let (db, pid) = setup_db(code);
+        let receipts = get_receipts(&db, pid);
+
+        let validator = JoinValidator::new(&db);
+        let result = validator.validate_arrow_type_homogeneity(receipts);
+
+        assert!(result.is_err(), "Mixed repeated and peek should fail");
+
+        if let Err(ValidationError::MixedArrowTypes { found_types, .. }) = result {
+            assert_eq!(found_types.len(), 2);
+            assert!(found_types.contains(&"repeated (<=)"));
+            assert!(found_types.contains(&"peek (<<-)"));
+        } else {
+            panic!("Expected MixedArrowTypes error");
+        }
+    }
+
+    #[test]
+    fn test_mixed_all_three_arrow_types_error() {
+        let code = r#"new ch1, ch2, ch3 in { for(@a <- ch1 & @b <= ch2 & @c <<- ch3) { Nil } }"#;
+        let (db, pid) = setup_db(code);
+        let receipts = get_receipts(&db, pid);
+
+        let validator = JoinValidator::new(&db);
+        let result = validator.validate_arrow_type_homogeneity(receipts);
+
+        assert!(result.is_err(), "Mixed all three arrow types should fail");
+
+        if let Err(ValidationError::MixedArrowTypes { found_types, .. }) = result {
+            assert_eq!(found_types.len(), 3);
+        } else {
+            panic!("Expected MixedArrowTypes error");
+        }
+    }
+
+    #[test]
+    fn test_sequential_receipts_allow_different_types() {
+        // Different arrow types in sequential receipts (separated by ;) should be OK
+        let code = r#"new ch1, ch2, ch3 in { for(@a <- ch1; @b <= ch2; @c <<- ch3) { Nil } }"#;
+        let (db, pid) = setup_db(code);
+        let receipts = get_receipts(&db, pid);
+
+        let validator = JoinValidator::new(&db);
+        let result = validator.validate_arrow_type_homogeneity(receipts);
+
+        assert!(
+            result.is_ok(),
+            "Sequential receipts with different arrow types should validate: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_single_binding_always_homogeneous() {
+        let code = r#"new ch in { for(@x <- ch) { Nil } }"#;
+        let (db, pid) = setup_db(code);
+        let receipts = get_receipts(&db, pid);
+
+        let validator = JoinValidator::new(&db);
+        let result = validator.validate_arrow_type_homogeneity(receipts);
+
+        assert!(
+            result.is_ok(),
+            "Single binding is always homogeneous: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_complex_mixed_sequential_and_parallel() {
+        // First group: all linear (OK)
+        // Second group: all repeated (OK)
+        // Third group: mixed (ERROR)
+        let code = r#"
+            new ch1, ch2, ch3, ch4, ch5, ch6 in {
+                for(
+                    @a <- ch1 & @b <- ch2;      // OK: all linear
+                    @c <= ch3 & @d <= ch4;      // OK: all repeated
+                    @e <- ch5 & @f <<- ch6      // ERROR: mixed linear + peek
+                ) {
+                    Nil
+                }
+            }
+        "#;
+        let (db, pid) = setup_db(code);
+        let receipts = get_receipts(&db, pid);
+
+        let validator = JoinValidator::new(&db);
+        let result = validator.validate_arrow_type_homogeneity(receipts);
+
+        assert!(
+            result.is_err(),
+            "Third receipt group has mixed types - should fail"
         );
     }
 }

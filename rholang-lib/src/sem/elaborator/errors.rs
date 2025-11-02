@@ -64,6 +64,12 @@ pub enum ValidationError {
         receipts: String,
         pos: Option<SourcePos>,
     },
+    /// Mixed arrow types in parallel join
+    MixedArrowTypes {
+        receipt_index: usize,
+        found_types: Vec<&'static str>,
+        pos: Option<SourcePos>,
+    },
 }
 
 // Conversion traits for integrating with SemanticDb diagnostics
@@ -147,6 +153,20 @@ impl std::fmt::Display for ValidationError {
             }
             ValidationError::DeadlockPotential { receipts, .. } => {
                 write!(f, "Deadlock potential: {}", receipts)
+            }
+            ValidationError::MixedArrowTypes {
+                receipt_index,
+                found_types,
+                ..
+            } => {
+                write!(
+                    f,
+                    "Mixed arrow types in join group {}: found {}. \
+                     All bindings in a parallel join (joined with &) must use the same arrow type: \
+                     all linear (<-), all repeated (<=), or all peek (<<-).",
+                    receipt_index,
+                    found_types.join(", ")
+                )
             }
         }
     }
