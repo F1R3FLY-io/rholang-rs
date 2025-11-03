@@ -3,7 +3,7 @@ use rholang_parser::{
     DfsEventExt,
     ast::{self, BinaryExpOp},
 };
-use smallvec::{SmallVec, smallvec};
+use smallvec::SmallVec;
 
 use crate::sem::{
     Diagnostic, DiagnosticPass, ErrorKind, PID, Pass, ProcRef, SemanticDb, SymbolOccurrence,
@@ -36,7 +36,7 @@ impl DiagnosticPass for DisjunctionConsistencyCheck {
 
             // Skip ASTs that don't introduce a lexical scope.
             // Only scoped processes can contain disjunctive name-patterns worth checking.
-            if db.get_scope(pid).is_none() {
+            if !db.is_scoped(pid) {
                 continue;
             }
 
@@ -66,41 +66,22 @@ fn check_deep<'a>(
     }
     if let Some(q) = name.as_quote() {
         // if it is indexed we will visit it later on
-        if db.lookup(q).is_some() {
+        if db.contains(q) {
             return;
         }
     }
 
-    // A stack of pending iterators, so recursion becomes iteration.
-    let this_iter = name.iter_into();
-    let mut stack: SmallVec<[_; 4]> = smallvec![this_iter];
-
-    while let Some(top) = stack.last_mut() {
-        for ev in top {
-            match ev {
-                DfsEventExt::Enter(node) => {
-                    if let ast::Proc::BinaryExp {
-                        op: BinaryExpOp::Disjunction,
-                        left,
-                        right,
-                    } = node.proc
-                    {
-                        check_disjunction(db, left, right, site, result);
-                    }
-                }
-                DfsEventExt::Name(name) if !is_atom(name) => {
-                    // Descend into the quoted process
-                    stack.push(name.iter_into());
-                    break;
-                }
-                _ => {
-                    // nothing to do — we only act on entry and quotes
-                }
-            }
+    name.iter_into_deep().for_each(|ev| {
+        if let DfsEventExt::Enter(node) = ev
+            && let ast::Proc::BinaryExp {
+                op: BinaryExpOp::Disjunction,
+                left,
+                right,
+            } = node.proc
+        {
+            check_disjunction(db, left, right, site, result);
         }
-        // current iterator exhausted
-        stack.pop();
-    }
+    });
 }
 
 fn check_disjunction<'a>(
