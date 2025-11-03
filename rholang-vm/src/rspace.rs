@@ -146,3 +146,56 @@ pub use pathmap_rspace::default_rspace;
 pub fn default_rspace() -> Box<dyn RSpace> {
     Box::new(InMemoryRSpace::new())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn chan(k: u16, s: &str) -> (u16, String) { (k, format!("@{}:{}", k, s)) }
+
+    #[test]
+    fn inmem_fifo_and_peek_and_reset() {
+        let (k, ch) = chan(1, "alpha");
+        let (k2, ch2) = chan(1, "beta");
+        let mut rs = InMemoryRSpace::new();
+
+        rs.tell(k, ch.clone(), Value::Int(1)).unwrap();
+        rs.tell(k, ch.clone(), Value::Int(2)).unwrap();
+        rs.tell(k2, ch2.clone(), Value::Int(9)).unwrap();
+
+        assert_eq!(rs.peek(k, ch.clone()).unwrap(), Some(Value::Int(1)));
+        assert_eq!(rs.ask(k, ch.clone()).unwrap(), Some(Value::Int(1)));
+        assert_eq!(rs.peek(k, ch.clone()).unwrap(), Some(Value::Int(2)));
+        assert_eq!(rs.ask(k, ch.clone()).unwrap(), Some(Value::Int(2)));
+        assert_eq!(rs.ask(k, ch.clone()).unwrap(), None);
+
+        // Other channel unaffected
+        assert_eq!(rs.peek(k2, ch2.clone()).unwrap(), Some(Value::Int(9)));
+
+        rs.reset();
+        assert_eq!(rs.peek(k2, ch2.clone()).unwrap(), None);
+    }
+
+    #[test]
+    fn inmem_kind_channel_mismatch_errors() {
+        let mut rs = InMemoryRSpace::new();
+        // Wrong prefix vs kind
+        let bad = rs.tell(2, "@1:alpha".to_string(), Value::Nil);
+        assert!(bad.is_err());
+    }
+
+    #[cfg(feature = "rspace-pathmap")]
+    #[test]
+    fn pathmap_fifo_peek_reset() {
+        let (k, ch) = chan(7, "q");
+        let mut rs = crate::rspace::pathmap_rspace::PathMapRSpace::new();
+        rs.tell(k, ch.clone(), Value::Str("a".into())).unwrap();
+        rs.tell(k, ch.clone(), Value::Str("b".into())).unwrap();
+        assert_eq!(rs.peek(k, ch.clone()).unwrap(), Some(Value::Str("a".into())));
+        assert_eq!(rs.ask(k, ch.clone()).unwrap(), Some(Value::Str("a".into())));
+        assert_eq!(rs.ask(k, ch.clone()).unwrap(), Some(Value::Str("b".into())));
+        assert_eq!(rs.ask(k, ch.clone()).unwrap(), None);
+        rs.reset();
+        assert_eq!(rs.peek(k, ch.clone()).unwrap(), None);
+    }
+}

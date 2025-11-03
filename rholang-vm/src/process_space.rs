@@ -104,9 +104,70 @@ mod pathmap_impl {
             *pm = pathmap::PathMap::new();
         }
     }
-
-    pub use PathMapProcessSpace as DefaultProcessSpace;
 }
+
+#[cfg(feature = "process-space")]
+pub use pathmap_impl::PathMapProcessSpace as DefaultProcessSpace;
 
 #[cfg(not(feature = "process-space"))]
 pub type DefaultProcessSpace = InMemoryProcessSpace;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::thread;
+
+    fn mkp(src: &str) -> Arc<Process> { Arc::new(Process::new(vec![], src)) }
+
+    #[test]
+    fn inmem_put_get_remove_clear() {
+        let space = InMemoryProcessSpace::new();
+        let p1 = mkp("p1");
+        let p2 = mkp("p2");
+        space.put("/process/1", p1.clone());
+        space.put("/process/2", p2.clone());
+        assert_eq!(space.get("/process/1").unwrap().source_ref, "p1");
+        assert_eq!(space.get("/process/2").unwrap().source_ref, "p2");
+        let removed = space.remove("/process/1").unwrap();
+        assert_eq!(removed.source_ref, "p1");
+        assert!(space.get("/process/1").is_none());
+        space.clear();
+        assert!(space.get("/process/2").is_none());
+    }
+
+    #[test]
+    fn inmem_concurrent_put_and_get() {
+        let space = InMemoryProcessSpace::new();
+        let space_arc = Arc::new(space);
+        let mut handles = vec![];
+        for i in 0..8u32 {
+            let s = space_arc.clone();
+            handles.push(thread::spawn(move || {
+                let path = format!("/process/{}", i);
+                s.put(&path, mkp(&format!("src:{}", i)));
+            }));
+        }
+        for h in handles { h.join().unwrap(); }
+        for i in 0..8u32 {
+            let path = format!("/process/{}", i);
+            assert_eq!(space_arc.get(&path).unwrap().source_ref, format!("src:{}", i));
+        }
+    }
+
+    #[cfg(feature = "process-space")]
+    #[test]
+    fn pathmap_put_get_remove_clear() {
+        let space = super::pathmap_impl::PathMapProcessSpace::new();
+        let p1 = mkp("p1");
+        let p2 = mkp("p2");
+        space.put("/process/1", p1.clone());
+        space.put("/process/2", p2.clone());
+        assert_eq!(space.get("/process/1").unwrap().source_ref, "p1");
+        assert_eq!(space.get("/process/2").unwrap().source_ref, "p2");
+        let removed = space.remove("/process/1").unwrap();
+        assert_eq!(removed.source_ref, "p1");
+        assert!(space.get("/process/1").is_none());
+        space.clear();
+        assert!(space.get("/process/2").is_none());
+    }
+}
