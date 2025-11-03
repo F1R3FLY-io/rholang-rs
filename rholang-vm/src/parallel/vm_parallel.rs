@@ -5,6 +5,7 @@ use super::ready_queue::ReadyQueue;
 use super::scheduler::Scheduler;
 use super::work::WorkItem;
 use crate::process::Process;
+use crate::process_space::{DefaultProcessSpace, ProcessSpace};
 use crate::value::Value;
 
 #[derive(Clone)]
@@ -49,6 +50,7 @@ pub struct VmParallel {
     rq: ReadyQueue,
     journal: Journal,
     next_pid: u64,
+    pspace: std::sync::Arc<dyn ProcessSpace>,
 }
 
 impl VmParallel {
@@ -65,15 +67,29 @@ impl VmParallel {
             rq: rq.clone(),
             journal: Journal::new(first_seq),
             next_pid: 1,
+            pspace: std::sync::Arc::new(DefaultProcessSpace::default()),
         }
     }
 
     pub fn spawn_process(&mut self, process: Arc<Process>) -> u64 {
         let pid = self.next_pid;
         self.next_pid += 1;
+        let path = self.process_path(pid);
+        self.pspace.put(&path, process.clone());
         let item = WorkItem::new(pid, process, self.budget);
         self.rq.enqueue(item);
         pid
+    }
+
+    /// Compute the canonical path for a given process id in the process space.
+    pub fn process_path(&self, pid: u64) -> String {
+        format!("/process/{}", pid)
+    }
+
+    /// Retrieve a process by pid (if still present) from the process space.
+    pub fn get_process(&self, pid: u64) -> Option<Arc<Process>> {
+        let path = self.process_path(pid);
+        self.pspace.get(&path)
     }
 
     pub fn run_until_quiescence(&self) -> Vec<(u64, Value)> {

@@ -3,7 +3,7 @@ use anyhow::Result;
 use crate::error::ExecError;
 use crate::execute::{self, StepResult};
 use crate::process::Process;
-use crate::rspace::{InMemoryRSpace, RSpace};
+use crate::rspace::{default_rspace, RSpace};
 use crate::value::Value;
 
 pub struct VM {
@@ -27,7 +27,7 @@ impl VM {
     pub fn new() -> Self {
         VM {
             stack: Vec::new(),
-            rspace: Box::new(InMemoryRSpace::new()),
+            rspace: default_rspace(),
             cont_table: std::collections::HashMap::new(),
             next_cont_id: 1,
             next_name_id: 1,

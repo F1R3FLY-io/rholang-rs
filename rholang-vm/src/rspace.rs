@@ -44,6 +44,11 @@ fn ensure_kind_matches_channel(kind: u16, channel: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+// Build a canonical key for RSpace storage when using a path-like map
+fn rspace_key(kind: u16, channel: &str) -> String {
+    format!("/rspace/{}/{}", kind, channel)
+}
+
 impl RSpace for InMemoryRSpace {
     fn tell(&mut self, kind: u16, channel: String, data: Value) -> Result<()> {
         ensure_kind_matches_channel(kind, &channel)?;
@@ -73,4 +78,71 @@ impl RSpace for InMemoryRSpace {
     fn reset(&mut self) {
         self.store.clear();
     }
+}
+
+#[cfg(feature = "rspace-pathmap")]
+mod pathmap_rspace {
+    use super::{ensure_kind_matches_channel, rspace_key, RSpace};
+    use crate::value::Value;
+    use anyhow::Result;
+    use pathmap::PathMap;
+    use std::collections::VecDeque;
+    use std::sync::RwLock;
+
+    pub struct PathMapRSpace {
+        inner: RwLock<PathMap<VecDeque<Value>>>,
+    }
+
+    impl PathMapRSpace {
+        pub fn new() -> Self {
+            Self {
+                inner: RwLock::new(PathMap::new()),
+            }
+        }
+    }
+
+    impl super::RSpace for PathMapRSpace {
+        fn tell(&mut self, kind: u16, channel: String, data: Value) -> Result<()> {
+            ensure_kind_matches_channel(kind, &channel)?;
+            let key = rspace_key(kind, &channel);
+            let mut pm = self.inner.write().expect("poisoned");
+            let mut q = pm.get(&key).cloned().unwrap_or_default();
+            q.push_back(data);
+            pm.insert(&key, q);
+            Ok(())
+        }
+        fn ask(&mut self, kind: u16, channel: String) -> Result<Option<Value>> {
+            ensure_kind_matches_channel(kind, &channel)?;
+            let key = rspace_key(kind, &channel);
+            let mut pm = self.inner.write().expect("poisoned");
+            let mut q = pm.get(&key).cloned().unwrap_or_default();
+            let res = q.pop_front();
+            if res.is_some() {
+                pm.insert(&key, q);
+            }
+            Ok(res)
+        }
+        fn peek(&self, kind: u16, channel: String) -> Result<Option<Value>> {
+            ensure_kind_matches_channel(kind, &channel)?;
+            let key = rspace_key(kind, &channel);
+            let pm = self.inner.read().expect("poisoned");
+            Ok(pm.get(&key).and_then(|q| q.front().cloned()))
+        }
+        fn reset(&mut self) {
+            let mut pm = self.inner.write().expect("poisoned");
+            *pm = PathMap::new();
+        }
+    }
+
+    pub fn default_rspace() -> Box<dyn RSpace> {
+        Box::new(PathMapRSpace::new())
+    }
+}
+
+#[cfg(feature = "rspace-pathmap")]
+pub use pathmap_rspace::default_rspace;
+
+#[cfg(not(feature = "rspace-pathmap"))]
+pub fn default_rspace() -> Box<dyn RSpace> {
+    Box::new(InMemoryRSpace::new())
 }
