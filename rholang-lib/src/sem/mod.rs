@@ -49,6 +49,7 @@ pub trait DiagnosticPass: Pass + Send + Sync {
 
 pub use enclosure_analysis::EnclosureAnalysisPass;
 pub use resolver::ResolverPass;
+pub use elaborator::ForCompElaborationPass;
 
 pub type ProcRef<'a> = &'a ast::AnnProc<'a>;
 
