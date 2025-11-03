@@ -139,10 +139,15 @@ mod pathmap_rspace {
     }
 }
 
-#[cfg(feature = "rspace-pathmap")]
+// Default RSpace selection precedence:
+// 1) If feature "rspace-inmemory" is enabled, always use InMemoryRSpace (overrides pathmap)
+// 2) Else if feature "rspace-pathmap" is enabled, use PathMap-backed RSpace
+// 3) Else fall back to InMemoryRSpace
+
+#[cfg(all(feature = "rspace-pathmap", not(feature = "rspace-inmemory")))]
 pub use pathmap_rspace::default_rspace;
 
-#[cfg(not(feature = "rspace-pathmap"))]
+#[cfg(any(not(feature = "rspace-pathmap"), feature = "rspace-inmemory"))]
 pub fn default_rspace() -> Box<dyn RSpace> {
     Box::new(InMemoryRSpace::new())
 }
@@ -197,5 +202,81 @@ mod tests {
         assert_eq!(rs.ask(k, ch.clone()).unwrap(), None);
         rs.reset();
         assert_eq!(rs.peek(k, ch.clone()).unwrap(), None);
+    }
+
+    #[cfg(feature = "rspace-pathmap")]
+    #[test]
+    fn pathmap_kind_namespace_separation() {
+        let (k1, ch1) = chan(1, "same");
+        let (k2, ch2) = chan(2, "same");
+        let mut rs = crate::rspace::pathmap_rspace::PathMapRSpace::new();
+        rs.tell(k1, ch1.clone(), Value::Int(10)).unwrap();
+        rs.tell(k2, ch2.clone(), Value::Int(20)).unwrap();
+        assert_eq!(rs.peek(k1, ch1.clone()).unwrap(), Some(Value::Int(10)));
+        assert_eq!(rs.peek(k2, ch2.clone()).unwrap(), Some(Value::Int(20)));
+        assert_eq!(rs.ask(k1, ch1.clone()).unwrap(), Some(Value::Int(10)));
+        assert_eq!(rs.ask(k1, ch1.clone()).unwrap(), None);
+        assert_eq!(rs.ask(k2, ch2.clone()).unwrap(), Some(Value::Int(20)));
+        assert_eq!(rs.ask(k2, ch2.clone()).unwrap(), None);
+    }
+
+    #[cfg(feature = "rspace-pathmap")]
+    #[test]
+    fn pathmap_interleaved_channels_fifo() {
+        let (k, a) = chan(3, "a");
+        let (_, b) = chan(3, "b");
+        let mut rs = crate::rspace::pathmap_rspace::PathMapRSpace::new();
+        rs.tell(k, a.clone(), Value::Str("a1".into())).unwrap();
+        rs.tell(k, b.clone(), Value::Str("b1".into())).unwrap();
+        rs.tell(k, a.clone(), Value::Str("a2".into())).unwrap();
+        rs.tell(k, b.clone(), Value::Str("b2".into())).unwrap();
+        assert_eq!(rs.ask(k, a.clone()).unwrap(), Some(Value::Str("a1".into())));
+        assert_eq!(rs.ask(k, a.clone()).unwrap(), Some(Value::Str("a2".into())));
+        assert_eq!(rs.ask(k, a.clone()).unwrap(), None);
+        assert_eq!(rs.ask(k, b.clone()).unwrap(), Some(Value::Str("b1".into())));
+        assert_eq!(rs.ask(k, b.clone()).unwrap(), Some(Value::Str("b2".into())));
+        assert_eq!(rs.ask(k, b.clone()).unwrap(), None);
+    }
+
+    #[cfg(feature = "rspace-pathmap")]
+    #[test]
+    fn pathmap_kind_channel_mismatch_errors() {
+        let mut rs = crate::rspace::pathmap_rspace::PathMapRSpace::new();
+        let bad = rs.tell(2, "@1:alpha".to_string(), Value::Nil);
+        assert!(bad.is_err());
+        let bad2 = rs.peek(3, "@4:beta".to_string());
+        assert!(bad2.is_err());
+        let bad3 = rs.ask(5, "@6:gamma".to_string());
+        assert!(bad3.is_err());
+    }
+
+    #[cfg(feature = "rspace-pathmap")]
+    #[test]
+    fn pathmap_large_queue_push_pop() {
+        let (k, ch) = chan(9, "big");
+        let mut rs = crate::rspace::pathmap_rspace::PathMapRSpace::new();
+        for i in 0..1000i64 {
+            rs.tell(k, ch.clone(), Value::Int(i)).unwrap();
+        }
+        for i in 0..1000i64 {
+            assert_eq!(rs.ask(k, ch.clone()).unwrap(), Some(Value::Int(i)));
+        }
+        assert_eq!(rs.ask(k, ch.clone()).unwrap(), None);
+    }
+
+    #[cfg(feature = "rspace-pathmap")]
+    #[test]
+    fn pathmap_peek_non_destructive_across_other_mutations() {
+        let (k, a) = chan(8, "a");
+        let (_, b) = chan(8, "b");
+        let mut rs = crate::rspace::pathmap_rspace::PathMapRSpace::new();
+        rs.tell(k, a.clone(), Value::Int(1)).unwrap();
+        assert_eq!(rs.peek(k, a.clone()).unwrap(), Some(Value::Int(1)));
+        // Mutate other channel
+        rs.tell(k, b.clone(), Value::Int(99)).unwrap();
+        assert_eq!(rs.peek(k, a.clone()).unwrap(), Some(Value::Int(1)));
+        // Remove from other channel; a should remain
+        assert_eq!(rs.ask(k, b.clone()).unwrap(), Some(Value::Int(99)));
+        assert_eq!(rs.peek(k, a.clone()).unwrap(), Some(Value::Int(1)));
     }
 }

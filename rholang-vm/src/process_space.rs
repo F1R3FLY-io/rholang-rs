@@ -170,4 +170,50 @@ mod tests {
         space.clear();
         assert!(space.get("/process/2").is_none());
     }
+
+    #[cfg(feature = "process-space")]
+    #[test]
+    fn pathmap_deep_paths_and_overwrite_and_missing_remove_and_bulk() {
+        let space = super::pathmap_impl::PathMapProcessSpace::new();
+
+        // Deep nested path support
+        let deep_path = "/process/a/b/c";
+        let p_deep = mkp("deep");
+        space.put(deep_path, p_deep.clone());
+        assert_eq!(space.get(deep_path).unwrap().source_ref, "deep");
+
+        // Overwrite semantics: inserting at the same path replaces the value
+        let p_over = mkp("overwritten");
+        space.put(deep_path, p_over.clone());
+        assert_eq!(space.get(deep_path).unwrap().source_ref, "overwritten");
+
+        // Removing a non-existent path returns None
+        assert!(space.remove("/process/does/not/exist").is_none());
+
+        // Sibling paths do not interfere
+        let p_sib1 = mkp("sib1");
+        let p_sib2 = mkp("sib2");
+        space.put("/process/a/x", p_sib1.clone());
+        space.put("/process/a/y", p_sib2.clone());
+        assert_eq!(space.get("/process/a/x").unwrap().source_ref, "sib1");
+        assert_eq!(space.get("/process/a/y").unwrap().source_ref, "sib2");
+
+        // Bulk insert and sampling
+        for i in 0..1_000u32 {
+            let path = format!("/process/bulk/{}", i);
+            space.put(&path, mkp(&format!("bulk:{}", i)));
+        }
+        // spot check a few
+        for i in [0u32, 1, 10, 123, 999] {
+            let path = format!("/process/bulk/{}", i);
+            assert_eq!(space.get(&path).unwrap().source_ref, format!("bulk:{}", i));
+        }
+
+        // Path normalization expectation: current implementation treats paths verbatim
+        space.put("process/no/leading/slash", mkp("no_slash"));
+        assert_eq!(space.get("process/no/leading/slash").unwrap().source_ref, "no_slash");
+        // trailing slash is also a distinct key
+        space.put("/process/trailing/", mkp("trail"));
+        assert_eq!(space.get("/process/trailing/").unwrap().source_ref, "trail");
+    }
 }

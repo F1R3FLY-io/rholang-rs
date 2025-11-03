@@ -17,6 +17,8 @@ name = "rholang_vm"
 path = "src/lib.rs"
 
 [features]
+default = ["parallel-exec", "process-space", "rspace-pathmap"]
 parallel-exec = ["crossbeam", "num_cpus"]
 process-space = ["pathmap"]
 rspace-pathmap = ["pathmap"]
+rspace-inmemory = []
