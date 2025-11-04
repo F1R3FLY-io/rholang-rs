@@ -262,9 +262,7 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
             }
 
             Proc::ForComprehension { receipts, proc } => {
-                self.push_children(
-                    iter::once(proc).chain(receipts.iter().flat_map(|r| inputs(&r))),
-                );
+                self.push_children(iter::once(proc).chain(receipts.iter().flat_map(|r| inputs(r))));
             }
 
             Proc::Let { bindings, body, .. } => {

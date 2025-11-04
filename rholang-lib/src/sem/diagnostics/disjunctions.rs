@@ -64,11 +64,11 @@ fn check_deep<'a>(
     if is_atom(name) {
         return;
     }
-    if let Some(q) = name.as_quote() {
+    if let Some(q) = name.as_quote()
+        && db.contains(q)
+    {
         // if it is indexed we will visit it later on
-        if db.contains(q) {
-            return;
-        }
+        return;
     }
 
     name.iter_into_deep().for_each(|ev| {
