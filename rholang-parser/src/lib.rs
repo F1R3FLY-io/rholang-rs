@@ -10,7 +10,7 @@ pub mod parser;
 mod traverse;
 
 pub use parser::RholangParser;
-pub use traverse::DfsEvent;
+pub use traverse::{DfsEvent, DfsEventExt};
 
 /// a position in the source code. 1-based
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

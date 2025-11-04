@@ -414,6 +414,15 @@ pub enum VarBinding {
     Free { index: usize },
 }
 
+impl VarBinding {
+    pub fn is_free(self) -> bool {
+        match self {
+            VarBinding::Bound(_) => false,
+            VarBinding::Free { .. } => true,
+        }
+    }
+}
+
 pub struct SemanticDb<'a> {
     rev: IndexMap<ByAddress<ProcRef<'a>>, PID, ahash::RandomState>, // ref <-> PID
     interner: interner::Interner,                                   // name <-> Symbol
@@ -479,6 +488,7 @@ pub enum ErrorKind {
     ProcInNamePosition(BinderId, Symbol),
     ConnectiveOutsidePattern,
     BundleInsidePattern,
+    UnmatchedVarInDisjunction(Symbol),
     FreeVariable(SymbolOccurrence),
     BadCode,
 }
@@ -730,6 +740,20 @@ mod tests {
                 move |node: ProcRef<'a>| matches!(node.proc, ast::Proc::Send { channel, .. } if channel.is_ident(expected))
             }
 
+            pub fn send_string_to_stdout<'a>(arg: &str) -> impl ProcMatch<'a> {
+                fn string_lit_arg(args: &[ast::AnnProc], expected: &str) -> bool {
+                    matches!(
+                        args,
+                        [ast::AnnProc {
+                            proc: ast::Proc::StringLiteral(str),
+                            ..
+                        }] if *str == expected
+                    )
+                }
+
+                move |node: ProcRef<'a>| matches!(node.proc, ast::Proc::Send { channel, inputs, .. } if channel.is_ident("stdout") && string_lit_arg(inputs, arg))
+            }
+
             impl ProcMatch<'_> for PID {
                 fn resolve(self, _db: &SemanticDb) -> Option<PID> {
                     Some(self)
@@ -915,7 +939,7 @@ mod tests {
                     matches!(diagnostic.kind, DiagnosticKind::Error(actual) if actual == expected)
                         && m.matches(db, diagnostic.pid)
                 })
-                .or_else(|| panic!("expect::error #{expected:#?} in {:#?}", db.diagnostics()));
+                .or_else(|| panic!("expect::error {expected:#?} in {:#?}", db.diagnostics()));
         }
 
         pub fn warning<'test, M: ProcMatch<'test>>(
@@ -1038,6 +1062,15 @@ mod tests {
                 (Some(_), None) => false,
                 (Some(sym), expected) => db.resolve_symbol(sym) == expected,
             }
+        }
+
+        pub fn errors(db: &SemanticDb, count: usize) {
+            assert_eq!(
+                db.errors().count(),
+                count,
+                "expect::errors #{count}, but got #{:#?}",
+                db.errors().collect::<Vec<_>>()
+            );
         }
     }
 }

@@ -21,7 +21,8 @@ impl TestRholangCodeArgs {
                 quote! {
                     let #pipeline = #pipeline_func(#procs.iter().map(|proc| #db.build_index(proc)));
                     println!("Running the pipeline:\n{}", #pipeline.describe());
-                    tokio::runtime::Builder::new_current_thread()
+                    tokio::runtime::Builder::new_multi_thread()
+                        .worker_threads(2)
                         .build()
                         .unwrap()
                         .block_on(#pipeline.run(&mut #db));
