@@ -12,7 +12,7 @@ use crate::vm::VM;
 pub enum StepResult {
     Next,
     Stop,
-    Jump(String),
+    Jump(usize),
 }
 
 pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepResult, ExecError> {
@@ -421,7 +421,7 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
             }
         }
 
-        // Continuations (store/resume)
+        // Continuations (store/resume) - simplified single-slot storage
         Opcode::CONT_STORE => {
             let v = vm.stack.pop().ok_or_else(|| ExecError::OpcodeParamError {
                 opcode: "CONT_STORE",
@@ -429,7 +429,7 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
             })?;
             let id = vm.next_cont_id;
             vm.next_cont_id = vm.next_cont_id.wrapping_add(1).max(1);
-            vm.cont_table.insert(id, v);
+            vm.cont_last = Some((id, v));
             vm.stack.push(Value::Int(id as i64));
         }
         Opcode::CONT_RESUME => {
@@ -442,7 +442,11 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
                     })
                 }
             };
-            let v = vm.cont_table.remove(&id).unwrap_or(Value::Nil);
+            let v = if let Some((saved_id, saved_v)) = vm.cont_last.take() {
+                if saved_id == id { saved_v } else { Value::Nil }
+            } else {
+                Value::Nil
+            };
             vm.stack.push(v);
         }
 
@@ -520,21 +524,12 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
 
         // Control flow
         Opcode::JUMP => {
-            // Expect a label name on stack (Value::Str)
-            let label = match vm.stack.pop() {
-                Some(Value::Str(s)) => s,
-                other => {
-                    return Err(ExecError::OpcodeParamError {
-                        opcode: "JUMP",
-                        message: format!("expects label String on stack, got {:?}", other),
-                    })
-                }
-            };
-            return Ok(StepResult::Jump(label));
+            // Jump to absolute instruction index provided as immediate operand
+            let idx = inst.op16() as usize;
+            return Ok(StepResult::Jump(idx));
         }
         Opcode::BRANCH_TRUE => {
-            // Expect condition bool then label string on stack (label on top like typical assembly push order?)
-            // We choose: pop condition first then label beneath? We'll require label on stack (Str) and condition (Bool) on top.
+            // Conditional branch to absolute index in instruction immediate
             let cond = match vm.stack.pop() {
                 Some(Value::Bool(b)) => b,
                 other => {
@@ -544,17 +539,9 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
                     })
                 }
             };
-            let label = match vm.stack.pop() {
-                Some(Value::Str(s)) => s,
-                other => {
-                    return Err(ExecError::OpcodeParamError {
-                        opcode: "BRANCH_TRUE",
-                        message: format!("expects label String under condition, got {:?}", other),
-                    })
-                }
-            };
             if cond {
-                return Ok(StepResult::Jump(label));
+                let idx = inst.op16() as usize;
+                return Ok(StepResult::Jump(idx));
             }
         }
         Opcode::BRANCH_FALSE => {
@@ -567,21 +554,13 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
                     })
                 }
             };
-            let label = match vm.stack.pop() {
-                Some(Value::Str(s)) => s,
-                other => {
-                    return Err(ExecError::OpcodeParamError {
-                        opcode: "BRANCH_FALSE",
-                        message: format!("expects label String under condition, got {:?}", other),
-                    })
-                }
-            };
             if !cond {
-                return Ok(StepResult::Jump(label));
+                let idx = inst.op16() as usize;
+                return Ok(StepResult::Jump(idx));
             }
         }
         Opcode::BRANCH_SUCCESS => {
-            // Strict semantics: expect Bool status on top and label String beneath, mirroring BRANCH_TRUE/BRANCH_FALSE.
+            // Expect Bool status on stack; if true, branch to immediate index
             let status = match vm.stack.pop() {
                 Some(Value::Bool(b)) => b,
                 other => {
@@ -591,17 +570,9 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
                     })
                 }
             };
-            let label = match vm.stack.pop() {
-                Some(Value::Str(s)) => s,
-                other => {
-                    return Err(ExecError::OpcodeParamError {
-                        opcode: "BRANCH_SUCCESS",
-                        message: format!("expects label String under status, got {:?}", other),
-                    })
-                }
-            };
             if status {
-                return Ok(StepResult::Jump(label));
+                let idx = inst.op16() as usize;
+                return Ok(StepResult::Jump(idx));
             }
         }
 
