@@ -664,11 +664,11 @@ pub(super) fn node_to_ast<'ast>(
 
                 _ => {
                     let text = get_node_value(&node, source);
-                    if text == "(" {
-                        if let Some(next_sibling) = node.next_named_sibling() {
-                            node = next_sibling;
-                            continue 'parse;
-                        }
+                    if text == "("
+                        && let Some(next_sibling) = node.next_named_sibling()
+                    {
+                        node = next_sibling;
+                        continue 'parse;
                     }
 
                     unimplemented!("{node}");
