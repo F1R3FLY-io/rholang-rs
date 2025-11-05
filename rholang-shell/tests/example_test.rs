@@ -1,7 +1,9 @@
 use anyhow::Result;
 use rstest::rstest;
 
-use rholang_shell::providers::{FakeInterpreterProvider, InterpretationResult, InterpreterProvider};
+use rholang_shell::providers::{
+    FakeInterpreterProvider, InterpretationResult, InterpreterProvider,
+};
 
 #[tokio::test]
 async fn test_fake_interpreter_with_arithmetic() -> Result<()> {

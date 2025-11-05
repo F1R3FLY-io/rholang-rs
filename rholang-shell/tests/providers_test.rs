@@ -70,7 +70,18 @@ async fn test_rholang_parser_interpreter_provider_invalid_code() -> Result<()> {
     // Test interpret method with invalid code (missing closing brace)
     let input = "new channel in { @\"stdout\"!(\"Hello, world!\")";
     let result = provider.interpret(input).await;
-    assert!(result.is_error());
+    match result {
+        InterpretationResult::Success(output) => {
+            assert!(
+                output.starts_with("Fail("),
+                "Expected Fail(...) output, got: {}",
+                output
+            );
+        }
+        InterpretationResult::Error(err) => {
+            panic!("Expected pretty-printed Fail, got error: {}", err);
+        }
+    }
 
     Ok(())
 }

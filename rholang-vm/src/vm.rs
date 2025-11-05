@@ -1,6 +1,5 @@
 use anyhow::Result;
 
-use crate::error::ExecError;
 use crate::execute::{self, StepResult};
 use crate::process::Process;
 use crate::rspace::{InMemoryRSpace, RSpace};
@@ -10,8 +9,8 @@ pub struct VM {
     pub(crate) stack: Vec<Value>,
     // Abstract RSpace implementation
     pub(crate) rspace: Box<dyn RSpace>,
-    // Simple continuation table: id -> stored value
-    pub(crate) cont_table: std::collections::HashMap<u32, Value>,
+    // Single-slot continuation storage (id, value)
+    pub(crate) cont_last: Option<(u32, Value)>,
     pub(crate) next_cont_id: u32,
     // Monotonic counter for fresh channel names
     pub(crate) next_name_id: u64,
@@ -28,7 +27,7 @@ impl VM {
         VM {
             stack: Vec::new(),
             rspace: Box::new(InMemoryRSpace::new()),
-            cont_table: std::collections::HashMap::new(),
+            cont_last: None,
             next_cont_id: 1,
             next_name_id: 1,
         }
@@ -38,7 +37,7 @@ impl VM {
         VM {
             stack: Vec::new(),
             rspace,
-            cont_table: std::collections::HashMap::new(),
+            cont_last: None,
             next_cont_id: 1,
             next_name_id: 1,
         }
@@ -63,17 +62,8 @@ impl VM {
                 StepResult::Stop => {
                     break;
                 }
-                StepResult::Jump(label) => {
-                    if let Some(&target) = process.labels.get(&label) {
-                        pc = target;
-                    } else {
-                        // Label not found is an execution error
-                        return Err(ExecError::LabelNotFound {
-                            label,
-                            source: process.source_ref.clone(),
-                        }
-                        .into());
-                    }
+                StepResult::Jump(target) => {
+                    pc = target;
                 }
             }
         }

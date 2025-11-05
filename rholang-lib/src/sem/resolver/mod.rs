@@ -141,7 +141,7 @@ fn resolve_var<'a>(
         }
 
         // Step 2: record in semantic db
-        let occ = SymbolOccurence {
+        let occ = SymbolOccurrence {
             symbol: sym,
             position: var.pos,
         };
@@ -172,7 +172,7 @@ fn resolve_var_ref<'a>(
             .unwrap_or_else(|| panic!("bug: dangling variable {var} (no owning scope found)"));
         scope.mark_used(binder);
 
-        let occ = SymbolOccurence {
+        let occ = SymbolOccurrence {
             symbol: sym,
             position: var.pos,
         };

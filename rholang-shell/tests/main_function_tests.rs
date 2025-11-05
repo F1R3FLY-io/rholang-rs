@@ -32,30 +32,3 @@ async fn test_main_function_code_path() -> Result<()> {
 
     Ok(())
 }
-
-// Test with multiline mode enabled
-#[tokio::test]
-async fn test_main_function_with_multiline() -> Result<()> {
-    // Parse args with multiline flag
-    let args = Args::parse_from(["program_name", "--multiline"]);
-
-    // Verify that multiline mode is enabled
-    assert!(args.multiline, "Multiline mode should be enabled");
-
-    // Create the interpreter provider
-    let interpreter = RholangParserInterpreterProvider::new()?;
-
-    // Set a very short delay for tests
-    interpreter.set_delay(0)?;
-
-    // Run the rholang-shell with a timeout
-    let result = timeout(Duration::from_millis(100), async {
-        run_shell(args, interpreter).await
-    })
-    .await;
-
-    // We expect a timeout error, which is fine
-    assert!(result.is_err(), "Expected timeout error");
-
-    Ok(())
-}

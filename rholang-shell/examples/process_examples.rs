@@ -81,9 +81,16 @@ async fn main() -> Result<()> {
         .to_path_buf();
 
     // Prefer tests/corpus (where examples are stored in this repo); fall back to corpus
-    let tests_corpus = project_root.join("rholang-parser").join("tests").join("corpus");
+    let tests_corpus = project_root
+        .join("rholang-parser")
+        .join("tests")
+        .join("corpus");
     let plain_corpus = project_root.join("rholang-parser").join("corpus");
-    let examples_dir = if tests_corpus.exists() { &tests_corpus } else { &plain_corpus };
+    let examples_dir = if tests_corpus.exists() {
+        &tests_corpus
+    } else {
+        &plain_corpus
+    };
 
     println!("Looking for Rholang files in: {}", examples_dir.display());
     let rholang_files = find_rholang_files(examples_dir)?;

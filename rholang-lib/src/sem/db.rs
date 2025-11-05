@@ -26,6 +26,7 @@ impl<'a> SemanticDb<'a> {
             binder_is_name: BitVec::with_capacity(DEFAULT_BINDERS_CAPACITY),
             binders: Vec::with_capacity(DEFAULT_BINDERS_CAPACITY),
             proc_to_scope: IntMap::with_capacity(DEFAULT_SCOPES_CAPACITY),
+            enclosing_pids: Vec::new(),
             var_to_binder: BTreeMap::new(),
         }
     }
@@ -80,14 +81,18 @@ impl<'a> SemanticDb<'a> {
     /// Builds an index for all processes in preorder DFS.
     /// Returns the [`PID`] of the root.
     pub fn build_index(&mut self, root: ProcRef<'a>) -> PID {
-        let start_id = self.rev.len();
+        let start_id = self.pid_count();
         let result = PID(start_id as u32); // SAFETY: we never allow to add more than u32 elements to the index
 
         root.iter_preorder_dfs().enumerate().for_each(|(i, proc)| {
             let key = ByAddress(proc);
-            let next = (start_id + i)
-                .try_into()
-                .expect("Too many elements in the index");
+            // SAFETY: below we check if `next` is equal to u32::MAX. So even if the enumeration
+            // starts from u32::MAX, the first item will panic
+            let next = (start_id + i) as u32;
+            if next == u32::MAX {
+                // u32::MAX is reserved for top-level (dummy) PID
+                panic!("Too many elements in the index");
+            }
             self.rev.insert(key, PID(next));
         });
 
@@ -104,6 +109,10 @@ impl<'a> SemanticDb<'a> {
         self.rev
             .get_index_of(&ByAddress(proc))
             .map(|i| PID(i as u32)) // SAFETY: we never allow to add more than u32 elements to the index
+    }
+
+    pub fn pid_count(&self) -> usize {
+        self.rev.len()
     }
 
     /// Iterate over all PIDs in indexing order
@@ -283,7 +292,7 @@ impl<'a> SemanticDb<'a> {
     pub fn binders_full(
         &self,
         scope: &ScopeInfo,
-    ) -> impl ExactSizeIterator<Item = (BinderId, &Binder)> {
+    ) -> impl ExactSizeIterator<Item = (BinderId, &Binder)> + DoubleEndedIterator {
         let binders = self.binders(scope);
         scope.binder_range().zip(binders)
     }
@@ -312,7 +321,7 @@ impl<'a> SemanticDb<'a> {
 
     fn check_kind(
         &mut self,
-        occ: SymbolOccurence,
+        occ: SymbolOccurrence,
         binder: BinderId,
         expects_name: bool,
         site: PID,
@@ -336,7 +345,7 @@ impl<'a> SemanticDb<'a> {
     #[must_use]
     pub(super) fn map_symbol_to_binder(
         &mut self,
-        occ: SymbolOccurence,
+        occ: SymbolOccurrence,
         binder: BinderId,
         expects_name: bool,
         site: PID,
@@ -350,7 +359,7 @@ impl<'a> SemanticDb<'a> {
     /// Maps a variable occurrence ([`SymbolOccurence`]) as a free variable.
     /// This is used only in patterns
     #[must_use]
-    pub(super) fn map_symbol_as_free(&mut self, occ: SymbolOccurence, index: usize) -> bool {
+    pub(super) fn map_symbol_as_free(&mut self, occ: SymbolOccurrence, index: usize) -> bool {
         let old = self.var_to_binder.insert(occ, VarBinding::Free { index });
         old.is_none()
     }
@@ -361,17 +370,13 @@ impl<'a> SemanticDb<'a> {
     }
 
     /// Query the binder for a given variable occurrence
-    pub fn binder_of(&self, occurence: SymbolOccurence) -> Option<VarBinding> {
+    pub fn binder_of(&self, occurence: SymbolOccurrence) -> Option<VarBinding> {
         self.var_to_binder.get(&occurence).copied()
     }
 
     /// Query the binder for a given [`rholang_parser::ast::Id`]
     pub fn binder_of_id(&self, id: rholang_parser::ast::Id) -> Option<VarBinding> {
-        let sym = self.intern(id.name);
-        let occurence = SymbolOccurence {
-            symbol: sym,
-            position: id.pos,
-        };
+        let occurence = SymbolOccurrence::from_id(id, self);
         self.binder_of(occurence)
     }
 
@@ -390,17 +395,20 @@ impl<'a> SemanticDb<'a> {
     /// Returns an iterator over variable bindings that occur within a given source span.
     ///
     /// The range is inclusive–exclusive: `[span.start, span.end)`.
-    pub fn bound_in_range(&self, span: SourceSpan) -> impl Iterator<Item = BoundOccurence> {
+    pub fn bound_in_range(
+        &self,
+        span: SourceSpan,
+    ) -> impl DoubleEndedIterator<Item = BoundOccurence> {
         use std::ops::Bound::*;
 
         // Construct range bounds for the BTreeMap key type
-        let start_key = SymbolOccurence {
+        let start_key = SymbolOccurrence {
             position: span.start,
-            symbol: Symbol::DUMMY, // any dummy symbol, ordering ignores it
+            symbol: Symbol::MIN,
         };
-        let end_key = SymbolOccurence {
+        let end_key = SymbolOccurrence {
             position: span.end,
-            symbol: Symbol::DUMMY,
+            symbol: Symbol::MIN,
         };
 
         self.var_to_binder
@@ -412,20 +420,147 @@ impl<'a> SemanticDb<'a> {
     }
 
     /// Returns an iterator over all variable bindings within the given scope.
-    pub fn bound_in_scope(&self, scope: &ScopeInfo) -> impl Iterator<Item = BoundOccurence> {
+    pub fn bound_in_scope(
+        &self,
+        scope: &ScopeInfo,
+    ) -> impl DoubleEndedIterator<Item = BoundOccurence> {
         self.bound_in_range(scope.span)
+    }
+
+    /// Returns an iterator over free variables that occur within a given source span.
+    ///
+    /// The range is inclusive–exclusive: `[span.start, span.end)`.
+    pub fn free_in_range(&self, span: SourceSpan) -> impl DoubleEndedIterator<Item = VarBinding> {
+        self.bound_in_range(span)
+            .filter_map(|occ| occ.binding.is_free().then_some(occ.binding))
     }
 
     /// Finds the binder corresponding to a given symbol within a specific scope.
     ///
     /// This method searches all variable binders declared in `scope`
-    /// (and only within that scope) and returns the first [`BinderId`] whose bound name
+    /// (and only within that scope) and returns the LAST [`BinderId`] whose bound name
     /// matches the provided [`Symbol`].
     ///
-    /// This function does not search parent or nested scopes — only binders declared directly in `scope`
+    /// This function does not search parent or nested scopes — only binders declared directly in `scope`.
+    /// For this, use [`Self::lookup_in_scope_chain`].
     pub fn find_binder_for_symbol(&self, sym: Symbol, scope: &ScopeInfo) -> Option<BinderId> {
         self.binders_full(scope)
-            .find_map(|(bid, binder)| (binder.name == sym).then_some(bid))
+            .rfind(|(_, binder)| binder.name == sym)
+            .map(|(bid, _)| bid)
+    }
+
+    /// Returns the PID of the immediately enclosing scope-introducing process.
+    ///
+    ///# Enclosure Map Invariant
+    ///
+    /// Each process `pid` has exactly one *enclosing* process recorded in `enclosing_pids[pid]`,
+    /// corresponding to the nearest **scope-introducing** ancestor in the AST traversal.
+    ///
+    /// ```text
+    ///        +-------------------+        +-------------------+
+    ///        |  @Top-level (⊤)  |◄───────┤  P0: "contract"   |   (introduces scope)
+    ///        +-------------------+        +-------------------+
+    ///                                        │
+    ///                                        │  enclosing_pids[P1] = P0
+    ///                                        ▼
+    ///                                +-------------------+
+    ///                                |  P1: "for"        |   (introduces scope)
+    ///                                +-------------------+
+    ///                                        │
+    ///                                        │  enclosing_pids[P2] = P1
+    ///                                        ▼
+    ///                                +-------------------+
+    ///                                |  P2: "send"       |   (no scope)
+    ///                                +-------------------+
+    /// ```
+    /// Thus, for any process `pid`, the chain
+    ///
+    /// ```text
+    /// pid → enclosing_process(pid) → enclosing_process(...) → ... → ⊤
+    /// ```
+    ///
+    /// walks outward through the nested lexical scopes.
+    #[inline]
+    pub fn enclosing_process(&self, pid: PID) -> Option<PID> {
+        self.enclosing_pids
+            .get(pid.0 as usize)
+            .and_then(|parent| (*parent != PID::TOP_LEVEL).then_some(*parent))
+    }
+
+    /// Returns the [`ScopeInfo`] of the nearest enclosing scope for the given process.
+    pub fn enclosing_scope(&self, pid: PID) -> Option<&ScopeInfo> {
+        self.enclosing_process(pid)
+            .and_then(|parent| self.get_scope(parent))
+    }
+
+    /// Iterates from the nearest enclosing scope to the outermost one.
+    ///
+    /// Useful for resolving symbols that may be shadowed across nested scopes.
+    pub fn scope_chain(&self, pid: PID) -> impl Iterator<Item = &ScopeInfo> {
+        self.process_scope_chain(pid).map(|(_, scope)| scope)
+    }
+
+    /// Iterates over `(process, scope)` pairs starting from the given process
+    /// and walking up the enclosing chain.
+    ///
+    /// Precisely:
+    /// - If `pid` introduces a scope, it is yielded first.
+    /// - Then, ascends through each enclosing process that has a scope.
+    /// - Stops when the top-level is reached.
+    #[inline]
+    pub fn process_scope_chain(&self, pid: PID) -> impl Iterator<Item = (PID, &ScopeInfo)> {
+        let mut first = true;
+        let mut next_pid: Option<PID> = self.enclosing_process(pid);
+        std::iter::from_fn(move || {
+            if first {
+                // first iteration: check if pid itself has a scope
+                first = false;
+                if let Some(scope) = self.get_scope(pid) {
+                    // include it
+                    return Some((pid, scope));
+                }
+            }
+            let current = next_pid?;
+            next_pid = self.enclosing_process(current);
+
+            self.get_scope(current).map(|scope| (current, scope))
+        })
+    }
+
+    /// Looks up a symbol by name, searching outward through the enclosing scopes.
+    ///
+    /// Returns the first matching binding, starting from the nearest enclosing scope.
+    pub fn lookup_in_scope_chain(&self, sym: Symbol, start_pid: PID) -> Option<BinderId> {
+        self.scope_chain(start_pid)
+            .find_map(|scope| self.find_binder_for_symbol(sym, scope))
+    }
+
+    pub fn resolve_var_binding(&self, pid: PID, vb: VarBinding) -> BinderId {
+        match vb {
+            // For regular bound vars, just look up directly
+            VarBinding::Bound(bid) => bid,
+            // A “free variable” is free relative to its binder, not globally.
+            VarBinding::Free { index } => {
+                let scope = self
+                    .get_scope(pid)
+                    .or_else(|| self.enclosing_scope(pid))
+                    .unwrap_or_else(|| panic!("Free var in non-scoped process"));
+
+                scope
+                    .binder_range()
+                    .nth(index)
+                    .unwrap_or_else(|| panic!("Invalid free var index"))
+            }
+        }
+    }
+
+    /// Resolves the defining binder for a symbol either through direct binding
+    /// (if known) or via lexical lookup up the scope chain.
+    pub fn resolve_occurence(&self, occ: SymbolOccurrence, pid: PID) -> Option<BinderId> {
+        self.binder_of(occ)
+            .map(|vb| self.resolve_var_binding(pid, vb))
+            .or_else(|| // fallback for unresolved or partial symbols
+        self.lookup_in_scope_chain(occ.symbol, pid))
     }
 }
 

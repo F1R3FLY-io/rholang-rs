@@ -1,0 +1,28 @@
+new server, stdout(`rho:io:stdout`) in {
+
+  new PingServer in {
+    // Define the ping server
+    contract PingServer(@req) = {
+      match req {
+        { "msg": msg, "return": ret } => {
+          stdout!("Server received: " ++ msg) |
+          @ret!("PONG from server")
+        }
+      }
+    } |
+
+    // Start the server
+    server!(*PingServer) 
+  } |
+
+  // Create a client that uses the server
+  new ret in {
+    for (ping <- server) {
+      // Send a message to the server with a return channel
+      ping!({ "msg": "PING from client", "return": *ret }) |
+      for (@response <- ret) {
+        stdout!("Client got: " ++ response)
+      }
+    }
+  }
+}

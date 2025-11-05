@@ -36,7 +36,18 @@ async fn test_rholang_parser_interpreter_with_invalid_code() -> Result<()> {
     let input = "new x in { x!(5) }}}"; // Extra closing braces
     let result = interpreter.interpret(input).await;
 
-    assert!(result.is_error());
+    match result {
+        rholang_shell::providers::InterpretationResult::Success(output) => {
+            assert!(
+                output.starts_with("Fail("),
+                "Expected Fail(...) output, got: {}",
+                output
+            );
+        }
+        rholang_shell::providers::InterpretationResult::Error(err) => {
+            panic!("Expected pretty-printed Fail, got error: {}", err);
+        }
+    }
 
     Ok(())
 }

@@ -5,7 +5,7 @@ use std::{
 
 use smallvec::{SmallVec, smallvec};
 
-use crate::{SourcePos, SourceSpan, traverse::PreorderDfsIter};
+use crate::{SourcePos, SourceSpan, traverse::*};
 
 pub type ProcList<'a> = SmallVec<[AnnProc<'a>; 1]>;
 
@@ -116,7 +116,7 @@ impl<'a> Proc<'a> {
         AnnProc { proc: self, span }
     }
 
-    pub fn is_ground(&self) -> bool {
+    pub fn is_trivially_ground(&self) -> bool {
         match self {
             Proc::Nil
             | Proc::Unit
@@ -138,6 +138,19 @@ impl<'a> Proc<'a> {
             _ => false,
         }
     }
+
+    pub fn as_var(&self) -> Option<Var<'a>> {
+        match self {
+            Proc::ProcVar(var) => Some(*var),
+            _ => None,
+        }
+    }
+}
+
+impl<'a> From<Var<'a>> for Proc<'a> {
+    fn from(value: Var<'a>) -> Self {
+        Proc::ProcVar(value)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -151,12 +164,43 @@ impl<'a> AnnProc<'a> {
         PreorderDfsIter::<16>::new(self)
     }
 
-    pub fn is_ground(&self) -> bool {
-        self.proc.is_ground()
+    pub fn iter_dfs_event(&'a self) -> impl Iterator<Item = DfsEvent<'a>> {
+        DfsEventIter::<32>::new(self)
+    }
+
+    pub fn iter_dfs_event_and_names(&'a self) -> impl Iterator<Item = DfsEventExt<'a>> {
+        NameAwareDfsEventIter::<32>::new(self)
+    }
+
+    pub fn is_trivially_ground(&self) -> bool {
+        self.proc.is_trivially_ground()
     }
 
     pub fn is_ident(&self, expected: &str) -> bool {
         self.proc.is_ident(expected)
+    }
+
+    pub fn as_var(&self) -> Option<Var<'a>> {
+        self.proc.as_var()
+    }
+
+    pub fn iter_proc_vars(&'a self) -> impl Iterator<Item = Var<'a>> {
+        PreorderDfsIter::<4>::new(self).filter_map(|ann_proc| ann_proc.as_var())
+    }
+
+    pub fn iter_vars(&'a self) -> impl Iterator<Item = Var<'a>> {
+        NameAwareDfsEventIter::<4>::new(self).filter_map(|ev| match ev {
+            DfsEventExt::Enter(ann_proc) => ann_proc.as_var(),
+            DfsEventExt::Name(name) => name.as_var(),
+            DfsEventExt::Exit(_) => None,
+        })
+    }
+
+    pub fn iter_names_direct(&'a self) -> impl Iterator<Item = &'a Name<'a>> {
+        NameAwareDfsEventIter::<4>::new(self)
+            .skip(1) // skip Enter(self)
+            .take_while(|ev| ev.as_proc().is_none()) // stop before entering any sub-process
+            .filter_map(|ev| ev.as_name())
     }
 }
 
@@ -194,7 +238,7 @@ pub enum Var<'ast> {
     Id(Id<'ast>),
 }
 
-impl Var<'_> {
+impl<'a> Var<'a> {
     pub fn get_position(self) -> Option<SourcePos> {
         match self {
             Var::Wildcard => None,
@@ -204,8 +248,15 @@ impl Var<'_> {
 
     pub fn is_ident(self, expected: &str) -> bool {
         match self {
-            Var::Wildcard => false,
+            Var::Wildcard => expected == "_",
             Var::Id(id) => id.name == expected,
+        }
+    }
+
+    pub fn as_ident(self) -> &'a str {
+        match self {
+            Var::Wildcard => "_",
+            Var::Id(id) => id.name,
         }
     }
 }
@@ -214,10 +265,9 @@ impl<'a> TryFrom<&Proc<'a>> for Var<'a> {
     type Error = String;
 
     fn try_from(value: &Proc<'a>) -> Result<Self, Self::Error> {
-        match value {
-            Proc::ProcVar(var) => Ok(*var),
-            other => Err(format!("attempt to convert {{ {other:?} }} to a var")),
-        }
+        value
+            .as_var()
+            .ok_or_else(|| format!("attempt to convert {{ {value:?} }} to a var"))
     }
 }
 
@@ -229,14 +279,21 @@ impl<'a> TryFrom<AnnProc<'a>> for Var<'a> {
     }
 }
 
+impl<'a> TryFrom<&AnnProc<'a>> for Var<'a> {
+    type Error = String;
+
+    fn try_from(value: &AnnProc<'a>) -> Result<Self, Self::Error> {
+        value.proc.try_into()
+    }
+}
+
 impl<'a> TryFrom<Name<'a>> for Var<'a> {
     type Error = String;
 
     fn try_from(value: Name<'a>) -> Result<Self, Self::Error> {
-        match value {
-            Name::NameVar(var) => Ok(var),
-            other => Err(format!("attempt to convert {{ {other:?} }} to a var")),
-        }
+        value
+            .as_var()
+            .ok_or_else(|| format!("attempt to convert {{ {value:?} }} to a var"))
     }
 }
 
@@ -246,11 +303,40 @@ pub enum Name<'ast> {
     Quote(AnnProc<'ast>),
 }
 
-impl Name<'_> {
+impl<'a> Name<'a> {
     pub fn is_ident(&self, expected: &str) -> bool {
         match self {
             Name::NameVar(var) => var.is_ident(expected),
             Name::Quote(ann_proc) => ann_proc.is_ident(expected),
+        }
+    }
+
+    pub fn is_trivially_ground(&self) -> bool {
+        match self {
+            Name::NameVar(Var::Wildcard) => true,
+            Name::Quote(quoted) => quoted.is_trivially_ground(),
+            _ => false,
+        }
+    }
+
+    pub fn as_quote(&'a self) -> Option<&'a AnnProc<'a>> {
+        match self {
+            Name::Quote(quoted) => Some(quoted),
+            _ => None,
+        }
+    }
+
+    pub fn as_var(&self) -> Option<Var<'a>> {
+        match self {
+            Name::NameVar(var) => Some(*var),
+            Name::Quote(_) => None,
+        }
+    }
+
+    pub fn iter_into(&'a self) -> impl Iterator<Item = DfsEventExt<'a>> {
+        match self {
+            Name::NameVar(_) => NameAwareDfsEventIter::<4>::single(self),
+            Name::Quote(quoted) => NameAwareDfsEventIter::<4>::new(quoted),
         }
     }
 }
@@ -450,6 +536,10 @@ impl<'a> Bind<'a> {
             | Bind::Repeated { lhs, rhs: _ }
             | Bind::Peek { lhs, rhs: _ } => lhs,
         }
+    }
+
+    pub fn names_iter(&self) -> std::slice::Iter<'_, Name<'a>> {
+        self.names().names.iter()
     }
 }
 

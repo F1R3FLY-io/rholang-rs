@@ -1,36 +1,29 @@
 use clap::Parser;
-
-// Import the Args struct from the rholang-shell crate
 use rholang_shell::Args;
 
 #[test]
-fn test_args_default_values() {
+fn test_args_parse_no_flags() {
+    // Ensure Args parses successfully with no flags
     let args = Args::parse_from(["rhosh"]);
-    assert!(!args.multiline, "Default multiline value should be false");
+    assert!(args.load.is_none());
 }
 
 #[test]
-fn test_args_multiline_flag() {
-    // Test with --multiline flag
-    let args = Args::parse_from(["rhosh", "--multiline"]);
-    assert!(
-        args.multiline,
-        "Multiline should be true with --multiline flag"
+fn test_args_parse_with_load_long() {
+    let args = Args::parse_from(["rhosh", "--load", "tests/data/sample.rho"]);
+    assert!(args.load.is_some());
+    assert_eq!(
+        args.load.unwrap().to_string_lossy(),
+        "tests/data/sample.rho"
     );
-
-    // Test with -m flag
-    let args = Args::parse_from(["rhosh", "-m"]);
-    assert!(args.multiline, "Multiline should be true with -m flag");
 }
 
 #[test]
-fn test_args_no_multiline_flag() {
-    // Since the multiline flag is a boolean with default value false,
-    // we need to modify the lib.rs file to support setting it to true.
-    // For now, we'll just test that the default is false and that
-    // explicitly setting it to true works.
-
-    // Default should be false
-    let args = Args::parse_from(["rhosh"]);
-    assert!(!args.multiline, "Default multiline value should be false");
+fn test_args_parse_with_load_short() {
+    let args = Args::parse_from(["rhosh", "-l", "tests/data/sample.rho"]);
+    assert!(args.load.is_some());
+    assert_eq!(
+        args.load.unwrap().to_string_lossy(),
+        "tests/data/sample.rho"
+    );
 }
