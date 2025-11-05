@@ -18,6 +18,8 @@ pub enum ParsingError {
         offender: &'static str,
     },
     NumberOutOfRange,
+    InvalidStringEscape,
+    InvalidStringCodePoint,
     DuplicateNameDecl {
         first: SourcePos,
         second: SourcePos,
