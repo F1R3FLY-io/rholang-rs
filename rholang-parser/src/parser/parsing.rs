@@ -297,6 +297,14 @@ pub(super) fn node_to_ast<'ast>(
                                 }
                             }
                         }
+                        kind!("pathmap") => {
+                            cont_stack.push(K::ConsumePathMap {
+                                arity: collection_node.named_child_count(),
+                                has_remainder,
+                                span,
+                            });
+                            cont_stack.push(K::EvalList(collection_node.walk()));
+                        }
                         _ => unreachable!("Rholang collections are: list, set, tuple and map"),
                     }
                 }
@@ -841,6 +849,22 @@ fn apply_cont<'tree, 'ast>(
                                 map.ann(span)
                             })
                         }
+                        K::ConsumePathMap {
+                            arity,
+                            has_remainder,
+                            span,
+                        } => proc_stack.replace_top_slice(arity, |elems| {
+                            let path_map = if has_remainder {
+                                assert!(!elems.is_empty());
+                                // SAFETY: We have checked above that there is at least one element
+                                let (last, init) = elems.split_last().unwrap_unchecked();
+                                ast_builder
+                                    .alloc_pathmap_with_remainder(init, into_remainder(*last))
+                            } else {
+                                ast_builder.alloc_pathmap(elems)
+                            };
+                            path_map.ann(span)
+                        }),
                         K::ConsumeMatch { span, arity } => {
                             proc_stack.replace_top_slice(arity * 2 + 1, |expr_cases| {
                                 let expr = expr_cases[0];
@@ -983,6 +1007,11 @@ enum K<'tree, 'ast> {
         has_remainder: bool,
         span: SourceSpan,
     },
+    ConsumePathMap {
+        arity: usize,
+        has_remainder: bool,
+        span: SourceSpan,
+    },
     ConsumeMatch {
         span: SourceSpan,
         arity: usize,
@@ -1087,6 +1116,11 @@ impl Debug for K<'_, '_> {
                 .finish(),
             Self::ConsumeMap { arity, span, .. } => f
                 .debug_struct("ConsumeMap")
+                .field("arity", arity)
+                .field("span", span)
+                .finish(),
+            Self::ConsumePathMap { arity, span, .. } => f
+                .debug_struct("ConsumePathMap")
                 .field("arity", arity)
                 .field("span", span)
                 .finish(),

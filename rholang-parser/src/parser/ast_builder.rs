@@ -172,6 +172,24 @@ impl<'ast> ASTBuilder<'ast> {
         }))
     }
 
+    pub fn alloc_pathmap(&self, procs: &[AnnProc<'ast>]) -> &Proc<'ast> {
+        self.arena.alloc(Proc::Collection(Collection::PathMap {
+            elements: procs.to_vec(),
+            remainder: None,
+        }))
+    }
+
+    pub fn alloc_pathmap_with_remainder(
+        &self,
+        procs: &[AnnProc<'ast>],
+        remainder: Var<'ast>,
+    ) -> &Proc<'ast> {
+        self.arena.alloc(Proc::Collection(Collection::PathMap {
+            elements: procs.to_vec(),
+            remainder: Some(remainder),
+        }))
+    }
+
     pub fn alloc_var(&self, id: Id<'ast>) -> &Proc<'ast> {
         self.arena.alloc(Proc::ProcVar(Var::Id(id)))
     }
