@@ -336,25 +336,29 @@ pub(super) fn node_to_ast<'ast>(
                     fn check_for_duplicate_decls(
                         decls: &[NameDecl],
                     ) -> Option<(SourcePos, SourcePos)> {
-                        decls.windows(2).find_map(|w| {
-                            if w[0] == w[1] {
-                                let mut first = w[0].id.pos;
-                                let mut second = w[1].id.pos;
-                                if second < first {
-                                    std::mem::swap(&mut first, &mut second);
+                        // Check for duplicates without requiring sorted input
+                        // Use O(n^2) comparison since n is typically small
+                        for i in 0..decls.len() {
+                            for j in (i + 1)..decls.len() {
+                                if decls[i].id.name == decls[j].id.name {
+                                    let mut first = decls[i].id.pos;
+                                    let mut second = decls[j].id.pos;
+                                    if second < first {
+                                        std::mem::swap(&mut first, &mut second);
+                                    }
+                                    return Some((first, second));
                                 }
-                                Some((first, second))
-                            } else {
-                                None
                             }
-                        })
+                        }
+                        None
                     }
 
                     let decls_node = get_field(&node, field!("decls"));
                     let proc_node = get_field(&node, field!("proc"));
 
-                    let mut decls = parse_decls(&decls_node, source);
-                    decls.sort_unstable();
+                    let decls = parse_decls(&decls_node, source);
+                    // IMPORTANT: Do NOT sort decls - preserve source order for correct variable indexing
+                    // The old parser (rust/dev) and Scala implementation expect source order
                     if let Some((first, second)) = check_for_duplicate_decls(&decls) {
                         errors.push(AnnParsingError::new(
                             ParsingError::DuplicateNameDecl { first, second },
