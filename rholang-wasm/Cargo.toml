@@ -7,7 +7,22 @@ license = "Apache-2.0"
 description = "WASM interface for Rholang interpreter"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+
+# Optional dependencies for VM-backed evaluation
+rholang-vm = { path = "../rholang-vm", optional = true }
+# rholang-parser will be added when wiring real parsing; kept commented for now.
+# rholang-parser = { path = "../rholang-parser", optional = true }
+
+[features]
+# Feature to enable VM-backed evaluation in rholang-wasm.
+# Default is off to keep wasm32 builds green while we iterate on compatibility.
+vm-eval = ["rholang-vm"]
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+pretty_assertions = { workspace = true }

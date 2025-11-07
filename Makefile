@@ -196,6 +196,8 @@ help:
 	@echo "  build-plugin    Build the JetBrains plugin (includes building rholang-jni-bridge)"
 	@echo "  build-rholang-parser Build the rholang-parser library (required for the JetBrains plugin)"
 	@echo "  build-rholang-jni-bridge Build the rholang-jni-bridge library with JNI support (required for the JetBrains plugin)"
+	@echo "  wasm-build      Build the rholang-wasm package (RELEASE=1 TARGET=web OUT_DIR=pkg FEATURES=...)"
+	@echo "  wasm-serve      Build and serve rholang-wasm demo (PORT=8000 RELEASE=1 OPEN=1)"
 	@echo "  setup           Install development dependencies"
 	@echo "  help            Show this help message"
 	@echo ""
@@ -207,3 +209,13 @@ help:
 	@echo "  container-check  Check code quality in a container"
 	@echo "  container-fix    Fix code quality issues in a container"
 	@echo "  container-shell  Start an interactive shell in the container"
+
+
+# WASM build and serve targets
+.PHONY: wasm-build
+wasm-build:
+	@bash scripts/build_wasm.sh $(if $(RELEASE),--release,) $(if $(TARGET),--target $(TARGET),) $(if $(OUT_DIR),--out-dir $(OUT_DIR),) $(if $(FEATURES),--features $(FEATURES),) $(EXTRA)
+
+.PHONY: wasm-serve
+wasm-serve:
+	@bash scripts/serve_wasm.sh $(if $(PORT),--port $(PORT),) $(if $(RELEASE),--release,) $(if $(OPEN),--open,)

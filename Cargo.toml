@@ -9,10 +9,6 @@ members = [
     "rholang-vm",
     "rholang-wasm",
     "test-macros",
-    "rholang-shell",
-    "rholang-lib",
-    "rholang-vm",
-    "test-macros"
 ]
 resolver = "3"
 
@@ -29,14 +25,11 @@ intmap = "3.1.2"
 is-terminal = "0.4.12"
 jni = "0.21.1"
 quote = "1.0.36"
-
 # Used by: rholang-shell, librho
 parking_lot = { version = "0.12.5" }
 tokio = { version = "1.48.0", features = ["rt", "rt-multi-thread", "test-util", "parking_lot", "sync", "macros"] }
-
 # Used by: rholang-shell
 rustyline-async = "0.4.6"
-
 # Used by: rholang-shell, rholang-parser
 rstest = "0.25.0"
 rustyline = "*"
@@ -49,21 +42,14 @@ validated = "1.0.0"
 [workspace.dependencies.async-scoped]
 version = "0.9.0"
 features = ["use-tokio"]
-# Used by: rholang-jni-bridge
-serde = { version = "1.0.188", features = ["derive"] }
 
 [workspace.dependencies.async-std]
 version = "1.13.1"
 features = ["attributes"]
-# Used by: rholang-jni-bridge
-serde_json = "1.0.107"
 
 [workspace.dependencies.clap]
 version = "4.5.40"
 features = ["derive"]
-
-[workspace.dependencies.parking_lot]
-version = "0.12.5"
 
 [workspace.dependencies.pretty_assertions]
 version = "1.4.1"
@@ -80,17 +66,6 @@ features = [
     "const_generics",
     "const_new",
     "may_dangle",
-]
-
-[workspace.dependencies.tokio]
-version = "1.47.1"
-features = [
-    "rt",
-    "rt-multi-thread",
-    "test-util",
-    "parking_lot",
-    "sync",
-    "full",
 ]
 
 [profile.bench]
