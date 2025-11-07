@@ -79,11 +79,18 @@ pub(super) fn node_to_ast<'ast>(
 
                 kind!("wildcard") => proc_stack.push(ast_builder.const_wild(), span),
                 kind!("var") => {
-                    let id = Id {
-                        name: get_node_value(&node, source),
-                        pos: span.start,
-                    };
-                    proc_stack.push(ast_builder.alloc_var(id), span);
+                    let name = get_node_value(&node, source);
+                    if name == "_" {
+                        // Some contexts emit '_' as a generic var node instead of a dedicated
+                        // wildcard node. Normalize it here so downstream stages see a wildcard.
+                        proc_stack.push(ast_builder.const_wild(), span);
+                    } else {
+                        let id = Id {
+                            name,
+                            pos: span.start,
+                        };
+                        proc_stack.push(ast_builder.alloc_var(id), span);
+                    }
                 }
 
                 kind!("nil") => proc_stack.push(ast_builder.const_nil(), span),
@@ -1827,7 +1834,10 @@ fn into_name(ann_proc: AnnProc, quoted: bool) -> Name {
         Name::Quote(ann_proc)
     } else {
         match ann_proc.proc {
-            Proc::ProcVar(var) => Name::NameVar(*var),
+            Proc::ProcVar(var) => match var {
+                Var::Id(id) if id.name == "_" => Name::NameVar(Var::Wildcard),
+                _ => Name::NameVar(*var),
+            },
             _ => panic!("invalid proc variant for into_name"),
         }
     }
