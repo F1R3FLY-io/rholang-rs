@@ -10,6 +10,7 @@ use rholang_parser::{SourcePos, SourceSpan, ast};
 
 pub mod db;
 pub mod diagnostics;
+mod elaborator;
 mod enclosure_analysis;
 mod interner;
 pub mod pipeline;
@@ -46,6 +47,7 @@ pub trait DiagnosticPass: Pass + Send + Sync {
     fn run(&self, db: &SemanticDb) -> Vec<Diagnostic>;
 }
 
+pub use elaborator::ForCompElaborationPass;
 pub use enclosure_analysis::EnclosureAnalysisPass;
 pub use resolver::ResolverPass;
 
@@ -485,6 +487,9 @@ pub enum ErrorKind {
     ConnectiveOutsidePattern,
     BundleInsidePattern,
     UnmatchedVarInDisjunction(Symbol),
+    InvalidPid,
+    IncompleteAstNode,
+    MixedArrowTypes { receipt_index: usize },
 }
 
 impl ErrorKind {
