@@ -47,9 +47,9 @@ pub trait DiagnosticPass: Pass + Send + Sync {
     fn run(&self, db: &SemanticDb) -> Vec<Diagnostic>;
 }
 
+pub use elaborator::ForCompElaborationPass;
 pub use enclosure_analysis::EnclosureAnalysisPass;
 pub use resolver::ResolverPass;
-pub use elaborator::ForCompElaborationPass;
 
 pub type ProcRef<'a> = &'a ast::AnnProc<'a>;
 

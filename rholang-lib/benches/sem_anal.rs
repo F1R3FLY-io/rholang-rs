@@ -1,7 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use librho::sem::{
-    EnclosureAnalysisPass, ResolverPass, ForCompElaborationPass, SemanticDb,
+    EnclosureAnalysisPass, ForCompElaborationPass, ResolverPass, SemanticDb,
     diagnostics::{DisjunctionConsistencyCheck, UnusedVarsPass},
     pipeline::Pipeline,
 };
