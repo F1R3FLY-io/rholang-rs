@@ -1,11 +1,9 @@
 //! Arrow type homogeneity validation for for-comprehensions
 
-use crate::sem::SemanticDb;
+use crate::sem::{Diagnostic, ErrorKind, PID, SemanticDb};
 use rholang_parser::SourcePos;
 use rholang_parser::ast::{Bind, Receipts, Source};
 use smallvec::SmallVec;
-
-use super::errors::{ValidationError, ValidationResult};
 
 /// Arrow type for a binding
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -16,16 +14,6 @@ enum ArrowType {
     Repeated,
     /// Peek/non-consuming receive: `x <<- channel`
     Peek,
-}
-
-impl ArrowType {
-    fn as_str(self) -> &'static str {
-        match self {
-            ArrowType::Linear => "linear (<-)",
-            ArrowType::Repeated => "repeated (<=)",
-            ArrowType::Peek => "peek (<<-)",
-        }
-    }
 }
 
 /// Validates arrow type homogeneity in for-comprehensions
@@ -50,17 +38,20 @@ impl<'a, 'ast> ArrowTypeValidator<'a, 'ast> {
     ///
     /// # Arguments
     ///
+    /// * `pid` - The PID of the for-comprehension being validated
     /// * `receipts` - The receipts from a for-comprehension AST node
     ///
     /// # Returns
     ///
-    /// * `Ok(())` - All concurrent join groups have homogeneous arrow types
-    /// * `Err(ValidationError::MixedArrowTypes)` - Found mixed arrow types
-    pub fn validate(&self, receipts: &'ast Receipts<'ast>) -> ValidationResult {
+    /// * `None` - All concurrent join groups have homogeneous arrow types
+    /// * `Some(Diagnostic)` - Found mixed arrow types error
+    pub(super) fn validate(&self, pid: PID, receipts: &'ast Receipts<'ast>) -> Option<Diagnostic> {
         for (receipt_idx, receipt) in receipts.iter().enumerate() {
-            self.validate_receipt(receipt_idx, receipt)?;
+            if let Some(diagnostic) = self.validate_receipt(pid, receipt_idx, receipt) {
+                return Some(diagnostic);
+            }
         }
-        Ok(())
+        None
     }
 
     /// Validate a single receipt (concurrent join group)
@@ -69,17 +60,23 @@ impl<'a, 'ast> ArrowTypeValidator<'a, 'ast> {
     ///
     /// # Arguments
     ///
+    /// * `pid` - The PID of the for-comprehension
     /// * `receipt_idx` - Index of this receipt (for error reporting)
     /// * `receipt` - The bindings in this concurrent join group
     ///
     /// # Returns
     ///
-    /// * `Ok(())` - All bindings use the same arrow type
-    /// * `Err(ValidationError::MixedArrowTypes)` - Found different arrow types
-    fn validate_receipt(&self, receipt_idx: usize, receipt: &[Bind<'ast>]) -> ValidationResult {
+    /// * `None` - All bindings use the same arrow type
+    /// * `Some(Diagnostic)` - Found different arrow types
+    fn validate_receipt(
+        &self,
+        pid: PID,
+        receipt_idx: usize,
+        receipt: &[Bind<'ast>],
+    ) -> Option<Diagnostic> {
         // Single bindings are always valid
         if receipt.len() <= 1 {
-            return Ok(());
+            return None;
         }
 
         // Collect all arrow types in this concurrent group
@@ -98,15 +95,17 @@ impl<'a, 'ast> ArrowTypeValidator<'a, 'ast> {
             }
 
             if arrow_types.len() > 1 {
-                return Err(ValidationError::MixedArrowTypes {
-                    receipt_index: receipt_idx,
-                    found_types: arrow_types.iter().map(|t| t.as_str()).collect(),
-                    pos: first_pos,
-                });
+                return Some(Diagnostic::error(
+                    pid,
+                    ErrorKind::MixedArrowTypes {
+                        receipt_index: receipt_idx,
+                    },
+                    first_pos,
+                ));
             }
         }
 
-        Ok(())
+        None
     }
 
     /// Extract arrow type and position from a binding
@@ -175,13 +174,14 @@ mod tests {
     fn assert_validates(code: &str) {
         let parser = RholangParser::new();
         let ast = parser.parse(code).expect("parse error");
-        let db = SemanticDb::new();
+        let mut db = SemanticDb::new();
+        let pid = db.build_index(&ast[0]);
 
         for proc in ast.iter() {
             if let rholang_parser::ast::Proc::ForComprehension { receipts, .. } = proc.proc {
                 let validator = ArrowTypeValidator::new(&db);
                 assert!(
-                    validator.validate(receipts).is_ok(),
+                    validator.validate(pid, receipts).is_none(),
                     "Expected validation to succeed for: {}",
                     code
                 );
@@ -196,14 +196,27 @@ mod tests {
     fn assert_mixed_arrows_error(code: &str) {
         let parser = RholangParser::new();
         let ast = parser.parse(code).expect("parse error");
-        let db = SemanticDb::new();
+        let mut db = SemanticDb::new();
+        let pid = db.build_index(&ast[0]);
 
         for proc in ast.iter() {
             if let rholang_parser::ast::Proc::ForComprehension { receipts, .. } = proc.proc {
                 let validator = ArrowTypeValidator::new(&db);
-                match validator.validate(receipts) {
-                    Err(ValidationError::MixedArrowTypes { .. }) => return, // Expected
-                    Ok(_) => panic!("Expected MixedArrowTypes error for: {}", code),
+                match validator.validate(pid, receipts) {
+                    Some(diagnostic) => {
+                        // Verify it's a MixedArrowTypes error
+                        use crate::sem::{DiagnosticKind, ErrorKind};
+                        assert!(
+                            matches!(
+                                diagnostic.kind,
+                                DiagnosticKind::Error(ErrorKind::MixedArrowTypes { .. })
+                            ),
+                            "Expected MixedArrowTypes error, got: {:?}",
+                            diagnostic
+                        );
+                        return;
+                    }
+                    None => panic!("Expected MixedArrowTypes error for: {}", code),
                 }
             }
         }

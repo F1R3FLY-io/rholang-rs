@@ -84,7 +84,6 @@ impl Symbol {
     const MIN: Symbol = Symbol(u32::MIN);
     #[allow(dead_code)]
     const MAX: Symbol = Symbol(u32::MAX);
-    pub const DUMMY: Symbol = Symbol(u32::MAX);
 }
 
 impl Display for Symbol {
@@ -488,7 +487,9 @@ pub enum ErrorKind {
     ConnectiveOutsidePattern,
     BundleInsidePattern,
     UnmatchedVarInDisjunction(Symbol),
-    BadCode,
+    InvalidPid,
+    IncompleteAstNode,
+    MixedArrowTypes { receipt_index: usize },
 }
 
 impl ErrorKind {

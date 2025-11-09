@@ -16,24 +16,21 @@
 //! elaborator.elaborate_and_finalize(pid)?;
 //! ```
 
-use crate::sem::{Diagnostic, PID, SemanticDb};
+use crate::sem::{Diagnostic, ErrorKind, PID, SemanticDb};
 use rholang_parser::ast::Proc;
 
 pub mod arrow_validator;
-pub mod errors;
-
-pub use errors::{ElaborationError, ElaborationResult};
 
 pub struct ForCompElaborator<'a, 'ast> {
     db: &'a mut SemanticDb<'ast>,
-    errors: Vec<ElaborationError>,
+    diagnostics: Vec<Diagnostic>,
 }
 
 impl<'a, 'ast> ForCompElaborator<'a, 'ast> {
     pub fn new(db: &'a mut SemanticDb<'ast>) -> Self {
         Self {
             db,
-            errors: Vec::new(),
+            diagnostics: Vec::new(),
         }
     }
 
@@ -41,91 +38,58 @@ impl<'a, 'ast> ForCompElaborator<'a, 'ast> {
     ///
     /// Prerequisites: ResolverPass MUST have run
     pub fn elaborate_and_finalize(mut self, pid: PID) -> Result<(), Vec<Diagnostic>> {
-        if let Err(error) = self.verify_for_comprehension(pid) {
-            self.errors.push(error);
+        if let Some(diagnostic) = self.verify_for_comprehension(pid) {
+            self.diagnostics.push(diagnostic);
             return self.finalize();
         }
 
-        if let Err(error) = self.validate_arrow_types(pid) {
-            self.errors.push(error);
+        if let Some(diagnostic) = self.validate_arrow_types(pid) {
+            self.diagnostics.push(diagnostic);
         }
 
         self.finalize()
     }
 
     /// Verify that PID is a for-comprehension
-    fn verify_for_comprehension(&self, pid: PID) -> ElaborationResult<()> {
-        let proc_ref = self
-            .db
-            .get(pid)
-            .ok_or(ElaborationError::InvalidPid { pid })?;
+    fn verify_for_comprehension(&self, pid: PID) -> Option<Diagnostic> {
+        let proc_ref = match self.db.get(pid) {
+            Some(p) => p,
+            None => return Some(Diagnostic::error(pid, ErrorKind::InvalidPid, None)),
+        };
 
         match proc_ref.proc {
-            Proc::ForComprehension { .. } => Ok(()),
-            _ => Err(ElaborationError::IncompleteAstNode {
+            Proc::ForComprehension { .. } => None,
+            _ => Some(Diagnostic::error(
                 pid,
-                position: Some(proc_ref.span.start),
-                reason: "Expected for-comprehension node".to_string(),
-            }),
+                ErrorKind::IncompleteAstNode,
+                Some(proc_ref.span.start),
+            )),
         }
     }
 
     /// Validate arrow type homogeneity
-    fn validate_arrow_types(&mut self, pid: PID) -> ElaborationResult<()> {
-        let proc = self
-            .db
-            .get(pid)
-            .ok_or(ElaborationError::InvalidPid { pid })?;
+    fn validate_arrow_types(&mut self, pid: PID) -> Option<Diagnostic> {
+        let proc = self.db.get(pid)?;
 
         match proc.proc {
             Proc::ForComprehension { receipts, .. } => {
                 let validator = arrow_validator::ArrowTypeValidator::new(self.db);
-                validator
-                    .validate(receipts)
-                    .map_err(|e| self.convert_validation_error(pid, e))
+                validator.validate(pid, receipts)
             }
-            _ => Err(ElaborationError::IncompleteAstNode {
-                pid,
-                position: None,
-                reason: "Expected for-comprehension node".to_string(),
-            }),
+            _ => Some(Diagnostic::error(pid, ErrorKind::IncompleteAstNode, None)),
         }
     }
 
     /// Finalize and emit diagnostics
     fn finalize(self) -> Result<(), Vec<Diagnostic>> {
-        let diagnostics: Vec<Diagnostic> = self.errors.iter().map(|e| e.to_diagnostic()).collect();
-
-        for diagnostic in &diagnostics {
+        for diagnostic in &self.diagnostics {
             self.db.emit_diagnostic(*diagnostic);
         }
 
-        if !self.errors.is_empty() {
-            Err(diagnostics)
+        if !self.diagnostics.is_empty() {
+            Err(self.diagnostics)
         } else {
             Ok(())
-        }
-    }
-
-    /// Convert ValidationError to ElaborationError
-    ///
-    /// This leverages the Display implementation of ValidationError to avoid
-    /// duplicating error message formatting logic.
-    fn convert_validation_error(
-        &self,
-        pid: PID,
-        error: errors::ValidationError,
-    ) -> ElaborationError {
-        use errors::ValidationError;
-
-        let (position, reason) = match &error {
-            ValidationError::MixedArrowTypes { pos, .. } => (*pos, error.to_string()),
-        };
-
-        ElaborationError::InvalidPattern {
-            pid,
-            position,
-            reason,
         }
     }
 }
