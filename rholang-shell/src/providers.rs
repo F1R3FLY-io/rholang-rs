@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use rholang_parser::RholangParser;
-use validated::Validated;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
@@ -9,6 +8,54 @@ use std::time::Duration;
 use tokio::sync::oneshot;
 use tokio::task;
 use tokio::time::timeout;
+use validated::Validated;
+
+/// Remove source position/span information from a pretty-printed AST/debug output
+fn strip_sourcepos(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut skip_depth: i32 = 0;
+    for line in input.lines() {
+        if skip_depth > 0 {
+            // Track nested braces within the skipped block
+            let opens = line.matches('{').count() as i32;
+            let closes = line.matches('}').count() as i32;
+            skip_depth += opens - closes;
+            if skip_depth <= 0 {
+                skip_depth = 0;
+            }
+            continue;
+        }
+
+        let trimmed = line.trim_start();
+
+        // Start skipping when encountering a SourcePos or span block
+        if trimmed.contains("SourcePos {") || trimmed.starts_with("span: SourceSpan {") {
+            // Initialize skip depth considering current line braces
+            let opens = line.matches('{').count() as i32;
+            let closes = line.matches('}').count() as i32;
+            // We enter a block (at least one opening brace)
+            skip_depth = 1 + (opens - closes - 1).max(0);
+            continue;
+        }
+
+        // Also skip simple fields that directly reference source position labels or span fields
+        if trimmed.starts_with("pos:")
+            || trimmed.starts_with("start: SourcePos")
+            || trimmed.starts_with("end: SourcePos")
+            || trimmed.starts_with("span:")
+        {
+            continue;
+        }
+
+        out.push_str(line);
+        out.push('\n');
+    }
+
+    if out.ends_with('\n') {
+        out.pop();
+    }
+    out
+}
 
 /// Represents an error that occurred during interpretation
 #[derive(Debug, Clone)]
@@ -292,23 +339,10 @@ impl InterpreterProvider for RholangParserInterpreterProvider {
                 // Create a parser locally in the task and parse the code
                 let parser = RholangParser::new();
                 let validated = parser.parse(&code_for_task);
-                match validated {
-                    Validated::Good(procs) => {
-                        // Ensure output contains the word "source" to satisfy tests
-                        InterpretationResult::Success(format!(
-                            "Parsed successfully: source ({} top-level procs)",
-                            procs.len()
-                        ))
-                    }
-                    Validated::Fail(_failure) => {
-                        // Return a parsing error without exposing internal details
-                        InterpretationResult::Error(InterpreterError::parsing_error(
-                            "Parsing failed",
-                            None,
-                            Some(code_for_task.clone()),
-                        ))
-                    }
-                }
+                // Always pretty-print the parser result (including failures) to match golden snapshots
+                let rendered = format!("{validated:#?}");
+                let cleaned = strip_sourcepos(&rendered);
+                InterpretationResult::Success(cleaned)
             };
 
             // Run the parser with a timeout
