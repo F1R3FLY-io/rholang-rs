@@ -12,16 +12,17 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
+# Ensure WebAssembly randomness backend available for transitive deps
+getrandom = { version = "0.3", features = ["wasm_js"] }
 
-# Optional dependencies for VM-backed evaluation
-rholang-vm = { path = "../rholang-vm", optional = true }
+# VM dependency is now mandatory; wasm interface always evaluates via VM.
+rholang-vm = { path = "../rholang-vm" }
 # rholang-parser will be added when wiring real parsing; kept commented for now.
-# rholang-parser = { path = "../rholang-parser", optional = true }
+# rholang-parser = { path = "../rholang-parser" }
 
 [features]
-# Feature to enable VM-backed evaluation in rholang-wasm.
-# Default is off to keep wasm32 builds green while we iterate on compatibility.
-vm-eval = ["rholang-vm"]
+# Placeholder feature used by build scripts; currently no conditional code.
+vm-eval = []
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

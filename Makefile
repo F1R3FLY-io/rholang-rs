@@ -112,8 +112,7 @@ coverage-html:
 .PHONY: clean
 clean:
 	cargo clean
-	cd rholang-jetbrains-plugin && ./gradlew clean
-	rm -rf rholang-jetbrains-plugin/.gradle
+
 
 # Build the JetBrains plugin
 .PHONY: build-plugin
