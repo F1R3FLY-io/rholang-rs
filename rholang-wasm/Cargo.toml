@@ -12,6 +12,15 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
+# FFI and browser console access
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["console"] }
+# Better panic messages in the browser
+console_error_panic_hook = "0.1"
+# JSON interop and serialization for API results
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde-wasm-bindgen = "0.6"
 # Ensure WebAssembly randomness backend available for transitive deps
 getrandom = { version = "0.3", features = ["wasm_js"] }
 
@@ -27,3 +36,9 @@ vm-eval = []
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
 pretty_assertions = { workspace = true }
+
+[profile.release]
+# Smaller and faster-for-size WASM binary
+lto = "fat"
+opt-level = "z"
+panic = "abort"

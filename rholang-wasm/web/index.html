@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>rholang-wasm demo</title>
+  </head>
+  <body>
+    <h1>rholang-wasm demo</h1>
+    <pre id="out">loading…</pre>
+    <script type="module">
+      import init, { version, eval_async } from "../pkg/rholang_wasm.js";
+      await init();
+      try {
+        const res = await eval_async("new x in { x!(42) }");
+        document.getElementById("out").textContent =
+          `rholang-wasm v${version()}\n` + JSON.stringify(res, null, 2);
+      } catch (e) {
+        document.getElementById("out").textContent = `Error: ${e}`;
+      }
+    </script>
+  </body>
+</html>

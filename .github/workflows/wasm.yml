@@ -1,0 +1,14 @@
+name: wasm
+on: [push, pull_request]
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: rustup target add wasm32-unknown-unknown
+      - run: cargo test --all --all-features
+      - run: cargo install wasm-pack
+      - run: wasm-pack build rholang-wasm --target web --release
+      # Optionally enable browser tests if they are stable in CI:
+      # - run: wasm-pack test rholang-wasm --headless --chrome
