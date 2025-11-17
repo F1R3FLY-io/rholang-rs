@@ -79,18 +79,11 @@ pub(super) fn node_to_ast<'ast>(
 
                 kind!("wildcard") => proc_stack.push(ast_builder.const_wild(), span),
                 kind!("var") => {
-                    let name = get_node_value(&node, source);
-                    if name == "_" {
-                        // Some contexts emit '_' as a generic var node instead of a dedicated
-                        // wildcard node. Normalize it here so downstream stages see a wildcard.
-                        proc_stack.push(ast_builder.const_wild(), span);
-                    } else {
-                        let id = Id {
-                            name,
-                            pos: span.start,
-                        };
-                        proc_stack.push(ast_builder.alloc_var(id), span);
-                    }
+                    let id = Id {
+                        name: get_node_value(&node, source),
+                        pos: span.start,
+                    };
+                    proc_stack.push(ast_builder.alloc_var(id), span);
                 }
 
                 kind!("nil") => proc_stack.push(ast_builder.const_nil(), span),
