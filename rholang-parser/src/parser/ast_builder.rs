@@ -8,7 +8,6 @@ use crate::ast::{
 
 pub(crate) struct ASTBuilder<'ast> {
     arena: Arena<Proc<'ast>>,
-    strings: Arena<String>,
     // useful quasi-constants
     nil: Proc<'ast>,
     r#true: Proc<'ast>,
@@ -30,7 +29,6 @@ impl<'ast> ASTBuilder<'ast> {
     pub(crate) fn with_capacity(capacity: usize) -> Self {
         ASTBuilder {
             arena: Arena::with_capacity(capacity),
-            strings: Arena::with_capacity(capacity),
             nil: Proc::Nil,
             r#true: Proc::BoolLiteral(true),
             r#false: Proc::BoolLiteral(false),
@@ -82,14 +80,8 @@ impl<'ast> ASTBuilder<'ast> {
         &self.bad
     }
 
-    // pub(crate) fn alloc_string_literal(&self, value: &'ast str) -> &Proc<'ast> {
-    //     self.arena
-    //         .alloc(Proc::StringLiteral(crate::trim_byte(value, b'"')))
-    // }
-
-    pub(crate) fn alloc_string_literal(&'ast self, value: String) -> &Proc<'ast> {
-        let s_ref: &'ast str = self.strings.alloc(value).as_str();
-        self.arena.alloc(Proc::StringLiteral(s_ref))
+    pub(crate) fn alloc_string_literal(&'ast self, value: String) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::StringLiteral(value))
     }
 
     pub(crate) fn alloc_long_literal(&self, value: i64) -> &Proc<'ast> {

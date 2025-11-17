@@ -551,8 +551,10 @@ mod tests {
     fn if_then_else_full() {
         // if (true) "yes" else "no"
         let cond = Proc::BoolLiteral(true).ann(SourcePos::at_col(5).span_of(5));
-        let if_true = Proc::StringLiteral("yes").ann(SourcePos::at_col(11).span_of(5));
-        let if_false = Proc::StringLiteral("no").ann(SourcePos::at_col(22).span_of(4));
+        let if_true_lit = Proc::StringLiteral("yes".to_string());
+        let if_true = if_true_lit.ann(SourcePos::at_col(11).span_of(5));
+        let if_false_lit = Proc::StringLiteral("no".to_string());
+        let if_false = if_false_lit.ann(SourcePos::at_col(22).span_of(4));
         let if_then_else = Proc::IfThenElse {
             condition: cond,
             if_true,
@@ -569,8 +571,8 @@ mod tests {
         // preorder: root → cond → if_true → if_false
         assert_matches!(nodes[0].proc, Proc::IfThenElse { .. });
         assert_matches!(nodes[1].proc, Proc::BoolLiteral(true));
-        assert_matches!(nodes[2].proc, Proc::StringLiteral("yes"));
-        assert_matches!(nodes[3].proc, Proc::StringLiteral("no"));
+        assert_matches!(nodes[2].proc, Proc::StringLiteral(s) if s == "yes");
+        assert_matches!(nodes[3].proc, Proc::StringLiteral(s) if s == "no");
 
         let events: Vec<_> = (&root).iter_dfs_event().collect();
         assert_matches!(
@@ -589,19 +591,19 @@ mod tests {
                     ..
                 }),
                 DfsEvent::Enter(AnnProc {
-                    proc: Proc::StringLiteral("yes"),
+                    proc: Proc::StringLiteral(_),
                     ..
                 }),
                 DfsEvent::Exit(AnnProc {
-                    proc: Proc::StringLiteral("yes"),
+                    proc: Proc::StringLiteral(_),
                     ..
                 }),
                 DfsEvent::Enter(AnnProc {
-                    proc: Proc::StringLiteral("no"),
+                    proc: Proc::StringLiteral(_),
                     ..
                 }),
                 DfsEvent::Exit(AnnProc {
-                    proc: Proc::StringLiteral("no"),
+                    proc: Proc::StringLiteral(_),
                     ..
                 }),
                 DfsEvent::Exit(AnnProc {
@@ -615,9 +617,11 @@ mod tests {
     #[test]
     fn collection_map() {
         // { "k1": 1, "k2": 2 }
-        let k1 = Proc::StringLiteral("k1").ann(SourcePos::at_col(3).span_of(4));
+        let k1_lit = Proc::StringLiteral("k1".to_string());
+        let k1 = k1_lit.ann(SourcePos::at_col(3).span_of(4));
         let v1 = Proc::LongLiteral(1).ann(SourcePos::at_col(9).span_of(1));
-        let k2 = Proc::StringLiteral("k2").ann(SourcePos::at_col(12).span_of(4));
+        let k2_lit = Proc::StringLiteral("k2".to_string());
+        let k2 = k2_lit.ann(SourcePos::at_col(12).span_of(4));
         let v2 = Proc::LongLiteral(2).ann(SourcePos::at_col(18).span_of(1));
         let map = Proc::Collection(Collection::Map {
             elements: vec![(k1, v1), (k2, v2)],
@@ -630,9 +634,9 @@ mod tests {
         assert_eq!(nodes.len(), 5);
         // preorder: root → k1 → v1 → k2 → v2
         assert_matches!(nodes[0].proc, Proc::Collection(Collection::Map { .. }));
-        assert_matches!(nodes[1].proc, Proc::StringLiteral("k1"));
+        assert_matches!(nodes[1].proc, Proc::StringLiteral(s) if s == "k1");
         assert_matches!(nodes[2].proc, Proc::LongLiteral(1));
-        assert_matches!(nodes[3].proc, Proc::StringLiteral("k2"));
+        assert_matches!(nodes[3].proc, Proc::StringLiteral(s) if s == "k2");
         assert_matches!(nodes[4].proc, Proc::LongLiteral(2));
 
         let events: Vec<_> = (&root).iter_dfs_event().collect();
@@ -644,11 +648,11 @@ mod tests {
                     ..
                 }),
                 DfsEvent::Enter(AnnProc {
-                    proc: Proc::StringLiteral("k1"),
+                    proc: Proc::StringLiteral(_),
                     ..
                 }),
                 DfsEvent::Exit(AnnProc {
-                    proc: Proc::StringLiteral("k1"),
+                    proc: Proc::StringLiteral(_),
                     ..
                 }),
                 DfsEvent::Enter(AnnProc {
@@ -660,11 +664,11 @@ mod tests {
                     ..
                 }),
                 DfsEvent::Enter(AnnProc {
-                    proc: Proc::StringLiteral("k2"),
+                    proc: Proc::StringLiteral(_),
                     ..
                 }),
                 DfsEvent::Exit(AnnProc {
-                    proc: Proc::StringLiteral("k2"),
+                    proc: Proc::StringLiteral(_),
                     ..
                 }),
                 DfsEvent::Enter(AnnProc {

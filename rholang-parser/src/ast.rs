@@ -15,7 +15,7 @@ pub enum Proc<'ast> {
     Unit,
     BoolLiteral(bool),
     LongLiteral(i64),
-    StringLiteral(&'ast str),
+    StringLiteral(String),
     UriLiteral(Uri<'ast>),
 
     SimpleType(SimpleType),

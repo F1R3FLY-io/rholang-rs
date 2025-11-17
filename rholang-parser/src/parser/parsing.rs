@@ -129,9 +129,11 @@ pub(super) fn node_to_ast<'ast>(
                 }
                 kind!("string_literal") => {
                     let lit_value_raw = get_node_value(&node, source);
-                    match parse_string_literal(lit_value_raw) {
+                    let mut buf = String::new();
+                    match parse_string_literal(lit_value_raw, &mut buf) {
                         Ok(unescaped) => {
-                            proc_stack.push(ast_builder.alloc_string_literal(unescaped), span)
+                            // Create owned String for AST (AST owns strings now)
+                            proc_stack.push(ast_builder.alloc_string_literal(unescaped.to_string()), span)
                         }
                         Err(err) => {
                             let perr = match err {
