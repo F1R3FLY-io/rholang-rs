@@ -343,9 +343,6 @@ pub(super) fn node_to_ast<'ast>(
                                 if decls[i].id.name == decls[j].id.name {
                                     let mut first = decls[i].id.pos;
                                     let mut second = decls[j].id.pos;
-                                    if second < first {
-                                        std::mem::swap(&mut first, &mut second);
-                                    }
                                     return Some((first, second));
                                 }
                             }
