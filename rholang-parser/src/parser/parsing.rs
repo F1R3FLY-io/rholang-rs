@@ -4,6 +4,7 @@ use bitvec::vec::BitVec;
 use nonempty_collections::NEVec;
 use rholang_tree_sitter_proc_macro::{field, kind};
 use smallvec::{SmallVec, ToSmallVec};
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::iter::{FusedIterator, Zip};
 use std::slice::Iter as SliceIter;
@@ -343,18 +344,18 @@ pub(super) fn node_to_ast<'ast>(
                     fn check_for_duplicate_decls(
                         decls: &[NameDecl],
                     ) -> Option<(SourcePos, SourcePos)> {
-                        // Check for duplicates without requiring sorted input
-                        // Use O(n^2) comparison since n is typically small
-                        for i in 0..decls.len() {
-                            for j in (i + 1)..decls.len() {
-                                if decls[i].id.name == decls[j].id.name {
-                                    let mut first = decls[i].id.pos;
-                                    let mut second = decls[j].id.pos;
-                                    if second < first {
-                                        std::mem::swap(&mut first, &mut second);
-                                    }
-                                    return Some((first, second));
+                        let mut seen = HashMap::with_capacity(decls.len());
+                        for decl in decls {
+                            if let Some(&first_pos) = seen.get(decl.id.name) {
+                                // Found duplicate - return both positions
+                                let mut first = first_pos;
+                                let mut second = decl.id.pos;
+                                if second < first {
+                                    std::mem::swap(&mut first, &mut second);
                                 }
+                                return Some((first, second));
+                            } else {
+                                seen.insert(decl.id.name, decl.id.pos);
                             }
                         }
                         None
