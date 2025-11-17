@@ -20,7 +20,6 @@ use crate::{
     parser::{
         ast_builder::ASTBuilder,
         errors::{AnnParsingError, ParsingError},
-        string_literal::{parse_string_literal, StringLitError},
     },
 };
 
@@ -128,21 +127,8 @@ pub(super) fn node_to_ast<'ast>(
                     }
                 }
                 kind!("string_literal") => {
-                    let lit_value_raw = get_node_value(&node, source);
-                    let mut buf = String::new();
-                    match parse_string_literal(lit_value_raw, &mut buf) {
-                        Ok(unescaped) => {
-                            proc_stack.push(ast_builder.alloc_string_literal(unescaped), span)
-                        }
-                        Err(err) => {
-                            let perr = match err {
-                                StringLitError::InvalidEscape => ParsingError::InvalidStringEscape,
-                                StringLitError::InvalidCodePoint => ParsingError::InvalidStringCodePoint,
-                            };
-                            errors.push(AnnParsingError::new(perr, &node));
-                            bad = true;
-                        }
-                    }
+                    let lit_value = get_node_value(&node, source);
+                    proc_stack.push(ast_builder.alloc_string_literal(lit_value), span);
                 }
                 kind!("uri_literal") => {
                     let lit_value = get_node_value(&node, source);
@@ -678,11 +664,11 @@ pub(super) fn node_to_ast<'ast>(
 
                 _ => {
                     let text = get_node_value(&node, source);
-                    if text == "(" {
-                        if let Some(next_sibling) = node.next_named_sibling() {
-                            node = next_sibling;
-                            continue 'parse;
-                        }
+                    if text == "("
+                        && let Some(next_sibling) = node.next_named_sibling()
+                    {
+                        node = next_sibling;
+                        continue 'parse;
                     }
 
                     unimplemented!("{node}");

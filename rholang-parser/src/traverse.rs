@@ -5,6 +5,14 @@ use smallvec::{SmallVec, smallvec};
 use crate::ast::*;
 
 /// Preorder DFS traversal over `AnnProc`.
+///
+/// ### Note:
+/// - This iterator **only expands process positions**.
+/// - It does **not** descend into names appearing inside processes
+///   (e.g., name variables, for-comprehension bindings, contract formal arguments).
+/// - It descends into quoted sub-processes appearing in channel names and evals
+/// - Use a higher-level iterator (such as [`NameAwareDfsEventIter`])
+///   if you need to see [`Name`] occurrences as well.
 pub(crate) struct PreorderDfsIter<'a, const S: usize> {
     stack: SmallVec<[&'a AnnProc<'a>; S]>,
 }
@@ -147,10 +155,42 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
 
 impl<'a, const S: usize> FusedIterator for PreorderDfsIter<'a, S> {}
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DfsEvent<'a> {
     Enter(&'a AnnProc<'a>),
     Exit(&'a AnnProc<'a>),
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum DfsEventExt<'a> {
+    Enter(&'a AnnProc<'a>),
+    Exit(&'a AnnProc<'a>),
+    Name(&'a Name<'a>),
+}
+
+impl<'a> DfsEventExt<'a> {
+    pub fn as_proc(&self) -> Option<&'a AnnProc<'a>> {
+        match self {
+            DfsEventExt::Enter(p) | DfsEventExt::Exit(p) => Some(p),
+            _ => None,
+        }
+    }
+
+    pub fn as_name(&self) -> Option<&'a Name<'a>> {
+        match self {
+            DfsEventExt::Name(name) => Some(name),
+            _ => None,
+        }
+    }
+}
+
+impl<'a> From<DfsEvent<'a>> for DfsEventExt<'a> {
+    fn from(value: DfsEvent<'a>) -> Self {
+        match value {
+            DfsEvent::Enter(ann_proc) => DfsEventExt::Enter(ann_proc),
+            DfsEvent::Exit(ann_proc) => DfsEventExt::Exit(ann_proc),
+        }
+    }
 }
 
 /*
@@ -163,6 +203,18 @@ So if you’re in a hot path and don’t need the Exit events, the hand-tuned ve
 2. Inlining and branch prediction
 Current PreorderDfsIter is straightforward enough to inline well; wrapping it in another iterator layer might inhibit some of that in release builds.
  */
+/// Depth-first traversal over the *process structure* of the AST.
+///
+/// This iterator visits each process position in depth-first order,
+/// emitting `Enter(proc)` before descending into its sub-processes
+/// and `Exit(proc)` after all children have been processed.
+///
+/// ### Note:
+/// - This iterator **only expands process positions**.
+/// - It does **not** descend into names appearing inside processes
+///   (e.g., name variables, for-comprehension bindings, contract formal arguments).
+/// - Use a higher-level iterator (such as [`NameAwareDfsEventIter`])
+///   if you need to see [`Name`] occurrences as well.
 pub(crate) struct DfsEventIter<'a, const S: usize> {
     stack: SmallVec<[Frame<'a>; S]>,
 }
@@ -174,11 +226,23 @@ enum Frame<'a> {
     Event(DfsEvent<'a>),
 }
 
+impl<const S: usize> Default for DfsEventIter<'_, S> {
+    fn default() -> Self {
+        Self {
+            stack: Default::default(),
+        }
+    }
+}
+
 impl<'a, const S: usize> DfsEventIter<'a, S> {
-    pub fn new(root: &'a AnnProc<'a>) -> Self {
+    pub(crate) fn new(root: &'a AnnProc<'a>) -> Self {
         Self {
             stack: smallvec![Frame::Node(root)],
         }
+    }
+
+    pub(crate) fn empty() -> Self {
+        Self::default()
     }
 
     /// Push children of `node` as `Node(child)` in reverse order so they are visited left->right.
@@ -187,9 +251,8 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
         &mut self,
         children: I,
     ) {
-        for child in children.into_iter().rev() {
-            self.stack.push(Frame::Node(child));
-        }
+        self.stack
+            .extend(children.into_iter().map(Frame::Node).rev());
     }
 
     fn expand_node_naked(&mut self, node: &'a AnnProc<'a>) {
@@ -199,7 +262,7 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
             }
 
             Proc::ForComprehension { receipts, proc } => {
-                self.push_children(iter::once(proc).chain(for_comprehension_inputs(receipts)));
+                self.push_children(iter::once(proc).chain(receipts.iter().flat_map(|r| inputs(r))));
             }
 
             Proc::Let { bindings, body, .. } => {
@@ -241,7 +304,7 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
                     // pattern enter
                     self.stack.push(Frame::Event(DfsEvent::Enter(pattern)));
                 }
-                self.push_children(iter::once(expression));
+                self.stack.push(Frame::Node(expression));
 
                 // Enter(Match) will be pushed by expand_node()
             }
@@ -264,33 +327,25 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
             Proc::New { proc: inner, .. }
             | Proc::Bundle { proc: inner, .. }
             | Proc::UnaryExp { arg: inner, .. } => {
-                self.push_children(iter::once(inner));
+                self.stack.push(Frame::Node(inner));
             }
 
             Proc::Send {
-                inputs, channel, ..
+                inputs, channel: _, ..
             } => {
-                let quoted = match channel {
-                    Name::Quote(q) => Some(q),
-                    _ => None,
-                };
-                self.push_children(quoted.into_iter().chain(inputs));
+                self.push_children(inputs);
             }
             Proc::SendSync {
-                channel,
+                channel: _,
                 inputs,
                 cont,
                 ..
             } => {
-                let quoted = match channel {
-                    Name::Quote(q) => Some(q),
-                    _ => None,
-                };
                 let cont_iter = match cont {
                     SyncSendCont::NonEmpty(p) => Some(p),
                     _ => None,
                 };
-                self.push_children(quoted.into_iter().chain(inputs).chain(cont_iter));
+                self.push_children(inputs.iter().chain(cont_iter));
             }
 
             Proc::Method { receiver, args, .. } => {
@@ -308,12 +363,6 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
                 }
             },
 
-            Proc::Eval { name } => {
-                if let Name::Quote(q) = name {
-                    self.push_children(iter::once(q));
-                }
-            }
-
             // leaves: no children
             Proc::Nil
             | Proc::Unit
@@ -323,6 +372,7 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
             | Proc::UriLiteral(_)
             | Proc::SimpleType(_)
             | Proc::ProcVar(_)
+            | Proc::Eval { .. }
             | Proc::VarRef { .. }
             | Proc::Bad => {}
 
@@ -348,14 +398,19 @@ impl<'a, const S: usize> Iterator for DfsEventIter<'a, S> {
     type Item = DfsEvent<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(item) = self.stack.pop() {
+        if let Some(item) = self.stack.pop() {
             match item {
                 Frame::Event(ev) => return Some(ev),
                 Frame::Node(node) => {
                     // expand node into Event::Enter, Node(children), Event::Exit
-                    self.expand_node(node);
-                    // and loop: the next iteration will pop the Enter event we just pushed
-                    continue;
+
+                    // push Exit first (it should be at bottom)
+                    self.stack.push(Frame::Event(DfsEvent::Exit(node)));
+
+                    self.expand_node_naked(node);
+
+                    // finally return Enter
+                    return Some(DfsEvent::Enter(node));
                 }
             }
         }
@@ -363,11 +418,139 @@ impl<'a, const S: usize> Iterator for DfsEventIter<'a, S> {
     }
 }
 
+impl<'a, const S: usize> FusedIterator for DfsEventIter<'a, S> {}
+
+/// A decorator over a *process-only* DFS iterator that re-emits the process `Enter`/`Exit` events
+/// and additionally emits [`DfsEventExt::Name`] events for *names that appear directly in the
+/// process node*.
+///
+/// ### Note:
+/// - It only inspects the *surface* of each process node when that node is entered, and emits
+///   events for the names found there (for example: channel of a `Send`, a quoted binding in
+///   for-comprehension, etc.).
+/// - It **does not** recurse into the bodies of quoted processes. If callers want to explore quoted
+///   processes, they can reconstruct a new [`NameAwareDfsEventIter`] (for example via
+///   [`Name::iter_into`]). This fits the Rho-calculus intuition that `@P` is not in the current
+///   world of processes, but in the world of names.
+///
+/// ### Ordering guarantee:
+/// When a process `p` is entered, this iterator yields `DfsEventExt::Enter(p)` first, and then the
+///  `DfsEventExt::Name` events for the names that appear directly in `p` (the names are emitted in
+/// a deterministic left-to-right order).
+pub(crate) struct NameAwareDfsEventIter<'a, const S: usize = 32> {
+    inner: DfsEventIter<'a, S>,
+    pending: SmallVec<[&'a Name<'a>; 4]>,
+}
+
+impl<'a, const S: usize> NameAwareDfsEventIter<'a, S> {
+    pub(crate) fn new(root: &'a AnnProc<'a>) -> Self {
+        Self {
+            inner: DfsEventIter::new(root),
+            pending: SmallVec::new(),
+        }
+    }
+
+    pub(crate) fn single(name: &'a Name<'a>) -> Self {
+        Self {
+            inner: DfsEventIter::empty(),
+            pending: smallvec![name],
+        }
+    }
+
+    fn enqueue_names(&mut self, node: &'a AnnProc<'a>) {
+        match node.proc {
+            Proc::Send { channel: name, .. }
+            | Proc::SendSync { channel: name, .. }
+            | Proc::Eval { name } => {
+                self.pending.push(name);
+            }
+            Proc::Contract { name, formals, .. } => {
+                self.pending.extend(formals.names.iter().rev());
+                self.pending.push(name);
+            }
+            Proc::Let { bindings, .. } => {
+                self.pending.extend(let_lhss(bindings));
+            }
+            Proc::ForComprehension { receipts, .. } => {
+                self.pending
+                    .extend(for_comprehension_outputs(receipts).rev());
+            }
+            /* no names */
+            _ => {}
+        }
+    }
+}
+
+impl<'a, const S: usize> Iterator for NameAwareDfsEventIter<'a, S> {
+    type Item = DfsEventExt<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // First, flush any pending names
+        if let Some(name) = self.pending.pop() {
+            return Some(DfsEventExt::Name(name));
+        }
+
+        // Otherwise, pull from inner iterator
+        if let Some(ev) = self.inner.next() {
+            if let DfsEvent::Enter(p) = ev {
+                // enqueue names found directly in p
+                self.enqueue_names(p);
+            }
+            return Some(ev.into());
+        }
+        None
+    }
+}
+
+impl<'a, const S: usize> FusedIterator for NameAwareDfsEventIter<'a, S> {}
+
+/// Depth-first traversal over [`Name`]s and their quoted processes.
+pub(crate) struct DeepDfsIter<'a, const S: usize> {
+    stack: SmallVec<[NameAwareDfsEventIter<'a, S>; 4]>,
+}
+
+impl<'a, const S: usize> DeepDfsIter<'a, S> {
+    pub fn new(root: &'a Name<'a>) -> Self {
+        Self {
+            stack: smallvec![NameAwareDfsEventIter::<S>::single(root)],
+        }
+    }
+}
+
+impl<'a, const S: usize> Iterator for DeepDfsIter<'a, S> {
+    type Item = DfsEventExt<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(top) = self.stack.last_mut() {
+            if let Some(ev) = top.next() {
+                if let DfsEventExt::Name(name) = ev
+                    && let Some(quoted) = name.as_quote()
+                {
+                    // Unconditionally descend into quoted process.
+                    self.stack.push(NameAwareDfsEventIter::<S>::new(quoted));
+                }
+                // Always yield the event.
+                return Some(ev);
+            } else {
+                self.stack.pop();
+            }
+        }
+        None
+    }
+}
+
+impl<'a, const S: usize> FusedIterator for DeepDfsIter<'a, S> {}
+
 /// Helper: extract right-hand sides of let bindings
 fn let_rhss<'a>(
     bindings: &'a [LetBinding<'a>],
 ) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
     bindings.iter().flat_map(|binding| &binding.rhs)
+}
+
+/// Helper: extract left-hand sides of let bindings
+fn let_lhss<'a>(bindings: &'a [LetBinding<'a>]) -> impl DoubleEndedIterator<Item = &'a Name<'a>> {
+    bindings.iter().flat_map(|binding| &binding.lhs.names)
 }
 
 /// Helper: extract sources + their inputs from `ForComprehension` receipts.
@@ -383,6 +566,17 @@ fn for_comprehension_inputs<'a>(
         let quoted_iter = name_proc.into_iter();
         let input_iter = binding.input().into_iter().flatten();
         quoted_iter.chain(input_iter)
+    })
+}
+
+/// Helper: extract sources + their outputs from `ForComprehension` receipts.
+fn for_comprehension_outputs<'a>(
+    receipts: &'a [Receipt<'a>],
+) -> impl DoubleEndedIterator<Item = &'a Name<'a>> {
+    receipts.iter().flatten().flat_map(|binding| {
+        binding
+            .names_iter()
+            .chain(iter::once(binding.source_name()))
     })
 }
 
@@ -425,6 +619,22 @@ mod tests {
     use crate::{SourcePos, SourceSpan, ast::AnnProc, ast::Proc, parser::ast_builder::ASTBuilder};
     use pretty_assertions::{assert_eq, assert_matches};
     use smallvec::smallvec;
+
+    fn assert_same_events<'test, E1, E2>(e1: E1, e2: E2)
+    where
+        E1: IntoIterator<Item = DfsEvent<'test>>,
+        E2: IntoIterator<Item = DfsEventExt<'test>>,
+    {
+        let mut evs = e1.into_iter();
+        let mut exts = e2.into_iter();
+
+        while let Some(ev) = evs.next() {
+            let actual: DfsEventExt = ev.into();
+            let expected = exts.next().expect("expected same number of events");
+            assert_eq!(actual, expected);
+        }
+        assert!(exts.next().is_none(), "expected same number of events");
+    }
 
     #[test]
     fn single_leaf() {
@@ -484,6 +694,8 @@ mod tests {
                 })
             ]
         );
+
+        assert_same_events(events, (&root).iter_dfs_event_with_names());
     }
 
     #[test]
@@ -545,16 +757,45 @@ mod tests {
                 })
             ]
         );
+
+        // events and names
+        let events_and_names: Vec<_> = (&root).iter_dfs_event_with_names().collect();
+        assert_matches!(
+            events_and_names.as_slice(),
+            [
+                DfsEventExt::Enter(AnnProc {
+                    proc: Proc::Let { .. },
+                    ..
+                }),
+                DfsEventExt::Name(name_x),
+                DfsEventExt::Enter(AnnProc {
+                    proc: Proc::Unit, ..
+                }),
+                DfsEventExt::Exit(AnnProc {
+                    proc: Proc::Unit, ..
+                }),
+                DfsEventExt::Enter(AnnProc {
+                    proc: Proc::LongLiteral(42),
+                    ..
+                }),
+                DfsEventExt::Exit(AnnProc {
+                    proc: Proc::LongLiteral(42),
+                    ..
+                }),
+                DfsEventExt::Exit(AnnProc {
+                    proc: Proc::Let { .. },
+                    ..
+                }),
+            ] if name_x.is_ident("x")
+        );
     }
 
     #[test]
     fn if_then_else_full() {
         // if (true) "yes" else "no"
         let cond = Proc::BoolLiteral(true).ann(SourcePos::at_col(5).span_of(5));
-        let if_true_lit = Proc::StringLiteral("yes");
-        let if_true = if_true_lit.ann(SourcePos::at_col(11).span_of(5));
-        let if_false_lit = Proc::StringLiteral("no");
-        let if_false = if_false_lit.ann(SourcePos::at_col(22).span_of(4));
+        let if_true = Proc::StringLiteral("yes").ann(SourcePos::at_col(11).span_of(5));
+        let if_false = Proc::StringLiteral("no").ann(SourcePos::at_col(22).span_of(4));
         let if_then_else = Proc::IfThenElse {
             condition: cond,
             if_true,
@@ -571,8 +812,8 @@ mod tests {
         // preorder: root → cond → if_true → if_false
         assert_matches!(nodes[0].proc, Proc::IfThenElse { .. });
         assert_matches!(nodes[1].proc, Proc::BoolLiteral(true));
-        assert_matches!(nodes[2].proc, Proc::StringLiteral(s) if *s == "yes");
-        assert_matches!(nodes[3].proc, Proc::StringLiteral(s) if *s == "no");
+        assert_matches!(nodes[2].proc, Proc::StringLiteral("yes"));
+        assert_matches!(nodes[3].proc, Proc::StringLiteral("no"));
 
         let events: Vec<_> = (&root).iter_dfs_event().collect();
         assert_matches!(
@@ -591,19 +832,19 @@ mod tests {
                     ..
                 }),
                 DfsEvent::Enter(AnnProc {
-                    proc: Proc::StringLiteral(_),
+                    proc: Proc::StringLiteral("yes"),
                     ..
                 }),
                 DfsEvent::Exit(AnnProc {
-                    proc: Proc::StringLiteral(_),
+                    proc: Proc::StringLiteral("yes"),
                     ..
                 }),
                 DfsEvent::Enter(AnnProc {
-                    proc: Proc::StringLiteral(_),
+                    proc: Proc::StringLiteral("no"),
                     ..
                 }),
                 DfsEvent::Exit(AnnProc {
-                    proc: Proc::StringLiteral(_),
+                    proc: Proc::StringLiteral("no"),
                     ..
                 }),
                 DfsEvent::Exit(AnnProc {
@@ -612,16 +853,16 @@ mod tests {
                 })
             ]
         );
+
+        assert_same_events(events, (&root).iter_dfs_event_with_names());
     }
 
     #[test]
     fn collection_map() {
         // { "k1": 1, "k2": 2 }
-        let k1_lit = Proc::StringLiteral("k1");
-        let k1 = k1_lit.ann(SourcePos::at_col(3).span_of(4));
+        let k1 = Proc::StringLiteral("k1").ann(SourcePos::at_col(3).span_of(4));
         let v1 = Proc::LongLiteral(1).ann(SourcePos::at_col(9).span_of(1));
-        let k2_lit = Proc::StringLiteral("k2");
-        let k2 = k2_lit.ann(SourcePos::at_col(12).span_of(4));
+        let k2 = Proc::StringLiteral("k2").ann(SourcePos::at_col(12).span_of(4));
         let v2 = Proc::LongLiteral(2).ann(SourcePos::at_col(18).span_of(1));
         let map = Proc::Collection(Collection::Map {
             elements: vec![(k1, v1), (k2, v2)],
@@ -634,9 +875,9 @@ mod tests {
         assert_eq!(nodes.len(), 5);
         // preorder: root → k1 → v1 → k2 → v2
         assert_matches!(nodes[0].proc, Proc::Collection(Collection::Map { .. }));
-        assert_matches!(nodes[1].proc, Proc::StringLiteral(s) if *s == "k1");
+        assert_matches!(nodes[1].proc, Proc::StringLiteral("k1"));
         assert_matches!(nodes[2].proc, Proc::LongLiteral(1));
-        assert_matches!(nodes[3].proc, Proc::StringLiteral(s) if *s == "k2");
+        assert_matches!(nodes[3].proc, Proc::StringLiteral("k2"));
         assert_matches!(nodes[4].proc, Proc::LongLiteral(2));
 
         let events: Vec<_> = (&root).iter_dfs_event().collect();
@@ -648,11 +889,11 @@ mod tests {
                     ..
                 }),
                 DfsEvent::Enter(AnnProc {
-                    proc: Proc::StringLiteral(_),
+                    proc: Proc::StringLiteral("k1"),
                     ..
                 }),
                 DfsEvent::Exit(AnnProc {
-                    proc: Proc::StringLiteral(_),
+                    proc: Proc::StringLiteral("k1"),
                     ..
                 }),
                 DfsEvent::Enter(AnnProc {
@@ -664,11 +905,11 @@ mod tests {
                     ..
                 }),
                 DfsEvent::Enter(AnnProc {
-                    proc: Proc::StringLiteral(_),
+                    proc: Proc::StringLiteral("k2"),
                     ..
                 }),
                 DfsEvent::Exit(AnnProc {
-                    proc: Proc::StringLiteral(_),
+                    proc: Proc::StringLiteral("k2"),
                     ..
                 }),
                 DfsEvent::Enter(AnnProc {
@@ -685,6 +926,8 @@ mod tests {
                 })
             ]
         );
+
+        assert_same_events(events, (&root).iter_dfs_event_with_names());
     }
 
     #[test]
@@ -767,6 +1010,54 @@ mod tests {
                     ..
                 })
             ]
+        );
+
+        let events_and_names: Vec<_> = (&root).iter_dfs_event_with_names().collect();
+        assert_matches!(
+            events_and_names.as_slice(),
+            [
+                DfsEventExt::Enter(AnnProc {
+                    proc: Proc::Par { .. },
+                    ..
+                }),
+                DfsEventExt::Enter(AnnProc {
+                    proc: Proc::BoolLiteral(true),
+                    ..
+                }),
+                DfsEventExt::Exit(AnnProc {
+                    proc: Proc::BoolLiteral(true),
+                    ..
+                }),
+                DfsEventExt::Enter(AnnProc {
+                    proc: Proc::Let { .. },
+                    ..
+                }),
+                DfsEventExt::Name(name_z),
+                DfsEventExt::Enter(AnnProc {
+                    proc: Proc::Unit,
+                    ..
+                }),
+                DfsEventExt::Exit(AnnProc {
+                    proc: Proc::Unit,
+                    ..
+                }),
+                DfsEventExt::Enter(AnnProc {
+                    proc: Proc::LongLiteral(7),
+                    ..
+                }),
+                DfsEventExt::Exit(AnnProc {
+                    proc: Proc::LongLiteral(7),
+                    ..
+                }),
+                DfsEventExt::Exit(AnnProc {
+                    proc: Proc::Let { .. },
+                    ..
+                }),
+                DfsEventExt::Exit(AnnProc {
+                    proc: Proc::Par { .. },
+                    ..
+                })
+            ] if name_z.is_ident("z")
         );
     }
 
@@ -890,6 +1181,65 @@ mod tests {
                     ..
                 })
             ]
+        );
+
+        let events_and_names: Vec<_> = (&root).iter_dfs_event_with_names().collect();
+        assert_matches!(
+            events_and_names.as_slice(),
+            [
+                DfsEventExt::Enter(AnnProc {
+                    proc: Proc::ForComprehension { .. },
+                    ..
+                }),
+                DfsEventExt::Name(name_y),
+                DfsEventExt::Name(name_z_outer),
+                DfsEventExt::Enter(AnnProc {
+                    proc: Proc::LongLiteral(99),
+                    ..
+                }),
+                DfsEventExt::Exit(AnnProc {
+                    proc: Proc::LongLiteral(99),
+                    ..
+                }),
+                DfsEventExt::Enter(AnnProc {
+                    proc: Proc::LongLiteral(99),
+                    ..
+                }),
+                DfsEventExt::Exit(AnnProc {
+                    proc: Proc::LongLiteral(99),
+                    ..
+                }),
+                DfsEventExt::Enter(AnnProc {
+                    proc: Proc::ForComprehension { .. },
+                    ..
+                }),
+                DfsEventExt::Name(name_x),
+                DfsEventExt::Name(name_z_inner),
+                DfsEventExt::Enter(AnnProc {
+                    proc: Proc::LongLiteral(42),
+                    ..
+                }),
+                DfsEventExt::Exit(AnnProc {
+                    proc: Proc::LongLiteral(42),
+                    ..
+                }),
+                DfsEventExt::Enter(AnnProc {
+                    proc: Proc::LongLiteral(42),
+                    ..
+                }),
+                DfsEventExt::Exit(AnnProc {
+                    proc: Proc::LongLiteral(42),
+                    ..
+                }),
+                DfsEventExt::Exit(AnnProc {
+                    proc: Proc::ForComprehension { .. },
+                    ..
+                }),
+                DfsEventExt::Exit(AnnProc {
+                    proc: Proc::ForComprehension { .. },
+                    ..
+                })
+            ] if name_y.is_ident("y") && name_z_outer.is_ident("z") && name_x.is_ident("x") && name_z_inner.is_ident("z")
         );
     }
 
@@ -1020,19 +1370,16 @@ mod tests {
         assert_matches!(nodes[3].proc, Proc::Par { .. });
         assert_matches!(
             nodes[4].proc,
-            Proc::ProcVar(Var::Id(Id { name: "arg1", .. }))
+            proc if proc.is_ident("arg1")
         );
         assert_matches!(nodes[5].proc, Proc::Eval { .. });
-        assert_matches!(
-            nodes[6].proc,
-            Proc::ProcVar(Var::Id(Id { name: "arg2", .. }))
-        );
+        assert_matches!(nodes[6].proc, proc if proc.is_ident("arg2"));
         assert_matches!(nodes[7].proc, Proc::Send { .. });
         assert_matches!(nodes[8].proc, Proc::BoolLiteral(true));
         assert_matches!(nodes[9].proc, Proc::Par { .. });
         assert_matches!(
             nodes[10].proc,
-            Proc::ProcVar(Var::Id(Id { name: "arg1", .. }))
+            proc if proc.is_ident("arg1")
         );
         assert_matches!(nodes[11].proc, Proc::Eval { .. });
 
@@ -1053,32 +1400,6 @@ mod tests {
                     proc: Proc::Send { .. },
                     ..
                 }),
-                // Enter (quote)
-                DfsEvent::Enter(AnnProc {
-                    proc: Proc::Par { .. },
-                    ..
-                }),
-                DfsEvent::Enter(AnnProc {
-                    proc: Proc::ProcVar(Var::Id(Id { name: "arg1", .. })),
-                    ..
-                }),
-                DfsEvent::Exit(AnnProc {
-                    proc: Proc::ProcVar(Var::Id(Id { name: "arg1", .. })),
-                    ..
-                }),
-                DfsEvent::Enter(AnnProc {
-                    proc: Proc::Eval { .. },
-                    ..
-                }),
-                DfsEvent::Exit(AnnProc {
-                    proc: Proc::Eval { .. },
-                    ..
-                }),
-                DfsEvent::Exit(AnnProc {
-                    proc: Proc::Par { .. },
-                    ..
-                }),
-                // Exit (quote)
                 DfsEvent::Enter(AnnProc {
                     proc: Proc::ProcVar(Var::Id(Id { name: "arg2", .. })),
                     ..
@@ -1112,38 +1433,72 @@ mod tests {
                     ..
                 }),
                 // Exit(for body)
-
-                // Enter (quote)
-                DfsEvent::Enter(AnnProc {
-                    proc: Proc::Par { .. },
-                    ..
-                }),
-                DfsEvent::Enter(AnnProc {
-                    proc: Proc::ProcVar(Var::Id(Id { name: "arg1", .. })),
-                    ..
-                }),
-                DfsEvent::Exit(AnnProc {
-                    proc: Proc::ProcVar(Var::Id(Id { name: "arg1", .. })),
-                    ..
-                }),
-                DfsEvent::Enter(AnnProc {
-                    proc: Proc::Eval { .. },
-                    ..
-                }),
-                DfsEvent::Exit(AnnProc {
-                    proc: Proc::Eval { .. },
-                    ..
-                }),
-                DfsEvent::Exit(AnnProc {
-                    proc: Proc::Par { .. },
-                    ..
-                }),
-                // Exit (quote)
                 DfsEvent::Exit(AnnProc {
                     proc: Proc::ForComprehension { .. },
                     ..
                 })
             ]
+        );
+
+        let events_and_names: Vec<_> = (&root).iter_dfs_event_with_names().collect();
+        assert_matches!(
+            events_and_names.as_slice(),
+            [
+                DfsEventExt::Enter(AnnProc {
+                    proc: Proc::ForComprehension { .. },
+                    ..
+                }),
+                DfsEventExt::Name(wildcard),
+                DfsEventExt::Name(Name::Quote(_)),
+                // Enter(for body)
+                DfsEventExt::Enter(AnnProc {
+                    proc: Proc::Par { .. },
+                    ..
+                }),
+                DfsEventExt::Enter(AnnProc {
+                    proc: Proc::Send { .. },
+                    ..
+                }),
+                DfsEventExt::Name(Name::Quote(_)),
+                DfsEventExt::Enter(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "arg2", .. })),
+                    ..
+                }),
+                DfsEventExt::Exit(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "arg2", .. })),
+                    ..
+                }),
+                DfsEventExt::Exit(AnnProc {
+                    proc: Proc::Send { .. },
+                    ..
+                }),
+                DfsEventExt::Enter(AnnProc {
+                    proc: Proc::Send { .. },
+                    ..
+                }),
+                DfsEventExt::Name(ack),
+                DfsEventExt::Enter(AnnProc {
+                    proc: Proc::BoolLiteral(true),
+                    ..
+                }),
+                DfsEventExt::Exit(AnnProc {
+                    proc: Proc::BoolLiteral(true),
+                    ..
+                }),
+                DfsEventExt::Exit(AnnProc {
+                    proc: Proc::Send { .. },
+                    ..
+                }),
+                DfsEventExt::Exit(AnnProc {
+                    proc: Proc::Par { .. },
+                    ..
+                }),
+                // Exit(for body)
+                DfsEventExt::Exit(AnnProc {
+                    proc: Proc::ForComprehension { .. },
+                    ..
+                })
+            ] if wildcard.is_ident("_") && ack.is_ident("ack")
         );
     }
 
@@ -1254,5 +1609,7 @@ mod tests {
                 })
             ]
         );
+
+        assert_same_events(events, (&root).iter_dfs_event_with_names());
     }
 }
