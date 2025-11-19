@@ -99,6 +99,11 @@ impl<'a> SemanticDb<'a> {
         result
     }
 
+    /// Checks if the given [`ProcRef`] is indexed
+    pub fn contains(&self, proc: ProcRef<'a>) -> bool {
+        self.lookup(proc).is_some()
+    }
+
     /// Returns a reference to the process by [`PID`], or None if out of bounds.
     pub fn get(&self, id: PID) -> Option<ProcRef<'a>> {
         self.rev.get_index(id.0 as usize).map(|(proc, _)| **proc)
@@ -230,6 +235,11 @@ impl<'a> SemanticDb<'a> {
     /// Returns the scope information associated with the given process, if any.
     pub fn get_scope(&self, proc: PID) -> Option<&ScopeInfo> {
         self.proc_to_scope.get(proc)
+    }
+
+    /// Checks if the given process introduced a lexical scope
+    pub fn is_scoped(&self, pid: PID) -> bool {
+        self.get_scope(pid).is_some()
     }
 
     /// Returns all binders introduced by the given process.
@@ -395,7 +405,10 @@ impl<'a> SemanticDb<'a> {
     /// Returns an iterator over variable bindings that occur within a given source span.
     ///
     /// The range is inclusive–exclusive: `[span.start, span.end)`.
-    pub fn bound_in_range(&self, span: SourceSpan) -> impl Iterator<Item = BoundOccurence> {
+    pub fn bound_in_range(
+        &self,
+        span: SourceSpan,
+    ) -> impl DoubleEndedIterator<Item = BoundOccurence> {
         use std::ops::Bound::*;
 
         // Construct range bounds for the BTreeMap key type
@@ -417,8 +430,19 @@ impl<'a> SemanticDb<'a> {
     }
 
     /// Returns an iterator over all variable bindings within the given scope.
-    pub fn bound_in_scope(&self, scope: &ScopeInfo) -> impl Iterator<Item = BoundOccurence> {
+    pub fn bound_in_scope(
+        &self,
+        scope: &ScopeInfo,
+    ) -> impl DoubleEndedIterator<Item = BoundOccurence> {
         self.bound_in_range(scope.span)
+    }
+
+    /// Returns an iterator over free variables that occur within a given source span.
+    ///
+    /// The range is inclusive–exclusive: `[span.start, span.end)`.
+    pub fn free_in_range(&self, span: SourceSpan) -> impl DoubleEndedIterator<Item = VarBinding> {
+        self.bound_in_range(span)
+            .filter_map(|occ| occ.binding.is_free().then_some(occ.binding))
     }
 
     /// Finds the binder corresponding to a given symbol within a specific scope.

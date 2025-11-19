@@ -116,7 +116,7 @@ impl<'a> Proc<'a> {
         AnnProc { proc: self, span }
     }
 
-    pub fn is_ground(&self) -> bool {
+    pub fn is_trivially_ground(&self) -> bool {
         match self {
             Proc::Nil
             | Proc::Unit
@@ -138,6 +138,13 @@ impl<'a> Proc<'a> {
             _ => false,
         }
     }
+
+    pub fn as_var(&self) -> Option<Var<'a>> {
+        match self {
+            Proc::ProcVar(var) => Some(*var),
+            _ => None,
+        }
+    }
 }
 
 impl<'a> From<Var<'a>> for Proc<'a> {
@@ -153,27 +160,85 @@ pub struct AnnProc<'ast> {
 }
 
 impl<'a> AnnProc<'a> {
+    /// Preorder DFS traversal over `AnnProc`.
+    ///
+    /// ### Note:
+    /// - This iterator **only expands process positions**.
+    /// - It does **not** descend into names appearing inside processes
+    ///   (e.g., name variables, for-comprehension bindings, contract formal arguments).
+    /// - It descends into quoted sub-processes appearing in channel names and evals
+    /// - Use a higher-level iterator (such as [`NameAwareDfsEventIter`])
+    ///   if you need to see [`Name`] occurrences as well.
     pub fn iter_preorder_dfs(&'a self) -> impl Iterator<Item = &'a Self> {
         PreorderDfsIter::<16>::new(self)
     }
 
+    /// Depth-first traversal over the *process structure* of the AST.
+    ///
+    /// This iterator visits each process position in depth-first order,
+    /// emitting `Enter(proc)` before descending into its sub-processes
+    /// and `Exit(proc)` after all children have been processed.
+    ///
+    /// ### Note:
+    /// - This iterator **only expands process positions**.
+    /// - It does **not** descend into names appearing inside processes
+    ///   (e.g., name variables, for-comprehension bindings, contract formal arguments).
+    /// - Use a higher-level iterator (such as [`NameAwareDfsEventIter`])
+    ///   if you need to see [`Name`] occurrences as well.
     pub fn iter_dfs_event(&'a self) -> impl Iterator<Item = DfsEvent<'a>> {
         DfsEventIter::<32>::new(self)
     }
 
-    pub fn is_ground(&self) -> bool {
-        self.proc.is_ground()
+    /// A decorator over a *process-only* DFS iterator that re-emits the process `Enter`/`Exit` events
+    /// and additionally emits [`DfsEventExt::Name`] events for *names that appear directly in the
+    /// process node*.
+    ///
+    /// ### Note:
+    /// - It only inspects the *surface* of each process node when that node is entered, and emits
+    ///   events for the names found there (for example: channel of a `Send`, a quoted binding in
+    ///   for-comprehension, etc.).
+    /// - It **does not** recurse into the bodies of quoted processes. If callers want to explore quoted
+    ///   processes, they can reconstruct a new [`NameAwareDfsEventIter`] (for example via
+    ///   [`Name::iter_into`]). This fits the Rho-calculus intuition that `@P` is not in the current
+    ///   world of processes, but in the world of names.
+    ///
+    /// ### Ordering guarantee:
+    /// When a process `p` is entered, this iterator yields `DfsEventExt::Enter(p)` first, and then the
+    ///  [`DfsEventExt::Name`] events for the names that appear directly in `p` (the names are emitted in
+    /// a deterministic left-to-right order).
+    pub fn iter_dfs_event_with_names(&'a self) -> impl Iterator<Item = DfsEventExt<'a>> {
+        NameAwareDfsEventIter::<32>::new(self)
+    }
+
+    pub fn is_trivially_ground(&self) -> bool {
+        self.proc.is_trivially_ground()
     }
 
     pub fn is_ident(&self, expected: &str) -> bool {
         self.proc.is_ident(expected)
     }
 
-    pub fn iter_proc_var(&'a self) -> impl Iterator<Item = Var<'a>> {
-        PreorderDfsIter::<4>::new(self).filter_map(|ann_proc| match ann_proc.proc {
-            Proc::ProcVar(var) => Some(*var),
-            _ => None,
+    pub fn as_var(&self) -> Option<Var<'a>> {
+        self.proc.as_var()
+    }
+
+    pub fn iter_proc_vars(&'a self) -> impl Iterator<Item = Var<'a>> {
+        PreorderDfsIter::<4>::new(self).filter_map(|ann_proc| ann_proc.as_var())
+    }
+
+    pub fn iter_vars(&'a self) -> impl Iterator<Item = Var<'a>> {
+        NameAwareDfsEventIter::<4>::new(self).filter_map(|ev| match ev {
+            DfsEventExt::Enter(ann_proc) => ann_proc.as_var(),
+            DfsEventExt::Name(name) => name.as_var(),
+            DfsEventExt::Exit(_) => None,
         })
+    }
+
+    pub fn iter_names_direct(&'a self) -> impl Iterator<Item = &'a Name<'a>> {
+        NameAwareDfsEventIter::<4>::new(self)
+            .skip(1) // skip Enter(self)
+            .take_while(|ev| ev.as_proc().is_none()) // stop before entering any sub-process
+            .filter_map(|ev| ev.as_name())
     }
 }
 
@@ -226,7 +291,7 @@ impl<'a> Var<'a> {
         }
     }
 
-    pub fn into_ident(self) -> &'a str {
+    pub fn as_ident(self) -> &'a str {
         match self {
             Var::Wildcard => "_",
             Var::Id(id) => id.name,
@@ -238,10 +303,9 @@ impl<'a> TryFrom<&Proc<'a>> for Var<'a> {
     type Error = String;
 
     fn try_from(value: &Proc<'a>) -> Result<Self, Self::Error> {
-        match value {
-            Proc::ProcVar(var) => Ok(*var),
-            other => Err(format!("attempt to convert {{ {other:?} }} to a var")),
-        }
+        value
+            .as_var()
+            .ok_or_else(|| format!("attempt to convert {{ {value:?} }} to a var"))
     }
 }
 
@@ -253,14 +317,21 @@ impl<'a> TryFrom<AnnProc<'a>> for Var<'a> {
     }
 }
 
+impl<'a> TryFrom<&AnnProc<'a>> for Var<'a> {
+    type Error = String;
+
+    fn try_from(value: &AnnProc<'a>) -> Result<Self, Self::Error> {
+        value.proc.try_into()
+    }
+}
+
 impl<'a> TryFrom<Name<'a>> for Var<'a> {
     type Error = String;
 
     fn try_from(value: Name<'a>) -> Result<Self, Self::Error> {
-        match value {
-            Name::NameVar(var) => Ok(var),
-            other => Err(format!("attempt to convert {{ {other:?} }} to a var")),
-        }
+        value
+            .as_var()
+            .ok_or_else(|| format!("attempt to convert {{ {value:?} }} to a var"))
     }
 }
 
@@ -270,12 +341,47 @@ pub enum Name<'ast> {
     Quote(AnnProc<'ast>),
 }
 
-impl Name<'_> {
+impl<'a> Name<'a> {
     pub fn is_ident(&self, expected: &str) -> bool {
         match self {
             Name::NameVar(var) => var.is_ident(expected),
             Name::Quote(ann_proc) => ann_proc.is_ident(expected),
         }
+    }
+
+    pub fn is_trivially_ground(&self) -> bool {
+        match self {
+            Name::NameVar(Var::Wildcard) => true,
+            Name::Quote(quoted) => quoted.is_trivially_ground(),
+            _ => false,
+        }
+    }
+
+    pub fn as_quote(&'a self) -> Option<&'a AnnProc<'a>> {
+        match self {
+            Name::Quote(quoted) => Some(quoted),
+            _ => None,
+        }
+    }
+
+    pub fn as_var(&self) -> Option<Var<'a>> {
+        match self {
+            Name::NameVar(var) => Some(*var),
+            Name::Quote(_) => None,
+        }
+    }
+
+    /// Depth-first traversal over this [`Name`] that does not expand quoted sub-processes.
+    pub fn iter_into(&'a self) -> impl Iterator<Item = DfsEventExt<'a>> {
+        match self {
+            Name::NameVar(_) => NameAwareDfsEventIter::<4>::single(self),
+            Name::Quote(quoted) => NameAwareDfsEventIter::<4>::new(quoted),
+        }
+    }
+
+    /// Depth-first traversal over this [`Name`] and its quoted processes.
+    pub fn iter_into_deep(&'a self) -> impl Iterator<Item = DfsEventExt<'a>> {
+        DeepDfsIter::<4>::new(self)
     }
 }
 
@@ -474,6 +580,10 @@ impl<'a> Bind<'a> {
             | Bind::Repeated { lhs, rhs: _ }
             | Bind::Peek { lhs, rhs: _ } => lhs,
         }
+    }
+
+    pub fn names_iter(&self) -> std::slice::Iter<'_, Name<'a>> {
+        self.names().names.iter()
     }
 }
 

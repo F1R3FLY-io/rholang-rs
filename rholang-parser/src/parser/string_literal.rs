@@ -29,7 +29,7 @@ fn trim_quotes(raw: &str) -> &str {
 /// Single-pass implementation with zero-copy fast path:
 /// - If the literal contains no escapes, returns a borrowed slice of the input (without quotes).
 /// - If escapes are present, writes into the provided buffer and returns a `&str` into that buffer.
-pub fn parse_string_literal<'a>(raw: &'a str, out: &'a mut String) -> Result<&'a str, StringLitError> {
+pub fn parse_string_literal<'a>(raw: &'a str, out: &'a mut String) -> Result<String, StringLitError> {
     let s = trim_quotes(raw);
 
     // Scan once to find the first backslash byte. If none, we can return a borrowed slice.
