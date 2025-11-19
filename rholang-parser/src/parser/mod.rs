@@ -1,5 +1,6 @@
 pub(crate) mod ast_builder;
 pub mod errors;
+pub mod string_literal;
 mod parsing;
 
 use nonempty_collections::NEVec;

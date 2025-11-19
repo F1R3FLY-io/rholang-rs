@@ -128,7 +128,30 @@ pub(super) fn node_to_ast<'ast>(
                 }
                 kind!("string_literal") => {
                     let lit_value = get_node_value(&node, source);
-                    proc_stack.push(ast_builder.alloc_string_literal(lit_value), span);
+                    match ast_builder.alloc_string_literal_from_raw(lit_value) {
+                        Ok(proc_ref) => proc_stack.push(proc_ref, span),
+                        Err(err) => {
+                            use crate::parser::errors::AnnParsingError;
+                            use crate::parser::errors::ParsingError;
+                            // Map string literal parse errors to existing ParsingError variants
+                            match err {
+                                crate::parser::string_literal::StringLitError::InvalidEscape => {
+                                    // Tokenization might also report this as SyntaxError; we use SyntaxError here.
+                                    errors.push(AnnParsingError::new(
+                                        ParsingError::SyntaxError { sexp: "string literal".into() },
+                                        &node,
+                                    ));
+                                }
+                                crate::parser::string_literal::StringLitError::InvalidCodePoint => {
+                                    errors.push(AnnParsingError::new(
+                                        ParsingError::NumberOutOfRange,
+                                        &node,
+                                    ));
+                                }
+                            }
+                            bad = true;
+                        }
+                    }
                 }
                 kind!("uri_literal") => {
                     let lit_value = get_node_value(&node, source);

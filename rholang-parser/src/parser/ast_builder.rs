@@ -1,5 +1,6 @@
 use smallvec::ToSmallVec;
 use typed_arena::Arena;
+use std::cell::RefCell;
 
 use crate::ast::{
     AnnProc, BinaryExpOp, Bind, BundleType, Case, Collection, Id, KeyValuePair, LetBinding, Name,
@@ -8,6 +9,8 @@ use crate::ast::{
 
 pub(crate) struct ASTBuilder<'ast> {
     arena: Arena<Proc<'ast>>,
+    // Owns unescaped string literals so we can hand out &'ast str without a separate arena.
+    strings: RefCell<Vec<String>>, // do not use Arena<String>; keep owned Strings here
     // useful quasi-constants
     nil: Proc<'ast>,
     r#true: Proc<'ast>,
@@ -29,6 +32,7 @@ impl<'ast> ASTBuilder<'ast> {
     pub(crate) fn with_capacity(capacity: usize) -> Self {
         ASTBuilder {
             arena: Arena::with_capacity(capacity),
+            strings: RefCell::new(Vec::new()),
             nil: Proc::Nil,
             r#true: Proc::BoolLiteral(true),
             r#false: Proc::BoolLiteral(false),
@@ -81,8 +85,44 @@ impl<'ast> ASTBuilder<'ast> {
     }
 
     pub(crate) fn alloc_string_literal(&self, value: &'ast str) -> &Proc<'ast> {
-        self.arena
-            .alloc(Proc::StringLiteral(crate::trim_byte(value, b'"')))
+        // Value is expected to be already-unescaped plain content without outer quotes.
+        self.arena.alloc(Proc::StringLiteral(value))
+    }
+
+    /// Allocate a string literal from raw source token (including quotes and escapes).
+    /// This function parses/unescapes on demand and stores owned strings inside the builder
+    /// to maintain `&'ast str` lifetimes without introducing an arena for strings.
+    pub(crate) fn alloc_string_literal_from_raw(
+        &self,
+        raw: &'ast str,
+    ) -> Result<&Proc<'ast>, crate::parser::string_literal::StringLitError> {
+        use crate::parser::string_literal::parse_string_literal;
+
+        // Fast path: if there is no backslash after trimming quotes, we can borrow directly.
+        let s = crate::trim_byte(raw, b'"');
+        if !s.as_bytes().contains(&b'\\') {
+            return Ok(self.alloc_string_literal(s));
+        }
+
+        // Slow path: unescape into a temporary buffer, then store owned String.
+        let mut buf = String::new();
+        let unescaped = parse_string_literal(raw, &mut buf)?; // returns &str into buf
+
+        // Transfer ownership of the unescaped content into our storage and return a stable &str.
+        // Safety rationale: The `strings` Vec is owned by `ASTBuilder<'ast>` and lives
+        // for the entire `'ast` lifetime. We push a new String into it and then produce
+        // a `&str` referencing that String's contents. The reference remains valid as long
+        // as ASTBuilder lives because we never remove from this Vec (only push and drop at the end).
+        let s_ref: &'ast str = {
+            let mut storage = self.strings.borrow_mut();
+            storage.push(unescaped.to_string());
+            let idx = storage.len() - 1;
+            let ptr: *const str = storage[idx].as_str();
+            // Drop the borrow before returning the reference.
+            drop(storage);
+            unsafe { &*ptr }
+        };
+        Ok(self.alloc_string_literal(s_ref))
     }
 
     pub(crate) fn alloc_long_literal(&self, value: i64) -> &Proc<'ast> {

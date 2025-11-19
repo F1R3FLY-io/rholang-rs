@@ -523,11 +523,11 @@ impl<'a, const S: usize> Iterator for DeepDfsIter<'a, S> {
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(top) = self.stack.last_mut() {
             if let Some(ev) = top.next() {
-                if let DfsEventExt::Name(name) = ev
-                    && let Some(quoted) = name.as_quote()
-                {
-                    // Unconditionally descend into quoted process.
-                    self.stack.push(NameAwareDfsEventIter::<S>::new(quoted));
+                if let DfsEventExt::Name(name) = ev {
+                    if let Name::Quote(quoted) = name {
+                        // Unconditionally descend into quoted process.
+                        self.stack.push(NameAwareDfsEventIter::<S>::new(quoted));
+                    }
                 }
                 // Always yield the event.
                 return Some(ev);
@@ -573,11 +573,10 @@ fn for_comprehension_inputs<'a>(
 fn for_comprehension_outputs<'a>(
     receipts: &'a [Receipt<'a>],
 ) -> impl DoubleEndedIterator<Item = &'a Name<'a>> {
-    receipts.iter().flatten().flat_map(|binding| {
-        binding
-            .names_iter()
-            .chain(iter::once(binding.source_name()))
-    })
+    receipts
+        .iter()
+        .flatten()
+        .flat_map(|binding| binding.names().names.iter().chain(iter::once(binding.source_name())))
 }
 
 /// Helper: extract expression + cases from `Match`.

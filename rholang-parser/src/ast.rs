@@ -161,6 +161,15 @@ impl<'a> AnnProc<'a> {
         DfsEventIter::<32>::new(self)
     }
 
+    /// Depth-first traversal that yields process Enter/Exit events and surface Name events.
+    ///
+    /// This is a convenience wrapper around `NameAwareDfsEventIter`.
+    pub fn iter_dfs_event_with_names(
+        &'a self,
+    ) -> impl Iterator<Item = DfsEventExt<'a>> {
+        NameAwareDfsEventIter::<32>::new(self)
+    }
+
     pub fn is_ground(&self) -> bool {
         self.proc.is_ground()
     }

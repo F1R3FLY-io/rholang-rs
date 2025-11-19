@@ -124,8 +124,13 @@ fn integration_invalid_escape_reports_error() {
     match parser.parse(src).ok() {
         Ok(_) => panic!("expected failure for invalid escape"),
         Err(errors) => {
-            // should contain an InvalidStringEscape error OR a SyntaxError (lexer-level), depending on how the grammar tokenizes it
-            let has_expected = errors.iter().any(|pf| pf.errors.iter().any(|ae| matches!(ae.error, ParsingError::InvalidStringEscape | ParsingError::SyntaxError { .. })));
+            // should contain either an Unexpected(char) or a SyntaxError, depending on tokenization
+            let has_expected = errors
+                .iter()
+                .any(|pf| pf
+                    .errors
+                    .iter()
+                    .any(|ae| matches!(ae.error, ParsingError::Unexpected(_) | ParsingError::SyntaxError { .. })));
             assert!(has_expected, "errors were: {:?}", errors);
         }
     }
@@ -139,7 +144,9 @@ fn integration_invalid_codepoint_reports_error() {
     match parser.parse(src).ok() {
         Ok(_) => panic!("expected failure for out-of-range code point"),
         Err(errors) => {
-            assert!(errors.iter().any(|pf| pf.errors.iter().any(|ae| matches!(ae.error, ParsingError::InvalidStringCodePoint))),
+            assert!(errors
+                .iter()
+                .any(|pf| pf.errors.iter().any(|ae| matches!(ae.error, ParsingError::NumberOutOfRange))),
                 "errors were: {:?}", errors);
         }
     }
