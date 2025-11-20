@@ -408,13 +408,12 @@ impl InstructionBuilder {
                 })?;
 
             // Calculate the jump offset
-            let jump_instruction_position = unresolved
-                .instruction_index
-                .checked_mul(4)
-                .ok_or(BytecodeError::JumpOutOfRange {
+            let jump_instruction_position = unresolved.instruction_index.checked_mul(4).ok_or(
+                BytecodeError::JumpOutOfRange {
                     offset: 0,
                     max_range: i16::MAX as i32,
-                })?;
+                },
+            )?;
 
             let offset = if label_position >= jump_instruction_position {
                 let diff = label_position - jump_instruction_position;

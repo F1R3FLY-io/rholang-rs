@@ -1,0 +1,23 @@
+[package]
+name = "rholang-compiler"
+version = "0.1.0"
+edition = "2021"
+description = "Rholang bytecode compiler"
+
+[lib]
+name = "rholang_compiler"
+path = "src/lib.rs"
+
+[dependencies]
+# Workspace dependencies
+anyhow = { workspace = true }
+
+# Local crates
+rholang-parser = { path = "../rholang-parser" }
+rholang-bytecode = { path = "../rholang-bytecode" }
+librho = { path = "../rholang-lib", package = "rholang-lib" }
+rholang-vm = { path = "../rholang-vm" }
+
+[dev-dependencies]
+tokio = { workspace = true }
+validated = { workspace = true }
