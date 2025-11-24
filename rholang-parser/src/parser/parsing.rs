@@ -1824,10 +1824,7 @@ fn into_name(ann_proc: AnnProc, quoted: bool) -> Name {
         Name::Quote(ann_proc)
     } else {
         match ann_proc.proc {
-            Proc::ProcVar(var) => match var {
-                Var::Id(id) if id.name == "_" => Name::NameVar(Var::Wildcard),
-                _ => Name::NameVar(*var),
-            },
+            Proc::ProcVar(var) => Name::NameVar(*var),
             _ => panic!("invalid proc variant for into_name"),
         }
     }
