@@ -5,7 +5,7 @@ fn extract_first_string_literal<'a>(proc: &'a AnnProc<'a>) -> Option<&'a str> {
         Proc::Send { inputs, .. } => {
             if let Some(first) = inputs.first() {
                 if let Proc::StringLiteral(s) = first.proc {
-                    return Some(s);
+                    return Some(s.as_ref());
                 }
             }
             None
@@ -13,7 +13,7 @@ fn extract_first_string_literal<'a>(proc: &'a AnnProc<'a>) -> Option<&'a str> {
         Proc::Method { args, .. } => {
             if let Some(first) = args.first() {
                 if let Proc::StringLiteral(s) = first.proc {
-                    return Some(s);
+                    return Some(s.as_ref());
                 }
             }
             None

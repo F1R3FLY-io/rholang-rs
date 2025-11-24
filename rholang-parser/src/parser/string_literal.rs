@@ -14,11 +14,8 @@
 //! Input is expected to be the raw literal as it appears in source, including
 //! the surrounding quotes. The function will trim the outer quotes if present.
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum StringLitError {
-    InvalidEscape,
-    InvalidCodePoint,
-}
+use std::borrow::Cow;
+use crate::parser::errors::ParsingError;
 
 fn trim_quotes(raw: &str) -> &str {
     crate::trim_byte(raw, b'"')
@@ -28,8 +25,8 @@ fn trim_quotes(raw: &str) -> &str {
 ///
 /// Single-pass implementation with zero-copy fast path:
 /// - If the literal contains no escapes, returns a borrowed slice of the input (without quotes).
-/// - If escapes are present, writes into the provided buffer and returns a `&str` into that buffer.
-pub fn parse_string_literal<'a>(raw: &'a str, out: &'a mut String) -> Result<&'a str, StringLitError> {
+/// - If escapes are present, returns an owned `String` with unescaped content.
+pub fn parse_string_literal<'a>(raw: &'a str) -> Result<Cow<'a, str>, ParsingError> {
     let s = trim_quotes(raw);
 
     // Scan once to find the first backslash byte. If none, we can return a borrowed slice.
@@ -40,12 +37,11 @@ pub fn parse_string_literal<'a>(raw: &'a str, out: &'a mut String) -> Result<&'a
     }
     if i == bytes.len() {
         // No escapes at all
-        return Ok(s);
+        return Ok(Cow::Borrowed(s));
     }
 
     // We found an escape at position `i`. Start building the output string in provided buffer.
-    out.clear();
-    out.reserve(s.len());
+    let mut out = String::with_capacity(s.len());
     // Push the prefix before first backslash
     out.push_str(&s[..i]);
 
@@ -68,7 +64,7 @@ pub fn parse_string_literal<'a>(raw: &'a str, out: &'a mut String) -> Result<&'a
         // We are at a backslash; handle the escape sequence.
         i += 1; // consume '\\'
         if i >= bytes.len() {
-            return Err(StringLitError::InvalidEscape);
+            return Err(ParsingError::InvalidStringEscape);
         }
 
         match bytes[i] {
@@ -98,14 +94,14 @@ pub fn parse_string_literal<'a>(raw: &'a str, out: &'a mut String) -> Result<&'a
                 out.push(ch);
                 i += consumed;
             }
-            _ => return Err(StringLitError::InvalidEscape),
+            _ => return Err(ParsingError::InvalidStringEscape),
         }
     }
 
-    Ok(out.as_str())
+    Ok(Cow::Owned(out))
 }
 
-fn parse_decimal_escape(s: &str) -> Result<(char, usize), StringLitError> {
+fn parse_decimal_escape(s: &str) -> Result<(char, usize), ParsingError> {
     // Collect contiguous decimal digits and count bytes consumed
     let mut digits = String::new();
     let mut bytes_consumed = 0usize;
@@ -118,20 +114,20 @@ fn parse_decimal_escape(s: &str) -> Result<(char, usize), StringLitError> {
         }
     }
     if digits.is_empty() {
-        return Err(StringLitError::InvalidEscape);
+        return Err(ParsingError::InvalidStringEscape);
     }
     let num = match digits.parse::<u32>() {
         Ok(n) => n,
-        Err(_) => return Err(StringLitError::InvalidCodePoint),
+        Err(_) => return Err(ParsingError::InvalidStringCodePoint),
     };
     let c = validate_scalar(num)?;
     Ok((c, bytes_consumed))
 }
 
-fn validate_scalar(num: u32) -> Result<char, StringLitError> {
+fn validate_scalar(num: u32) -> Result<char, ParsingError> {
     // `char::from_u32` already rejects values > 0x10FFFF and surrogate code points
     // (0xD800..=0xDFFF). Rely on it directly and map `None` to `InvalidCodePoint`.
-    char::from_u32(num).ok_or(StringLitError::InvalidCodePoint)
+    char::from_u32(num).ok_or(ParsingError::InvalidStringCodePoint)
 }
 
 #[cfg(test)]
@@ -140,79 +136,63 @@ mod tests {
 
     #[test]
     fn test_plain() {
-        let mut buf = String::new();
-        assert_eq!(parse_string_literal("\"hello\"", &mut buf).unwrap(), "hello");
+        assert_eq!(parse_string_literal("\"hello\"").unwrap(), "hello");
     }
 
     #[test]
     fn test_basic_escapes() {
-        let mut buf = String::new();
-        assert_eq!(parse_string_literal("\"a\\n b\\r c\\t d\"", &mut buf).unwrap(), "a\n b\r c\t d");
+        assert_eq!(parse_string_literal("\"a\\n b\\r c\\t d\"").unwrap(), "a\n b\r c\t d");
     }
 
     #[test]
     fn test_decimal_code_points() {
-        let mut buf = String::new();
-        assert_eq!(parse_string_literal("\"smile: \\128512\"", &mut buf).unwrap(), "smile: 😀");
-        buf.clear();
-        assert_eq!(parse_string_literal("\"nul: \\0\"", &mut buf).unwrap(), "nul: \u{0}");
-        buf.clear();
-        assert_eq!(parse_string_literal("\"A: \\65\"", &mut buf).unwrap(), "A: A");
+        assert_eq!(parse_string_literal("\"smile: \\128512\"").unwrap(), "smile: 😀");
+        assert_eq!(parse_string_literal("\"nul: \\0\"").unwrap(), "nul: \u{0}");
+        assert_eq!(parse_string_literal("\"A: \\65\"").unwrap(), "A: A");
     }
 
     #[test]
     fn test_backslash_via_decimal_escape() {
         // 92 is '\\'
-        let mut buf = String::new();
-        assert_eq!(parse_string_literal("\"\\92\"", &mut buf).unwrap(), "\\");
+        assert_eq!(parse_string_literal("\"\\92\"").unwrap(), "\\");
         // in context
-        buf.clear();
-        assert_eq!(parse_string_literal("\"x\\92y\"", &mut buf).unwrap(), "x\\y");
+        assert_eq!(parse_string_literal("\"x\\92y\"").unwrap(), "x\\y");
     }
 
     #[test]
     fn test_backslash_escape_simple_and_context() {
         // \\\\ -> \\
-        let mut buf = String::new();
-        assert_eq!(parse_string_literal("\"\\\\\"", &mut buf).unwrap(), "\\");
+        assert_eq!(parse_string_literal("\"\\\\\"").unwrap(), "\\");
         // in context
-        buf.clear();
-        assert_eq!(parse_string_literal("\"a\\\\b\"", &mut buf).unwrap(), "a\\b");
+        assert_eq!(parse_string_literal("\"a\\\\b\"").unwrap(), "a\\b");
     }
 
     #[test]
     fn test_double_quote_escape_simple_and_context() {
         // \" -> "
-        let mut buf = String::new();
-        assert_eq!(parse_string_literal("\"\\\"\"", &mut buf).unwrap(), "\"");
+        assert_eq!(parse_string_literal("\"\\\"\"").unwrap(), "\"");
         // in context
-        buf.clear();
-        assert_eq!(parse_string_literal("\"a\\\"b\"", &mut buf).unwrap(), "a\"b");
+        assert_eq!(parse_string_literal("\"a\\\"b\"").unwrap(), "a\"b");
         // mixed with others
-        buf.clear();
-        assert_eq!(parse_string_literal("\"x\\\"\\n\"\"", &mut buf).unwrap(), "x\"\n\"");
+        assert_eq!(parse_string_literal("\"x\\\"\\n\"\"").unwrap(), "x\"\n\"");
     }
 
     #[test]
     fn test_invalid_trailing_backslash() {
         // Lone trailing backslash
-        let mut buf = String::new();
-        assert!(matches!(parse_string_literal("\"abc\\\"", &mut buf), Err(StringLitError::InvalidEscape)));
+        assert!(matches!(parse_string_literal("\"abc\\\""), Err(ParsingError::InvalidStringEscape)));
     }
 
     #[test]
     fn test_invalid_escape() {
-        let mut buf = String::new();
-        assert!(matches!(parse_string_literal("\"foo\\x\"", &mut buf), Err(StringLitError::InvalidEscape)));
+        assert!(matches!(parse_string_literal("\"foo\\x\""), Err(ParsingError::InvalidStringEscape)));
     }
 
     #[test]
     fn test_invalid_code_point() {
         // Above max
-        let mut buf = String::new();
-        assert!(matches!(parse_string_literal("\"\\1114112\"", &mut buf), Err(StringLitError::InvalidCodePoint)));
+        assert!(matches!(parse_string_literal("\"\\1114112\""), Err(ParsingError::InvalidStringCodePoint)));
         // Surrogate
-        buf.clear();
-        assert!(matches!(parse_string_literal("\"\\55296\"", &mut buf), Err(StringLitError::InvalidCodePoint)));
+        assert!(matches!(parse_string_literal("\"\\55296\""), Err(ParsingError::InvalidStringCodePoint)));
     }
 }

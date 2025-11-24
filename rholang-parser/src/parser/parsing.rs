@@ -20,7 +20,7 @@ use crate::{
     parser::{
         ast_builder::ASTBuilder,
         errors::{AnnParsingError, ParsingError},
-        string_literal::{parse_string_literal, StringLitError},
+        string_literal::{parse_string_literal},
     },
 };
 
@@ -129,17 +129,10 @@ pub(super) fn node_to_ast<'ast>(
                 }
                 kind!("string_literal") => {
                     let lit_value_raw = get_node_value(&node, source);
-                    let mut buf = String::new();
-                    match parse_string_literal(lit_value_raw, &mut buf) {
-                        Ok(unescaped) => {
-                            proc_stack.push(ast_builder.alloc_string_literal(unescaped), span)
-                        }
+                    match parse_string_literal(lit_value_raw) {
+                        Ok(cow) => proc_stack.push(ast_builder.alloc_string_literal(cow), span),
                         Err(err) => {
-                            let perr = match err {
-                                StringLitError::InvalidEscape => ParsingError::InvalidStringEscape,
-                                StringLitError::InvalidCodePoint => ParsingError::InvalidStringCodePoint,
-                            };
-                            errors.push(AnnParsingError::new(perr, &node));
+                            errors.push(AnnParsingError::new(err, &node));
                             bad = true;
                         }
                     }
