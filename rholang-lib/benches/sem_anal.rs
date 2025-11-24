@@ -1,7 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use librho::sem::{
-    EnclosureAnalysisPass, ResolverPass, SemanticDb,
+    EnclosureAnalysisPass, ForCompElaborationPass, ResolverPass, SemanticDb,
     diagnostics::{DisjunctionConsistencyCheck, UnusedVarsPass},
     pipeline::Pipeline,
 };
@@ -31,6 +31,7 @@ fn sem_anal(bencher: divan::Bencher, arg: &PathBuf) {
                 let root = db.build_index(ast);
                 pipeline
                     .add_fact(ResolverPass::new(root))
+                    .add_fact(ForCompElaborationPass::new(root))
                     .add_fact(EnclosureAnalysisPass::new(root))
             })
             .add_diagnostic(UnusedVarsPass)

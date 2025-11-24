@@ -85,7 +85,9 @@ pub fn process_special_command<W: Write, I: InterpreterProvider>(
         return Ok(false);
     }
 
-    let (cmd, arg) = trimmed.split_once(' ').map_or((trimmed, ""), |(c, a)| (c, a.trim()));
+    let (cmd, arg) = trimmed
+        .split_once(' ')
+        .map_or((trimmed, ""), |(c, a)| (c, a.trim()));
 
     match cmd {
         ".help" => {
