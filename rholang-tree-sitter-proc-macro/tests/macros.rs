@@ -2,11 +2,12 @@
 use rholang_tree_sitter_proc_macro::{field, kind, kw};
 
 // Static values for node kinds
-const NEW_KIND: u16 = 79;
-const SEND_KIND: u16 = 87;
-const BUNDLE_KIND: u16 = 82;
-const BRANCH_KIND: u16 = 129;
-const CASE_KIND: u16 = 128;
+// Updated: +2 for line_comment and block_comment added to grammar
+const NEW_KIND: u16 = 81;
+const SEND_KIND: u16 = 89;
+const BUNDLE_KIND: u16 = 84;
+const BRANCH_KIND: u16 = 130;
+const CASE_KIND: u16 = 129;
 
 // Static values for keywords
 const NEW_KW: u16 = 4;
