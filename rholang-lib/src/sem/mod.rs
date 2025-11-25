@@ -14,6 +14,7 @@ mod enclosure_analysis;
 mod interner;
 pub mod pipeline;
 mod resolver;
+mod elaborator;
 
 /// A generic semantic analysis pass.
 ///
@@ -47,6 +48,7 @@ pub trait DiagnosticPass: Pass + Send + Sync {
 }
 
 pub use enclosure_analysis::EnclosureAnalysisPass;
+pub use elaborator::ForCompElaborationPass;
 pub use resolver::ResolverPass;
 
 pub type ProcRef<'a> = &'a ast::AnnProc<'a>;
@@ -75,13 +77,15 @@ impl IntKey for PID {
 }
 
 /// Interned strings
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Symbol(u32);
 
 impl Symbol {
     const MIN: Symbol = Symbol(u32::MIN);
     #[allow(dead_code)]
     const MAX: Symbol = Symbol(u32::MAX);
+    /// Sentinel symbol used for wildcards and quoted-process channels in analyses
+    pub const DUMMY: Symbol = Symbol(u32::MAX);
 }
 
 impl Display for Symbol {
@@ -121,7 +125,7 @@ pub struct BoundOccurence {
 }
 
 /// ID of a binder (variable or name)
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BinderId(u32);
 
 impl BinderId {
@@ -485,6 +489,8 @@ pub enum ErrorKind {
     ConnectiveOutsidePattern,
     BundleInsidePattern,
     UnmatchedVarInDisjunction(Symbol),
+    FreeVariable(SymbolOccurrence),
+    BadCode,
 }
 
 impl ErrorKind {

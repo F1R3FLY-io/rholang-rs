@@ -90,7 +90,7 @@ async fn test_main_calls_run_shell() -> Result<()> {
 // A mock version of the main function that uses our mocks instead of the real components
 async fn mock_main(args: MockArgs) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Create a mock interpreter
-    let interpreter = shell::providers::FakeInterpreterProvider;
+    let interpreter = rholang_shell::providers::FakeInterpreterProvider;
 
     // Call the mock run_shell function
     mock_run_shell(args, interpreter)
