@@ -481,15 +481,19 @@ pub enum WarningKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorKind {
     UnboundVariable,
-    DuplicateVarDef { original: SymbolOccurrence },
+    DuplicateVarDef {
+        original: SymbolOccurrence,
+    },
     NameInProcPosition(BinderId, Symbol),
     ProcInNamePosition(BinderId, Symbol),
     ConnectiveOutsidePattern,
     BundleInsidePattern,
     UnmatchedVarInDisjunction(Symbol),
-    InvalidPid,
-    IncompleteAstNode,
-    MixedArrowTypes { receipt_index: usize },
+    MixedArrowTypes {
+        receipt_index: usize,
+        expected: &'static str,
+        found: &'static str,
+    },
 }
 
 impl ErrorKind {

@@ -31,9 +31,9 @@ fn sem_anal(bencher: divan::Bencher, arg: &PathBuf) {
                 let root = db.build_index(ast);
                 pipeline
                     .add_fact(ResolverPass::new(root))
-                    .add_fact(ForCompElaborationPass::new(root))
                     .add_fact(EnclosureAnalysisPass::new(root))
             })
+            .add_diagnostic(ForCompElaborationPass)
             .add_diagnostic(UnusedVarsPass)
             .add_diagnostic(DisjunctionConsistencyCheck);
 

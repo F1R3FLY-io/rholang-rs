@@ -339,6 +339,15 @@ impl<'a> Name<'a> {
             Name::Quote(quoted) => NameAwareDfsEventIter::<4>::new(quoted),
         }
     }
+    pub fn position(&self) -> SourcePos {
+        match self {
+            Name::NameVar(var) => match var {
+                Var::Id(id) => id.pos,
+                Var::Wildcard => SourcePos::default(),
+            },
+            Name::Quote(proc) => proc.span.start,
+        }
+    }
 }
 
 impl<'a> From<Id<'a>> for Name<'a> {
@@ -541,6 +550,13 @@ impl<'a> Bind<'a> {
     pub fn names_iter(&self) -> std::slice::Iter<'_, Name<'a>> {
         self.names().names.iter()
     }
+
+    pub fn position(&self) -> SourcePos {
+        match self {
+            Bind::Linear { rhs, .. } => rhs.position(),
+            Bind::Repeated { rhs, .. } | Bind::Peek { rhs, .. } => rhs.position(),
+        }
+    }
 }
 
 // source definitions
@@ -557,6 +573,16 @@ pub enum Source<'ast> {
         name: Name<'ast>,
         inputs: ProcList<'ast>,
     },
+}
+
+impl<'a> Source<'a> {
+    pub fn position(&self) -> SourcePos {
+        match self {
+            Source::Simple { name }
+            | Source::ReceiveSend { name }
+            | Source::SendReceive { name, .. } => name.position(),
+        }
+    }
 }
 
 // case in match expression

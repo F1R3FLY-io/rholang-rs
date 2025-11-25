@@ -4,7 +4,7 @@
 //! ## Usage
 //!
 //! ```ignore
-//! let mut db = SemanticDb::new();
+//! let db = SemanticDb::new();
 //! let pid = db.build_index(&ast);
 //!
 //! // Step 1: Run ResolverPass (REQUIRED)
@@ -12,288 +12,203 @@
 //! resolver.run(&mut db);
 //!
 //! // Step 2: Run elaborator
-//! let elaborator = ForCompElaborator::new(&mut db);
-//! elaborator.elaborate_and_finalize(pid)?;
+//! let elaborator = ForCompElaborator::new(&db);
+//! let diagnostics = elaborator.elaborate(pid);
 //! ```
 
-use crate::sem::{Diagnostic, ErrorKind, PID, SemanticDb};
-use rholang_parser::ast::Proc;
+use crate::sem::{Diagnostic, PID, SemanticDb};
+use rholang_parser::ast::{Proc, Receipts};
 
 pub mod arrow_validator;
 
 pub struct ForCompElaborator<'a, 'ast> {
-    db: &'a mut SemanticDb<'ast>,
-    diagnostics: Vec<Diagnostic>,
+    db: &'a SemanticDb<'ast>,
 }
 
 impl<'a, 'ast> ForCompElaborator<'a, 'ast> {
-    pub fn new(db: &'a mut SemanticDb<'ast>) -> Self {
-        Self {
-            db,
-            diagnostics: Vec::new(),
-        }
+    pub fn new(db: &'a SemanticDb<'ast>) -> Self {
+        Self { db }
     }
 
     /// Elaborate a for-comprehension
     ///
     /// Prerequisites: ResolverPass MUST have run
-    pub fn elaborate_and_finalize(mut self, pid: PID) -> Result<(), Vec<Diagnostic>> {
-        if let Some(diagnostic) = self.verify_for_comprehension(pid) {
-            self.diagnostics.push(diagnostic);
-            return self.finalize();
-        }
+    ///
+    /// # Panics
+    ///
+    /// Panics if `pid` is invalid or does not refer to a for-comprehension.
+    /// This indicates a programming error in the semantic analyzer.
+    pub fn elaborate(self, pid: PID) -> Vec<Diagnostic> {
+        self.verify_for_comprehension(pid);
 
-        if let Some(diagnostic) = self.validate_arrow_types(pid) {
-            self.diagnostics.push(diagnostic);
-        }
+        let mut diagnostics = Vec::new();
+        self.validate_arrow_types(pid, &mut diagnostics);
 
-        self.finalize()
+        diagnostics
+    }
+
+    /// Elaborate a for-comprehension with pre-extracted receipts
+    pub fn elaborate_with_receipts(
+        self,
+        pid: PID,
+        receipts: &'ast Receipts<'ast>,
+    ) -> Vec<Diagnostic> {
+        let mut diagnostics = Vec::new();
+        self.validate_arrow_types_with_receipts(pid, receipts, &mut diagnostics);
+
+        diagnostics
     }
 
     /// Verify that PID is a for-comprehension
-    fn verify_for_comprehension(&self, pid: PID) -> Option<Diagnostic> {
-        let proc_ref = match self.db.get(pid) {
-            Some(p) => p,
-            None => return Some(Diagnostic::error(pid, ErrorKind::InvalidPid, None)),
-        };
+    ///
+    /// # Panics
+    ///
+    /// Panics if PID is invalid or does not refer to a for-comprehension.
+    /// This is a programming error in the semantic analyzer.
+    fn verify_for_comprehension(&self, pid: PID) {
+        let proc_ref = self
+            .db
+            .get(pid)
+            .expect("ForCompElaborator called with invalid PID");
 
-        match proc_ref.proc {
-            Proc::ForComprehension { .. } => None,
-            _ => Some(Diagnostic::error(
-                pid,
-                ErrorKind::IncompleteAstNode,
-                Some(proc_ref.span.start),
-            )),
-        }
+        assert!(
+            matches!(proc_ref.proc, Proc::ForComprehension { .. }),
+            "ForCompElaborator called on non-for-comprehension node at PID {pid}"
+        );
     }
 
     /// Validate arrow type homogeneity
-    fn validate_arrow_types(&mut self, pid: PID) -> Option<Diagnostic> {
-        let proc = self.db.get(pid)?;
+    ///
+    /// # Panics
+    ///
+    /// Panics if PID is invalid or does not refer to a for-comprehension.
+    /// This is a programming error in the semantic analyzer.
+    fn validate_arrow_types(&self, pid: PID, diagnostics: &mut Vec<Diagnostic>) {
+        let proc = self
+            .db
+            .get(pid)
+            .expect("validate_arrow_types called with invalid PID");
 
         match proc.proc {
             Proc::ForComprehension { receipts, .. } => {
                 let validator = arrow_validator::ArrowTypeValidator::new(self.db);
-                validator.validate(pid, receipts)
+                validator.validate(pid, receipts, diagnostics);
             }
-            _ => Some(Diagnostic::error(pid, ErrorKind::IncompleteAstNode, None)),
+            _ => panic!("validate_arrow_types called on non-for-comprehension node at PID {pid}"),
         }
     }
 
-    /// Finalize and emit diagnostics
-    fn finalize(self) -> Result<(), Vec<Diagnostic>> {
-        for diagnostic in &self.diagnostics {
-            self.db.emit_diagnostic(*diagnostic);
-        }
-
-        if !self.diagnostics.is_empty() {
-            Err(self.diagnostics)
-        } else {
-            Ok(())
-        }
+    /// Validate arrow type homogeneity with pre-extracted receipts
+    fn validate_arrow_types_with_receipts(
+        &self,
+        pid: PID,
+        receipts: &'ast Receipts<'ast>,
+        diagnostics: &mut Vec<Diagnostic>,
+    ) {
+        let validator = arrow_validator::ArrowTypeValidator::new(self.db);
+        validator.validate(pid, receipts, diagnostics);
     }
 }
 
 /// Pipeline pass for for-comprehension elaboration
-pub struct ForCompElaborationPass {
-    root: PID,
-}
-
-impl ForCompElaborationPass {
-    pub fn new(root: PID) -> Self {
-        Self { root }
-    }
-
-    pub fn root(&self) -> PID {
-        self.root
-    }
-}
+pub struct ForCompElaborationPass;
 
 impl crate::sem::Pass for ForCompElaborationPass {
     fn name(&self) -> std::borrow::Cow<'static, str> {
-        std::borrow::Cow::Owned(format!("ForCompElaborationPass({})", self.root))
+        std::borrow::Cow::Borrowed("ForCompElaborationPass")
     }
 }
 
-impl crate::sem::FactPass for ForCompElaborationPass {
-    fn run(&self, db: &mut SemanticDb) {
-        // Find all for-comprehensions in the subtree
-        let for_comprehensions: Vec<PID> = db
-            .filter_procs(|p| matches!(p.proc, Proc::ForComprehension { .. }))
-            .map(|(pid, _)| pid)
-            .collect();
-
-        // Elaborate each for-comprehension
-        // Errors are already emitted as diagnostics; we don't propagate them
-        // because this pass should not halt the entire pipeline
-        for for_comp_pid in for_comprehensions {
-            let elaborator = ForCompElaborator::new(db);
-            let _ = elaborator.elaborate_and_finalize(for_comp_pid);
-        }
+impl crate::sem::DiagnosticPass for ForCompElaborationPass {
+    fn run(&self, db: &SemanticDb) -> Vec<Diagnostic> {
+        // Find all for-comprehensions and elaborate them directly
+        db.filter_procs(|p| matches!(p.proc, Proc::ForComprehension { .. }))
+            .flat_map(|(pid, proc_ref)| {
+                if let Proc::ForComprehension { receipts, .. } = proc_ref.proc {
+                    let elaborator = ForCompElaborator::new(db);
+                    elaborator.elaborate_with_receipts(pid, receipts)
+                } else {
+                    // Should never happen due to filter, but handle defensively
+                    Vec::new()
+                }
+            })
+            .collect()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sem::{FactPass, SemanticDb};
-    use rholang_parser::RholangParser;
+    use crate::sem::{DiagnosticPass, SemanticDb};
+    use rholang_parser::ast::AnnProc;
+    use test_macros::test_rholang_code;
 
-    /// Helper to count diagnostics in the database
-    fn count_diagnostics(db: &SemanticDb) -> usize {
-        db.diagnostics().len()
-    }
-
-    #[test]
-    fn test_pass_finds_single_for_comprehension() {
-        let parser = RholangParser::new();
-        let ast = parser
-            .parse("for(@x <- ch1 & @y <- ch2) { Nil }")
-            .expect("parse error");
-        let mut db = SemanticDb::new();
-        let pid = db.build_index(&ast[0]);
-
-        let pass = ForCompElaborationPass::new(pid);
-        pass.run(&mut db);
+    #[test_rholang_code("for(@x <- ch1 & @y <- ch2) { Nil }")]
+    fn test_pass_finds_single_for_comprehension(_procs: &[AnnProc], db: &SemanticDb) {
+        let pass = ForCompElaborationPass;
+        let diagnostics = pass.run(db);
 
         // Should have no errors for valid for-comprehension
-        assert_eq!(count_diagnostics(&db), 0);
+        assert_eq!(diagnostics.len(), 0);
     }
 
-    #[test]
-    fn test_pass_finds_multiple_for_comprehensions() {
-        let parser = RholangParser::new();
-        let code = r#"
-            for(@x <- ch1) { Nil } |
-            for(@y <= ch2) { Nil } |
-            for(@z <<- ch3) { Nil }
-        "#;
-        let ast = parser.parse(code).expect("parse error");
-        let mut db = SemanticDb::new();
-        let pid = db.build_index(&ast[0]);
-
-        let pass = ForCompElaborationPass::new(pid);
-        pass.run(&mut db);
+    #[test_rholang_code(
+        "for(@x <- ch1) { Nil } | for(@y <= ch2) { Nil } | for(@z <<- ch3) { Nil }"
+    )]
+    fn test_pass_finds_multiple_for_comprehensions(_procs: &[AnnProc], db: &SemanticDb) {
+        let pass = ForCompElaborationPass;
+        let diagnostics = pass.run(db);
 
         // All three for-comprehensions are valid, no errors expected
-        assert_eq!(count_diagnostics(&db), 0);
+        assert_eq!(diagnostics.len(), 0);
     }
 
-    #[test]
-    fn test_pass_emits_diagnostic_for_mixed_arrows() {
-        let parser = RholangParser::new();
-        let ast = parser
-            .parse("for(@x <- ch1 & @y <= ch2) { Nil }")
-            .expect("parse error");
-        let mut db = SemanticDb::new();
-        let pid = db.build_index(&ast[0]);
-
-        let pass = ForCompElaborationPass::new(pid);
-        pass.run(&mut db);
+    #[test_rholang_code("for(@x <- ch1 & @y <= ch2) { Nil }")]
+    fn test_pass_emits_diagnostic_for_mixed_arrows(_procs: &[AnnProc], db: &SemanticDb) {
+        let pass = ForCompElaborationPass;
+        let diagnostics = pass.run(db);
 
         // Should emit diagnostic for mixed arrow types
-        assert_eq!(count_diagnostics(&db), 1);
+        assert_eq!(diagnostics.len(), 1);
     }
 
-    #[test]
-    fn test_pass_emits_multiple_diagnostics() {
-        let parser = RholangParser::new();
-        let code = r#"
-            for(@x <- ch1 & @y <= ch2) { Nil } |
-            for(@a <= ch3 & @b <<- ch4) { Nil }
-        "#;
-        let ast = parser.parse(code).expect("parse error");
-        let mut db = SemanticDb::new();
-        let pid = db.build_index(&ast[0]);
-
-        let pass = ForCompElaborationPass::new(pid);
-        pass.run(&mut db);
+    #[test_rholang_code("for(@x <- ch1 & @y <= ch2) { Nil } | for(@a <= ch3 & @b <<- ch4) { Nil }")]
+    fn test_pass_emits_multiple_diagnostics(_procs: &[AnnProc], db: &SemanticDb) {
+        let pass = ForCompElaborationPass;
+        let diagnostics = pass.run(db);
 
         // Should emit 2 diagnostics, one for each invalid for-comprehension
-        assert_eq!(count_diagnostics(&db), 2);
+        assert_eq!(diagnostics.len(), 2);
     }
 
-    #[test]
-    fn test_pass_handles_nested_for_comprehensions() {
-        let parser = RholangParser::new();
-        let code = r#"
-            for(@x <- ch1) {
-                for(@y <- ch2 & @z <- ch3) { Nil }
-            }
-        "#;
-        let ast = parser.parse(code).expect("parse error");
-        let mut db = SemanticDb::new();
-        let pid = db.build_index(&ast[0]);
-
-        let pass = ForCompElaborationPass::new(pid);
-        pass.run(&mut db);
+    #[test_rholang_code("for(@x <- ch1) { for(@y <- ch2 & @z <- ch3) { Nil } }")]
+    fn test_pass_handles_nested_for_comprehensions(_procs: &[AnnProc], db: &SemanticDb) {
+        let pass = ForCompElaborationPass;
+        let diagnostics = pass.run(db);
 
         // Both for-comprehensions are valid
-        assert_eq!(count_diagnostics(&db), 0);
+        assert_eq!(diagnostics.len(), 0);
     }
 
-    #[test]
-    fn test_pass_handles_no_for_comprehensions() {
-        let parser = RholangParser::new();
-        let ast = parser
-            .parse("Nil | stdout!(\"hello\")")
-            .expect("parse error");
-        let mut db = SemanticDb::new();
-        let pid = db.build_index(&ast[0]);
-
-        let pass = ForCompElaborationPass::new(pid);
-        pass.run(&mut db);
+    #[test_rholang_code("Nil | stdout!(\"hello\")")]
+    fn test_pass_handles_no_for_comprehensions(_procs: &[AnnProc], db: &SemanticDb) {
+        let pass = ForCompElaborationPass;
+        let diagnostics = pass.run(db);
 
         // No for-comprehensions, so no diagnostics
-        assert_eq!(count_diagnostics(&db), 0);
+        assert_eq!(diagnostics.len(), 0);
     }
 
     #[test]
-    fn test_pass_name_includes_pid() {
+    fn test_pass_name() {
         use crate::sem::Pass;
-        let pass = ForCompElaborationPass::new(PID(42));
+        let pass = ForCompElaborationPass;
         let name = pass.name();
-        assert!(name.contains("ForCompElaborationPass"));
-        assert!(name.contains("42"));
+        assert_eq!(name, "ForCompElaborationPass");
     }
 
-    #[test]
-    fn test_elaborator_invalid_pid() {
-        let mut db = SemanticDb::new();
-        let elaborator = ForCompElaborator::new(&mut db);
-
-        // Use a non-existent PID
-        let result = elaborator.elaborate_and_finalize(PID(9999));
-
-        assert!(result.is_err());
-        let diagnostics = result.unwrap_err();
-        assert_eq!(diagnostics.len(), 1);
-    }
-
-    #[test]
-    fn test_elaborator_non_for_comprehension_node() {
-        let parser = RholangParser::new();
-        let ast = parser.parse("Nil").expect("parse error");
-        let mut db = SemanticDb::new();
-        let pid = db.build_index(&ast[0]);
-
-        let elaborator = ForCompElaborator::new(&mut db);
-        let result = elaborator.elaborate_and_finalize(pid);
-
-        assert!(result.is_err());
-        let diagnostics = result.unwrap_err();
-        assert_eq!(diagnostics.len(), 1);
-    }
-
-    #[test]
-    fn test_elaborator_valid_for_comprehension() {
-        let parser = RholangParser::new();
-        let ast = parser
-            .parse("for(@x <- ch1 & @y <- ch2) { Nil }")
-            .expect("parse error");
-        let mut db = SemanticDb::new();
-        let _root = db.build_index(&ast[0]);
-
+    #[test_rholang_code("for(@x <- ch1 & @y <- ch2) { Nil }")]
+    fn test_elaborator_valid_for_comprehension(_procs: &[AnnProc], db: &SemanticDb) {
         // Find the for-comprehension PID
         let for_comp_pid = db
             .filter_procs(|p| matches!(p.proc, Proc::ForComprehension { .. }))
@@ -301,21 +216,14 @@ mod tests {
             .next()
             .expect("should find for-comprehension");
 
-        let elaborator = ForCompElaborator::new(&mut db);
-        let result = elaborator.elaborate_and_finalize(for_comp_pid);
+        let elaborator = ForCompElaborator::new(db);
+        let diagnostics = elaborator.elaborate(for_comp_pid);
 
-        assert!(result.is_ok());
+        assert_eq!(diagnostics.len(), 0);
     }
 
-    #[test]
-    fn test_elaborator_mixed_arrows_error() {
-        let parser = RholangParser::new();
-        let ast = parser
-            .parse("for(@x <- ch1 & @y <= ch2) { Nil }")
-            .expect("parse error");
-        let mut db = SemanticDb::new();
-        let _root = db.build_index(&ast[0]);
-
+    #[test_rholang_code("for(@x <- ch1 & @y <= ch2) { Nil }")]
+    fn test_elaborator_mixed_arrows_error(_procs: &[AnnProc], db: &SemanticDb) {
         // Find the for-comprehension PID
         let for_comp_pid = db
             .filter_procs(|p| matches!(p.proc, Proc::ForComprehension { .. }))
@@ -323,11 +231,9 @@ mod tests {
             .next()
             .expect("should find for-comprehension");
 
-        let elaborator = ForCompElaborator::new(&mut db);
-        let result = elaborator.elaborate_and_finalize(for_comp_pid);
+        let elaborator = ForCompElaborator::new(db);
+        let diagnostics = elaborator.elaborate(for_comp_pid);
 
-        assert!(result.is_err());
-        let diagnostics = result.unwrap_err();
         assert_eq!(diagnostics.len(), 1);
     }
 }
