@@ -10,9 +10,17 @@ use std::io::Write;
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
-    /// Load code from file into the buffer at startup
+    /// Load code from file into the buffer at startup (interactive mode)
     #[arg(short = 'l', long = "load", value_name = "FILE")]
     pub load: Option<std::path::PathBuf>,
+
+    /// Execute the provided code and exit (non-interactive)
+    #[arg(short = 'e', long = "exec", value_name = "CODE")]
+    pub exec: Option<String>,
+
+    /// Execute code from the provided file and exit (non-interactive)
+    #[arg(short = 'f', long = "file", value_name = "FILE")]
+    pub file: Option<std::path::PathBuf>,
 }
 
 pub fn help_message() -> String {
@@ -29,6 +37,10 @@ pub fn help_message() -> String {
         + "\n  .ps - List all running processes"
         + "\n  .kill <index> - Kill a running process by index"
         + "\n  .quit - Exit the rholang-shell"
+        + "\n\nNon-interactive CLI:"
+        + "\n  --exec, -e <CODE>  Execute the provided code and exit"
+        + "\n  --file, -f <FILE>  Execute code loaded from the file and exit"
+        + "\n  If stdin is piped (non-TTY), the shell reads all input, executes it, and exits"
 }
 
 const DEFAULT_PROMPT: &str = ">>> ";
@@ -458,6 +470,37 @@ pub fn handle_interrupt<W: Write, I: InterpreterProvider>(
 
 /// Run the rholang-shell with the provided interpreter provider
 pub async fn run_shell<I: InterpreterProvider>(args: Args, interpreter: I) -> Result<()> {
+    // Highest-priority non-interactive: explicit --exec or --file flags
+    if let Some(code) = args.exec.as_ref() {
+        let result = interpreter.interpret(code).await;
+        match result {
+            InterpretationResult::Success(output) => {
+                // In explicit non-interactive mode, always print plain output (no labels/colors)
+                println!("{}", output);
+            }
+            InterpretationResult::Error(e) => {
+                eprintln!("Error: {}", e);
+                // Keep exit code 0 to avoid breaking callers that rely on Ok(()).
+                // Optionally, change to non-zero by returning Err(e.into()).
+            }
+        }
+        return Ok(());
+    }
+
+    if let Some(file_path) = args.file.as_ref() {
+        let code = std::fs::read_to_string(file_path)?;
+        let result = interpreter.interpret(&code).await;
+        match result {
+            InterpretationResult::Success(output) => {
+                println!("{}", output);
+            }
+            InterpretationResult::Error(e) => {
+                eprintln!("Error: {}", e);
+            }
+        }
+        return Ok(());
+    }
+
     // If stdin is not a TTY, run in non-interactive (batch) mode and read from stdin
     if !atty::is(atty::Stream::Stdin) {
         use std::io::{self, Read};
