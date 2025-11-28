@@ -241,7 +241,7 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
                 message: "stack underflow lhs (requires Ints)".to_string(),
             })?;
             match (a, b) {
-                (Value::Int(a), Value::Int(b)) => vm.stack.push(Value::Bool(b >= a)),
+                (Value::Int(a), Value::Int(b)) => vm.stack.push(Value::Bool(a >= b)),
                 (a, b) => {
                     return Err(ExecError::OpcodeParamError {
                         opcode: "CMP_GTE",
@@ -443,7 +443,11 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
                 }
             };
             let v = if let Some((saved_id, saved_v)) = vm.cont_last.take() {
-                if saved_id == id { saved_v } else { Value::Nil }
+                if saved_id == id {
+                    saved_v
+                } else {
+                    Value::Nil
+                }
             } else {
                 Value::Nil
             };
