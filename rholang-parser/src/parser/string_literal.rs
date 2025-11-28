@@ -102,26 +102,22 @@ pub fn parse_string_literal<'a>(raw: &'a str) -> Result<Cow<'a, str>, ParsingErr
 }
 
 fn parse_decimal_escape(s: &str) -> Result<(char, usize), ParsingError> {
-    // Collect contiguous decimal digits and count bytes consumed
-    let mut digits = String::new();
-    let mut bytes_consumed = 0usize;
-    for ch in s.chars() {
-        if ch.is_ascii_digit() {
-            digits.push(ch);
-            bytes_consumed += ch.len_utf8();
-        } else {
-            break;
-        }
+    // Find the end of the contiguous ASCII digit run in the original slice
+    let bytes = s.as_bytes();
+    let mut end = 0usize;
+    while end < bytes.len() && (bytes[end] as char).is_ascii_digit() {
+        end += 1;
     }
-    if digits.is_empty() {
+    if end == 0 {
         return Err(ParsingError::InvalidStringEscape);
     }
-    let num = match digits.parse::<u32>() {
+
+    let num = match s[..end].parse::<u32>() {
         Ok(n) => n,
         Err(_) => return Err(ParsingError::InvalidStringCodePoint),
     };
     let c = validate_scalar(num)?;
-    Ok((c, bytes_consumed))
+    Ok((c, end))
 }
 
 fn validate_scalar(num: u32) -> Result<char, ParsingError> {
