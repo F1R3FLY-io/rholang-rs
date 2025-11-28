@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     fmt::{Debug, Display, Write},
     ops::Deref,
 };
@@ -15,7 +16,7 @@ pub enum Proc<'ast> {
     Unit,
     BoolLiteral(bool),
     LongLiteral(i64),
-    StringLiteral(&'ast str),
+    StringLiteral(Cow<'ast, str>),
     UriLiteral(Uri<'ast>),
 
     SimpleType(SimpleType),

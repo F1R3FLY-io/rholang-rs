@@ -5,6 +5,7 @@ use crate::ast::{
     AnnProc, BinaryExpOp, Bind, BundleType, Case, Collection, Id, KeyValuePair, LetBinding, Name,
     NameDecl, Names, Proc, SendType, SimpleType, SyncSendCont, UnaryExpOp, Var, VarRefKind,
 };
+use crate::parser::string_literal::parse_string_literal;
 
 pub(crate) struct ASTBuilder<'ast> {
     arena: Arena<Proc<'ast>>,
@@ -80,9 +81,8 @@ impl<'ast> ASTBuilder<'ast> {
         &self.bad
     }
 
-    pub(crate) fn alloc_string_literal(&self, value: &'ast str) -> &Proc<'ast> {
-        self.arena
-            .alloc(Proc::StringLiteral(crate::trim_byte(value, b'"')))
+    pub(crate) fn alloc_string_literal(&'ast self, value: std::borrow::Cow<'ast, str>) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::StringLiteral(value))
     }
 
     pub(crate) fn alloc_long_literal(&self, value: i64) -> &Proc<'ast> {
