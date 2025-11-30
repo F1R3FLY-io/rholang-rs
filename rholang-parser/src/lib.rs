@@ -1,15 +1,29 @@
-//! Rholang parser based on tree-sitter grammar
+//! Rholang parser
 //!
-//! This crate provides a parser for the Rholang language using the tree-sitter grammar
-//! defined in the rholang-tree-sitter crate.
+//! Non-wasm builds use the tree-sitter based implementation. For `wasm32` target we
+//! provide a minimal stub parser to avoid compiling native C code.
 
 use std::fmt::{Debug, Display, Write};
 
 pub mod ast;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod parser;
+#[cfg(target_arch = "wasm32")]
+pub mod parser_wasm;
+#[cfg(target_arch = "wasm32")]
+pub use parser_wasm as parser;
 mod traverse;
 
 pub use parser::RholangParser;
+
+// Unified parse failure type alias for consumers
+#[cfg(not(target_arch = "wasm32"))]
+pub type ParseFailure<'a> = parser::errors::ParsingFailure<'a>;
+#[cfg(target_arch = "wasm32")]
+#[derive(Debug, Clone)]
+pub struct ParseFailure<'a> {
+    pub _phantom: core::marker::PhantomData<&'a ()>,
+}
 pub use traverse::{DfsEvent, DfsEventExt};
 
 /// a position in the source code. 1-based
@@ -52,6 +66,7 @@ impl Display for SourcePos {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl From<tree_sitter::Point> for SourcePos {
     fn from(value: tree_sitter::Point) -> Self {
         SourcePos {
@@ -86,6 +101,7 @@ impl Default for SourceSpan {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl From<tree_sitter::Range> for SourceSpan {
     fn from(value: tree_sitter::Range) -> Self {
         SourceSpan {

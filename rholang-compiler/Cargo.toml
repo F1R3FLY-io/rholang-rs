@@ -11,6 +11,7 @@ path = "src/lib.rs"
 [dependencies]
 # Workspace dependencies
 anyhow = { workspace = true }
+validated = { workspace = true }
 
 # Local crates
 rholang-parser = { path = "../rholang-parser" }
@@ -20,4 +21,3 @@ rholang-vm = { path = "../rholang-vm" }
 
 [dev-dependencies]
 tokio = { workspace = true }
-validated = { workspace = true }

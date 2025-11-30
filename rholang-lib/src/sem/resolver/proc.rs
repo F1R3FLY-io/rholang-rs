@@ -12,10 +12,21 @@ pub(super) fn resolve(db: &mut SemanticDb, stack: &mut BindingStack, root: PID) 
 const STACK_RED_ZONE: usize = 4 * 1024;
 const SWEET_STACK_SIZE: usize = 16 * STACK_RED_ZONE;
 
+#[inline]
+fn maybe_grow_stack<F: FnOnce()>(f: F) {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        stacker::maybe_grow(STACK_RED_ZONE, SWEET_STACK_SIZE, f)
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        // No stack growth on wasm; just run the closure.
+        f()
+    }
+}
+
 fn resolve_rec<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, root: ProcRef<'a>) {
-    stacker::maybe_grow(STACK_RED_ZONE, SWEET_STACK_SIZE, || {
-        resolve_unguarded(db, stack, root)
-    })
+    maybe_grow_stack(|| resolve_unguarded(db, stack, root))
 }
 
 fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this: ProcRef<'a>) {

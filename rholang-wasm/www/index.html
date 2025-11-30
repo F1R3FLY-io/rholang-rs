@@ -1,55 +1,12 @@
 <!doctype html>
 <html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Rholang WASM Test</title>
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; }
-    textarea { width: 100%; height: 200px; font-family: monospace; }
-    #output { white-space: pre-wrap; background: #111; color: #0f0; padding: 1rem; border-radius: 6px; min-height: 120px; }
-    .row { display: grid; grid-template-columns: 1fr; gap: 1rem; }
-    button { padding: .6rem 1rem; }
-  </style>
-</head>
-<body>
-  <h1>Rholang WASM Tester</h1>
-  <div class="row">
-    <label for="code">Rholang code</label>
-    <textarea id="code" placeholder="// Type Rholang here"></textarea>
-    <div>
-      <button id="run">Run</button>
-      <span id="status"></span>
-    </div>
-    <div id="output" aria-live="polite"></div>
-  </div>
-  <script type="module">
-    import init, { WasmInterpreter } from './pkg/rholang_wasm.js';
-
-    const status = document.getElementById('status');
-    const output = document.getElementById('output');
-    const code = document.getElementById('code');
-    const runBtn = document.getElementById('run');
-
-    async function main() {
-      status.textContent = 'Loading...';
-      await init();
-      status.textContent = 'Ready';
-      const interp = new WasmInterpreter();
-      runBtn.onclick = async () => {
-        status.textContent = 'Running...';
-        try {
-          const res = await interp.interpret(code.value);
-          output.textContent = res;
-          status.textContent = 'Done';
-        } catch (e) {
-          output.textContent = 'Error: ' + e;
-          status.textContent = 'Error';
-        }
-      };
-    }
-
-    main();
-  </script>
-</body>
-</html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rholang WASM (React)</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+  </html>
