@@ -22,6 +22,8 @@ rholang-vm = { path = "../rholang-vm", optional = true }
 rholang-parser = { path = "../rholang-parser", optional = true }
 rholang-compiler = { path = "../rholang-compiler", optional = true }
 rholang-lib = { path = "../rholang-lib", optional = true }
+# Shared interpreter facade (no tokio on wasm)
+rholang-interpreter = { path = "../rholang-interpreter", default-features = false, optional = true }
 validated = { workspace = true }
 anyhow = { workspace = true }
 
@@ -33,6 +35,7 @@ vm-eval = [
     "rholang-vm",
     "rholang-compiler",
     "rholang-lib",
+    "rholang-interpreter",
 ]
 
 [dev-dependencies]

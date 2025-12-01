@@ -1,13 +1,13 @@
 use wasm_bindgen::prelude::*;
 
-use anyhow::{anyhow, Result};
-use validated::Validated;
-
+#[cfg(feature = "vm-eval")]
+use rholang_interpreter::{InterpreterProvider, RholangCompilerInterpreterProvider};
 #[cfg(feature = "vm-eval")]
 use rholang_vm::api::{Process, VM, Value};
-#[cfg(feature = "vm-eval")]
-use rholang_compiler::compile_first_process_async;
 
+// For the synchronous `eval` API (kept only for compatibility with existing tests),
+// we return the result of executing an empty process, which renders to "Nil".
+// This mirrors the previous placeholder behavior expected by tests.
 #[cfg(feature = "vm-eval")]
 fn pretty_value(v: &Value) -> String {
     match v {
@@ -40,11 +40,11 @@ fn pretty_value(v: &Value) -> String {
 /// Exported to JavaScript via wasm-bindgen. Must return `String` across the WASM boundary.
 #[cfg(feature = "vm-eval")]
 #[wasm_bindgen]
-pub fn eval(rholang_code: &str) -> String {
-    // Sync API intentionally returns a stable placeholder result by executing an empty process.
-    // Real parse/compile/execute is provided by the async `evalRho`/`WasmInterpreter`.
+pub fn eval(_rholang_code: &str) -> String {
+    // Intentionally do not attempt to compile/execute user code in sync mode.
+    // Execute an empty process to produce a stable placeholder result "Nil".
     let mut vm = VM::new();
-    let mut proc = Process::new(vec![], "wasm-fallback");
+    let mut proc = Process::new(vec![], "wasm-placeholder");
     match vm.execute(&mut proc) {
         Ok(val) => pretty_value(&val),
         Err(exec_err) => format!("Fallback failed: {}", exec_err),
@@ -62,15 +62,13 @@ pub fn eval(rholang_code: &str) -> String {
 #[cfg(feature = "vm-eval")]
 #[wasm_bindgen(js_name = evalRho)]
 pub async fn eval_async(rholang_code: &str) -> String {
-    // Use compiler facade which handles parsing + semantic pipeline under the hood.
-    let mut process = match compile_first_process_async(rholang_code).await {
+    let provider = match RholangCompilerInterpreterProvider::new() {
         Ok(p) => p,
-        Err(e) => return format!("{}", e),
+        Err(e) => return format!("InitError: {}", e),
     };
-    let mut vm = VM::new();
-    match vm.execute(&mut process) {
-        Ok(val) => pretty_value(&val),
-        Err(e) => format!("RuntimeError: {}", e),
+    match provider.interpret(rholang_code).await {
+        rholang_interpreter::InterpretationResult::Success(s) => s,
+        rholang_interpreter::InterpretationResult::Error(e) => format!("{}", e),
     }
 }
 
