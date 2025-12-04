@@ -17,6 +17,7 @@
 //! ```
 
 mod codegen;
+mod disassembler;
 
 use anyhow::Result;
 use librho::sem::SemanticDb;
@@ -24,6 +25,7 @@ use rholang_parser::ast::AnnProc;
 use rholang_vm::api::Process;
 
 pub use codegen::CodegenContext;
+pub use disassembler::{Disassembler, DisassemblerConfig, DisassemblyFormat};
 
 /// The main compiler that transforms Rholang AST into bytecode processes
 ///
