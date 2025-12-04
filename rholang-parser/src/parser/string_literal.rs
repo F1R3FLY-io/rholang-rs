@@ -17,25 +17,21 @@
 use std::borrow::Cow;
 use crate::parser::errors::ParsingError;
 
-fn trim_quotes(raw: &str) -> &str {
-    crate::trim_byte(raw, b'"')
-}
-
 /// Parse a raw string literal (including quotes) into its unescaped content.
 ///
 /// Single-pass implementation with zero-copy fast path:
 /// - If the literal contains no escapes, returns a borrowed slice of the input (without quotes).
 /// - If escapes are present, returns an owned `String` with unescaped content.
+#[inline(never)]
 pub fn parse_string_literal<'a>(raw: &'a str) -> Result<Cow<'a, str>, ParsingError> {
-    let s = trim_quotes(raw);
+    let s = crate::trim_byte(raw, b'"');
 
     // Scan once to find the first backslash byte. If none, we can return a borrowed slice.
     let bytes = s.as_bytes();
-    let mut i = 0usize;
-    while i < bytes.len() && bytes[i] != b'\\' {
-        i += 1; // scanning bytes is fine; backslash is ASCII and won't appear in UTF-8 continuation bytes
-    }
-    if i == bytes.len() {
+    let mut i;
+    if let Some(pos) = bytes.iter().position(|&b| b == b'\\') {
+        i = pos;
+    } else {
         // No escapes at all
         return Ok(Cow::Borrowed(s));
     }
@@ -101,13 +97,13 @@ pub fn parse_string_literal<'a>(raw: &'a str) -> Result<Cow<'a, str>, ParsingErr
     Ok(Cow::Owned(out))
 }
 
+#[inline(never)]
 fn parse_decimal_escape(s: &str) -> Result<(char, usize), ParsingError> {
     // Find the end of the contiguous ASCII digit run in the original slice
-    let bytes = s.as_bytes();
-    let mut end = 0usize;
-    while end < bytes.len() && (bytes[end] as char).is_ascii_digit() {
-        end += 1;
-    }
+    // Use `str::find` with a predicate to get the byte position of the first
+    // non-ASCII-digit. This avoids relying on any separate length value and
+    // reads clearly as a position query.
+    let end = s.find(|c: char| !c.is_ascii_digit()).unwrap_or(s.len());
     if end == 0 {
         return Err(ParsingError::InvalidStringEscape);
     }
@@ -116,14 +112,8 @@ fn parse_decimal_escape(s: &str) -> Result<(char, usize), ParsingError> {
         Ok(n) => n,
         Err(_) => return Err(ParsingError::InvalidStringCodePoint),
     };
-    let c = validate_scalar(num)?;
+    let c = char::from_u32(num).ok_or(ParsingError::InvalidStringCodePoint)?;
     Ok((c, end))
-}
-
-fn validate_scalar(num: u32) -> Result<char, ParsingError> {
-    // `char::from_u32` already rejects values > 0x10FFFF and surrogate code points
-    // (0xD800..=0xDFFF). Rely on it directly and map `None` to `InvalidCodePoint`.
-    char::from_u32(num).ok_or(ParsingError::InvalidStringCodePoint)
 }
 
 #[cfg(test)]
@@ -190,5 +180,63 @@ mod tests {
         assert!(matches!(parse_string_literal("\"\\1114112\""), Err(ParsingError::InvalidStringCodePoint)));
         // Surrogate
         assert!(matches!(parse_string_literal("\"\\55296\""), Err(ParsingError::InvalidStringCodePoint)));
+    }
+
+    // The following tests specifically exercise the branch that uses:
+    //   if let Some(rel) = s[i..].find('\\') { i += rel; ... }
+    // to ensure `find` returns a byte position within the slice (not a byte value)
+    // and that adding it to `i` yields a valid UTF-8 boundary even with multibyte chars.
+
+    #[test]
+    fn test_copy_chunk_with_multibyte_between_escapes() {
+        // Two escapes separated by multibyte UTF-8 characters ("😀α").
+        // After handling the first escape, the loop should copy the multibyte chunk
+        // up to the next backslash using s[i..].find('\\').
+        let input = "\"\\n😀α\\t\""; // literal: "\n😀α\t"
+        let expected = "\n😀α\t";
+        assert_eq!(parse_string_literal(input).unwrap(), expected);
+    }
+
+    #[test]
+    fn test_copy_chunk_with_only_ascii_between_escapes() {
+        // Control case with only ASCII between escapes to exercise the same branch.
+        let input = "\"\\nabc\\t\""; // literal: "\nabc\t"
+        let expected = "\nabc\t";
+        assert_eq!(parse_string_literal(input).unwrap(), expected);
+    }
+
+    // Additional coverage tests to reach 100%
+
+    #[test]
+    fn test_max_unicode_scalar_via_decimal_escape() {
+        // 0x10FFFF == 1114111 (max valid Unicode scalar value)
+        let input = "\"\\1114111\"";
+        assert_eq!(parse_string_literal(input).unwrap(), "\u{10FFFF}");
+    }
+
+    #[test]
+    fn test_decimal_overflow_parse_error_maps_to_invalid_code_point() {
+        // An absurdly large decimal that doesn't fit in u32 should fail at parse::<u32>()
+        // and be mapped to InvalidStringCodePoint by parse_decimal_escape.
+        let big = "99999999999999999999999999999999999999999";
+        let input = format!("\"\\{}\"", big);
+        assert!(matches!(
+            parse_string_literal(&input),
+            Err(ParsingError::InvalidStringCodePoint)
+        ));
+    }
+
+    #[test]
+    fn test_copy_remainder_after_last_escape() {
+        // After processing the first escape, there are no more backslashes;
+        // the parser should copy the remainder via the `None` branch.
+        assert_eq!(parse_string_literal("\"\\nxyz\"").unwrap(), "\nxyz");
+    }
+
+    #[test]
+    fn test_parse_decimal_escape_end_zero_errors() {
+        // Directly exercise the private helper to cover the `end == 0` branch
+        assert!(matches!(parse_decimal_escape(""), Err(ParsingError::InvalidStringEscape)));
+        assert!(matches!(parse_decimal_escape("x123"), Err(ParsingError::InvalidStringEscape)));
     }
 }
