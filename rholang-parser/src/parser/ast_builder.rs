@@ -5,7 +5,6 @@ use crate::ast::{
     AnnProc, BinaryExpOp, Bind, BundleType, Case, Collection, Id, KeyValuePair, LetBinding, Name,
     NameDecl, Names, Proc, SendType, SimpleType, SyncSendCont, UnaryExpOp, Var, VarRefKind,
 };
-use crate::parser::string_literal::parse_string_literal;
 
 pub(crate) struct ASTBuilder<'ast> {
     arena: Arena<Proc<'ast>>,

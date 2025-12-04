@@ -1,28 +1,5 @@
 use rholang_parser::parser::{RholangParser, errors::ParsingError, parse_string_literal};
 
-fn extract_first_string_literal<'a>(proc: &'a rholang_parser::ast::AnnProc<'a>) -> Option<&'a str> {
-    use rholang_parser::ast::Proc;
-    match &proc.proc {
-        Proc::Send { inputs, .. } => {
-            if let Some(first) = inputs.first() {
-                if let Proc::StringLiteral(s) = first.proc {
-                    return Some(s.as_ref());
-                }
-            }
-            None
-        }
-        Proc::Method { args, .. } => {
-            if let Some(first) = args.first() {
-                if let Proc::StringLiteral(s) = first.proc {
-                    return Some(s.as_ref());
-                }
-            }
-            None
-        }
-        _ => None,
-    }
-}
-
 #[test]
 fn unit_plain_fast_path_no_escapes() {
     // Exercises the early return borrowed path

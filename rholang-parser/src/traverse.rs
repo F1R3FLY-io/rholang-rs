@@ -1,4 +1,5 @@
 use std::iter::{self, FusedIterator};
+#[cfg(test)]
 use std::borrow::Cow;
 
 use smallvec::{SmallVec, smallvec};

@@ -22,39 +22,27 @@ use crate::parser::errors::ParsingError;
 /// Single-pass implementation with zero-copy fast path:
 /// - If the literal contains no escapes, returns a borrowed slice of the input (without quotes).
 /// - If escapes are present, returns an owned `String` with unescaped content.
-#[inline(never)]
 pub fn parse_string_literal<'a>(raw: &'a str) -> Result<Cow<'a, str>, ParsingError> {
     let s = crate::trim_byte(raw, b'"');
-
-    // Scan once to find the first backslash byte. If none, we can return a borrowed slice.
     let bytes = s.as_bytes();
-    let mut i;
-    if let Some(pos) = bytes.iter().position(|&b| b == b'\\') {
-        i = pos;
-    } else {
-        // No escapes at all
-        return Ok(Cow::Borrowed(s));
-    }
 
-    // We found an escape at position `i`. Start building the output string in provided buffer.
+    // Find the first backslash; if none, return borrowed slice.
+    let mut i = match bytes.iter().position(|&b| b == b'\\') {
+        Some(pos) => pos,
+        None => return Ok(Cow::Borrowed(s)),
+    };
+
+    // Prepare output and copy prefix before the first backslash.
     let mut out = String::with_capacity(s.len());
-    // Push the prefix before first backslash
     out.push_str(&s[..i]);
 
-    // Continue processing from the first backslash
+    // Process remaining content.
     while i < bytes.len() {
         if bytes[i] != b'\\' {
-            // Copy a chunk up to the next backslash in one go.
-            let start = i;
-            if let Some(rel) = s[i..].find('\\') {
-                i += rel;
-                out.push_str(&s[start..i]);
-                continue; // next loop iteration will see a backslash at i
-            } else {
-                // No more backslashes; copy the remainder and finish
-                out.push_str(&s[start..]);
+            if !push_until_backslash(&mut out, s, &mut i) {
                 break;
             }
+            continue;
         }
 
         // We are at a backslash; handle the escape sequence.
@@ -85,7 +73,6 @@ pub fn parse_string_literal<'a>(raw: &'a str) -> Result<Cow<'a, str>, ParsingErr
                 i += 1;
             }
             b'0'..=b'9' => {
-                // Decode decimal Unicode code point starting at current position
                 let (ch, consumed) = parse_decimal_escape(&s[i..])?;
                 out.push(ch);
                 i += consumed;
@@ -97,7 +84,6 @@ pub fn parse_string_literal<'a>(raw: &'a str) -> Result<Cow<'a, str>, ParsingErr
     Ok(Cow::Owned(out))
 }
 
-#[inline(never)]
 fn parse_decimal_escape(s: &str) -> Result<(char, usize), ParsingError> {
     // Find the end of the contiguous ASCII digit run in the original slice
     // Use `str::find` with a predicate to get the byte position of the first
@@ -114,6 +100,20 @@ fn parse_decimal_escape(s: &str) -> Result<(char, usize), ParsingError> {
     };
     let c = char::from_u32(num).ok_or(ParsingError::InvalidStringCodePoint)?;
     Ok((c, end))
+}
+
+#[inline]
+fn push_until_backslash(out: &mut String, s: &str, i: &mut usize) -> bool {
+    let start = *i;
+    if let Some(rel) = s[*i..].find('\\') {
+        *i += rel;
+        out.push_str(&s[start..*i]);
+        true
+    } else {
+        out.push_str(&s[start..]);
+        *i = s.len();
+        false
+    }
 }
 
 #[cfg(test)]
