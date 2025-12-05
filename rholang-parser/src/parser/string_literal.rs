@@ -24,6 +24,7 @@ use crate::parser::errors::ParsingError;
 /// - If escapes are present, returns an owned `String` with unescaped content.
 pub fn parse_string_literal<'a>(raw: &'a str) -> Result<Cow<'a, str>, ParsingError> {
     let s = crate::trim_byte(raw, b'"');
+    
     let bytes = s.as_bytes();
 
     // Find the first backslash; if none, return borrowed slice.
@@ -47,6 +48,7 @@ pub fn parse_string_literal<'a>(raw: &'a str) -> Result<Cow<'a, str>, ParsingErr
 
         // We are at a backslash; handle the escape sequence.
         i += 1; // consume '\\'
+        // If the backslash is the last byte, it's an invalid escape (trailing backslash).
         if i >= bytes.len() {
             return Err(ParsingError::InvalidStringEscape);
         }
@@ -116,6 +118,8 @@ fn push_until_backslash(out: &mut String, s: &str, i: &mut usize) -> bool {
     }
 }
 
+// former example rewritten as a proper test lives in `mod tests`
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -135,6 +139,48 @@ mod tests {
         assert_eq!(parse_string_literal("\"smile: \\128512\"").unwrap(), "smile: 😀");
         assert_eq!(parse_string_literal("\"nul: \\0\"").unwrap(), "nul: \u{0}");
         assert_eq!(parse_string_literal("\"A: \\65\"").unwrap(), "A: A");
+    }
+
+    #[test]
+    fn test_example_push_until_backslash_markers() {
+        // This is a test of the main parsing loop with a constant string literal.
+        // It walks through the string, and whenever a backslash is encountered,
+        // it records the character that immediately follows it.
+        const S: &str = "Hello\\World\\\\ Hello\\World\\\\\\ Hello\\World\\\\\\\\ Hello\\World\\\\\\\\\\\\ Hello\\World Hello\\World";
+        let bytes = S.as_bytes();
+        let mut i = 0;
+        let mut markers: Vec<char> = Vec::new();
+
+        while i < bytes.len() {
+            if bytes[i] != b'\\' {
+                // Skip ahead to next backslash using the same helper under test.
+                if !push_until_backslash(&mut String::new(), S, &mut i) {
+                    break;
+                }
+                continue;
+            }
+
+            // At a backslash: consume it and record the following character.
+            i += 1;
+            if i >= bytes.len() {
+                break; // trailing backslash in example would stop
+            }
+            markers.push(bytes[i] as char);
+        }
+
+        // Expected sequence of characters immediately following each backslash
+        // for the constant S above. Groups correspond to the segments separated
+        // by spaces in S: \ , \\\ , \\\\ , \\\\\\ , and two final single escapes.
+        let expected: Vec<char> = vec![
+            'W', '\\', ' ',
+            'W', '\\', '\\', ' ',
+            'W', '\\', '\\', '\\', ' ',
+            'W', '\\', '\\', '\\', '\\', '\\', ' ',
+            'W',
+            'W',
+        ];
+
+        assert_eq!(markers, expected);
     }
 
     #[test]
