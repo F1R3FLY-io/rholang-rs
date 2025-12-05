@@ -146,7 +146,8 @@ mod tests {
         // This is a test of the main parsing loop with a constant string literal.
         // It walks through the string, and whenever a backslash is encountered,
         // it records the character that immediately follows it.
-        const S: &str = "Hello\\World\\\\ Hello\\World\\\\\\ Hello\\World\\\\\\\\ Hello\\World\\\\\\\\\\\\ Hello\\World Hello\\World";
+        const S: &str = "L\\öwe \\老\\虎 L\\éopard";
+        
         let bytes = S.as_bytes();
         let mut i = 0;
         let mut markers: Vec<char> = Vec::new();
@@ -169,16 +170,14 @@ mod tests {
         }
 
         // Expected sequence of characters immediately following each backslash
-        // for the constant S above. Groups correspond to the segments separated
-        // by spaces in S: \ , \\\ , \\\\ , \\\\\\ , and two final single escapes.
-        let expected: Vec<char> = vec![
-            'W', '\\', ' ',
-            'W', '\\', '\\', ' ',
-            'W', '\\', '\\', '\\', ' ',
-            'W', '\\', '\\', '\\', '\\', '\\', ' ',
-            'W',
-            'W',
-        ];
+        // for the constant S above. Here S contains a single backslash before
+        // the non-ASCII character '虎'. The marker we record is the very next
+        // byte interpreted as a char, which is the first UTF-8 byte of '虎'.
+        // The string S uses backslashes immediately before multi-byte UTF-8 chars.
+        // We record the NEXT BYTE as a char, which yields the leading UTF-8 bytes
+        // for those code points: 'ö' -> 0xC3 ('Ã'), '老' -> 0xE8 ('è'),
+        // '虎' -> 0xE8 ('è'), 'é' -> 0xC3 ('Ã').
+        let expected: Vec<char> = vec!['Ã', 'è', 'è', 'Ã'];
 
         assert_eq!(markers, expected);
     }
