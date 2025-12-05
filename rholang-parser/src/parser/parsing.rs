@@ -20,6 +20,7 @@ use crate::{
     parser::{
         ast_builder::ASTBuilder,
         errors::{AnnParsingError, ParsingError},
+        string_literal::{parse_string_literal},
     },
 };
 
@@ -127,8 +128,14 @@ pub(super) fn node_to_ast<'ast>(
                     }
                 }
                 kind!("string_literal") => {
-                    let lit_value = get_node_value(&node, source);
-                    proc_stack.push(ast_builder.alloc_string_literal(lit_value), span);
+                    let lit_value_raw = get_node_value(&node, source);
+                    match parse_string_literal(lit_value_raw) {
+                        Ok(cow) => proc_stack.push(ast_builder.alloc_string_literal(cow), span),
+                        Err(err) => {
+                            errors.push(AnnParsingError::new(err, &node));
+                            bad = true;
+                        }
+                    }
                 }
                 kind!("uri_literal") => {
                     let lit_value = get_node_value(&node, source);

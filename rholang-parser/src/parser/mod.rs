@@ -1,6 +1,8 @@
 pub(crate) mod ast_builder;
 pub mod errors;
 mod parsing;
+mod string_literal;
+pub use string_literal::parse_string_literal;
 
 use nonempty_collections::NEVec;
 use validated::Validated;

@@ -80,9 +80,8 @@ impl<'ast> ASTBuilder<'ast> {
         &self.bad
     }
 
-    pub(crate) fn alloc_string_literal(&self, value: &'ast str) -> &Proc<'ast> {
-        self.arena
-            .alloc(Proc::StringLiteral(crate::trim_byte(value, b'"')))
+    pub(crate) fn alloc_string_literal(&'ast self, value: std::borrow::Cow<'ast, str>) -> &'ast Proc<'ast> {
+        self.arena.alloc(Proc::StringLiteral(value))
     }
 
     pub(crate) fn alloc_long_literal(&self, value: i64) -> &Proc<'ast> {

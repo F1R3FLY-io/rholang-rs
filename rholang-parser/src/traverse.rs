@@ -1,4 +1,6 @@
 use std::iter::{self, FusedIterator};
+#[cfg(test)]
+use std::borrow::Cow;
 
 use smallvec::{SmallVec, smallvec};
 
@@ -794,8 +796,8 @@ mod tests {
     fn if_then_else_full() {
         // if (true) "yes" else "no"
         let cond = Proc::BoolLiteral(true).ann(SourcePos::at_col(5).span_of(5));
-        let if_true = Proc::StringLiteral("yes").ann(SourcePos::at_col(11).span_of(5));
-        let if_false = Proc::StringLiteral("no").ann(SourcePos::at_col(22).span_of(4));
+        let if_true = Proc::StringLiteral(Cow::Borrowed("yes")).ann(SourcePos::at_col(11).span_of(5));
+        let if_false = Proc::StringLiteral(Cow::Borrowed("no")).ann(SourcePos::at_col(22).span_of(4));
         let if_then_else = Proc::IfThenElse {
             condition: cond,
             if_true,
@@ -812,8 +814,8 @@ mod tests {
         // preorder: root → cond → if_true → if_false
         assert_matches!(nodes[0].proc, Proc::IfThenElse { .. });
         assert_matches!(nodes[1].proc, Proc::BoolLiteral(true));
-        assert_matches!(nodes[2].proc, Proc::StringLiteral("yes"));
-        assert_matches!(nodes[3].proc, Proc::StringLiteral("no"));
+        if let Proc::StringLiteral(s) = nodes[2].proc { assert_eq!(s.as_ref(), "yes"); } else { panic!("expected StringLiteral yes"); }
+        if let Proc::StringLiteral(s) = nodes[3].proc { assert_eq!(s.as_ref(), "no"); } else { panic!("expected StringLiteral no"); }
 
         let events: Vec<_> = (&root).iter_dfs_event().collect();
         assert_matches!(
@@ -831,22 +833,10 @@ mod tests {
                     proc: Proc::BoolLiteral(true),
                     ..
                 }),
-                DfsEvent::Enter(AnnProc {
-                    proc: Proc::StringLiteral("yes"),
-                    ..
-                }),
-                DfsEvent::Exit(AnnProc {
-                    proc: Proc::StringLiteral("yes"),
-                    ..
-                }),
-                DfsEvent::Enter(AnnProc {
-                    proc: Proc::StringLiteral("no"),
-                    ..
-                }),
-                DfsEvent::Exit(AnnProc {
-                    proc: Proc::StringLiteral("no"),
-                    ..
-                }),
+                DfsEvent::Enter(AnnProc { proc: Proc::StringLiteral(_), .. }),
+                DfsEvent::Exit(AnnProc { proc: Proc::StringLiteral(_), .. }),
+                DfsEvent::Enter(AnnProc { proc: Proc::StringLiteral(_), .. }),
+                DfsEvent::Exit(AnnProc { proc: Proc::StringLiteral(_), .. }),
                 DfsEvent::Exit(AnnProc {
                     proc: Proc::IfThenElse { .. },
                     ..
@@ -860,9 +850,9 @@ mod tests {
     #[test]
     fn collection_map() {
         // { "k1": 1, "k2": 2 }
-        let k1 = Proc::StringLiteral("k1").ann(SourcePos::at_col(3).span_of(4));
+        let k1 = Proc::StringLiteral(Cow::Borrowed("k1")).ann(SourcePos::at_col(3).span_of(4));
         let v1 = Proc::LongLiteral(1).ann(SourcePos::at_col(9).span_of(1));
-        let k2 = Proc::StringLiteral("k2").ann(SourcePos::at_col(12).span_of(4));
+        let k2 = Proc::StringLiteral(Cow::Borrowed("k2")).ann(SourcePos::at_col(12).span_of(4));
         let v2 = Proc::LongLiteral(2).ann(SourcePos::at_col(18).span_of(1));
         let map = Proc::Collection(Collection::Map {
             elements: vec![(k1, v1), (k2, v2)],
@@ -875,9 +865,9 @@ mod tests {
         assert_eq!(nodes.len(), 5);
         // preorder: root → k1 → v1 → k2 → v2
         assert_matches!(nodes[0].proc, Proc::Collection(Collection::Map { .. }));
-        assert_matches!(nodes[1].proc, Proc::StringLiteral("k1"));
+        if let Proc::StringLiteral(s) = nodes[1].proc { assert_eq!(s.as_ref(), "k1"); } else { panic!("expected StringLiteral k1"); }
         assert_matches!(nodes[2].proc, Proc::LongLiteral(1));
-        assert_matches!(nodes[3].proc, Proc::StringLiteral("k2"));
+        if let Proc::StringLiteral(s) = nodes[3].proc { assert_eq!(s.as_ref(), "k2"); } else { panic!("expected StringLiteral k2"); }
         assert_matches!(nodes[4].proc, Proc::LongLiteral(2));
 
         let events: Vec<_> = (&root).iter_dfs_event().collect();
@@ -888,14 +878,8 @@ mod tests {
                     proc: Proc::Collection(Collection::Map { .. }),
                     ..
                 }),
-                DfsEvent::Enter(AnnProc {
-                    proc: Proc::StringLiteral("k1"),
-                    ..
-                }),
-                DfsEvent::Exit(AnnProc {
-                    proc: Proc::StringLiteral("k1"),
-                    ..
-                }),
+                DfsEvent::Enter(AnnProc { proc: Proc::StringLiteral(_), .. }),
+                DfsEvent::Exit(AnnProc { proc: Proc::StringLiteral(_), .. }),
                 DfsEvent::Enter(AnnProc {
                     proc: Proc::LongLiteral(1),
                     ..
@@ -904,14 +888,8 @@ mod tests {
                     proc: Proc::LongLiteral(1),
                     ..
                 }),
-                DfsEvent::Enter(AnnProc {
-                    proc: Proc::StringLiteral("k2"),
-                    ..
-                }),
-                DfsEvent::Exit(AnnProc {
-                    proc: Proc::StringLiteral("k2"),
-                    ..
-                }),
+                DfsEvent::Enter(AnnProc { proc: Proc::StringLiteral(_), .. }),
+                DfsEvent::Exit(AnnProc { proc: Proc::StringLiteral(_), .. }),
                 DfsEvent::Enter(AnnProc {
                     proc: Proc::LongLiteral(2),
                     ..
