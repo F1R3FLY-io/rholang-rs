@@ -239,4 +239,120 @@ mod tests {
         assert!(matches!(parse_decimal_escape(""), Err(ParsingError::InvalidStringEscape)));
         assert!(matches!(parse_decimal_escape("x123"), Err(ParsingError::InvalidStringEscape)));
     }
+
+    // ---- Direct tests for push_until_backslash ----
+
+    #[test]
+    fn test_push_until_backslash_no_backslash_ascii() {
+        let s = "abcdef";
+        let mut out = String::new();
+        let mut i = 0usize;
+        let found = push_until_backslash(&mut out, s, &mut i);
+        assert!(!found);
+        assert_eq!(out, "abcdef");
+        assert_eq!(i, s.len());
+    }
+
+    #[test]
+    fn test_push_until_backslash_no_backslash_unicode() {
+        // Contains multibyte code points only, no backslash
+        let s = "😀αβγ👍🏽";
+        let mut out = String::from("pre:");
+        let mut i = 0usize;
+        let found = push_until_backslash(&mut out, s, &mut i);
+        assert!(!found);
+        assert_eq!(out, format!("pre:{}", s));
+        assert_eq!(i, s.len());
+    }
+
+    #[test]
+    fn test_push_until_backslash_backslash_at_current_index() {
+        let s = "\\rest"; // backslash at index 0
+        let mut out = String::new();
+        let mut i = 0usize;
+        let found = push_until_backslash(&mut out, s, &mut i);
+        // Should stop immediately at the backslash, push nothing, return true
+        assert!(found);
+        assert_eq!(out, "");
+        assert_eq!(i, 0);
+    }
+
+    #[test]
+    fn test_push_until_backslash_ascii_before_backslash() {
+        let s = "hello\\world";
+        let mut out = String::new();
+        let mut i = 0usize;
+        let found = push_until_backslash(&mut out, s, &mut i);
+        assert!(found);
+        // Should copy up to but not including the backslash
+        assert_eq!(out, "hello");
+        // i should now point at the backslash byte position
+        assert_eq!(&s[i..i + 1], "\\");
+    }
+
+    #[test]
+    fn test_push_until_backslash_unicode_before_backslash() {
+        // Sequence of complex multibyte graphemes before a backslash
+        // Includes: ZWJ sequence and combining mark
+        let woman_technologist = "👩‍💻"; // ZWJ sequence
+        let e_acute_combining = "e\u{0301}"; // 'e' + COMBINING ACUTE ACCENT
+        let chunk = format!("{}{}★α", woman_technologist, e_acute_combining);
+        let s = format!("{}\\tail", chunk);
+        let mut out = String::new();
+        let mut i = 0usize;
+        let found = push_until_backslash(&mut out, &s, &mut i);
+        assert!(found);
+        assert_eq!(out, chunk);
+        // Ensure we did not split inside UTF-8: index should be at backslash and slicing is valid
+        assert_eq!(&s[i..i + 1], "\\");
+    }
+
+    #[test]
+    fn test_push_until_backslash_mid_string_start_index() {
+        // Start from the middle (simulate parser loop after first escape)
+        let s = "lead\\mid\\tail";
+        // Start just after 'lead'
+        let mut i = 4usize; // points to backslash
+        let mut out = String::new();
+        let found1 = push_until_backslash(&mut out, s, &mut i);
+        // Since i was at a backslash, found1 should be true and nothing appended
+        assert!(found1);
+        assert_eq!(out, "");
+        assert_eq!(&s[i..i + 1], "\\");
+
+        // Advance past the first backslash and some ascii, then copy until the next
+        i += 1; // simulate consuming the backslash by the caller; now i points at 'm'
+        // From 'm', the helper should copy "mid" and stop at the next backslash
+        let found2 = push_until_backslash(&mut out, s, &mut i);
+        assert!(found2);
+        assert_eq!(out, "mid");
+        assert_eq!(&s[i..i + 1], "\\");
+    }
+
+    #[test]
+    fn test_push_until_backslash_multiple_backslashes() {
+        let s = "ab\\cd\\ef";
+        let mut out = String::new();
+        let mut i = 0usize;
+        let found = push_until_backslash(&mut out, s, &mut i);
+        assert!(found);
+        assert_eq!(out, "ab");
+        assert_eq!(&s[i..i + 1], "\\");
+    }
+
+    #[test]
+    fn test_push_until_backslash_backslash_is_last_char() {
+        let s = "αβγ\\"; // backslash is the last byte
+        let mut out = String::new();
+        let mut i = 0usize;
+        let found = push_until_backslash(&mut out, s, &mut i);
+        assert!(found);
+        assert_eq!(out, "αβγ");
+        assert_eq!(&s[i..i + 1], "\\");
+        // Calling again without advancing should still return true and append nothing
+        let found2 = push_until_backslash(&mut out, s, &mut i);
+        assert!(found2);
+        assert_eq!(out, "αβγ");
+        assert_eq!(i, s.len() - 1);
+    }
 }
