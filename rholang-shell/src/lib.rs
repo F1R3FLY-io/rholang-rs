@@ -30,6 +30,7 @@ pub fn help_message() -> String {
         + "\n  .delete or .del - Remove the last edited line"
         + "\n  .reset or Ctrl+C - Interrupt current input (clear buffer)"
         + "\n  .load <file> - Load code from file into the buffer"
+        + "\n  .dia - Disassemble bytecode for the code in the buffer"
         + "\n  .validate - Validate code in buffer with all rholang-lib validators"
         + "\n  .validate-unused - Validate only unused-variable diagnostics"
         + "\n  .validate-elab - Validate only elaboration diagnostics (types/joins/consumption/patterns)"
@@ -67,6 +68,7 @@ fn label_info(s: &str) -> String {
 fn label_ok(s: &str) -> String {
     colorize(s, "32", is_tty_stdout())
 } // green
+#[allow(dead_code)]
 fn label_warn(s: &str) -> String {
     colorize(s, "33", is_tty_stdout())
 } // yellow
@@ -324,6 +326,21 @@ pub fn process_special_command<W: Write, I: InterpreterProvider>(
                 writeln!(stdout, "Usage: .load <file>")?;
             } else {
                 load_file_into_buffer(path, buffer, stdout, update_prompt)?;
+            }
+        }
+        ".dia" => {
+            let code = buffer.join("\n");
+            if code.trim().is_empty() {
+                writeln!(stdout, "Buffer is empty, nothing to disassemble")?;
+            } else {
+                match interpreter.disassemble(&code) {
+                    Ok(output) => {
+                        writeln!(stdout, "{}", output)?;
+                    }
+                    Err(e) => {
+                        writeln!(stdout, "{} {}", label_err_out("Disassembly error:"), e)?;
+                    }
+                }
             }
         }
         ".validate" => {
@@ -728,6 +745,8 @@ fn run_validation_subset<W: Write>(code: &str, stdout: &mut W, mode: ValidationM
 
     print_diagnostics(stdout, db.diagnostics(), header)
 }
+
+// (Disassembler functionality moved into InterpreterProvider::disassemble)
 
 fn run_all_validators_on_code<W: Write>(code: &str, stdout: &mut W) -> Result<()> {
     run_validation_subset(code, stdout, ValidationMode::All)

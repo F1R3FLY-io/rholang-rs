@@ -1,6 +1,5 @@
 use rholang_vm::{api::Instruction, api::Opcode, api::Process, api::Value, VM};
 
-
 #[test]
 fn test_nop_and_halt() {
     let mut vm = VM::new();
@@ -43,7 +42,7 @@ fn test_branch_true_and_false() {
     // Case true: jump
     let mut vm = VM::new();
     let prog_true = vec![
-        Instruction::unary(Opcode::PUSH_BOOL, 1), // true
+        Instruction::unary(Opcode::PUSH_BOOL, 1),   // true
         Instruction::unary(Opcode::BRANCH_TRUE, 3), // jump to index 3
         // fallthrough path (should be skipped)
         Instruction::unary(Opcode::PUSH_INT, 1),
@@ -58,7 +57,7 @@ fn test_branch_true_and_false() {
     // Case false: fall through
     let mut vm2 = VM::new();
     let prog_false = vec![
-        Instruction::unary(Opcode::PUSH_BOOL, 0), // false
+        Instruction::unary(Opcode::PUSH_BOOL, 0),   // false
         Instruction::unary(Opcode::BRANCH_TRUE, 3), // would jump to index 3 if true
         // fallthrough happens
         Instruction::unary(Opcode::PUSH_INT, 7),
