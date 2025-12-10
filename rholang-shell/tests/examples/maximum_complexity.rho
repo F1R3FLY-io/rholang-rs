@@ -1,0 +1,149 @@
+// Maximum complexity disassembly example - exercises all supported MVP compiler features
+// Comprehensive example exercising ALL supported MVP compiler constructs:
+// 1. Multiple nested new declarations
+// 2. Multiple send operations with different data types
+// 3. Multiple for comprehensions (receives)
+// 4. Parallel composition at multiple levels
+// 5. All arithmetic operators: +, -, *, /
+// 6. All comparison operators: ==, !=, <, >, <=, >=
+// 7. Boolean operators: and, or
+// 8. Nested if-then-else conditionals
+// 9. Collections: lists, tuples
+// 10. Various literal types: integers, strings, booleans
+
+new main, worker1, worker2, worker3, collector, logger in {
+    // Section 1: Send various data types
+    main!(0) |
+    main!(1) |
+    main!(2) |
+    main!(42) |
+    main!(-100) |
+    main!(32767) |
+    main!("hello") |
+    main!("world") |
+    main!("rholang") |
+    main!("disassembly") |
+    main!("test") |
+    main!(true) |
+    main!(false) |
+    
+    // Section 2: Multiple workers with receives
+    for (a <- worker1) {
+        logger!(1)
+    } |
+    for (b <- worker2) {
+        logger!(2)
+    } |
+    for (c <- worker3) {
+        logger!(3)
+    } |
+    
+    // Section 3: Arithmetic expressions (Note: % modulo not supported in MVP)
+    collector!(1 + 2) |
+    collector!(10 - 5) |
+    collector!(3 * 4) |
+    collector!(20 / 4) |
+    collector!((1 + 2) * (3 + 4)) |
+    collector!(((10 - 2) * 3) + 1) |
+    collector!(100 / 10 / 2) |
+    
+    // Section 4: Comparison operations
+    collector!(1 == 1) |
+    collector!(1 != 2) |
+    collector!(1 < 2) |
+    collector!(2 > 1) |
+    collector!(1 <= 1) |
+    collector!(2 >= 2) |
+    collector!(5 <= 10) |
+    collector!(10 >= 5) |
+    
+    // Section 5: Boolean operations (Note: 'not' unary operator is not supported in MVP)
+    collector!(true and true) |
+    collector!(true or false) |
+    collector!((1 < 2) and (3 > 2)) |
+    collector!((1 == 1) or (2 == 3)) |
+    
+    // Section 6: Nested conditionals
+    if (true) {
+        if (1 < 2) {
+            logger!("nested-true-true")
+        } else {
+            logger!("nested-true-false")
+        }
+    } else {
+        if (3 > 4) {
+            logger!("nested-false-true")
+        } else {
+            logger!("nested-false-false")
+        }
+    } |
+    
+    // Section 7: Collections - lists
+    collector!([1, 2, 3]) |
+    collector!([4, 5, 6, 7, 8]) |
+    collector!(["a", "b", "c"]) |
+    collector!([true, false, true]) |
+    collector!([1, "mixed", true]) |
+    collector!([[1, 2], [3, 4]]) |
+    
+    // Section 8: Collections - tuples
+    collector!((1, 2)) |
+    collector!((1, 2, 3)) |
+    collector!(("x", "y", "z")) |
+    collector!((true, 42, "hello")) |
+    collector!(((1, 2), (3, 4))) |
+    
+    // Section 9: Complex nested expressions
+    if ((1 + 2) == 3) {
+        if ((4 * 5) > 15) {
+            collector!([(1 + 1), (2 + 2), (3 + 3)])
+        } else {
+            collector!((100 - 50, 200 / 4))
+        }
+    } else {
+        collector!(0)
+    } |
+    
+    // Section 10: Nested new with more operations
+    new inner1, inner2 in {
+        inner1!(1) |
+        inner2!(2) |
+        for (i <- inner1) {
+            collector!(999)
+        } |
+        new deepNested in {
+            deepNested!("deep") |
+            for (d <- deepNested) {
+                logger!("received-deep")
+            }
+        }
+    } |
+    
+    // Section 11: Long chain of parallel compositions
+    Nil | Nil | Nil | Nil | Nil |
+    main!(100) | main!(101) | main!(102) | main!(103) |
+    
+    // Section 12: More complex boolean chains
+    if ((1 < 2) and (2 < 3) and (3 < 4)) {
+        collector!("chain-true")
+    } else {
+        collector!("chain-false")
+    } |
+    
+    if ((1 > 2) or (2 > 3) or (3 < 4)) {
+        collector!("or-chain-true")
+    } else {
+        collector!("or-chain-false")
+    } |
+    
+    // Section 13: Edge cases (integers limited to i16 range: -32768 to 32767)
+    collector!(0) |
+    collector!(-1) |
+    collector!(-32768) |
+    collector!(32767) |
+    collector!("") |
+    collector!([]) |
+    
+    // Final marker
+    logger!("complete")
+}
