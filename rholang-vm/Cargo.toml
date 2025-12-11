@@ -17,3 +17,10 @@ path = "src/lib.rs"
 
 [features]
 parallel-exec = ["crossbeam", "num_cpus"]
+
+[dev-dependencies]
+rholang-compiler = { path = "../rholang-compiler" }
+rholang-parser = { path = "../rholang-parser" }
+rholang-lib = { path = "../rholang-lib" }
+tokio = { workspace = true }
+validated = { workspace = true }

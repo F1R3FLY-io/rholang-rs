@@ -8,6 +8,8 @@ fn test_args_creation_and_parse() {
         load: None,
         exec: None,
         file: None,
+        disassemble: false,
+        both: false,
     };
     let _parsed = Args::try_parse_from(["program_name"]).expect("Failed to parse args");
 }

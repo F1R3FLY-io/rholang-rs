@@ -21,6 +21,14 @@ pub struct Args {
     /// Execute code from the provided file and exit (non-interactive)
     #[arg(short = 'f', long = "file", value_name = "FILE")]
     pub file: Option<std::path::PathBuf>,
+
+    /// Show disassembly instead of executing (use with -e or -f)
+    #[arg(short = 'd', long = "disassemble")]
+    pub disassemble: bool,
+
+    /// Show both disassembly and execution result (use with -e or -f)
+    #[arg(short = 'b', long = "both")]
+    pub both: bool,
 }
 
 pub fn help_message() -> String {
@@ -39,9 +47,11 @@ pub fn help_message() -> String {
         + "\n  .kill <index> - Kill a running process by index"
         + "\n  .quit - Exit the rholang-shell"
         + "\n\nNon-interactive CLI:"
-        + "\n  --exec, -e <CODE>  Execute the provided code and exit"
-        + "\n  --file, -f <FILE>  Execute code loaded from the file and exit"
-        + "\n  If stdin is piped (non-TTY), the shell reads all input, executes it, and exits"
+        + "\n  --exec, -e <CODE>     Execute the provided code and exit"
+        + "\n  --file, -f <FILE>     Execute code loaded from the file and exit"
+        + "\n  --disassemble, -d     Show disassembly instead of executing (use with -e or -f)"
+        + "\n  --both, -b            Show both disassembly and execution result"
+        + "\n  If stdin is piped (non-TTY), the shell reads all input and processes it"
 }
 
 const DEFAULT_PROMPT: &str = ">>> ";
@@ -485,37 +495,59 @@ pub fn handle_interrupt<W: Write, I: InterpreterProvider>(
     Ok(())
 }
 
+/// Run code in non-interactive mode with optional disassembly
+async fn run_non_interactive<I: InterpreterProvider>(
+    code: &str,
+    args: &Args,
+    interpreter: &I,
+) -> Result<()> {
+    let show_disasm = args.disassemble || args.both;
+    let show_exec = !args.disassemble || args.both;
+
+    // Show disassembly if requested
+    if show_disasm {
+        match interpreter.disassemble(code) {
+            Ok(disasm) => {
+                if args.both {
+                    println!("=== Disassembly ===");
+                }
+                println!("{}", disasm);
+            }
+            Err(e) => {
+                eprintln!("Disassembly error: {}", e);
+            }
+        }
+    }
+
+    // Execute if requested
+    if show_exec {
+        if args.both {
+            println!("\n=== Execution ===");
+        }
+        let result = interpreter.interpret(code).await;
+        match result {
+            InterpretationResult::Success(output) => {
+                println!("{}", output);
+            }
+            InterpretationResult::Error(e) => {
+                eprintln!("Error: {}", e);
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Run the rholang-shell with the provided interpreter provider
 pub async fn run_shell<I: InterpreterProvider>(args: Args, interpreter: I) -> Result<()> {
     // Highest-priority non-interactive: explicit --exec or --file flags
     if let Some(code) = args.exec.as_ref() {
-        let result = interpreter.interpret(code).await;
-        match result {
-            InterpretationResult::Success(output) => {
-                // In explicit non-interactive mode, always print plain output (no labels/colors)
-                println!("{}", output);
-            }
-            InterpretationResult::Error(e) => {
-                eprintln!("Error: {}", e);
-                // Keep exit code 0 to avoid breaking callers that rely on Ok(()).
-                // Optionally, change to non-zero by returning Err(e.into()).
-            }
-        }
-        return Ok(());
+        return run_non_interactive(code, &args, &interpreter).await;
     }
 
     if let Some(file_path) = args.file.as_ref() {
         let code = std::fs::read_to_string(file_path)?;
-        let result = interpreter.interpret(&code).await;
-        match result {
-            InterpretationResult::Success(output) => {
-                println!("{}", output);
-            }
-            InterpretationResult::Error(e) => {
-                eprintln!("Error: {}", e);
-            }
-        }
-        return Ok(());
+        return run_non_interactive(&code, &args, &interpreter).await;
     }
 
     // If stdin is not a TTY, run in non-interactive (batch) mode and read from stdin
@@ -527,27 +559,7 @@ pub async fn run_shell<I: InterpreterProvider>(args: Args, interpreter: I) -> Re
         if input.is_empty() {
             return Ok(());
         }
-        let result = interpreter.interpret(&input).await;
-        match result {
-            InterpretationResult::Success(output) => {
-                if is_tty_stdout() {
-                    let colored = colorize_ast_tree(&output, true);
-                    println!("{} {}", label_ok("Output:"), colored);
-                } else {
-                    println!("{}", output);
-                }
-            }
-            InterpretationResult::Error(e) => {
-                if is_tty_stderr() {
-                    eprintln!("{} {}", label_err_err("Error:"), e);
-                } else {
-                    eprintln!("Error: {}", e);
-                }
-                // Non-zero exit if error in batch mode
-                // But since function returns Result, propagate as Ok to avoid panics for now
-            }
-        }
-        return Ok(());
+        return run_non_interactive(&input, &args, &interpreter).await;
     }
 
     writeln!(std::io::stdout(), "{}", help_message())?;
