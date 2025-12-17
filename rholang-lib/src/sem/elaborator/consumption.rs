@@ -33,7 +33,7 @@ impl ConsumptionTracker {
             channel_usages: HashMap::new(),
         }
     }
-    
+
     fn record_usage(
         &mut self,
         channel: Symbol,
@@ -108,7 +108,7 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
     pub fn new(db: &'a SemanticDb<'ast>) -> Self {
         Self { db }
     }
-    
+
     /// This method validates consumption patterns by:
     /// 1. Tracking all channel usages and their consumption modes
     /// 2. Validating linear consumption (channels consumed exactly once)
@@ -118,16 +118,16 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
     /// 6. Verifying channel existence and binding
     pub fn validate(&self, _for_comp_pid: PID, receipts: &Receipts<'ast>) -> ValidationResult {
         let tracker = self.track_consumption_patterns(receipts)?;
-        
+
         tracker.validate_linear_consumption()?;
-        
+
         self.detect_reentrancy_patterns(receipts)?;
-        
+
         self.verify_all_channels(receipts)?;
 
         Ok(())
     }
-    
+
     /// Builds a consumption tracker that records how each channel is used
     /// throughout the for-comprehension
     fn track_consumption_patterns(
@@ -163,7 +163,7 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
 
         Ok(tracker)
     }
-    
+
     fn extract_name_from_source<'b>(&self, source: &'b Source<'ast>) -> &'b Name<'ast> {
         match source {
             Source::Simple { name } => name,
@@ -181,7 +181,7 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
             Name::Quote(_) => None,
         }
     }
-    
+
     fn get_name_position(&self, name: &Name<'ast>) -> rholang_parser::SourcePos {
         match name {
             Name::NameVar(var) => match var {
@@ -217,7 +217,7 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
 
         Ok(())
     }
-    
+
     fn is_reentrancy_pattern(&self, source: &Source<'ast>) -> bool {
         matches!(
             source,
@@ -278,7 +278,7 @@ mod tests {
                 .map(|(channel, _)| *channel)
                 .collect()
         }
-        
+
         fn get_consumed_channels(&self) -> HashSet<Symbol> {
             self.channel_usages
                 .iter()

@@ -62,7 +62,7 @@ impl StringInterner {
                 current: s.len(),
             });
         }
-        
+
         if self.count() >= self.max_total_strings {
             return Err(BytecodeError::ResourceExhaustion {
                 resource_type: "string_count".to_string(),
@@ -225,7 +225,7 @@ impl ConstantPool {
     /// Get integer by index
     pub fn get_integer(&self, index: u32) -> Result<&i64, BytecodeError> {
         let index_usize = index as usize;
-        
+
         if index_usize >= self.integers.len() {
             return Err(BytecodeError::InvalidConstantIndex {
                 index,
@@ -307,7 +307,7 @@ impl ConstantPool {
     /// Get compiled pattern by index (zero-copy access)
     pub fn get_pattern(&self, index: u32) -> Result<&CompiledPattern, BytecodeError> {
         let index_usize = index as usize;
-        
+
         if index_usize >= self.compiled_patterns.len() {
             return Err(BytecodeError::InvalidConstantIndex {
                 index,

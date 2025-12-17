@@ -1,10 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 
-use rholang_shell::{
-    providers::RholangCompilerInterpreterProvider,
-    run_shell, Args,
-};
+use rholang_shell::{providers::RholangCompilerInterpreterProvider, run_shell, Args};
 
 #[tokio::main]
 async fn main() -> Result<()> {

@@ -8,7 +8,6 @@ use std::time::Duration;
 use tokio::sync::oneshot;
 use tokio::task;
 use tokio::time::timeout;
-use validated::Validated;
 // Compiler/VM imports
 use librho::sem::{
     pipeline::Pipeline, DiagnosticKind, EnclosureAnalysisPass, ErrorKind, ForCompElaborationPass,
@@ -179,6 +178,12 @@ pub trait InterpreterProvider {
     /// Interpret a string of code and return the result
     async fn interpret(&self, code: &str) -> InterpretationResult;
 
+    /// Disassemble the provided code into bytecode representation (as text)
+    /// Default providers may return an error if unsupported
+    fn disassemble(&self, _code: &str) -> Result<String> {
+        Err(anyhow!("Disassembly is not supported by this provider"))
+    }
+
     /// List all running processes
     /// Returns a vector of tuples containing the process ID and the code being executed
     fn list_processes(&self) -> Result<Vec<(usize, String)>>;
@@ -201,6 +206,12 @@ impl InterpreterProvider for FakeInterpreterProvider {
     async fn interpret(&self, code: &str) -> InterpretationResult {
         // Fake implementation: just returns the input code
         InterpretationResult::Success(code.to_string())
+    }
+
+    fn disassemble(&self, _code: &str) -> Result<String> {
+        Err(anyhow!(
+            "Disassembly not available in FakeInterpreterProvider"
+        ))
     }
 
     /// List all running processes
@@ -386,6 +397,12 @@ impl InterpreterProvider for RholangParserInterpreterProvider {
         result
     }
 
+    fn disassemble(&self, _code: &str) -> Result<String> {
+        Err(anyhow!(
+            "Disassembly not available in RholangParserInterpreterProvider"
+        ))
+    }
+
     /// List all running processes
     /// Returns a vector of tuples containing the process ID and the code being executed
     /// This implementation returns the actual list of running processes managed by this provider
@@ -563,99 +580,99 @@ impl InterpreterProvider for RholangCompilerInterpreterProvider {
                 tokio::time::sleep(Duration::from_millis(delay)).await;
             }
 
-            let res = task::spawn_blocking(move || {
-                // Parse
-                let parser = RholangParser::new();
-                let validated = parser.parse(&code_for_task);
+            let res =
+                task::spawn_blocking(move || {
+                    // Parse
+                    let parser = RholangParser::new();
+                    let validated = parser.parse(&code_for_task);
 
-                // Extract AST or pretty-print errors
-                let ast_vec = match validated {
-                    validated::Validated::Good(ast) => ast,
-                    validated::Validated::Fail(ref err) => {
-                        let rendered = format!("{err:#?}");
-                        let cleaned = strip_sourcepos(&rendered);
-                        return InterpretationResult::Error(InterpreterError::parsing_error(
-                            cleaned,
-                            None,
-                            None,
+                    // Extract AST or pretty-print errors
+                    let ast_vec = match validated {
+                        validated::Validated::Good(ast) => ast,
+                        validated::Validated::Fail(ref err) => {
+                            let rendered = format!("{err:#?}");
+                            let cleaned = strip_sourcepos(&rendered);
+                            return InterpretationResult::Error(InterpreterError::parsing_error(
+                                cleaned, None, None,
+                            ));
+                        }
+                    };
+
+                    if ast_vec.is_empty() {
+                        return InterpretationResult::Success("".to_string());
+                    }
+
+                    let mut db = SemanticDb::new();
+                    // For now, execute the first top-level process
+                    let first = &ast_vec[0];
+                    let root = db.build_index(first);
+
+                    // Run essential semantic passes before compilation using a dedicated runtime
+                    let pipeline = Pipeline::new()
+                        .add_fact(ResolverPass::new(root))
+                        .add_fact(ForCompElaborationPass::new(root))
+                        .add_fact(EnclosureAnalysisPass::new(root));
+
+                    // Create a minimal runtime to block_on the async pipeline
+                    if let Ok(rt) = tokio::runtime::Builder::new_current_thread()
+                        .enable_time()
+                        .build()
+                    {
+                        rt.block_on(pipeline.run(&mut db));
+                    } else {
+                        return InterpretationResult::Error(InterpreterError::other_error(
+                            "Failed to initialize runtime for semantic pipeline".to_string(),
                         ));
                     }
-                };
 
-                if ast_vec.is_empty() {
-                    return InterpretationResult::Success("".to_string());
-                }
+                    // Filter out NameInProcPosition errors (handled by compiler emitting EVAL)
+                    let real_errors: Vec<_> = db
+                        .errors()
+                        .filter(|diag| {
+                            !matches!(
+                                diag.kind,
+                                DiagnosticKind::Error(ErrorKind::NameInProcPosition(_, _))
+                            )
+                        })
+                        .collect();
 
-                let mut db = SemanticDb::new();
-                // For now, execute the first top-level process
-                let first = &ast_vec[0];
-                let root = db.build_index(first);
-
-                // Run essential semantic passes before compilation using a dedicated runtime
-                let pipeline = Pipeline::new()
-                    .add_fact(ResolverPass::new(root))
-                    .add_fact(ForCompElaborationPass::new(root))
-                    .add_fact(EnclosureAnalysisPass::new(root));
-
-                // Create a minimal runtime to block_on the async pipeline
-                if let Ok(rt) = tokio::runtime::Builder::new_current_thread().enable_time().build()
-                {
-                    rt.block_on(pipeline.run(&mut db));
-                } else {
-                    return InterpretationResult::Error(InterpreterError::other_error(
-                        "Failed to initialize runtime for semantic pipeline".to_string(),
-                    ));
-                }
-
-                // Filter out NameInProcPosition errors (handled by compiler emitting EVAL)
-                let real_errors: Vec<_> = db
-                    .errors()
-                    .filter(|diag| {
-                        !matches!(
-                            diag.kind,
-                            DiagnosticKind::Error(ErrorKind::NameInProcPosition(_, _))
-                        )
-                    })
-                    .collect();
-
-                if !real_errors.is_empty() {
-                    return InterpretationResult::Error(InterpreterError::other_error(format!(
-                        "Semantic errors: {:?}",
-                        real_errors
-                    )));
-                }
-
-                let compiler = Compiler::new(&db);
-                let mut process = match compiler.compile_single(first) {
-                    Ok(p) => p,
-                    Err(e) => {
+                    if !real_errors.is_empty() {
                         return InterpretationResult::Error(InterpreterError::other_error(
-                            format!("Compilation error: {}", e),
-                        ))
+                            format!("Semantic errors: {:?}", real_errors),
+                        ));
                     }
-                };
 
-                // Execute the process
-                let mut vm = VM::new();
-                let value = match vm.execute(&mut process) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        return InterpretationResult::Error(InterpreterError::other_error(
-                            format!("Execution error: {}", e),
-                        ))
-                    }
-                };
+                    let compiler = Compiler::new(&db);
+                    let mut process = match compiler.compile_single(first) {
+                        Ok(p) => p,
+                        Err(e) => {
+                            return InterpretationResult::Error(InterpreterError::other_error(
+                                format!("Compilation error: {}", e),
+                            ))
+                        }
+                    };
 
-                let rendered = Self::render_value(&value);
-                InterpretationResult::Success(rendered)
-            })
-            .await
-            .unwrap_or_else(|e| {
-                InterpretationResult::Error(InterpreterError::other_error(format!(
-                    "Blocking task error: {}",
-                    e
-                )))
-            });
+                    // Execute the process
+                    let mut vm = VM::new();
+                    let value = match vm.execute(&mut process) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            return InterpretationResult::Error(InterpreterError::other_error(
+                                format!("Execution error: {}", e),
+                            ))
+                        }
+                    };
+
+                    let rendered = Self::render_value(&value);
+                    InterpretationResult::Success(rendered)
+                })
+                .await
+                .unwrap_or_else(|e| {
+                    InterpretationResult::Error(InterpreterError::other_error(format!(
+                        "Blocking task error: {}",
+                        e
+                    )))
+                });
 
             res
         };
@@ -684,6 +701,87 @@ impl InterpreterProvider for RholangCompilerInterpreterProvider {
         processes.remove(&pid);
 
         result
+    }
+
+    fn disassemble(&self, code: &str) -> Result<String> {
+        // Helper that does the entire pipeline on the current thread
+        fn do_disassemble(code: &str) -> String {
+            // Parse
+            let parser = RholangParser::new();
+            let validated = parser.parse(code);
+
+            let ast_vec = match validated {
+                validated::Validated::Good(ast) => ast,
+                validated::Validated::Fail(_err) => {
+                    return "Parsing failed: unable to build AST. Please fix syntax errors and try again.".to_string();
+                }
+            };
+
+            if ast_vec.is_empty() {
+                return "No code to disassemble (empty AST)".to_string();
+            }
+
+            // Build semantic DB and run essential passes (resolver + elaborations)
+            let mut db = SemanticDb::new();
+            let first = &ast_vec[0];
+            let root = db.build_index(first);
+
+            // Run the pipeline using a lightweight runtime local to this thread
+            if let Ok(rt) = tokio::runtime::Builder::new_current_thread()
+                .enable_time()
+                .build()
+            {
+                let pipeline = Pipeline::new()
+                    .add_fact(ResolverPass::new(root))
+                    .add_fact(ForCompElaborationPass::new(root))
+                    .add_fact(EnclosureAnalysisPass::new(root));
+                rt.block_on(pipeline.run(&mut db));
+            } else {
+                return "Failed to initialize runtime for semantic pipeline".to_string();
+            }
+
+            // Filter out NameInProcPosition errors (handled by compiler emitting EVAL)
+            let real_errors: Vec<_> = db
+                .errors()
+                .filter(|diag| {
+                    !matches!(
+                        diag.kind,
+                        DiagnosticKind::Error(ErrorKind::NameInProcPosition(_, _))
+                    )
+                })
+                .collect();
+
+            if !real_errors.is_empty() {
+                return format!("Semantic errors: {:?}", real_errors);
+            }
+
+            // Compile first top-level process
+            let compiler = Compiler::new(&db);
+            let process = match compiler.compile_single(first) {
+                Ok(p) => p,
+                Err(e) => {
+                    return format!("Compilation error: {}", e);
+                }
+            };
+
+            // Disassemble in verbose format by default
+            use rholang_compiler::{Disassembler, DisassemblyFormat};
+            let disasm = Disassembler::with_format(DisassemblyFormat::Verbose);
+            disasm.disassemble(&process)
+        }
+
+        // If we're inside a Tokio runtime, offload the entire work to a dedicated OS thread
+        // to avoid nested-runtime and blocking issues. Otherwise, run directly.
+        if tokio::runtime::Handle::try_current().is_ok() {
+            let code_owned = code.to_string();
+            let join = std::thread::spawn(move || do_disassemble(&code_owned));
+            match join.join() {
+                Ok(s) => Ok(s),
+                Err(_e) => Ok("Disassembly failed due to thread panic".to_string()),
+            }
+        } else {
+            Ok(do_disassemble(code))
+        }
     }
 
     fn list_processes(&self) -> Result<Vec<(usize, String)>> {
