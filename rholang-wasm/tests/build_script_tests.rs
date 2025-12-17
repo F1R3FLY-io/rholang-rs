@@ -27,12 +27,12 @@ fn build_wasm_script_produces_artifacts() {
 
     // Run the build script via bash from the crate root. The tests' CWD is the crate dir by default.
     let status = Command::new("bash")
-        .arg("../scripts/build_wasm.sh")
+        .arg("../scripts/wasm_build.sh")
         // Debug build is fine and faster; no flags needed.
         .status()
-        .expect("failed to invoke build_wasm.sh");
+        .expect("failed to invoke wasm_build.sh");
 
-    assert!(status.success(), "build_wasm.sh exited with non-zero status");
+    assert!(status.success(), "wasm_build.sh exited with non-zero status");
 
     // Verify artifacts exist in the default out-dir (pkg)
     let js = Path::new("pkg").join("rholang_wasm.js");

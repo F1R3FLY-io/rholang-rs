@@ -9,6 +9,7 @@ export default function App() {
   x!(42)
 }`)
   const [output, setOutput] = useState<string>('')
+  const [disassembly, setDisassembly] = useState<string>('')
   const [interpreter, setInterpreter] = useState<any | null>(null)
 
   useEffect(() => {
@@ -31,11 +32,16 @@ export default function App() {
     setStatus('running')
     try {
       if (!interpreter) throw new Error('Interpreter not ready')
-      const res = await interpreter.interpret(code)
+      const [res, disasm] = await Promise.all([
+        interpreter.interpret(code),
+        interpreter.disassemble(code),
+      ])
       setOutput(res)
+      setDisassembly(disasm)
       setStatus('ready')
     } catch (e: any) {
       setOutput('Error: ' + (e?.message ?? String(e)))
+      setDisassembly('')
       setStatus('error')
     }
   }
@@ -56,8 +62,19 @@ export default function App() {
         <div>
           <button onClick={run} disabled={status !== 'ready' || !interpreter}>Run</button>
         </div>
-        <div style={{ whiteSpace: 'pre-wrap', background: '#111', color: '#0f0', padding: '1rem', borderRadius: 6, minHeight: 120 }}>
-          {output}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div>
+            <h3 style={{ marginTop: 0 }}>Result</h3>
+            <div style={{ whiteSpace: 'pre-wrap', background: '#111', color: '#0f0', padding: '1rem', borderRadius: 6, minHeight: 120 }}>
+              {output}
+            </div>
+          </div>
+          <div>
+            <h3 style={{ marginTop: 0 }}>Disassembly</h3>
+            <div style={{ whiteSpace: 'pre-wrap', background: '#0a0a0a', color: '#0ff', padding: '1rem', borderRadius: 6, minHeight: 120 }}>
+              {disassembly}
+            </div>
+          </div>
         </div>
       </div>
     </div>

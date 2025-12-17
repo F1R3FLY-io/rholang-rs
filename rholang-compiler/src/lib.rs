@@ -118,8 +118,11 @@ pub async fn compile_source_async(
 /// Convenience: compile only the first top-level process in the source.
 pub async fn compile_first_process_async(src: &str) -> Result<Process> {
     let procs = compile_source_async(src).await?;
-    procs
-        .into_iter()
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("No process in source"))
+    Ok(
+        procs
+            .into_iter()
+            .next()
+            // Treat empty sources as a valid no-op process so callers (e.g. WASM) get `Nil` instead of an error.
+            .unwrap_or_else(|| Process::new(Vec::new(), "<empty>")),
+    )
 }

@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# build_wasm_react.sh
+# wasm_build.sh
 # Builds the rholang-wasm package and the React (Vite) app for production.
 #
 # Usage:
-#   ./scripts/build_wasm_react.sh [--debug]
+#   ./scripts/wasm_build.sh [--debug]
 #
 # Options:
-#   --debug   Build WASM in debug mode (default is release/optimized)
+#   --debug   Build WASM in debug mode (default: release/optimized)
 #
 # Output:
 #   - rholang-wasm/pkg/* (wasm-bindgen JS glue + .wasm)
@@ -36,8 +36,18 @@ if ! command -v npm >/dev/null 2>&1; then
   echo "[error] npm not found. Please install Node.js (18+) and npm." >&2
   exit 1
 fi
+if ! command -v rustup >/dev/null 2>&1; then
+  echo "[error] rustup not found. Please install rustup." >&2
+  exit 1
+fi
 
 export RUSTUP_TOOLCHAIN=nightly
+
+# Ensure wasm32 target is available
+if ! rustup target list --installed | grep -q "wasm32-unknown-unknown"; then
+  echo "[info] Adding Rust target wasm32-unknown-unknown ..."
+  rustup target add wasm32-unknown-unknown
+fi
 
 echo "[info] Building rholang-wasm package ($PROFILE) ..."
 pushd rholang-wasm >/dev/null

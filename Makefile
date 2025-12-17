@@ -213,8 +213,8 @@ help:
 # WASM build and serve targets
 .PHONY: wasm-build
 wasm-build:
-	@bash scripts/build_wasm.sh $(if $(RELEASE),--release,) $(if $(TARGET),--target $(TARGET),) $(if $(OUT_DIR),--out-dir $(OUT_DIR),) $(if $(FEATURES),--features $(FEATURES),) $(EXTRA)
+	@bash scripts/wasm_build.sh $(if $(DEBUG),--debug,)
 
-.PHONY: wasm-serve
-wasm-serve:
-	@bash scripts/serve_wasm.sh $(if $(PORT),--port $(PORT),) $(if $(RELEASE),--release,) $(if $(OPEN),--open,)
+.PHONY: wasm-run
+wasm-run:
+	@bash scripts/wasm_run.sh $(if $(RELEASE),--release,)

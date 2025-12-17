@@ -1,31 +1,43 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# run_wasm_react_dev.sh
-# Build the rholang-wasm package and start the React (Vite) dev server.
+# wasm_run.sh
+# Builds the rholang-wasm package (debug by default) and starts the React (Vite) dev server.
 #
 # Usage:
-#   ./scripts/run_wasm_react_dev.sh [--release]
+#   ./scripts/wasm_run.sh [--release] [--port <PORT>] [--host <HOST>]
 #
 # Options:
-#   --release  Build WASM in release mode (optimized). Default is debug.
-#
-# Prerequisites:
-#   - rustup + cargo
-#   - wasm-pack (install: cargo install wasm-pack)
-#   - Node.js 18+ and npm
+#   --release       Build WASM in release mode (optimized). Default is debug.
+#   --port <PORT>   Port for Vite dev server (default: 5173)
+#   --host <HOST>   Host for Vite dev server (default: 127.0.0.1)
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
 cd "$ROOT_DIR"
 
 PROFILE=dev
-for arg in "$@"; do
-  case "$arg" in
-    --release) PROFILE=release ;;
+PORT=5173
+HOST=127.0.0.1
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --release)
+      PROFILE=release
+      shift
+      ;;
+    --port)
+      shift
+      PORT=${1:-5173}
+      shift
+      ;;
+    --host)
+      shift
+      HOST=${1:-127.0.0.1}
+      shift
+      ;;
     -h|--help)
       grep -E "^#( |$)" "$0" | sed 's/^# //; s/^#//' ; exit 0 ;;
     *)
-      echo "Unknown option: $arg" >&2 ; exit 2 ;;
+      echo "Unknown option: $1" >&2 ; exit 2 ;;
   esac
 done
 
@@ -35,6 +47,10 @@ if ! command -v wasm-pack >/dev/null 2>&1; then
 fi
 if ! command -v npm >/dev/null 2>&1; then
   echo "[error] npm not found. Please install Node.js (18+) and npm." >&2
+  exit 1
+fi
+if ! command -v rustup >/dev/null 2>&1; then
+  echo "[error] rustup not found. Please install rustup." >&2
   exit 1
 fi
 
@@ -55,7 +71,7 @@ else
   wasm-pack build --target web --out-dir pkg
 fi
 
-echo "[info] Starting React dev server (Vite) ..."
+echo "[info] Starting React dev server (Vite) on $HOST:$PORT ..."
 pushd www >/dev/null
 
 # Install dependencies if node_modules missing
@@ -65,7 +81,7 @@ if [[ ! -d node_modules ]]; then
 fi
 
 # Use the package script that rebuilds WASM then starts Vite for convenience
-npm run dev:wasm
+npm run dev:wasm -- --host "$HOST" --port "$PORT"
 
 popd >/dev/null
 popd >/dev/null

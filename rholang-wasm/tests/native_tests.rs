@@ -7,14 +7,14 @@ use rholang_wasm::eval;
 fn eval_returns_placeholder_simple() {
     let input = "1 + 2 * 3";
     let out = eval(input);
-    assert_eq!(out, "Nil");
+    assert_eq!(out, "7");
 }
 
 #[test]
 fn eval_handles_multiline_and_returns_placeholder() {
     let input = "new x in {\n  x!(42)\n}";
     let out = eval(input);
-    assert_eq!(out, "Nil");
+    assert_eq!(out, "true");
 }
 
 #[test]
@@ -22,5 +22,5 @@ fn eval_exposed_function_is_callable_natively() {
     // Although primarily for WASM, the exported function is also callable natively.
     let input = "new stdout(`rho:io:stdout`) in { stdout!(\"Hi\") }";
     let out = eval(input);
-    assert_eq!(out, "Nil");
+    assert_eq!(out, "true");
 }

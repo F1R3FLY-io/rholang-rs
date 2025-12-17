@@ -20,6 +20,11 @@ vi.mock('../../pkg/rholang_wasm.js', () => {
       // Simulate the stubbed wasm behavior
       return `StubEval: ${code}`
     }
+
+    async disassemble(code: string): Promise<string> {
+      if (!initialized) throw new Error('WASM not initialized')
+      return `StubDisasm: ${code}`
+    }
   }
 
   return { default: init, WasmInterpreter }

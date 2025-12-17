@@ -64,22 +64,22 @@ fn serve_wasm_script_serves_index() {
 
     let port = pick_free_port();
 
-    // Start server script
+    // Start dev server via wasm_run.sh
     let mut child: Child = Command::new("bash")
-        .arg("../scripts/serve_wasm.sh")
+        .arg("../scripts/wasm_run.sh")
         .arg("--port")
         .arg(port.to_string())
         // Avoid inheriting stdout to keep test output clean; keep stderr for debugging if it fails.
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("failed to spawn serve_wasm.sh");
+        .expect("failed to spawn wasm_run.sh");
 
     // Wait for server to become ready, polling index.html
     let deadline = Instant::now() + Duration::from_secs(40);
     let mut ok = false;
     while Instant::now() < deadline {
-        match http_get("127.0.0.1", port, "/index.html") {
+        match http_get("127.0.0.1", port, "/") {
             Ok((status, body)) => {
                 if status.starts_with("HTTP/1.0 200") || status.starts_with("HTTP/1.1 200") {
                     // Check for a stable marker text from the page

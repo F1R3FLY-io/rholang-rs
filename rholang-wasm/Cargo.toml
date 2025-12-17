@@ -8,6 +8,7 @@ description = "WASM interface for Rholang interpreter"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+doctest = false
 
 [dependencies]
 wasm-bindgen = "0.2"
@@ -26,6 +27,7 @@ rholang-lib = { path = "../rholang-lib", optional = true }
 rholang-interpreter = { path = "../rholang-interpreter", default-features = false, optional = true }
 validated = { workspace = true }
 anyhow = { workspace = true }
+futures = "0.3"
 
 [features]
 default = ["vm-eval"]

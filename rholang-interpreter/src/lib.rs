@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use rholang_compiler::compile_first_process_async;
+use rholang_compiler::compile_source_async;
 use rholang_vm::api::{Value as VmValue, VM};
 
 #[cfg(feature = "native-runtime")]
@@ -145,20 +145,33 @@ impl InterpreterProvider for RholangCompilerInterpreterProvider {
             );
         }
 
-        // Core async compile + sync execute
+        // Core async compile + sync execute. Compile all top-level processes and return the
+        // result of the last one (mirrors shell semantics and avoids "No process" errors).
         let fut = async move {
-            let mut process = match compile_first_process_async(code).await {
-                Ok(p) => p,
+            let processes = match compile_source_async(code).await {
+                Ok(ps) => ps,
                 Err(e) => return InterpretationResult::Error(InterpreterError::new(e.to_string())),
             };
-            let mut vm = VM::new();
-            match vm.execute(&mut process) {
-                Ok(val) => InterpretationResult::Success(Self::render_value(&val)),
-                Err(e) => InterpretationResult::Error(InterpreterError::new(format!(
-                    "Execution error: {}",
-                    e
-                ))),
+
+            if processes.is_empty() {
+                return InterpretationResult::Success("Nil".to_string());
             }
+
+            let mut vm = VM::new();
+            let mut last_val = VmValue::Nil;
+            for mut proc in processes.into_iter() {
+                match vm.execute(&mut proc) {
+                    Ok(val) => last_val = val,
+                    Err(e) => {
+                        return InterpretationResult::Error(InterpreterError::new(format!(
+                            "Execution error: {}",
+                            e
+                        )))
+                    }
+                }
+            }
+
+            InterpretationResult::Success(Self::render_value(&last_val))
         };
 
         #[cfg(feature = "native-runtime")]
