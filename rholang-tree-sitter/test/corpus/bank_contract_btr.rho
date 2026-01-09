@@ -1,6 +1,6 @@
-====================
-Simple bank contract
-====================
+==============================================
+Simple bank contract (more realistic version)
+==============================================
 
 new
   stdout(`rho:io:stdout`),
@@ -11,72 +11,54 @@ new
 
   contract makeBank(@initialBalances, ret) = {
 
-    new balances, loop in {
+    new bank, balances, loop in {
 
       // Initialize account balances
-      for (@() <- loop) {
-        for (@(name, balance) <- initialBalances) {
-          balances!(name, balance)
-        }
+      for (@[(name, balance) ... tl] <- loop) {
+          balances!((name, balance)) |
+          loop!(tl)
       } |
 
-      loop!(*nil) |
+      loop!(initialBalances) |
 
       // Define the bank contract
-      contract bank(@"deposit", name, amount, ack) = {
-        for (name2, old <- balances) {
-          match name == name2 {
-            true => {
-              let newBalance = old + amount in {
-                balances!(name, newBalance) |
+      contract bank(@"deposit", @name, @amount, ack) = {
+        for (@(=name, old) <- balances) {
+            let newBalance = old + amount in {
+                balances!((name, newBalance)) |
                 ack!("Deposited " ++ amount.toString() ++ " into " ++ name)
-              }
             }
-            false => {
-              ack!("Account not found")
-            }
-          }
         }
       } |
 
-      contract bank(@"withdraw", name, amount, ack) = {
-        for (name2, old <- balances) {
-          match name == name2 {
-            true => {
-              match old >= amount {
+      contract bank(@"withdraw", @name, @amount, ack) = {
+        for (@(=name, old) <- balances) {
+            match old >= amount {
                 true => {
-                  let newBalance = old - amount in {
-                    balances!(name, newBalance) |
-                    ack!("Withdrew " ++ amount.toString() ++ " from " ++ name)
-                  }
+                    let newBalance = old - amount in {
+                        balances!((name, newBalance)) |
+                        ack!("Withdrew " ++ amount.toString() ++ " from " ++ name)
+                    }
                 }
                 false => {
-                  ack!("Insufficient funds")
+                    ack!("Insufficient funds")
                 }
-              }
             }
-            false => {
-              ack!("Account not found")
-            }
-          }
         }
       } |
 
-      contract bank(@"getBalance", name, ack) = {
-        for (name2, balance <- balances) {
-          match name == name2 {
-            true => ack!(balance)
-            false => ack!("Account not found")
-          }
+      contract bank(@"getBalance", @name, ack) = {
+        for (@(=name, balance) <- balances) {
+            ack!(balance)
         }
       } |
 
-      ret!(bank)
+      ret!(*bank)
     }
   } |
 
   // Example usage:
-  makeBank!([["Alice", 100], ["Bob", 50]], *return) |
+  makeBank!([("Alice", 100), ("Bob", 50)], *return) |
 
   for (bank <- return) {
     new ack1, ack2, ack3, ack4 in {
@@ -85,10 +67,10 @@ new
       bank!("getBalance", "Alice", *ack3) |
       bank!("getBalance", "Charlie", *ack4) |
 
-      for (msg <- ack1) { stdout!(msg) } |
-      for (msg <- ack2) { stdout!(msg) } |
-      for (msg <- ack3) { stdout!("Alice's balance: " ++ msg.toString()) } |
-      for (msg <- ack4) { stdout!(msg) }
+      for (@msg <- ack1) { stdout!(msg) } |
+      for (@msg <- ack2) { stdout!(msg) } |
+      for (@msg <- ack3) { stdout!("Alice's balance: " ++ msg.toString()) } |
+      for (@msg <- ack4) { stdout!(msg) }
     }
   }
 }
@@ -126,6 +108,8 @@ new
                   (name_decl
                     (var))
                   (name_decl
+                    (var))
+                  (name_decl
                     (var)))
                 proc: (block
                   (par
@@ -139,42 +123,44 @@ new
                                   (linear_bind
                                     names: (names
                                       (quote
-                                        (unit)))
-                                    input: (simple_source
-                                      (var)))))
-                              proc: (block
-                                (input
-                                  receipts: (receipts
-                                    (receipt
-                                      (linear_bind
-                                        names: (names
-                                          (quote
+                                        (collection
+                                          (list
                                             (collection
                                               (tuple
                                                 (var)
-                                                (var)))))
-                                        input: (simple_source
+                                                (var)))
+                                            remainder: (var)))))
+                                    input: (simple_source
+                                      (var)))))
+                              proc: (block
+                                (par
+                                  (send
+                                    channel: (var)
+                                    send_type: (send_single)
+                                    inputs: (inputs
+                                      (collection
+                                        (tuple
+                                          (var)
                                           (var)))))
-                                  proc: (block
-                                    (send
-                                      channel: (var)
-                                      send_type: (send_single)
-                                      inputs: (inputs
-                                        (var)
-                                        (var)))))))
+                                  (send
+                                    channel: (var)
+                                    send_type: (send_single)
+                                    inputs: (inputs
+                                      (var))))))
                             (send
                               channel: (var)
                               send_type: (send_single)
                               inputs: (inputs
-                                (eval
-                                  (var)))))
+                                (var))))
                           (contract
                             name: (var)
                             formals: (names
                               (quote
                                 (string_literal))
-                              (var)
-                              (var)
+                              (quote
+                                (var))
+                              (quote
+                                (var))
                               (var))
                             proc: (block
                               (input
@@ -182,63 +168,56 @@ new
                                   (receipt
                                     (linear_bind
                                       names: (names
-                                        (var)
-                                        (var))
+                                        (quote
+                                          (collection
+                                            (tuple
+                                              (var_ref
+                                                kind: (var_ref_kind)
+                                                var: (var))
+                                              (var)))))
                                       input: (simple_source
                                         (var)))))
                                 proc: (block
-                                  (match
-                                    expression: (eq
-                                      (var)
-                                      (var))
-                                    cases: (cases
-                                      (case
-                                        pattern: (bool_literal)
-                                        proc: (block
-                                          (let
-                                            decls: (linear_decls
-                                              (let_var_decl
+                                  (let
+                                    decls: (linear_decls
+                                      (let_var_decl
+                                        (var)
+                                        (add
+                                          (var)
+                                          (var))))
+                                    proc: (block
+                                      (par
+                                        (send
+                                          channel: (var)
+                                          send_type: (send_single)
+                                          inputs: (inputs
+                                            (collection
+                                              (tuple
                                                 (var)
-                                                (add
-                                                  (var)
-                                                  (var))))
-                                            proc: (block
-                                              (par
-                                                (send
-                                                  channel: (var)
-                                                  send_type: (send_single)
-                                                  inputs: (inputs
-                                                    (var)
-                                                    (var)))
-                                                (send
-                                                  channel: (var)
-                                                  send_type: (send_single)
-                                                  inputs: (inputs
-                                                    (concat
-                                                      (concat
-                                                        (concat
-                                                          (string_literal)
-                                                          (method
-                                                            receiver: (var)
-                                                            name: (var)
-                                                            args: (args)))
-                                                        (string_literal))
-                                                      (var)))))))))
-                                      (case
-                                        pattern: (bool_literal)
-                                        proc: (block
-                                          (send
-                                            channel: (var)
-                                            send_type: (send_single)
-                                            inputs: (inputs
-                                              (string_literal))))))))))))
+                                                (var)))))
+                                        (send
+                                          channel: (var)
+                                          send_type: (send_single)
+                                          inputs: (inputs
+                                            (concat
+                                              (concat
+                                                (concat
+                                                  (string_literal)
+                                                  (method
+                                                    receiver: (var)
+                                                    name: (var)
+                                                    args: (args)))
+                                                (string_literal))
+                                              (var))))))))))))
                         (contract
                           name: (var)
                           formals: (names
                             (quote
                               (string_literal))
-                            (var)
-                            (var)
+                            (quote
+                              (var))
+                            (quote
+                              (var))
                             (var))
                           proc: (block
                             (input
@@ -246,64 +225,55 @@ new
                                 (receipt
                                   (linear_bind
                                     names: (names
-                                      (var)
-                                      (var))
+                                      (quote
+                                        (collection
+                                          (tuple
+                                            (var_ref
+                                              kind: (var_ref_kind)
+                                              var: (var))
+                                            (var)))))
                                     input: (simple_source
                                       (var)))))
                               proc: (block
                                 (match
-                                  expression: (eq
+                                  expression: (gte
                                     (var)
                                     (var))
                                   cases: (cases
                                     (case
                                       pattern: (bool_literal)
                                       proc: (block
-                                        (match
-                                          expression: (gte
-                                            (var)
-                                            (var))
-                                          cases: (cases
-                                            (case
-                                              pattern: (bool_literal)
-                                              proc: (block
-                                                (let
-                                                  decls: (linear_decls
-                                                    (let_var_decl
+                                        (let
+                                          decls: (linear_decls
+                                            (let_var_decl
+                                              (var)
+                                              (sub
+                                                (var)
+                                                (var))))
+                                          proc: (block
+                                            (par
+                                              (send
+                                                channel: (var)
+                                                send_type: (send_single)
+                                                inputs: (inputs
+                                                  (collection
+                                                    (tuple
                                                       (var)
-                                                      (sub
-                                                        (var)
-                                                        (var))))
-                                                  proc: (block
-                                                    (par
-                                                      (send
-                                                        channel: (var)
-                                                        send_type: (send_single)
-                                                        inputs: (inputs
-                                                          (var)
-                                                          (var)))
-                                                      (send
-                                                        channel: (var)
-                                                        send_type: (send_single)
-                                                        inputs: (inputs
-                                                          (concat
-                                                            (concat
-                                                              (concat
-                                                                (string_literal)
-                                                                (method
-                                                                  receiver: (var)
-                                                                  name: (var)
-                                                                  args: (args)))
-                                                              (string_literal))
-                                                            (var)))))))))
-                                            (case
-                                              pattern: (bool_literal)
-                                              proc: (block
-                                                (send
-                                                  channel: (var)
-                                                  send_type: (send_single)
-                                                  inputs: (inputs
-                                                    (string_literal)))))))))
+                                                      (var)))))
+                                              (send
+                                                channel: (var)
+                                                send_type: (send_single)
+                                                inputs: (inputs
+                                                  (concat
+                                                    (concat
+                                                      (concat
+                                                        (string_literal)
+                                                        (method
+                                                          receiver: (var)
+                                                          name: (var)
+                                                          args: (args)))
+                                                      (string_literal))
+                                                    (var)))))))))
                                     (case
                                       pattern: (bool_literal)
                                       proc: (block
@@ -317,7 +287,8 @@ new
                         formals: (names
                           (quote
                             (string_literal))
-                          (var)
+                          (quote
+                            (var))
                           (var))
                         proc: (block
                           (input
@@ -325,35 +296,27 @@ new
                               (receipt
                                 (linear_bind
                                   names: (names
-                                    (var)
-                                    (var))
+                                    (quote
+                                      (collection
+                                        (tuple
+                                          (var_ref
+                                            kind: (var_ref_kind)
+                                            var: (var))
+                                          (var)))))
                                   input: (simple_source
                                     (var)))))
                             proc: (block
-                              (match
-                                expression: (eq
-                                  (var)
-                                  (var))
-                                cases: (cases
-                                  (case
-                                    pattern: (bool_literal)
-                                    proc: (send
-                                      channel: (var)
-                                      send_type: (send_single)
-                                      inputs: (inputs
-                                        (var))))
-                                  (case
-                                    pattern: (bool_literal)
-                                    proc: (send
-                                      channel: (var)
-                                      send_type: (send_single)
-                                      inputs: (inputs
-                                        (string_literal)))))))))))
+                              (send
+                                channel: (var)
+                                send_type: (send_single)
+                                inputs: (inputs
+                                  (var))))))))
                     (send
                       channel: (var)
                       send_type: (send_single)
                       inputs: (inputs
-                        (var))))))))
+                        (eval
+                          (var)))))))))
           (send
             channel: (var)
             send_type: (send_single)
@@ -361,11 +324,11 @@ new
               (collection
                 (list
                   (collection
-                    (list
+                    (tuple
                       (string_literal)
                       (long_literal)))
                   (collection
-                    (list
+                    (tuple
                       (string_literal)
                       (long_literal)))))
               (eval
@@ -436,7 +399,8 @@ new
                             (receipt
                               (linear_bind
                                 names: (names
-                                  (var))
+                                  (quote
+                                    (var)))
                                 input: (simple_source
                                   (var)))))
                           proc: (block
@@ -450,7 +414,8 @@ new
                           (receipt
                             (linear_bind
                               names: (names
-                                (var))
+                                (quote
+                                  (var)))
                               input: (simple_source
                                 (var)))))
                         proc: (block
@@ -464,7 +429,8 @@ new
                         (receipt
                           (linear_bind
                             names: (names
-                              (var))
+                              (quote
+                                (var)))
                             input: (simple_source
                               (var)))))
                       proc: (block
@@ -483,7 +449,8 @@ new
                       (receipt
                         (linear_bind
                           names: (names
-                            (var))
+                            (quote
+                              (var)))
                           input: (simple_source
                             (var)))))
                     proc: (block

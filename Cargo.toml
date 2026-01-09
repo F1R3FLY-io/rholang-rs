@@ -5,26 +5,39 @@ members = [
     "rholang-parser",
     "rholang-tree-sitter-proc-macro",
     "rholang-shell",
+    "rholang-lib",
+    "test-macros"
 ]
 
 [workspace.dependencies]
-# Used by: rholang-shell, rholang-parser, rholang-jni-bridge
+# Used by: librho
+ahash = "0.8.12"
+
+# Used by: rholang-shell, rholang-jni-bridge
 anyhow = "1.0.98"
 
-# Used by: rholang-shell
-async-trait = "0.1.88"
+# General purpose for dynamic metaprogramming
+as-any = "0.3.2"
 
-# General purpose, used mostly by rholang-parser
+# Used by: rholang-shell, librho
+async-scoped = { version = "0.9.0", features = ["use-tokio"] }
+async-trait = "0.1.89"
+
+# General purpose, used mostly by librho
 bitvec = "1.0.1"
+i256 = "0.2.3"
+indexmap = "2.12.1"
+intmap = "3.1.2"
 
-# Used by: rholang-shell
-tokio = { version = "1.45.1", features = ["rt", "rt-multi-thread", "full"] }
+# Used by: rholang-shell, librho
+parking_lot = { version = "0.12.5" }
+tokio = { version = "1.48.0", features = ["rt", "rt-multi-thread", "test-util", "parking_lot", "sync", "macros"] }
 
 # Used by: rholang-shell
 rustyline-async = "0.4.6"
 
 # Used by: rholang-shell, rholang-parser
-rstest = "0.25.0"
+rstest = "0.26.1"
 
 # Used by: rholang-shell
 clap = { version = "4.5.40", features = ["derive"] }
@@ -38,11 +51,11 @@ bracket-parser = "0.1.0"
 # Library for benchmarking
 divan = "0.1.21"
 
-# Used by: rholang-parser
+# Used by: rholang-parser, librho
 smallvec = { version = "1.15.1", features = ["union", "const_generics", "const_new", "may_dangle"] }
 
 # Used by: rholang-parser, rholang-tree-sitter
-tree-sitter = "0.25.9"
+tree-sitter = "0.25.10"
 
 # Used by: rholang-tree-sitter
 tree-sitter-language = "0.1.5"
@@ -50,18 +63,18 @@ tree-sitter-language = "0.1.5"
 # Used by: rholang-parser
 validated = "1.0.0"
 
-# Used by: rholang-parser, rholang-jni-bridge
+# Used by: rholang-jni-bridge
 serde = { version = "1.0.188", features = ["derive"] }
 
-# Used by: rholang-parser, rholang-jni-bridge
+# Used by: rholang-jni-bridge
 serde_json = "1.0.107"
 
 # Used by: rholang-jni-bridge
 jni = "0.21.1"
 
 # Used by: rholang-tree-sitter-proc-macro
-quote = "1.0.36"
-syn = "2.0.58"
+quote = "1.0.42"
+syn = "2.0.111"
 
 # Used by: rholang-tree-sitter-proc-macro examples
 is-terminal = "0.4.12"

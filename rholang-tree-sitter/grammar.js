@@ -206,9 +206,11 @@ module.exports = grammar({
             $.linear_decls,
             $.conc_decls),
 
-        linear_decls: $ => semiSep1($.decl),
-        conc_decls: $ => prec(-1, conc1($.decl)),
-        decl: $ => seq(field('names', $.names), '=', field('procs', alias(commaSep1($._proc), $.procs))),
+        linear_decls: $ => semiSep1($._decl),
+        conc_decls: $ => prec(-1, conc1($._decl)),
+        _decl: $ => choice($.decl, $.let_var_decl),
+        decl: $ => seq(field('names', $.names), '<-', field('procs', alias(commaSep1($._proc), $.procs))),
+        let_var_decl: $ => seq($.var, '=', $._proc),
 
         // bundles
         _bundle: $ => choice(
@@ -225,7 +227,7 @@ module.exports = grammar({
         case: $ => seq(field('pattern', $._proc), '=>', field('proc', $._proc)),
 
         // branch in select expression
-        branch: $ => seq(field('pattern', conc1($.linear_bind)), '=>', field('proc', choice($.send, $._proc_expression))),
+        branch: $ => seq(field('pattern', semiSep1($.linear_bind)), '=>', field('proc', choice($.send, $._proc_expression))),
 
         // for comprehensions
         receipts: $ => semiSep1($.receipt),

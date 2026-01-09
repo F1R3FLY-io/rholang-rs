@@ -1,11 +1,11 @@
 use std::{
-    fmt::{Display, Write},
+    fmt::{Debug, Display, Write},
     ops::Deref,
 };
 
 use smallvec::{SmallVec, smallvec};
 
-use crate::{SourcePos, SourceSpan, traverse::PreorderDfsIter};
+use crate::{SourcePos, SourceSpan, traverse::*};
 
 pub type ProcList<'a> = SmallVec<[AnnProc<'a>; 1]>;
 
@@ -115,6 +115,42 @@ impl<'a> Proc<'a> {
     pub fn ann(&'a self, span: SourceSpan) -> AnnProc<'a> {
         AnnProc { proc: self, span }
     }
+
+    pub fn is_trivially_ground(&self) -> bool {
+        match self {
+            Proc::Nil
+            | Proc::Unit
+            | Proc::BoolLiteral(_)
+            | Proc::LongLiteral(_)
+            | Proc::StringLiteral(_)
+            | Proc::UriLiteral(_)
+            | Proc::SimpleType(_)
+            | Proc::ProcVar(Var::Wildcard)
+            | Proc::Bad => true,
+            Proc::Collection(col) if col.is_empty() => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_ident(&self, expected: &str) -> bool {
+        match self {
+            Proc::ProcVar(var) => var.is_ident(expected),
+            _ => false,
+        }
+    }
+
+    pub fn as_var(&self) -> Option<Var<'a>> {
+        match self {
+            Proc::ProcVar(var) => Some(*var),
+            _ => None,
+        }
+    }
+}
+
+impl<'a> From<Var<'a>> for Proc<'a> {
+    fn from(value: Var<'a>) -> Self {
+        Proc::ProcVar(value)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -124,8 +160,85 @@ pub struct AnnProc<'ast> {
 }
 
 impl<'a> AnnProc<'a> {
+    /// Preorder DFS traversal over `AnnProc`.
+    ///
+    /// ### Note:
+    /// - This iterator **only expands process positions**.
+    /// - It does **not** descend into names appearing inside processes
+    ///   (e.g., name variables, for-comprehension bindings, contract formal arguments).
+    /// - It descends into quoted sub-processes appearing in channel names and evals
+    /// - Use a higher-level iterator (such as [`NameAwareDfsEventIter`])
+    ///   if you need to see [`Name`] occurrences as well.
     pub fn iter_preorder_dfs(&'a self) -> impl Iterator<Item = &'a Self> {
         PreorderDfsIter::<16>::new(self)
+    }
+
+    /// Depth-first traversal over the *process structure* of the AST.
+    ///
+    /// This iterator visits each process position in depth-first order,
+    /// emitting `Enter(proc)` before descending into its sub-processes
+    /// and `Exit(proc)` after all children have been processed.
+    ///
+    /// ### Note:
+    /// - This iterator **only expands process positions**.
+    /// - It does **not** descend into names appearing inside processes
+    ///   (e.g., name variables, for-comprehension bindings, contract formal arguments).
+    /// - Use a higher-level iterator (such as [`NameAwareDfsEventIter`])
+    ///   if you need to see [`Name`] occurrences as well.
+    pub fn iter_dfs_event(&'a self) -> impl Iterator<Item = DfsEvent<'a>> {
+        DfsEventIter::<32>::new(self)
+    }
+
+    /// A decorator over a *process-only* DFS iterator that re-emits the process `Enter`/`Exit` events
+    /// and additionally emits [`DfsEventExt::Name`] events for *names that appear directly in the
+    /// process node*.
+    ///
+    /// ### Note:
+    /// - It only inspects the *surface* of each process node when that node is entered, and emits
+    ///   events for the names found there (for example: channel of a `Send`, a quoted binding in
+    ///   for-comprehension, etc.).
+    /// - It **does not** recurse into the bodies of quoted processes. If callers want to explore quoted
+    ///   processes, they can reconstruct a new [`NameAwareDfsEventIter`] (for example via
+    ///   [`Name::iter_into`]). This fits the Rho-calculus intuition that `@P` is not in the current
+    ///   world of processes, but in the world of names.
+    ///
+    /// ### Ordering guarantee:
+    /// When a process `p` is entered, this iterator yields `DfsEventExt::Enter(p)` first, and then the
+    ///  [`DfsEventExt::Name`] events for the names that appear directly in `p` (the names are emitted in
+    /// a deterministic left-to-right order).
+    pub fn iter_dfs_event_with_names(&'a self) -> impl Iterator<Item = DfsEventExt<'a>> {
+        NameAwareDfsEventIter::<32>::new(self)
+    }
+
+    pub fn is_trivially_ground(&self) -> bool {
+        self.proc.is_trivially_ground()
+    }
+
+    pub fn is_ident(&self, expected: &str) -> bool {
+        self.proc.is_ident(expected)
+    }
+
+    pub fn as_var(&self) -> Option<Var<'a>> {
+        self.proc.as_var()
+    }
+
+    pub fn iter_proc_vars(&'a self) -> impl Iterator<Item = Var<'a>> {
+        PreorderDfsIter::<4>::new(self).filter_map(|ann_proc| ann_proc.as_var())
+    }
+
+    pub fn iter_vars(&'a self) -> impl Iterator<Item = Var<'a>> {
+        NameAwareDfsEventIter::<4>::new(self).filter_map(|ev| match ev {
+            DfsEventExt::Enter(ann_proc) => ann_proc.as_var(),
+            DfsEventExt::Name(name) => name.as_var(),
+            DfsEventExt::Exit(_) => None,
+        })
+    }
+
+    pub fn iter_names_direct(&'a self) -> impl Iterator<Item = &'a Name<'a>> {
+        NameAwareDfsEventIter::<4>::new(self)
+            .skip(1) // skip Enter(self)
+            .take_while(|ev| ev.as_proc().is_none()) // stop before entering any sub-process
+            .filter_map(|ev| ev.as_name())
     }
 }
 
@@ -163,14 +276,36 @@ pub enum Var<'ast> {
     Id(Id<'ast>),
 }
 
+impl<'a> Var<'a> {
+    pub fn get_position(self) -> Option<SourcePos> {
+        match self {
+            Var::Wildcard => None,
+            Var::Id(id) => Some(id.pos),
+        }
+    }
+
+    pub fn is_ident(self, expected: &str) -> bool {
+        match self {
+            Var::Wildcard => expected == "_",
+            Var::Id(id) => id.name == expected,
+        }
+    }
+
+    pub fn as_ident(self) -> &'a str {
+        match self {
+            Var::Wildcard => "_",
+            Var::Id(id) => id.name,
+        }
+    }
+}
+
 impl<'a> TryFrom<&Proc<'a>> for Var<'a> {
     type Error = String;
 
     fn try_from(value: &Proc<'a>) -> Result<Self, Self::Error> {
-        match value {
-            Proc::ProcVar(var) => Ok(*var),
-            other => Err(format!("attempt to convert {{ {other:?} }} to a var")),
-        }
+        value
+            .as_var()
+            .ok_or_else(|| format!("attempt to convert {{ {value:?} }} to a var"))
     }
 }
 
@@ -182,14 +317,21 @@ impl<'a> TryFrom<AnnProc<'a>> for Var<'a> {
     }
 }
 
+impl<'a> TryFrom<&AnnProc<'a>> for Var<'a> {
+    type Error = String;
+
+    fn try_from(value: &AnnProc<'a>) -> Result<Self, Self::Error> {
+        value.proc.try_into()
+    }
+}
+
 impl<'a> TryFrom<Name<'a>> for Var<'a> {
     type Error = String;
 
     fn try_from(value: Name<'a>) -> Result<Self, Self::Error> {
-        match value {
-            Name::NameVar(var) => Ok(var),
-            other => Err(format!("attempt to convert {{ {other:?} }} to a var")),
-        }
+        value
+            .as_var()
+            .ok_or_else(|| format!("attempt to convert {{ {value:?} }} to a var"))
     }
 }
 
@@ -197,6 +339,50 @@ impl<'a> TryFrom<Name<'a>> for Var<'a> {
 pub enum Name<'ast> {
     NameVar(Var<'ast>),
     Quote(AnnProc<'ast>),
+}
+
+impl<'a> Name<'a> {
+    pub fn is_ident(&self, expected: &str) -> bool {
+        match self {
+            Name::NameVar(var) => var.is_ident(expected),
+            Name::Quote(ann_proc) => ann_proc.is_ident(expected),
+        }
+    }
+
+    pub fn is_trivially_ground(&self) -> bool {
+        match self {
+            Name::NameVar(Var::Wildcard) => true,
+            Name::Quote(quoted) => quoted.is_trivially_ground(),
+            _ => false,
+        }
+    }
+
+    pub fn as_quote(&'a self) -> Option<&'a AnnProc<'a>> {
+        match self {
+            Name::Quote(quoted) => Some(quoted),
+            _ => None,
+        }
+    }
+
+    pub fn as_var(&self) -> Option<Var<'a>> {
+        match self {
+            Name::NameVar(var) => Some(*var),
+            Name::Quote(_) => None,
+        }
+    }
+
+    /// Depth-first traversal over this [`Name`] that does not expand quoted sub-processes.
+    pub fn iter_into(&'a self) -> impl Iterator<Item = DfsEventExt<'a>> {
+        match self {
+            Name::NameVar(_) => NameAwareDfsEventIter::<4>::single(self),
+            Name::Quote(quoted) => NameAwareDfsEventIter::<4>::new(quoted),
+        }
+    }
+
+    /// Depth-first traversal over this [`Name`] and its quoted processes.
+    pub fn iter_into_deep(&'a self) -> impl Iterator<Item = DfsEventExt<'a>> {
+        DeepDfsIter::<4>::new(self)
+    }
 }
 
 impl<'a> From<Id<'a>> for Name<'a> {
@@ -209,6 +395,13 @@ impl<'a> From<Id<'a>> for Name<'a> {
 pub struct Names<'ast> {
     pub names: SmallVec<[Name<'ast>; 1]>,
     pub remainder: Option<Var<'ast>>,
+}
+
+pub enum NamesKind<'a> {
+    Empty,
+    SingleName(&'a Name<'a>),
+    SingleRemainder(Var<'a>),
+    Multiple,
 }
 
 impl Clone for Names<'_> {
@@ -242,7 +435,7 @@ impl Clone for Names<'_> {
 }
 
 impl<'a> Names<'a> {
-    pub(super) fn from_iter<I>(iterable: I, with_remainder: bool) -> Result<Names<'a>, String>
+    pub fn from_iter<I>(iterable: I, with_remainder: bool) -> Result<Names<'a>, String>
     where
         I: IntoIterator<Item = Name<'a>, IntoIter: DoubleEndedIterator>,
     {
@@ -262,8 +455,7 @@ impl<'a> Names<'a> {
         })
     }
 
-    #[allow(dead_code)]
-    pub(super) fn single(name: Name<'a>) -> Self {
+    pub fn single(name: Name<'a>) -> Self {
         Names {
             names: smallvec![name],
             remainder: None,
@@ -277,6 +469,22 @@ impl<'a> Names<'a> {
     pub fn only_remainder(&self) -> bool {
         self.names.is_empty() && self.remainder.is_some()
     }
+
+    pub fn is_single_name(&self) -> bool {
+        self.names.len() == 1 && self.remainder.is_none()
+    }
+
+    pub fn kind(&'a self) -> NamesKind<'a> {
+        if self.is_empty() {
+            NamesKind::Empty
+        } else if self.only_remainder() {
+            NamesKind::SingleRemainder(self.remainder.unwrap())
+        } else if self.is_single_name() {
+            NamesKind::SingleName(&self.names[0])
+        } else {
+            NamesKind::Multiple
+        }
+    }
 }
 
 // expressions
@@ -286,6 +494,11 @@ pub enum UnaryExpOp {
     Not,
     Neg,
     Negation,
+}
+impl UnaryExpOp {
+    pub fn is_connective(self) -> bool {
+        self == UnaryExpOp::Negation
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -311,16 +524,67 @@ pub enum BinaryExpOp {
     Conjunction,
 }
 
+impl BinaryExpOp {
+    pub fn is_connective(self) -> bool {
+        matches!(self, BinaryExpOp::Conjunction | BinaryExpOp::Disjunction)
+    }
+}
+
 // for-comprehensions
 
 pub type Receipts<'a> = SmallVec<[Receipt<'a>; 1]>;
 pub type Receipt<'a> = SmallVec<[Bind<'a>; 1]>;
+
+pub fn source_names<'a>(
+    receipt: &'a [Bind<'a>],
+) -> impl DoubleEndedIterator<Item = &'a Name<'a>> + ExactSizeIterator {
+    receipt.iter().map(|bind| bind.source_name())
+}
+
+pub fn inputs<'a>(receipt: &'a [Bind<'a>]) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
+    receipt.iter().filter_map(|bind| bind.input()).flatten()
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Bind<'ast> {
     Linear { lhs: Names<'ast>, rhs: Source<'ast> },
     Repeated { lhs: Names<'ast>, rhs: Name<'ast> },
     Peek { lhs: Names<'ast>, rhs: Name<'ast> },
+}
+
+impl<'a> Bind<'a> {
+    pub fn source_name(&self) -> &Name<'a> {
+        match self {
+            Bind::Linear { lhs: _, rhs } => match rhs {
+                Source::Simple { name }
+                | Source::ReceiveSend { name }
+                | Source::SendReceive { name, .. } => name,
+            },
+            Bind::Repeated { lhs: _, rhs } | Bind::Peek { lhs: _, rhs } => rhs,
+        }
+    }
+
+    pub fn input(&self) -> Option<&[AnnProc<'a>]> {
+        match self {
+            Bind::Linear { lhs: _, rhs } => match rhs {
+                Source::Simple { .. } | Source::ReceiveSend { .. } => None,
+                Source::SendReceive { name: _, inputs } => Some(inputs),
+            },
+            Bind::Repeated { .. } | Bind::Peek { .. } => None,
+        }
+    }
+
+    pub fn names(&self) -> &Names<'a> {
+        match self {
+            Bind::Linear { lhs, rhs: _ }
+            | Bind::Repeated { lhs, rhs: _ }
+            | Bind::Peek { lhs, rhs: _ } => lhs,
+        }
+    }
+
+    pub fn names_iter(&self) -> std::slice::Iter<'_, Name<'a>> {
+        self.names().names.iter()
+    }
 }
 
 // source definitions
@@ -376,7 +640,7 @@ impl Deref for Uri<'_> {
 
 impl<'a> From<&'a str> for Uri<'a> {
     fn from(value: &'a str) -> Self {
-        Uri(value.trim_matches(|c| c == '`'))
+        Uri(super::trim_byte(value, b'`'))
     }
 }
 
@@ -418,6 +682,35 @@ pub enum Collection<'ast> {
     },
 }
 
+impl<'a> Collection<'a> {
+    pub fn remainder(&self) -> Option<Var<'a>> {
+        match self {
+            Collection::List { remainder, .. }
+            | Collection::Set { remainder, .. }
+            | Collection::Map { remainder, .. } => *remainder,
+            Collection::Tuple(_) => None,
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            Collection::List {
+                elements,
+                remainder,
+            }
+            | Collection::Set {
+                elements,
+                remainder,
+            } => elements.is_empty() && remainder.is_none(),
+            Collection::Map {
+                elements,
+                remainder,
+            } => elements.is_empty() && remainder.is_none(),
+            Collection::Tuple(_) => false,
+        }
+    }
+}
+
 // sends
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -441,15 +734,18 @@ pub enum BundleType {
 pub type LetBindings<'a> = SmallVec<[LetBinding<'a>; 1]>;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum LetBinding<'ast> {
-    Single {
-        lhs: Name<'ast>,
-        rhs: AnnProc<'ast>,
-    },
-    Multiple {
-        lhs: Var<'ast>,
-        rhs: Vec<AnnProc<'ast>>,
-    },
+pub struct LetBinding<'ast> {
+    pub lhs: Names<'ast>,
+    pub rhs: ProcList<'ast>,
+}
+
+impl<'a> LetBinding<'a> {
+    pub fn single(lhs: Name<'a>, rhs: AnnProc<'a>) -> Self {
+        Self {
+            lhs: Names::single(lhs),
+            rhs: smallvec![rhs],
+        }
+    }
 }
 
 // new name declaration
@@ -510,7 +806,8 @@ impl Display for Id<'_> {
         f.write_char('\'')?;
         f.write_str(self.name)?;
         f.write_char('\'')?;
-        Ok(())
+        f.write_char(':')?;
+        Display::fmt(&self.pos, f)
     }
 }
 
@@ -518,8 +815,7 @@ impl Display for Uri<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_char('`')?;
         f.write_str(self.0)?;
-        f.write_char('`')?;
-        Ok(())
+        f.write_char('`')
     }
 }
 
@@ -531,13 +827,16 @@ impl Display for SimpleType {
 
 impl Display for NameDecl<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.id, f)?;
+        f.write_char('\'')?;
+        f.write_str(self.id.name)?;
+        f.write_char('\'')?;
         if let Some(uri) = &self.uri {
             f.write_char('(')?;
             Display::fmt(uri, f)?;
             f.write_char(')')?;
         }
 
-        Ok(())
+        f.write_char(':')?;
+        Display::fmt(&self.id.pos, f)
     }
 }

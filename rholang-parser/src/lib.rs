@@ -10,6 +10,7 @@ pub mod parser;
 mod traverse;
 
 pub use parser::{RholangParser, ASTBuilder};
+pub use traverse::{DfsEvent, DfsEventExt};
 
 /// a position in the source code. 1-based
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -101,4 +102,20 @@ impl Display for SourceSpan {
         Display::fmt(&self.end, f)?;
         Ok(())
     }
+}
+
+// helper function for literals
+fn trim_byte(s: &str, a: u8) -> &str {
+    let bytes = s.as_bytes();
+    let mut start = 0;
+    let mut end = bytes.len();
+
+    if start < end && bytes[0] == a {
+        start += 1;
+    }
+    if start < end && bytes[end - 1] == a {
+        end -= 1;
+    }
+
+    &s[start..end]
 }
