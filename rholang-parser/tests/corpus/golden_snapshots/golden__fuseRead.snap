@@ -9,10 +9,10 @@ Good(
                 decls: [
                     NameDecl {
                         id: Id {
-                            name: "ack",
+                            name: "fuseRead",
                             pos: SourcePos {
-                                line: 4,
-                                col: 37,
+                                line: 1,
+                                col: 5,
                             },
                         },
                         uri: None,
@@ -30,16 +30,6 @@ Good(
                                 "rho:registry:fuseRead",
                             ),
                         ),
-                    },
-                    NameDecl {
-                        id: Id {
-                            name: "fuseRead",
-                            pos: SourcePos {
-                                line: 1,
-                                col: 5,
-                            },
-                        },
-                        uri: None,
                     },
                     NameDecl {
                         id: Id {
@@ -68,6 +58,16 @@ Good(
                                 "rho:io:stdoutAck",
                             ),
                         ),
+                    },
+                    NameDecl {
+                        id: Id {
+                            name: "ack",
+                            pos: SourcePos {
+                                line: 4,
+                                col: 37,
+                            },
+                        },
+                        uri: None,
                     },
                 ],
                 proc: AnnProc {

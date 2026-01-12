@@ -341,8 +341,8 @@ pub(super) fn node_to_ast<'ast>(
                         for i in 0..decls.len() {
                             for j in (i + 1)..decls.len() {
                                 if decls[i].id.name == decls[j].id.name {
-                                    let mut first = decls[i].id.pos;
-                                    let mut second = decls[j].id.pos;
+                                    let first = decls[i].id.pos;
+                                    let second = decls[j].id.pos;
                                     return Some((first, second));
                                 }
                             }
