@@ -160,15 +160,53 @@ pub struct AnnProc<'ast> {
 }
 
 impl<'a> AnnProc<'a> {
+    /// Preorder DFS traversal over `AnnProc`.
+    ///
+    /// ### Note:
+    /// - This iterator **only expands process positions**.
+    /// - It does **not** descend into names appearing inside processes
+    ///   (e.g., name variables, for-comprehension bindings, contract formal arguments).
+    /// - It descends into quoted sub-processes appearing in channel names and evals
+    /// - Use a higher-level iterator (such as [`NameAwareDfsEventIter`])
+    ///   if you need to see [`Name`] occurrences as well.
     pub fn iter_preorder_dfs(&'a self) -> impl Iterator<Item = &'a Self> {
         PreorderDfsIter::<16>::new(self)
     }
 
+    /// Depth-first traversal over the *process structure* of the AST.
+    ///
+    /// This iterator visits each process position in depth-first order,
+    /// emitting `Enter(proc)` before descending into its sub-processes
+    /// and `Exit(proc)` after all children have been processed.
+    ///
+    /// ### Note:
+    /// - This iterator **only expands process positions**.
+    /// - It does **not** descend into names appearing inside processes
+    ///   (e.g., name variables, for-comprehension bindings, contract formal arguments).
+    /// - Use a higher-level iterator (such as [`NameAwareDfsEventIter`])
+    ///   if you need to see [`Name`] occurrences as well.
     pub fn iter_dfs_event(&'a self) -> impl Iterator<Item = DfsEvent<'a>> {
         DfsEventIter::<32>::new(self)
     }
 
-    pub fn iter_dfs_event_and_names(&'a self) -> impl Iterator<Item = DfsEventExt<'a>> {
+    /// A decorator over a *process-only* DFS iterator that re-emits the process `Enter`/`Exit` events
+    /// and additionally emits [`DfsEventExt::Name`] events for *names that appear directly in the
+    /// process node*.
+    ///
+    /// ### Note:
+    /// - It only inspects the *surface* of each process node when that node is entered, and emits
+    ///   events for the names found there (for example: channel of a `Send`, a quoted binding in
+    ///   for-comprehension, etc.).
+    /// - It **does not** recurse into the bodies of quoted processes. If callers want to explore quoted
+    ///   processes, they can reconstruct a new [`NameAwareDfsEventIter`] (for example via
+    ///   [`Name::iter_into`]). This fits the Rho-calculus intuition that `@P` is not in the current
+    ///   world of processes, but in the world of names.
+    ///
+    /// ### Ordering guarantee:
+    /// When a process `p` is entered, this iterator yields `DfsEventExt::Enter(p)` first, and then the
+    ///  [`DfsEventExt::Name`] events for the names that appear directly in `p` (the names are emitted in
+    /// a deterministic left-to-right order).
+    pub fn iter_dfs_event_with_names(&'a self) -> impl Iterator<Item = DfsEventExt<'a>> {
         NameAwareDfsEventIter::<32>::new(self)
     }
 
@@ -333,11 +371,17 @@ impl<'a> Name<'a> {
         }
     }
 
+    /// Depth-first traversal over this [`Name`] that does not expand quoted sub-processes.
     pub fn iter_into(&'a self) -> impl Iterator<Item = DfsEventExt<'a>> {
         match self {
             Name::NameVar(_) => NameAwareDfsEventIter::<4>::single(self),
             Name::Quote(quoted) => NameAwareDfsEventIter::<4>::new(quoted),
         }
+    }
+
+    /// Depth-first traversal over this [`Name`] and its quoted processes.
+    pub fn iter_into_deep(&'a self) -> impl Iterator<Item = DfsEventExt<'a>> {
+        DeepDfsIter::<4>::new(self)
     }
 }
 

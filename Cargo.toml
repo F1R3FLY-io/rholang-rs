@@ -25,6 +25,8 @@ bitvec = "1.0.1"
 bracket-parser = "0.1.0"
 divan = "0.1.21"
 indexmap = "2.12.0"
+i256 = "0.2.3"
+indexmap = "2.12.1"
 intmap = "3.1.2"
 is-terminal = "0.4.12"
 jni = "0.21.1"
@@ -39,6 +41,24 @@ rstest = "0.25.0"
 rustyline = "*"
 serde_json = "1.0.107"
 syn = "2.0.58"
+rstest = "0.26.1"
+
+# Used by: rholang-shell
+clap = { version = "4.5.40", features = ["derive"] }
+
+# Used by: rholang-shell
+async-std = { version = "1.13.1", features = ["attributes"] }
+
+# Used by: rholang-shell
+bracket-parser = "0.1.0"
+
+# Library for benchmarking
+divan = "0.1.21"
+
+# Used by: rholang-parser, librho
+smallvec = { version = "1.15.1", features = ["union", "const_generics", "const_new", "may_dangle"] }
+
+# Used by: rholang-parser, rholang-tree-sitter
 tree-sitter = "0.25.10"
 tree-sitter-language = "0.1.5"
 validated = "1.0.0"
@@ -58,6 +78,9 @@ features = ["derive"]
 [workspace.dependencies.pretty_assertions]
 version = "1.4.1"
 features = ["unstable"]
+# Used by: rholang-tree-sitter-proc-macro
+quote = "1.0.42"
+syn = "2.0.111"
 
 [workspace.dependencies.serde]
 version = "1.0.188"
