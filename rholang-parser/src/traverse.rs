@@ -356,6 +356,7 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
             Proc::Collection(collection) => match collection {
                 Collection::List { elements, .. }
                 | Collection::Set { elements, .. }
+                | Collection::PathMap { elements, .. }
                 | Collection::Tuple(elements) => {
                     self.push_children(elements);
                 }

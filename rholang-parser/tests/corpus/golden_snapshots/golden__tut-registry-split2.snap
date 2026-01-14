@@ -9,10 +9,60 @@ Good(
                 decls: [
                     NameDecl {
                         id: Id {
-                            name: "ack",
+                            name: "simpleInsertTest",
                             pos: SourcePos {
-                                line: 17,
-                                col: 36,
+                                line: 12,
+                                col: 5,
+                            },
+                        },
+                        uri: None,
+                    },
+                    NameDecl {
+                        id: Id {
+                            name: "simpleInsertTestReturnID",
+                            pos: SourcePos {
+                                line: 12,
+                                col: 23,
+                            },
+                        },
+                        uri: None,
+                    },
+                    NameDecl {
+                        id: Id {
+                            name: "simpleLookupTest",
+                            pos: SourcePos {
+                                line: 12,
+                                col: 49,
+                            },
+                        },
+                        uri: None,
+                    },
+                    NameDecl {
+                        id: Id {
+                            name: "signedInsertTest",
+                            pos: SourcePos {
+                                line: 13,
+                                col: 5,
+                            },
+                        },
+                        uri: None,
+                    },
+                    NameDecl {
+                        id: Id {
+                            name: "signedInsertTestReturnID",
+                            pos: SourcePos {
+                                line: 13,
+                                col: 23,
+                            },
+                        },
+                        uri: None,
+                    },
+                    NameDecl {
+                        id: Id {
+                            name: "signedLookupTest",
+                            pos: SourcePos {
+                                line: 13,
+                                col: 49,
                             },
                         },
                         uri: None,
@@ -47,66 +97,6 @@ Good(
                     },
                     NameDecl {
                         id: Id {
-                            name: "signedInsertTest",
-                            pos: SourcePos {
-                                line: 13,
-                                col: 5,
-                            },
-                        },
-                        uri: None,
-                    },
-                    NameDecl {
-                        id: Id {
-                            name: "signedInsertTestReturnID",
-                            pos: SourcePos {
-                                line: 13,
-                                col: 23,
-                            },
-                        },
-                        uri: None,
-                    },
-                    NameDecl {
-                        id: Id {
-                            name: "signedLookupTest",
-                            pos: SourcePos {
-                                line: 13,
-                                col: 49,
-                            },
-                        },
-                        uri: None,
-                    },
-                    NameDecl {
-                        id: Id {
-                            name: "simpleInsertTest",
-                            pos: SourcePos {
-                                line: 12,
-                                col: 5,
-                            },
-                        },
-                        uri: None,
-                    },
-                    NameDecl {
-                        id: Id {
-                            name: "simpleInsertTestReturnID",
-                            pos: SourcePos {
-                                line: 12,
-                                col: 23,
-                            },
-                        },
-                        uri: None,
-                    },
-                    NameDecl {
-                        id: Id {
-                            name: "simpleLookupTest",
-                            pos: SourcePos {
-                                line: 12,
-                                col: 49,
-                            },
-                        },
-                        uri: None,
-                    },
-                    NameDecl {
-                        id: Id {
                             name: "stdout",
                             pos: SourcePos {
                                 line: 16,
@@ -132,6 +122,16 @@ Good(
                                 "rho:io:stdoutAck",
                             ),
                         ),
+                    },
+                    NameDecl {
+                        id: Id {
+                            name: "ack",
+                            pos: SourcePos {
+                                line: 17,
+                                col: 36,
+                            },
+                        },
+                        uri: None,
                     },
                 ],
                 proc: AnnProc {
