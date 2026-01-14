@@ -117,6 +117,12 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
             }
         }
 
+        FunctionCall { args, .. } => {
+            for arg in args {
+                resolve_unguarded(db, stack, arg);
+            }
+        }
+
         Collection(collection) => resolve_collection(collection, db, stack),
 
         Eval { name } => resolve_name(name, db[this], db, stack),

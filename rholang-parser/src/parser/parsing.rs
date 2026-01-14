@@ -15,7 +15,7 @@ use crate::{
     SourceSpan,
     ast::{
         AnnProc, BinaryExpOp, Bind, BundleType, Hyperparam, HyperparamList, Id,
-        LetBinding, NameDecl, Names, Proc, RankModifier, SendType, SimilarityMatcher, SimModifier,
+        LetBinding, NameDecl, Names, PatternMatchSpec, PatternModifier, Proc, SendType,
         SimpleType, Source, UnaryExpOp, VarRefKind,
     },
     parser::{
@@ -173,6 +173,25 @@ pub(super) fn node_to_ast<'ast>(
                     }
                     node = receiver_node;
                     continue 'parse;
+                }
+                kind!("function_call") => {
+                    let name_node = get_field(&node, field!("function"));
+                    let args_node = get_field(&node, field!("args"));
+
+                    let arity = args_node.named_child_count();
+                    cont_stack.push(K::ConsumeFunctionCall {
+                        id: Id {
+                            name: get_node_value(&name_node, source),
+                            pos: name_node.start_position().into(),
+                        },
+                        arity,
+                        span,
+                    });
+
+                    if arity > 0 {
+                        cont_stack.push(K::EvalList(args_node.walk()));
+                    }
+                    // Fall through - no node to recursively parse (no receiver like method)
                 }
                 kind!("or")
                 | kind!("and")
@@ -563,7 +582,7 @@ pub(super) fn node_to_ast<'ast>(
                                                 })
                                                 .unwrap_or((false, 0));
 
-                                            SimilarityDesc::new(has_sim, sim_params_count, has_rank, rank_params_count)
+                                            PatternMatchDesc::new(has_sim, sim_params_count, has_rank, rank_params_count)
                                         });
 
                                     BindDesc::Linear {
@@ -1182,6 +1201,11 @@ fn apply_cont<'tree, 'ast>(
                                 ast_builder.alloc_method(id, recv, args).ann(span)
                             })
                         }
+                        K::ConsumeFunctionCall { span, id, arity } => {
+                            proc_stack.replace_top_slice(arity, |args| {
+                                ast_builder.alloc_function_call(id, args).ann(span)
+                            })
+                        }
                         K::ConsumeNew { decls, span } => proc_stack
                             .replace_top(|body| ast_builder.alloc_new(body, decls).ann(span)),
                         K::ConsumePar { span } => proc_stack.replace_top2(|left, right| {
@@ -1394,6 +1418,11 @@ enum K<'tree, 'ast> {
         id: Id<'ast>,
         arity: usize,
     },
+    ConsumeFunctionCall {
+        span: SourceSpan,
+        id: Id<'ast>,
+        arity: usize,
+    },
     ConsumeNew {
         decls: Vec<NameDecl<'ast>>,
         span: SourceSpan,
@@ -1511,6 +1540,12 @@ impl Debug for K<'_, '_> {
                 .finish(),
             Self::ConsumeMethod { span, id, arity } => f
                 .debug_struct("ConsumeMethod")
+                .field("id", &id.name)
+                .field("arity", arity)
+                .field("span", span)
+                .finish(),
+            Self::ConsumeFunctionCall { span, id, arity } => f
+                .debug_struct("ConsumeFunctionCall")
                 .field("id", &id.name)
                 .field("arity", arity)
                 .field("span", span)
@@ -1866,10 +1901,10 @@ impl SourceDesc {
     }
 }
 
-/// Descriptor for similarity modifiers during parsing (before AST allocation)
+/// Descriptor for pattern modifiers during parsing (before AST allocation)
 /// Compositional structure: [sim(fn, params...)] [rank(fn, params...)] ~ query
 #[derive(Debug, Clone, Copy)]
-struct SimilarityDesc {
+struct PatternMatchDesc {
     /// Whether sim modifier is present (1 = function identifier)
     has_sim: bool,
     /// Number of params in sim modifier (after function identifier)
@@ -1879,13 +1914,13 @@ struct SimilarityDesc {
     /// Number of params in rank modifier (after function identifier)
     rank_params_count: usize,
     // Query is always 1 proc
-    /// H1 Optimization: Precomputed total proc count for this similarity pattern.
+    /// H1 Optimization: Precomputed total proc count for this pattern match.
     /// = (has_sim ? 1 + sim_params : 0) + (has_rank ? 1 + rank_params : 0) + 1 (query)
     cached_len: usize,
 }
 
-impl SimilarityDesc {
-    /// Create a new SimilarityDesc with precomputed length (H1 optimization)
+impl PatternMatchDesc {
+    /// Create a new PatternMatchDesc with precomputed length (H1 optimization)
     #[inline]
     fn new(has_sim: bool, sim_params_count: usize, has_rank: bool, rank_params_count: usize) -> Self {
         let sim_procs = if has_sim { 1 + sim_params_count } else { 0 };
@@ -1894,7 +1929,7 @@ impl SimilarityDesc {
         Self { has_sim, sim_params_count, has_rank, rank_params_count, cached_len }
     }
 
-    /// Returns the total number of procs in this similarity pattern
+    /// Returns the total number of procs in this pattern match
     #[inline]
     fn len(&self) -> usize {
         self.cached_len
@@ -1907,7 +1942,7 @@ enum BindDesc {
         name_count: usize,
         cont_present: bool,
         source: SourceDesc,
-        similarity: Option<SimilarityDesc>,  // VectorDB similarity pattern
+        similarity: Option<PatternMatchDesc>,  // VectorDB pattern match
     },
     Repeated {
         name_count: usize,
@@ -1925,7 +1960,7 @@ impl BindDesc {
             BindDesc::Linear {
                 name_count, source, similarity, ..
             } => {
-                // H1 Optimization: Use cached length from SimilarityDesc
+                // H1 Optimization: Use cached length from PatternMatchDesc for pattern match
                 let sim_len = similarity.map(|s| s.len()).unwrap_or(0);
                 name_count + source.len() + sim_len
             }
@@ -1965,57 +2000,53 @@ impl BindDesc {
                         }
                     };
 
-                    // H1 Optimization: Use cached similarity length
-                    let sim_len = similarity.map(|s| s.len()).unwrap_or(0);
+                    // H1 Optimization: Use cached pattern match length
+                    let pattern_len = similarity.map(|s| s.len()).unwrap_or(0);
 
-                    // Build similarity matcher from procs at the end of the slice
+                    // Build pattern match spec from procs at the end of the slice
                     // Procs are in order: [sim_function, sim_params...] [rank_function, rank_params...] [query]
-                    let sim_matcher = if let Some(desc) = similarity {
-                        let sim_start = rest.len() - sim_len;
-                        let sim_procs = &rest[sim_start..];
+                    let pattern_spec = if let Some(desc) = similarity {
+                        let pattern_start = rest.len() - pattern_len;
+                        let pattern_procs = &rest[pattern_start..];
 
                         let mut offset = 0;
+                        let mut modifiers = SmallVec::new();
 
                         // Build sim modifier if present: function + params SmallVec
-                        let sim_mod = if desc.has_sim {
-                            let function = sim_procs[offset];
+                        if desc.has_sim {
+                            let function = pattern_procs[offset];
                             offset += 1;
-                            let params = sim_procs[offset..offset + desc.sim_params_count].to_smallvec();
+                            let params = pattern_procs[offset..offset + desc.sim_params_count].to_smallvec();
                             offset += desc.sim_params_count;
-                            Some(SimModifier { function, params })
-                        } else {
-                            None
-                        };
+                            modifiers.push(PatternModifier { name: "sim", function, params });
+                        }
 
                         // Build rank modifier if present: function + params SmallVec
-                        let rank_mod = if desc.has_rank {
-                            let function = sim_procs[offset];
+                        if desc.has_rank {
+                            let function = pattern_procs[offset];
                             offset += 1;
-                            let params = sim_procs[offset..offset + desc.rank_params_count].to_smallvec();
+                            let params = pattern_procs[offset..offset + desc.rank_params_count].to_smallvec();
                             offset += desc.rank_params_count;
-                            Some(RankModifier { function, params })
-                        } else {
-                            None
-                        };
+                            modifiers.push(PatternModifier { name: "rank", function, params });
+                        }
 
                         // Query is always last
-                        let query = sim_procs[offset];
+                        let query = pattern_procs[offset];
 
-                        Some(SimilarityMatcher {
-                            sim: sim_mod,
-                            rank: rank_mod,
+                        Some(PatternMatchSpec {
+                            modifiers,
                             query,
                         })
                     } else {
                         None
                     };
 
-                    // Calculate lhs range (excluding similarity procs at the end)
+                    // Calculate lhs range (excluding pattern match procs at the end)
                     let lhs_start = source.len() - 1;
-                    let lhs_end = rest.len() - sim_len;
+                    let lhs_end = rest.len() - pattern_len;
                     let lhs = into_names(&rest[lhs_start..lhs_end], &qs[lhs_start..lhs_end], cont_present);
 
-                    Bind::Linear { lhs, rhs, similarity: sim_matcher }
+                    Bind::Linear { lhs, rhs, pattern_match: pattern_spec }
                 }
 
                 BindDesc::Repeated { cont_present, .. } => Bind::Repeated {

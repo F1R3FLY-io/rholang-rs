@@ -1,6 +1,5 @@
 ---
 source: rholang-parser/tests/golden.rs
-assertion_line: 23
 expression: result
 ---
 Fail(
@@ -59,10 +58,9 @@ Fail(
                                                             ),
                                                         ),
                                                     },
-                                                    similarity: Some(
-                                                        SimilarityMatcher {
-                                                            sim: None,
-                                                            rank: None,
+                                                    pattern_match: Some(
+                                                        PatternMatchSpec {
+                                                            modifiers: [],
                                                             query: AnnProc {
                                                                 proc: Collection(
                                                                     List {
@@ -205,10 +203,9 @@ Fail(
                                                             ),
                                                         ),
                                                     },
-                                                    similarity: Some(
-                                                        SimilarityMatcher {
-                                                            sim: None,
-                                                            rank: None,
+                                                    pattern_match: Some(
+                                                        PatternMatchSpec {
+                                                            modifiers: [],
                                                             query: AnnProc {
                                                                 proc: UnaryExp {
                                                                     op: Negation,
@@ -388,10 +385,9 @@ Fail(
                                                     ),
                                                 ),
                                             },
-                                            similarity: Some(
-                                                SimilarityMatcher {
-                                                    sim: None,
-                                                    rank: None,
+                                            pattern_match: Some(
+                                                PatternMatchSpec {
+                                                    modifiers: [],
                                                     query: AnnProc {
                                                         proc: ProcVar(
                                                             Id(

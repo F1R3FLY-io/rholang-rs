@@ -234,6 +234,19 @@ fn resolve_proc_pattern_rec<'a>(
                 )
             }
         }
+        FunctionCall { args, .. } => {
+            for arg in args {
+                resolve_proc_pattern_rec(db, env, res, arg);
+            }
+
+            if res.top_level() {
+                db.warning(
+                    res.id,
+                    WarningKind::TopLevelPatternExpr { span: pattern.span },
+                    None,
+                )
+            }
+        }
         Match { expression, cases } => {
             resolve_proc_pattern_rec(db, env, res, expression);
             for ast::Case { pattern, proc } in cases {

@@ -143,6 +143,11 @@ pub enum Proc<'ast> {
         name: Id<'ast>,
         args: ProcList<'ast>,
     },
+    /// Built-in function call: getSpaceAgent(space), etc.
+    FunctionCall {
+        name: Id<'ast>,
+        args: ProcList<'ast>,
+    },
 
     UnaryExp {
         op: UnaryExpOp,
@@ -598,51 +603,47 @@ impl BinaryExpOp {
 pub type Receipts<'a> = SmallVec<[Receipt<'a>; 1]>;
 pub type Receipt<'a> = SmallVec<[Bind<'a>; 1]>;
 
-/// Similarity matcher for VectorDB pattern matching in consume operations.
+/// Parameters for pattern modifiers (up to 4 inline, then heap)
+pub type ModifierParams<'ast> = SmallVec<[AnnProc<'ast>; 4]>;
+
+/// Generic pattern modifier for VectorDB operations.
+/// This is a backend-agnostic representation that captures any modifier (sim, rank, or custom)
+/// with its function identifier and parameters. The backend interprets the modifier name.
+///
+/// Examples:
+///   - PatternModifier { name: "sim", function: "cos", params: ["0.7"] }
+///   - PatternModifier { name: "rank", function: "topk", params: [3] }
+///   - PatternModifier { name: "custom", function: "my_fn", params: [...] }
+///
+/// Formal Correspondence: GenericRSpace.v (VectorDB pattern matching)
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct PatternModifier<'ast> {
+    /// Modifier name: "sim", "rank", or any identifier (interpreted by backend)
+    pub name: &'ast str,
+    /// Function identifier (first argument to the modifier)
+    pub function: AnnProc<'ast>,
+    /// Additional parameters (all args after the function identifier)
+    pub params: ModifierParams<'ast>,
+}
+
+/// Pattern matching specification for VectorDB operations.
 /// Enables similarity-based matching instead of exact structural matching.
 ///
-/// New compositional syntax:
+/// Compositional syntax:
 ///   - `~ query`                                    - basic query (space defaults)
 ///   - `~ sim("cos") ~ query`                       - explicit metric
 ///   - `~ sim("cos", "0.7") ~ query`                - explicit metric and threshold
 ///   - `~ rank("topk", 3) ~ query`                  - top-K selection
 ///   - `~ sim("cos", "0.7") ~ rank("topk", 3) ~ query` - full composition
 ///
-/// All arguments can be parameterized: `sim(fn, params...)`, `rank(fn, params...)`, `~ queryVec`
+/// All arguments can be parameterized: `modifier(fn, params...)`, `~ queryVec`
 /// Formal Correspondence: GenericRSpace.v (VectorDB similarity matching)
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct SimilarityMatcher<'ast> {
-    /// Optional sim(function_id, params...) modifier for similarity configuration
-    pub sim: Option<SimModifier<'ast>>,
-    /// Optional rank(function_id, params...) modifier for result selection
-    pub rank: Option<RankModifier<'ast>>,
-    /// The query vector (required)
+pub struct PatternMatchSpec<'ast> {
+    /// Modifiers processed left-to-right (sim, rank, or any custom modifier)
+    pub modifiers: SmallVec<[PatternModifier<'ast>; 2]>,
+    /// The query vector/pattern (required)
     pub query: AnnProc<'ast>,
-}
-
-/// Parameters for sim/rank modifiers (up to 4 inline, then heap)
-pub type ModifierParams<'ast> = SmallVec<[AnnProc<'ast>; 4]>;
-
-/// Similarity modifier: sim(function_id, params...)
-/// The function identifier and params are passed to the backend for interpretation.
-/// Examples: sim("cos"), sim("cos", "0.7"), sim("boost", "0.7", "topic", 1.5)
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct SimModifier<'ast> {
-    /// Function identifier (first argument to sim)
-    pub function: AnnProc<'ast>,
-    /// Additional parameters (all args after the function identifier)
-    pub params: ModifierParams<'ast>,
-}
-
-/// Ranking modifier: rank(function_id, params...)
-/// The function identifier and params are passed to the backend for interpretation.
-/// Examples: rank("topk", 3), rank("all"), rank("diversity", 5, 0.3)
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct RankModifier<'ast> {
-    /// Function identifier (first argument to rank)
-    pub function: AnnProc<'ast>,
-    /// Additional parameters (all args after the function identifier)
-    pub params: ModifierParams<'ast>,
 }
 
 pub fn source_names<'a>(
@@ -660,8 +661,8 @@ pub enum Bind<'ast> {
     Linear {
         lhs: Names<'ast>,
         rhs: Source<'ast>,
-        /// Optional similarity matcher for VectorDB operations
-        similarity: Option<SimilarityMatcher<'ast>>,
+        /// Optional pattern match specification for VectorDB operations
+        pattern_match: Option<PatternMatchSpec<'ast>>,
     },
     Repeated { lhs: Names<'ast>, rhs: Name<'ast> },
     Peek { lhs: Names<'ast>, rhs: Name<'ast> },
@@ -965,23 +966,21 @@ impl Display for NameDecl<'_> {
     }
 }
 
-impl Display for SimilarityMatcher<'_> {
+impl Display for PatternModifier<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // Format sim modifier if present: sim(function, params...)
-        if let Some(sim) = &self.sim {
-            write!(f, " ~ sim({:?}", sim.function.proc)?;
-            for param in &sim.params {
-                write!(f, ", {:?}", param.proc)?;
-            }
-            write!(f, ")")?;
+        write!(f, " ~ {}({:?}", self.name, self.function.proc)?;
+        for param in &self.params {
+            write!(f, ", {:?}", param.proc)?;
         }
-        // Format rank modifier if present: rank(function, params...)
-        if let Some(rank) = &self.rank {
-            write!(f, " ~ rank({:?}", rank.function.proc)?;
-            for param in &rank.params {
-                write!(f, ", {:?}", param.proc)?;
-            }
-            write!(f, ")")?;
+        write!(f, ")")
+    }
+}
+
+impl Display for PatternMatchSpec<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Format all modifiers in order
+        for modifier in &self.modifiers {
+            Display::fmt(modifier, f)?;
         }
         // Format query
         write!(f, " ~ {:?}", self.query.proc)

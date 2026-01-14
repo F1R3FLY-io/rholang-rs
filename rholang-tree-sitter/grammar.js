@@ -193,6 +193,7 @@ module.exports = grammar({
             $.eq,
             $.eval,
             $.free,  // Reified RSpaces: theory specification
+            $.function_call,
             $.gt,
             $.gte,
             $.interpolation,
@@ -240,6 +241,12 @@ module.exports = grammar({
             field('receiver', $._proc),
             '.',
             field('name', $.var),
+            field('args', alias($._proc_list, $.args)))
+        ),
+        // Built-in function call: getSpaceAgent(space), etc.
+        // This enables synchronous function-style calls for built-in operations.
+        function_call: $ => prec(11, seq(
+            field('function', $.var),
             field('args', alias($._proc_list, $.args)))
         ),
         eval: $ => prec(12, seq('*', $.name)),

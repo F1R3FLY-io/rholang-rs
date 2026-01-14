@@ -372,6 +372,13 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
+    pub fn alloc_function_call(&self, name: Id<'ast>, args: &[AnnProc<'ast>]) -> &Proc<'ast> {
+        self.arena.alloc(Proc::FunctionCall {
+            name,
+            args: args.to_smallvec(),
+        })
+    }
+
     pub fn alloc_binary_exp(
         &self,
         op: BinaryExpOp,

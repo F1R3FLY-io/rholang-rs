@@ -119,6 +119,10 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
                 self.stack.push(receiver);
             }
 
+            Proc::FunctionCall { args, .. } => {
+                self.remember(args);
+            }
+
             Proc::Collection(collection) => match collection {
                 Collection::List { elements, .. }
                 | Collection::Set { elements, .. }
@@ -354,6 +358,10 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
 
             Proc::Method { receiver, args, .. } => {
                 self.push_children(iter::once(receiver).chain(args));
+            }
+
+            Proc::FunctionCall { args, .. } => {
+                self.push_children(args.iter());
             }
 
             Proc::Collection(collection) => match collection {
@@ -1086,7 +1094,7 @@ mod tests {
                 hyperparams: None,
                 inputs: smallvec![inner_rhs.ann(SourcePos::at_col(36).span_of(2))],
             },
-            similarity: None,
+            pattern_match: None,
         };
 
         let inner_proc = Proc::ForComprehension {
@@ -1113,7 +1121,7 @@ mod tests {
                     inner_proc.ann(SourcePos::at_col(21).span_of(27))
                 ],
             },
-            similarity: None,
+            pattern_match: None,
         };
 
         let outer_proc = Proc::ForComprehension {
@@ -1312,7 +1320,7 @@ mod tests {
             rhs: Source::Simple {
                 name: Name::Quote(par_in_bind.ann(SourcePos::at_col(12).span_of(15))),
             },
-            similarity: None,
+            pattern_match: None,
         };
 
         let arg1_in_send = Proc::ProcVar(Var::Id(Id {
