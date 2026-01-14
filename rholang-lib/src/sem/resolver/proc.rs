@@ -51,6 +51,10 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
             | Map {
                 remainder: Some(var),
                 ..
+            }
+            | PathMap {
+                remainder: Some(var),
+                ..
             },
         ) => {
             db.error(
@@ -61,7 +65,8 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
         }
 
         // -- ground expressions that do not contain names --
-        Nil | Unit | BoolLiteral(_) | LongLiteral(_) | StringLiteral(_) | UriLiteral(_) | Bad => {}
+        Nil | Unit | BoolLiteral(_) | LongLiteral(_) | StringLiteral(_) | UriLiteral(_)
+        | TheoryCall(_) | Bad => {}
 
         // -- variables --
         ProcVar(Id(id)) => {
@@ -152,6 +157,7 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
             channel,
             inputs,
             cont: SyncSendCont::Empty,
+            ..
         } => {
             resolve_send(db[this], channel, inputs, None, db, stack);
         }
@@ -159,6 +165,7 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
             channel,
             inputs,
             cont: SyncSendCont::NonEmpty(proc),
+            ..
         } => resolve_send(db[this], channel, inputs, Some(proc), db, stack),
 
         // -- new --
@@ -311,6 +318,12 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
         Select { branches: _ } => {
             unimplemented!("Select is not implemented in this version of Rholang")
         }
+
+        UseBlock { space, proc } => {
+            // Resolve the space name and the body process
+            resolve_name(space, db[this], db, stack);
+            resolve_rec(db, stack, proc);
+        }
     }
 }
 
@@ -339,7 +352,10 @@ fn resolve_collection<'a>(
     use ast::Collection::*;
 
     match collection {
-        List { elements, .. } | Set { elements, .. } | Tuple(elements) => {
+        List { elements, .. }
+        | Set { elements, .. }
+        | PathMap { elements, .. }
+        | Tuple(elements) => {
             for elt in elements {
                 resolve_unguarded(db, stack, elt);
             }

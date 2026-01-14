@@ -38,6 +38,7 @@ new x in {
                         kind: (var_ref_kind)
                         var: (var)))
                     send_type: (send_single)
-                    inputs: (inputs
-                      (wildcard))))
+                    inputs: (send_inputs
+                      data: (send_data
+                        (wildcard)))))
                 proc: (nil)))))))))

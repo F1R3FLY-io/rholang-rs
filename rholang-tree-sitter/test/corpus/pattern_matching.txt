@@ -48,8 +48,9 @@ match R { contract foo(@S) = { x!(P + S) } => Q }
                 (send
                   channel: (var)
                   send_type: (send_single)
-                  inputs: (inputs
-                    (var))))))
+                  inputs: (send_inputs
+                    data: (send_data
+                      (var)))))))
           input: (simple_source
             (var)))))
     proc: (block
@@ -88,8 +89,9 @@ match R { contract foo(@S) = { x!(P + S) } => Q }
         pattern: (send
           channel: (var)
           send_type: (send_single)
-          inputs: (inputs
-            (var)))
+          inputs: (send_inputs
+            data: (send_data
+              (var))))
         proc: (var))))
   (match
     expression: (var)
@@ -119,8 +121,9 @@ match R { contract foo(@S) = { x!(P + S) } => Q }
                 (send
                   channel: (var)
                   send_type: (send_single)
-                  inputs: (inputs
-                    (var))))))
+                  inputs: (send_inputs
+                    data: (send_data
+                      (var)))))))
           input: (simple_source
             (var)))))
     proc: (block
@@ -201,8 +204,9 @@ match R { contract foo(@S) = { x!(P + S) } => Q }
             (send
               channel: (var)
               send_type: (send_single)
-              inputs: (inputs
-                (add
-                  (var)
-                  (var))))))
+              inputs: (send_inputs
+                data: (send_data
+                  (add
+                    (var)
+                    (var)))))))
         proc: (var)))))

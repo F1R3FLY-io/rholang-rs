@@ -1,5 +1,6 @@
 ---
 source: rholang-parser/tests/golden.rs
+assertion_line: 23
 expression: result
 ---
 Fail(
@@ -17,6 +18,7 @@ Fail(
                                         col: 5,
                                     },
                                 },
+                                space_type: None,
                                 uri: None,
                             },
                             NameDecl {
@@ -27,6 +29,18 @@ Fail(
                                         col: 14,
                                     },
                                 },
+                                space_type: None,
+                                uri: None,
+                            },
+                            NameDecl {
+                                id: Id {
+                                    name: "store",
+                                    pos: SourcePos {
+                                        line: 1,
+                                        col: 23,
+                                    },
+                                },
+                                space_type: None,
                                 uri: None,
                             },
                             NameDecl {
@@ -37,21 +51,12 @@ Fail(
                                         col: 30,
                                     },
                                 },
+                                space_type: None,
                                 uri: Some(
                                     Uri(
                                         "rho:io:stdout",
                                     ),
                                 ),
-                            },
-                            NameDecl {
-                                id: Id {
-                                    name: "store",
-                                    pos: SourcePos {
-                                        line: 1,
-                                        col: 23,
-                                    },
-                                },
-                                uri: None,
                             },
                         ],
                         proc: AnnProc {
@@ -187,6 +192,7 @@ Fail(
                                                                                     ),
                                                                                 ),
                                                                             },
+                                                                            similarity: None,
                                                                         },
                                                                     ],
                                                                 ],
@@ -205,6 +211,7 @@ Fail(
                                                                                         },
                                                                                     ),
                                                                                 ),
+                                                                                hyperparams: None,
                                                                                 send_type: Single,
                                                                                 inputs: [
                                                                                     AnnProc {
@@ -325,6 +332,7 @@ Fail(
                                                                                         },
                                                                                     ),
                                                                                 ),
+                                                                                hyperparams: None,
                                                                                 send_type: Single,
                                                                                 inputs: [
                                                                                     AnnProc {
@@ -491,6 +499,7 @@ Fail(
                                                                                     ),
                                                                                 ),
                                                                             },
+                                                                            similarity: None,
                                                                         },
                                                                     ],
                                                                 ],
@@ -507,6 +516,7 @@ Fail(
                                                                                 },
                                                                             ),
                                                                         ),
+                                                                        hyperparams: None,
                                                                         send_type: Single,
                                                                         inputs: [
                                                                             AnnProc {
@@ -640,22 +650,9 @@ Fail(
                                                         },
                                                     ),
                                                 ),
+                                                hyperparams: None,
                                                 send_type: Single,
-                                                inputs: [
-                                                    AnnProc {
-                                                        proc: Bad,
-                                                        span: SourceSpan {
-                                                            start: SourcePos {
-                                                                line: 12,
-                                                                col: 11,
-                                                            },
-                                                            end: SourcePos {
-                                                                line: 12,
-                                                                col: 20,
-                                                            },
-                                                        },
-                                                    },
-                                                ],
+                                                inputs: [],
                                             },
                                             span: SourceSpan {
                                                 start: SourcePos {
@@ -685,26 +682,13 @@ Fail(
                                         decls: [
                                             NameDecl {
                                                 id: Id {
-                                                    name: "register",
-                                                    pos: SourcePos {
-                                                        line: 13,
-                                                        col: 32,
-                                                    },
-                                                },
-                                                uri: Some(
-                                                    Uri(
-                                                        "rho:registry:insertArbitrary",
-                                                    ),
-                                                ),
-                                            },
-                                            NameDecl {
-                                                id: Id {
                                                     name: "uriAddData",
                                                     pos: SourcePos {
                                                         line: 13,
                                                         col: 8,
                                                     },
                                                 },
+                                                space_type: None,
                                                 uri: None,
                                             },
                                             NameDecl {
@@ -715,7 +699,23 @@ Fail(
                                                         col: 20,
                                                     },
                                                 },
+                                                space_type: None,
                                                 uri: None,
+                                            },
+                                            NameDecl {
+                                                id: Id {
+                                                    name: "register",
+                                                    pos: SourcePos {
+                                                        line: 13,
+                                                        col: 32,
+                                                    },
+                                                },
+                                                space_type: None,
+                                                uri: Some(
+                                                    Uri(
+                                                        "rho:registry:insertArbitrary",
+                                                    ),
+                                                ),
                                             },
                                         ],
                                         proc: AnnProc {
@@ -735,6 +735,7 @@ Fail(
                                                                         },
                                                                     ),
                                                                 ),
+                                                                hyperparams: None,
                                                                 send_type: Single,
                                                                 inputs: [
                                                                     AnnProc {
@@ -828,6 +829,7 @@ Fail(
                                                                         },
                                                                     ),
                                                                 ),
+                                                                hyperparams: None,
                                                                 send_type: Single,
                                                                 inputs: [
                                                                     AnnProc {
@@ -968,6 +970,7 @@ Fail(
                                                                             ),
                                                                         ),
                                                                     },
+                                                                    similarity: None,
                                                                 },
                                                             ],
                                                             [
@@ -1015,6 +1018,7 @@ Fail(
                                                                             ),
                                                                         ),
                                                                     },
+                                                                    similarity: None,
                                                                 },
                                                             ],
                                                         ],
@@ -1031,6 +1035,7 @@ Fail(
                                                                         },
                                                                     ),
                                                                 ),
+                                                                hyperparams: None,
                                                                 send_type: Single,
                                                                 inputs: [
                                                                     AnnProc {

@@ -40,41 +40,46 @@ new chan, stdout(`rho:io:stdout`) in {
                     (send
                       channel: (var)
                       send_type: (send_single)
-                      inputs: (inputs
-                        (long_literal)
-                        (long_literal)
-                        (long_literal)))
+                      inputs: (send_inputs
+                        data: (send_data
+                          (long_literal)
+                          (long_literal)
+                          (long_literal))))
                     (send
                       channel: (var)
                       send_type: (send_single)
-                      inputs: (inputs
-                        (collection
-                          (tuple
-                            (long_literal)
-                            (long_literal)
-                            (long_literal))))))
+                      inputs: (send_inputs
+                        data: (send_data
+                          (collection
+                            (tuple
+                              (long_literal)
+                              (long_literal)
+                              (long_literal)))))))
                   (send
                     channel: (var)
                     send_type: (send_single)
-                    inputs: (inputs
-                      (long_literal)
-                      (long_literal))))
+                    inputs: (send_inputs
+                      data: (send_data
+                        (long_literal)
+                        (long_literal)))))
                 (send
                   channel: (var)
                   send_type: (send_single)
-                  inputs: (inputs
-                    (collection
-                      (list
-                        (long_literal)
-                        (long_literal)))
-                    (long_literal))))
+                  inputs: (send_inputs
+                    data: (send_data
+                      (collection
+                        (list
+                          (long_literal)
+                          (long_literal)))
+                      (long_literal)))))
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (par
-                    (long_literal)
-                    (long_literal)))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (par
+                      (long_literal)
+                      (long_literal))))))
             (input
               receipts: (receipts
                 (receipt
@@ -91,13 +96,14 @@ new chan, stdout(`rho:io:stdout`) in {
                 (send
                   channel: (var)
                   send_type: (send_single)
-                  inputs: (inputs
-                    (collection
-                      (list
-                        (string_literal)
-                        (var)
-                        (var)
-                        (var))))))))
+                  inputs: (send_inputs
+                    data: (send_data
+                      (collection
+                        (list
+                          (string_literal)
+                          (var)
+                          (var)
+                          (var)))))))))
           (input
             receipts: (receipts
               (receipt
@@ -112,12 +118,13 @@ new chan, stdout(`rho:io:stdout`) in {
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (collection
-                    (list
-                      (string_literal)
-                      (var)
-                      (var))))))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (collection
+                      (list
+                        (string_literal)
+                        (var)
+                        (var)))))))))
         (input
           receipts: (receipts
             (receipt
@@ -130,8 +137,9 @@ new chan, stdout(`rho:io:stdout`) in {
             (send
               channel: (var)
               send_type: (send_single)
-              inputs: (inputs
-                (collection
-                  (list
-                    (string_literal)
-                    (var)))))))))))
+              inputs: (send_inputs
+                data: (send_data
+                  (collection
+                    (list
+                      (string_literal)
+                      (var))))))))))))

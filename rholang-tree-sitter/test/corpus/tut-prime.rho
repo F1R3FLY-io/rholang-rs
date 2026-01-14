@@ -77,15 +77,17 @@ new loop, primeCheck, stdoutAck(`rho:io:stdoutAck`) in {
                                 (send
                                   channel: (var)
                                   send_type: (send_single)
-                                  inputs: (inputs
-                                    (var)))))
+                                  inputs: (send_inputs
+                                    data: (send_data
+                                      (var))))))
                             (send
                               channel: (var)
                               send_type: (send_single)
-                              inputs: (inputs
-                                (var)
-                                (eval
-                                  (var)))))))))))))
+                              inputs: (send_inputs
+                                data: (send_data
+                                  (var)
+                                  (eval
+                                    (var))))))))))))))
           (contract
             name: (var)
             formals: (names
@@ -101,10 +103,11 @@ new loop, primeCheck, stdoutAck(`rho:io:stdoutAck`) in {
                     proc: (send
                       channel: (var)
                       send_type: (send_single)
-                      inputs: (inputs
-                        (string_literal)
-                        (eval
-                          (var)))))
+                      inputs: (send_inputs
+                        data: (send_data
+                          (string_literal)
+                          (eval
+                            (var))))))
                   (case
                     pattern: (negation
                       (block
@@ -116,35 +119,38 @@ new loop, primeCheck, stdoutAck(`rho:io:stdoutAck`) in {
                     proc: (send
                       channel: (var)
                       send_type: (send_single)
-                      inputs: (inputs
-                        (string_literal)
-                        (eval
-                          (var)))))
+                      inputs: (send_inputs
+                        data: (send_data
+                          (string_literal)
+                          (eval
+                            (var))))))
                   (case
                     pattern: (wildcard)
                     proc: (send
                       channel: (var)
                       send_type: (send_single)
-                      inputs: (inputs
-                        (string_literal)
-                        (eval
-                          (var))))))))))
+                      inputs: (send_inputs
+                        data: (send_data
+                          (string_literal)
+                          (eval
+                            (var)))))))))))
         (send
           channel: (var)
           send_type: (send_single)
-          inputs: (inputs
-            (collection
-              (list
-                (nil)
-                (long_literal)
-                (par
+          inputs: (send_inputs
+            data: (send_data
+              (collection
+                (list
+                  (nil)
                   (long_literal)
-                  (long_literal))
-                (par
-                  (long_literal)
-                  (nil))
-                (par
-                  (long_literal)
-                  (long_literal))
-                (nil)
-                (long_literal)))))))))
+                  (par
+                    (long_literal)
+                    (long_literal))
+                  (par
+                    (long_literal)
+                    (nil))
+                  (par
+                    (long_literal)
+                    (long_literal))
+                  (nil)
+                  (long_literal))))))))))

@@ -26,44 +26,49 @@ new stdout(`rho:io:stdout`) in {
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (collection
-                    (tuple
-                      (long_literal)))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (collection
+                      (tuple
+                        (long_literal))))))
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (mult
-                    (long_literal)
-                    (add
+                inputs: (send_inputs
+                  data: (send_data
+                    (mult
                       (long_literal)
-                      (long_literal))))))
+                      (add
+                        (long_literal)
+                        (long_literal)))))))
             (send
               channel: (var)
               send_type: (send_single)
-              inputs: (inputs
-                (add
-                  (long_literal)
-                  (long_literal)))))
+              inputs: (send_inputs
+                data: (send_data
+                  (add
+                    (long_literal)
+                    (long_literal))))))
           (send
             channel: (quote
               (collection
                 (tuple
                   (long_literal))))
             send_type: (send_single)
-            inputs: (inputs
-              (add
-                (long_literal)
-                (long_literal)))))
+            inputs: (send_inputs
+              data: (send_data
+                (add
+                  (long_literal)
+                  (long_literal))))))
         (send
           channel: (var)
           send_type: (send_single)
-          inputs: (inputs
-            (mult
-              (long_literal)
-              (add
+          inputs: (send_inputs
+            data: (send_data
+              (mult
                 (long_literal)
-                (div
+                (add
                   (long_literal)
-                  (long_literal))))))))))
+                  (div
+                    (long_literal)
+                    (long_literal)))))))))))

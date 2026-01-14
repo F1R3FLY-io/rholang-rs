@@ -29,9 +29,10 @@ new blockData(`rho:block:data`), stdout(`rho:io:stdout`), retCh in {
         (send
           channel: (var)
           send_type: (send_single)
-          inputs: (inputs
-            (eval
-              (var))))
+          inputs: (send_inputs
+            data: (send_data
+              (eval
+                (var)))))
         (input
           receipts: (receipts
             (receipt
@@ -51,27 +52,30 @@ new blockData(`rho:block:data`), stdout(`rho:io:stdout`), retCh in {
                 (send
                   channel: (var)
                   send_type: (send_single)
-                  inputs: (inputs
-                    (collection
-                      (map
-                        (key_value_pair
-                          key: (string_literal)
-                          value: (var))))))
+                  inputs: (send_inputs
+                    data: (send_data
+                      (collection
+                        (map
+                          (key_value_pair
+                            key: (string_literal)
+                            value: (var)))))))
                 (send
                   channel: (var)
                   send_type: (send_single)
-                  inputs: (inputs
+                  inputs: (send_inputs
+                    data: (send_data
+                      (collection
+                        (map
+                          (key_value_pair
+                            key: (string_literal)
+                            value: (var))))))))
+              (send
+                channel: (var)
+                send_type: (send_single)
+                inputs: (send_inputs
+                  data: (send_data
                     (collection
                       (map
                         (key_value_pair
                           key: (string_literal)
-                          value: (var)))))))
-              (send
-                channel: (var)
-                send_type: (send_single)
-                inputs: (inputs
-                  (collection
-                    (map
-                      (key_value_pair
-                        key: (string_literal)
-                        value: (var)))))))))))))
+                          value: (var))))))))))))))

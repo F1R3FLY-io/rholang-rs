@@ -38,26 +38,29 @@ new helloNameAge, getOlder, stdout(`rho:io:stdout`) in {
                         channel: (quote
                           (string_literal))
                         send_type: (send_single)
-                        inputs: (inputs
-                          (var)))
+                        inputs: (send_inputs
+                          data: (send_data
+                            (var))))
                       (send
                         channel: (quote
                           (string_literal))
                         send_type: (send_single)
-                        inputs: (inputs
-                          (var))))
+                        inputs: (send_inputs
+                          data: (send_data
+                            (var)))))
                     (wildcard)))))
             proc: (block
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (collection
-                    (list
-                      (string_literal)
-                      (var)
-                      (string_literal)
-                      (var)))))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (collection
+                      (list
+                        (string_literal)
+                        (var)
+                        (string_literal)
+                        (var))))))))
           (contract
             name: (var)
             formals: (names
@@ -72,47 +75,54 @@ new helloNameAge, getOlder, stdout(`rho:io:stdout`) in {
                             channel: (quote
                               (string_literal))
                             send_type: (send_single)
-                            inputs: (inputs
-                              (wildcard)))
+                            inputs: (send_inputs
+                              data: (send_data
+                                (wildcard))))
                           (wildcard))))
                     (send
                       channel: (quote
                         (string_literal))
                       send_type: (send_single)
-                      inputs: (inputs
-                        (var))))))
+                      inputs: (send_inputs
+                        data: (send_data
+                          (var)))))))
               (var))
             proc: (block
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (par
-                    (send
-                      channel: (quote
-                        (string_literal))
-                      send_type: (send_single)
-                      inputs: (inputs
-                        (add
-                          (var)
-                          (long_literal))))
-                    (var)))))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (par
+                      (send
+                        channel: (quote
+                          (string_literal))
+                        send_type: (send_single)
+                        inputs: (send_inputs
+                          data: (send_data
+                            (add
+                              (var)
+                              (long_literal)))))
+                      (var))))))))
         (send
           channel: (var)
           send_type: (send_single)
-          inputs: (inputs
-            (par
-              (send
-                channel: (quote
-                  (string_literal))
-                send_type: (send_single)
-                inputs: (inputs
-                  (string_literal)))
-              (send
-                channel: (quote
-                  (string_literal))
-                send_type: (send_single)
-                inputs: (inputs
-                  (long_literal))))
-            (eval
-              (var))))))))
+          inputs: (send_inputs
+            data: (send_data
+              (par
+                (send
+                  channel: (quote
+                    (string_literal))
+                  send_type: (send_single)
+                  inputs: (send_inputs
+                    data: (send_data
+                      (string_literal))))
+                (send
+                  channel: (quote
+                    (string_literal))
+                  send_type: (send_single)
+                  inputs: (send_inputs
+                    data: (send_data
+                      (long_literal)))))
+              (eval
+                (var)))))))))

@@ -696,6 +696,7 @@ mod tests {
                 pos: SourcePos::at_col(11),
             }
             .into(),
+            hyperparams: None,
             send_type: ast::SendType::Single,
             inputs: send_inputs,
         };

@@ -1,5 +1,6 @@
 ---
 source: rholang-parser/tests/golden.rs
+assertion_line: 23
 expression: result
 ---
 Good(
@@ -9,22 +10,24 @@ Good(
                 decls: [
                     NameDecl {
                         id: Id {
-                            name: "PoSCh",
-                            pos: SourcePos {
-                                line: 1,
-                                col: 12,
-                            },
-                        },
-                        uri: None,
-                    },
-                    NameDecl {
-                        id: Id {
                             name: "retCh",
                             pos: SourcePos {
                                 line: 1,
                                 col: 5,
                             },
                         },
+                        space_type: None,
+                        uri: None,
+                    },
+                    NameDecl {
+                        id: Id {
+                            name: "PoSCh",
+                            pos: SourcePos {
+                                line: 1,
+                                col: 12,
+                            },
+                        },
+                        space_type: None,
                         uri: None,
                     },
                     NameDecl {
@@ -35,6 +38,7 @@ Good(
                                 col: 19,
                             },
                         },
+                        space_type: None,
                         uri: Some(
                             Uri(
                                 "rho:registry:lookup",
@@ -49,6 +53,7 @@ Good(
                                 col: 46,
                             },
                         },
+                        space_type: None,
                         uri: Some(
                             Uri(
                                 "rho:io:stdout",
@@ -73,6 +78,7 @@ Good(
                                                 },
                                             ),
                                         ),
+                                        hyperparams: None,
                                         send_type: Single,
                                         inputs: [
                                             AnnProc {
@@ -116,6 +122,7 @@ Good(
                                                 },
                                             ),
                                         ),
+                                        hyperparams: None,
                                         send_type: Single,
                                         inputs: [
                                             AnnProc {
@@ -266,6 +273,7 @@ Good(
                                                     ),
                                                 ),
                                             },
+                                            similarity: None,
                                         },
                                     ],
                                 ],
@@ -284,6 +292,7 @@ Good(
                                                         },
                                                     ),
                                                 ),
+                                                hyperparams: None,
                                                 send_type: Single,
                                                 inputs: [
                                                     AnnProc {
@@ -325,6 +334,7 @@ Good(
                                                                 col: 9,
                                                             },
                                                         },
+                                                        space_type: None,
                                                         uri: Some(
                                                             Uri(
                                                                 "rho:rchain:deployerId",
@@ -361,6 +371,7 @@ Good(
                                                                         },
                                                                     },
                                                                 ),
+                                                                hyperparams: None,
                                                                 send_type: Single,
                                                                 inputs: [
                                                                     AnnProc {
@@ -537,6 +548,7 @@ Good(
                                                                                     ),
                                                                                 ),
                                                                             },
+                                                                            similarity: None,
                                                                         },
                                                                     ],
                                                                 ],
@@ -553,6 +565,7 @@ Good(
                                                                                 },
                                                                             ),
                                                                         ),
+                                                                        hyperparams: None,
                                                                         send_type: Single,
                                                                         inputs: [
                                                                             AnnProc {

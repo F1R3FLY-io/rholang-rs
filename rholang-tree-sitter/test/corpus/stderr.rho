@@ -18,5 +18,6 @@ new stderr(`rho:io:stderr`) in {
       (send
         channel: (var)
         send_type: (send_single)
-        inputs: (inputs
-          (string_literal))))))
+        inputs: (send_inputs
+          data: (send_data
+            (string_literal)))))))

@@ -37,20 +37,23 @@ new x, y, stdout(`rho:io:stdout`), keccak256Hash(`rho:crypto:keccak256Hash`) in 
           (send
             channel: (var)
             send_type: (send_single)
-            inputs: (inputs
-              (par
-                (send
-                  channel: (quote
-                    (string_literal))
-                  send_type: (send_single)
-                  inputs: (inputs
-                    (string_literal)))
-                (send
-                  channel: (quote
-                    (string_literal))
-                  send_type: (send_single)
-                  inputs: (inputs
-                    (long_literal))))))
+            inputs: (send_inputs
+              data: (send_data
+                (par
+                  (send
+                    channel: (quote
+                      (string_literal))
+                    send_type: (send_single)
+                    inputs: (send_inputs
+                      data: (send_data
+                        (string_literal))))
+                  (send
+                    channel: (quote
+                      (string_literal))
+                    send_type: (send_single)
+                    inputs: (send_inputs
+                      data: (send_data
+                        (long_literal))))))))
           (input
             receipts: (receipts
               (receipt
@@ -64,13 +67,14 @@ new x, y, stdout(`rho:io:stdout`), keccak256Hash(`rho:crypto:keccak256Hash`) in 
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (method
-                    receiver: (var)
-                    name: (var)
-                    args: (args))
-                  (eval
-                    (var)))))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (method
+                      receiver: (var)
+                      name: (var)
+                      args: (args))
+                    (eval
+                      (var))))))))
         (input
           receipts: (receipts
             (receipt
@@ -84,5 +88,6 @@ new x, y, stdout(`rho:io:stdout`), keccak256Hash(`rho:crypto:keccak256Hash`) in 
             (send
               channel: (var)
               send_type: (send_single)
-              inputs: (inputs
-                (var)))))))))
+              inputs: (send_inputs
+                data: (send_data
+                  (var))))))))))

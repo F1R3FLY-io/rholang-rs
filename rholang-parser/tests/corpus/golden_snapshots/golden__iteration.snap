@@ -1,5 +1,6 @@
 ---
 source: rholang-parser/tests/golden.rs
+assertion_line: 23
 expression: result
 ---
 Good(
@@ -15,6 +16,7 @@ Good(
                                 col: 5,
                             },
                         },
+                        space_type: None,
                         uri: None,
                     },
                 ],
@@ -175,6 +177,7 @@ Good(
                                                                         col: 15,
                                                                     },
                                                                 },
+                                                                space_type: None,
                                                                 uri: None,
                                                             },
                                                         ],
@@ -193,6 +196,7 @@ Good(
                                                                                 },
                                                                             ),
                                                                         ),
+                                                                        hyperparams: None,
                                                                         send_type: Single,
                                                                         inputs: [
                                                                             AnnProc {
@@ -282,6 +286,7 @@ Good(
                                                                                             ),
                                                                                         ),
                                                                                     },
+                                                                                    similarity: None,
                                                                                 },
                                                                             ],
                                                                         ],
@@ -298,6 +303,7 @@ Good(
                                                                                         },
                                                                                     ),
                                                                                 ),
+                                                                                hyperparams: None,
                                                                                 send_type: Single,
                                                                                 inputs: [
                                                                                     AnnProc {
@@ -452,6 +458,7 @@ Good(
                                                                 },
                                                             ),
                                                         ),
+                                                        hyperparams: None,
                                                         send_type: Single,
                                                         inputs: [
                                                             AnnProc {
@@ -511,22 +518,24 @@ Good(
                                 decls: [
                                     NameDecl {
                                         id: Id {
-                                            name: "done",
-                                            pos: SourcePos {
-                                                line: 13,
-                                                col: 18,
-                                            },
-                                        },
-                                        uri: None,
-                                    },
-                                    NameDecl {
-                                        id: Id {
                                             name: "process",
                                             pos: SourcePos {
                                                 line: 13,
                                                 col: 9,
                                             },
                                         },
+                                        space_type: None,
+                                        uri: None,
+                                    },
+                                    NameDecl {
+                                        id: Id {
+                                            name: "done",
+                                            pos: SourcePos {
+                                                line: 13,
+                                                col: 18,
+                                            },
+                                        },
+                                        space_type: None,
                                         uri: None,
                                     },
                                 ],
@@ -547,6 +556,7 @@ Good(
                                                                 },
                                                             ),
                                                         ),
+                                                        hyperparams: None,
                                                         send_type: Single,
                                                         inputs: [
                                                             AnnProc {
@@ -743,6 +753,7 @@ Good(
                                                                         },
                                                                     ),
                                                                 ),
+                                                                hyperparams: None,
                                                                 send_type: Single,
                                                                 inputs: [
                                                                     AnnProc {
@@ -821,6 +832,7 @@ Good(
                                                                     ),
                                                                 ),
                                                             },
+                                                            similarity: None,
                                                         },
                                                     ],
                                                 ],

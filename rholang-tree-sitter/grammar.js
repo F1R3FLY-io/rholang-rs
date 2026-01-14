@@ -34,7 +34,10 @@ module.exports = grammar({
             "not",
             "bundle",
             "true",
-            "false"
+            "false",
+            // Reified RSpaces keywords
+            "use",      // UseBlock scoping
+            "free"      // Free operator for theory expressions in space constructors
         ],
     },
 
@@ -54,6 +57,7 @@ module.exports = grammar({
             $.contract,
             $.input,
             $.send,
+            $.use_block,  // Reified RSpaces: scoped default space
             $._proc_expression
         ),
 
@@ -62,7 +66,8 @@ module.exports = grammar({
         send_sync: $ => prec(1, seq(
             field('channel', $.name),
             '!?',
-            field('inputs', alias($._proc_list, $.messages)), field('cont', $.sync_send_cont))
+            field('inputs', $.send_inputs),
+            field('cont', $.sync_send_cont))
         ),
 
         new: $ => prec(1, seq(
@@ -122,7 +127,57 @@ module.exports = grammar({
         send: $ => prec(3, seq(
             field('channel', $.name),
             field('send_type', $._send_type),
-            field('inputs', alias($._proc_list, $.inputs))
+            field('inputs', $.send_inputs)
+        )),
+
+        // Send inputs with optional hyperparameters
+        // Syntax: channel!(data; hyperparams) where hyperparams can be:
+        //   - Positional: channel!(data; 0, 100)
+        //   - Named: channel!(data; priority=0, ttl=100)
+        //   - Mixed: channel!(data; 0, ttl=100)
+        // Formal Correspondence: Collections/PriorityQueue.v (priority as first hyperparam)
+        send_inputs: $ => seq(
+            '(',
+            optional(field('data', $.send_data)),
+            optional(field('hyperparams', $.hyperparams_section)),
+            ')'
+        ),
+
+        // Data section: comma-separated processes
+        send_data: $ => commaSep1($._proc),
+
+        // Hyperparams section: semicolon followed by optional params
+        hyperparams_section: $ => seq(
+            ';',
+            optional(field('params', $.hyperparam_list))
+        ),
+
+        // List of hyperparams
+        hyperparam_list: $ => commaSep1($.hyperparam),
+
+        // Individual hyperparam: positional or named
+        hyperparam: $ => choice(
+            $.named_hyperparam,
+            $.positional_hyperparam
+        ),
+
+        // Named: key=value (key is an identifier/var)
+        named_hyperparam: $ => prec(2, seq(
+            field('key', $.var),
+            '=',
+            field('value', $._proc)
+        )),
+
+        // Positional: just a value
+        positional_hyperparam: $ => $._proc,
+
+        // Reified RSpaces: UseBlock for scoped default space selection
+        // Syntax: use space_expr { body }
+        // Formal Correspondence: Registry/Invariants.v:inv_use_blocks_valid
+        use_block: $ => prec(2, seq(
+            'use',
+            field('space', $.name),
+            field('proc', $.block)
         )),
 
         _proc_expression: $ => choice(
@@ -137,6 +192,7 @@ module.exports = grammar({
             $.div,
             $.eq,
             $.eval,
+            $.free,  // Reified RSpaces: theory specification
             $.gt,
             $.gte,
             $.interpolation,
@@ -176,6 +232,9 @@ module.exports = grammar({
         mod: $ => prec.left(9, seq($._proc, '%', $._proc)),
         not: $ => prec(10, seq('not', $._proc)),
         neg: $ => prec(10, seq('-', $._proc)),
+        // Reified RSpaces: theory specification syntax - free Nat(), free Int(), etc.
+        free: $ => prec(10, seq('free', $.theory_call)),
+        theory_call: $ => seq(field('name', $.var), '(', ')'),
         _parenthesized: $ => prec(11, seq('(', $._proc_expression, ')')),
         method: $ => prec(11, seq(
             field('receiver', $._proc),
@@ -198,8 +257,14 @@ module.exports = grammar({
         empty_cont: $ => '.',
 
         // new name declaration
+        // Reified RSpaces: supports optional space type annotation
+        // Syntax: x : space_type (`uri`)  or  x : space_type  or  x (`uri`)  or  x
         name_decls: $ => commaSep1($.name_decl),
-        name_decl: $ => seq($.var, optional(seq('(', field('uri', $.uri_literal), ')'))),
+        name_decl: $ => seq(
+            $.var,
+            optional(seq(':', field('space_type', $.name))),  // Optional space type
+            optional(seq('(', field('uri', $.uri_literal), ')'))
+        ),
 
         // let declarations
         _let_decls: $ => choice(
@@ -233,11 +298,62 @@ module.exports = grammar({
         receipts: $ => semiSep1($.receipt),
         receipt: $ => conc1(choice($.linear_bind, $.repeated_bind, $.peek_bind)),
 
+        // Reified RSpaces: linear_bind supports optional similarity matcher
+        // Syntax: names <- source ~ query  or  names <- source ~> threshold ~ query
+        // Formal Correspondence: GenericRSpace.v (VectorDB similarity matching)
         linear_bind: $ => seq(
             optional(field('names', $.names)),
             '<-',
-            field('input', $._source)
+            field('input', $._source),
+            optional(field('similarity', $.similarity_modifier))
         ),
+
+        // Similarity modifier for VectorDB pattern matching
+        // New syntax with sim() and rank() modifiers:
+        //   ~ query                                    - basic query (space defaults)
+        //   ~ sim("cos") ~ query                       - explicit metric
+        //   ~ sim("cos", "0.7") ~ query                - explicit metric and threshold
+        //   ~ rank("topk", 3) ~ query                  - top-K selection
+        //   ~ sim("cos", "0.7") ~ rank("topk", 3) ~ query - full composition
+        // All arguments can be parameterized: sim(@metric, @threshold), rank("topk", @k), ~ @query
+        // Formal Correspondence: GenericRSpace.v (VectorDB similarity matching)
+        similarity_modifier: $ => seq(
+            optional(field('sim', $.sim_modifier)),
+            optional(field('rank', $.rank_modifier)),
+            '~',
+            field('query', $._proc)
+        ),
+
+        // sim(metric) or sim(metric, threshold) or sim(metric, threshold, extra_params...)
+        // Examples: sim("cos"), sim("cos", "0.7"), sim("semantic_boost", "0.7", "topic", 1.5)
+        // All arguments can be parameterized: sim(@metric, @threshold)
+        sim_modifier: $ => seq(
+            '~',
+            'sim',
+            '(',
+            field('metric', $._proc),
+            optional(seq(
+                ',',
+                field('threshold', $._proc),
+                optional(field('extra', $.extra_args))
+            )),
+            ')'
+        ),
+
+        // rank(function) or rank(function, params...)
+        // Examples: rank("topk", 3), rank("all"), rank("diversity", 5, 0.3)
+        // All arguments can be parameterized: rank(@rankFn, @k)
+        rank_modifier: $ => seq(
+            '~',
+            'rank',
+            '(',
+            field('function', $._proc),
+            optional(field('params', $.extra_args)),
+            ')'
+        ),
+
+        // Comma-separated additional arguments for sim/rank modifiers
+        extra_args: $ => repeat1(seq(',', $._proc)),
 
         repeated_bind: $ => seq(
             optional(field('names', $.names)),
@@ -259,7 +375,7 @@ module.exports = grammar({
 
         simple_source: $ => $.name,
         receive_send_source: $ => seq($.name, '?!'),
-        send_receive_source: $ => seq($.name, '!?', field('inputs', alias($._proc_list, $.inputs))),
+        send_receive_source: $ => seq($.name, '!?', field('inputs', $.send_inputs)),
 
         // sends
         _send_type: $ => choice($.send_single, $.send_multiple),

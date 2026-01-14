@@ -54,9 +54,10 @@ new simpleInsertTest, simpleInsertTestReturnID,
           (send
             channel: (var)
             send_type: (send_single)
-            inputs: (inputs
-              (eval
-                (var))))
+            inputs: (send_inputs
+              data: (send_data
+                (eval
+                  (var)))))
           (input
             receipts: (receipts
               (receipt
@@ -70,8 +71,9 @@ new simpleInsertTest, simpleInsertTestReturnID,
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (var))))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (var)))))))
         (contract
           name: (var)
           formals: (names
@@ -81,8 +83,9 @@ new simpleInsertTest, simpleInsertTestReturnID,
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (string_literal)))
+                inputs: (send_inputs
+                  data: (send_data
+                    (string_literal))))
               (new
                 decls: (name_decls
                   (name_decl
@@ -96,11 +99,12 @@ new simpleInsertTest, simpleInsertTestReturnID,
                     (send
                       channel: (var)
                       send_type: (send_single)
-                      inputs: (inputs
-                        (eval
-                          (var))
-                        (eval
-                          (var))))
+                      inputs: (send_inputs
+                        data: (send_data
+                          (eval
+                            (var))
+                          (eval
+                            (var)))))
                     (input
                       receipts: (receipts
                         (receipt
@@ -115,16 +119,18 @@ new simpleInsertTest, simpleInsertTestReturnID,
                             (send
                               channel: (var)
                               send_type: (send_single)
-                              inputs: (inputs
-                                (string_literal)))
+                              inputs: (send_inputs
+                                data: (send_data
+                                  (string_literal))))
                             (send
                               channel: (var)
                               send_type: (send_single)
-                              inputs: (inputs
-                                (eval
-                                  (var))
-                                (eval
-                                  (var)))))
+                              inputs: (send_inputs
+                                data: (send_data
+                                  (eval
+                                    (var))
+                                  (eval
+                                    (var))))))
                           (input
                             receipts: (receipts
                               (receipt
@@ -140,15 +146,18 @@ new simpleInsertTest, simpleInsertTestReturnID,
                                   (send
                                     channel: (var)
                                     send_type: (send_single)
-                                    inputs: (inputs
-                                      (string_literal)))
+                                    inputs: (send_inputs
+                                      data: (send_data
+                                        (string_literal))))
                                   (send
                                     channel: (var)
                                     send_type: (send_single)
-                                    inputs: (inputs
-                                      (var))))
+                                    inputs: (send_inputs
+                                      data: (send_data
+                                        (var)))))
                                 (send
                                   channel: (var)
                                   send_type: (send_single)
-                                  inputs: (inputs
-                                    (var)))))))))))))))))))
+                                  inputs: (send_inputs
+                                    data: (send_data
+                                      (var))))))))))))))))))))

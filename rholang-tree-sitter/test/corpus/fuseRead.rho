@@ -48,8 +48,9 @@ new fuseRead,
             (send
               channel: (var)
               send_type: (send_single)
-              inputs: (inputs
-                (string_literal)))
+              inputs: (send_inputs
+                data: (send_data
+                  (string_literal))))
             (new
               decls: (name_decls
                 (name_decl
@@ -59,10 +60,11 @@ new fuseRead,
                   (send
                     channel: (var)
                     send_type: (send_single)
-                    inputs: (inputs
-                      (var)
-                      (eval
-                        (var))))
+                    inputs: (send_inputs
+                      data: (send_data
+                        (var)
+                        (eval
+                          (var)))))
                   (input
                     receipts: (receipts
                       (receipt
@@ -77,12 +79,14 @@ new fuseRead,
                         (send
                           channel: (var)
                           send_type: (send_single)
-                          inputs: (inputs
-                            (string_literal)))
+                          inputs: (send_inputs
+                            data: (send_data
+                              (string_literal))))
                         (send
                           channel: (var)
                           send_type: (send_single)
-                          inputs: (inputs
-                            (var)
-                            (eval
-                              (var))))))))))))))))
+                          inputs: (send_inputs
+                            data: (send_data
+                              (var)
+                              (eval
+                                (var)))))))))))))))))

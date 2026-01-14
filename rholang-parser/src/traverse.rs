@@ -74,6 +74,7 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
             }
             Proc::New { proc: inner, .. }
             | Proc::Bundle { proc: inner, .. }
+            | Proc::UseBlock { proc: inner, .. }
             | Proc::UnaryExp { arg: inner, .. } => {
                 self.stack.push(inner);
             }
@@ -143,6 +144,7 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
             | Proc::SimpleType(_)
             | Proc::ProcVar(_)
             | Proc::VarRef { .. }
+            | Proc::TheoryCall(_)
             | Proc::Bad => {}
 
             Proc::Select { .. } => {
@@ -327,6 +329,7 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
 
             Proc::New { proc: inner, .. }
             | Proc::Bundle { proc: inner, .. }
+            | Proc::UseBlock { proc: inner, .. }
             | Proc::UnaryExp { arg: inner, .. } => {
                 self.stack.push(Frame::Node(inner));
             }
@@ -356,6 +359,7 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
             Proc::Collection(collection) => match collection {
                 Collection::List { elements, .. }
                 | Collection::Set { elements, .. }
+                | Collection::PathMap { elements, .. }
                 | Collection::Tuple(elements) => {
                     self.push_children(elements);
                 }
@@ -375,6 +379,7 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
             | Proc::ProcVar(_)
             | Proc::Eval { .. }
             | Proc::VarRef { .. }
+            | Proc::TheoryCall(_)
             | Proc::Bad => {}
 
             Proc::Select { .. } => {
@@ -1078,8 +1083,10 @@ mod tests {
                     pos: SourcePos::at_col(32),
                 }
                 .into(),
+                hyperparams: None,
                 inputs: smallvec![inner_rhs.ann(SourcePos::at_col(36).span_of(2))],
             },
+            similarity: None,
         };
 
         let inner_proc = Proc::ForComprehension {
@@ -1100,11 +1107,13 @@ mod tests {
                     pos: SourcePos::at_col(11),
                 }
                 .into(),
+                hyperparams: None,
                 inputs: smallvec![
                     outer_rhs.ann(SourcePos::at_col(15).span_of(2)),
                     inner_proc.ann(SourcePos::at_col(21).span_of(27))
                 ],
             },
+            similarity: None,
         };
 
         let outer_proc = Proc::ForComprehension {
@@ -1303,6 +1312,7 @@ mod tests {
             rhs: Source::Simple {
                 name: Name::Quote(par_in_bind.ann(SourcePos::at_col(12).span_of(15))),
             },
+            similarity: None,
         };
 
         let arg1_in_send = Proc::ProcVar(Var::Id(Id {
@@ -1327,6 +1337,7 @@ mod tests {
         }));
         let first_send = Proc::Send {
             channel: Name::Quote(par_in_send.ann(SourcePos { line: 2, col: 4 }.span_of(15))),
+            hyperparams: None,
             send_type: SendType::Single,
             inputs: smallvec![arg2.ann(SourcePos { line: 2, col: 21 }.span_of(4))],
         };
@@ -1337,6 +1348,7 @@ mod tests {
                 name: "ack",
                 pos: SourcePos { line: 3, col: 3 },
             })),
+            hyperparams: None,
             send_type: SendType::Single,
             inputs: smallvec![true_lit.ann(SourcePos { line: 3, col: 8 }.span_of(4))],
         };

@@ -41,15 +41,17 @@ new philosopher1, philosopher2, north, south, knife, spoon in {
             (send
               channel: (var)
               send_type: (send_single)
-              inputs: (inputs
-                (eval
-                  (var))))
+              inputs: (send_inputs
+                data: (send_data
+                  (eval
+                    (var)))))
             (send
               channel: (var)
               send_type: (send_single)
-              inputs: (inputs
-                (eval
-                  (var)))))
+              inputs: (send_inputs
+                data: (send_data
+                  (eval
+                    (var))))))
           (input
             receipts: (receipts
               (receipt
@@ -72,18 +74,21 @@ new philosopher1, philosopher2, north, south, knife, spoon in {
                   (send
                     channel: (var)
                     send_type: (send_single)
-                    inputs: (inputs
-                      (string_literal)))
+                    inputs: (send_inputs
+                      data: (send_data
+                        (string_literal))))
                   (send
                     channel: (var)
                     send_type: (send_single)
-                    inputs: (inputs
-                      (var))))
+                    inputs: (send_inputs
+                      data: (send_data
+                        (var)))))
                 (send
                   channel: (var)
                   send_type: (send_single)
-                  inputs: (inputs
-                    (var)))))))
+                  inputs: (send_inputs
+                    data: (send_data
+                      (var))))))))
         (input
           receipts: (receipts
             (receipt
@@ -106,15 +111,18 @@ new philosopher1, philosopher2, north, south, knife, spoon in {
                 (send
                   channel: (var)
                   send_type: (send_single)
-                  inputs: (inputs
-                    (string_literal)))
+                  inputs: (send_inputs
+                    data: (send_data
+                      (string_literal))))
                 (send
                   channel: (var)
                   send_type: (send_single)
-                  inputs: (inputs
-                    (var))))
+                  inputs: (send_inputs
+                    data: (send_data
+                      (var)))))
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (var))))))))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (var)))))))))))

@@ -38,12 +38,14 @@ new loop in {
                   proc: (send
                     channel: (var)
                     send_type: (send_single)
-                    inputs: (inputs
-                      (sub
-                        (var)
-                        (long_literal)))))))))
+                    inputs: (send_inputs
+                      data: (send_data
+                        (sub
+                          (var)
+                          (long_literal))))))))))
         (send
           channel: (var)
           send_type: (send_single)
-          inputs: (inputs
-            (long_literal)))))))
+          inputs: (send_inputs
+            data: (send_data
+              (long_literal))))))))

@@ -1,5 +1,6 @@
 ---
 source: rholang-parser/tests/golden.rs
+assertion_line: 23
 expression: result
 ---
 Good(
@@ -9,32 +10,13 @@ Good(
                 decls: [
                     NameDecl {
                         id: Id {
-                            name: "knife",
-                            pos: SourcePos {
-                                line: 1,
-                                col: 47,
-                            },
-                        },
-                        uri: None,
-                    },
-                    NameDecl {
-                        id: Id {
-                            name: "north",
-                            pos: SourcePos {
-                                line: 1,
-                                col: 33,
-                            },
-                        },
-                        uri: None,
-                    },
-                    NameDecl {
-                        id: Id {
                             name: "philosopher1",
                             pos: SourcePos {
                                 line: 1,
                                 col: 5,
                             },
                         },
+                        space_type: None,
                         uri: None,
                     },
                     NameDecl {
@@ -45,6 +27,18 @@ Good(
                                 col: 19,
                             },
                         },
+                        space_type: None,
+                        uri: None,
+                    },
+                    NameDecl {
+                        id: Id {
+                            name: "north",
+                            pos: SourcePos {
+                                line: 1,
+                                col: 33,
+                            },
+                        },
+                        space_type: None,
                         uri: None,
                     },
                     NameDecl {
@@ -55,6 +49,18 @@ Good(
                                 col: 40,
                             },
                         },
+                        space_type: None,
+                        uri: None,
+                    },
+                    NameDecl {
+                        id: Id {
+                            name: "knife",
+                            pos: SourcePos {
+                                line: 1,
+                                col: 47,
+                            },
+                        },
+                        space_type: None,
                         uri: None,
                     },
                     NameDecl {
@@ -65,6 +71,7 @@ Good(
                                 col: 54,
                             },
                         },
+                        space_type: None,
                         uri: None,
                     },
                 ],
@@ -87,6 +94,7 @@ Good(
                                                         },
                                                     ),
                                                 ),
+                                                hyperparams: None,
                                                 send_type: Single,
                                                 inputs: [
                                                     AnnProc {
@@ -140,6 +148,7 @@ Good(
                                                         },
                                                     ),
                                                 ),
+                                                hyperparams: None,
                                                 send_type: Single,
                                                 inputs: [
                                                     AnnProc {
@@ -240,6 +249,7 @@ Good(
                                                             ),
                                                         ),
                                                     },
+                                                    similarity: None,
                                                 },
                                             ],
                                             [
@@ -287,6 +297,7 @@ Good(
                                                             ),
                                                         ),
                                                     },
+                                                    similarity: None,
                                                 },
                                             ],
                                         ],
@@ -307,6 +318,7 @@ Good(
                                                                         },
                                                                     ),
                                                                 ),
+                                                                hyperparams: None,
                                                                 send_type: Single,
                                                                 inputs: [
                                                                     AnnProc {
@@ -350,6 +362,7 @@ Good(
                                                                         },
                                                                     ),
                                                                 ),
+                                                                hyperparams: None,
                                                                 send_type: Single,
                                                                 inputs: [
                                                                     AnnProc {
@@ -413,6 +426,7 @@ Good(
                                                                 },
                                                             ),
                                                         ),
+                                                        hyperparams: None,
                                                         send_type: Single,
                                                         inputs: [
                                                             AnnProc {
@@ -535,6 +549,7 @@ Good(
                                                     ),
                                                 ),
                                             },
+                                            similarity: None,
                                         },
                                     ],
                                     [
@@ -582,6 +597,7 @@ Good(
                                                     ),
                                                 ),
                                             },
+                                            similarity: None,
                                         },
                                     ],
                                 ],
@@ -602,6 +618,7 @@ Good(
                                                                 },
                                                             ),
                                                         ),
+                                                        hyperparams: None,
                                                         send_type: Single,
                                                         inputs: [
                                                             AnnProc {
@@ -645,6 +662,7 @@ Good(
                                                                 },
                                                             ),
                                                         ),
+                                                        hyperparams: None,
                                                         send_type: Single,
                                                         inputs: [
                                                             AnnProc {
@@ -708,6 +726,7 @@ Good(
                                                         },
                                                     ),
                                                 ),
+                                                hyperparams: None,
                                                 send_type: Single,
                                                 inputs: [
                                                     AnnProc {

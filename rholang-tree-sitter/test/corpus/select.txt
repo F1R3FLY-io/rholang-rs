@@ -42,20 +42,23 @@ contract Cell( get, set, state ) = {
                   (send
                     channel: (var)
                     send_type: (send_single)
-                    inputs: (inputs
-                      (var)))
+                    inputs: (send_inputs
+                      data: (send_data
+                        (var))))
                   (send
                     channel: (var)
                     send_type: (send_single)
-                    inputs: (inputs
-                      (var))))
+                    inputs: (send_inputs
+                      data: (send_data
+                        (var)))))
                 (send
                   channel: (var)
                   send_type: (send_single)
-                  inputs: (inputs
-                    (var)
-                    (var)
-                    (var))))))
+                  inputs: (send_inputs
+                    data: (send_data
+                      (var)
+                      (var)
+                      (var)))))))
           (branch
             pattern: (linear_bind
               names: (names
@@ -72,12 +75,14 @@ contract Cell( get, set, state ) = {
                 (send
                   channel: (var)
                   send_type: (send_single)
-                  inputs: (inputs
-                    (var)))
+                  inputs: (send_inputs
+                    data: (send_data
+                      (var))))
                 (send
                   channel: (var)
                   send_type: (send_single)
-                  inputs: (inputs
-                    (var)
-                    (var)
-                    (var)))))))))))
+                  inputs: (send_inputs
+                    data: (send_data
+                      (var)
+                      (var)
+                      (var))))))))))))

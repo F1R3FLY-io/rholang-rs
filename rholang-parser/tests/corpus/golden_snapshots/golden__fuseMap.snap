@@ -1,5 +1,6 @@
 ---
 source: rholang-parser/tests/golden.rs
+assertion_line: 23
 expression: result
 ---
 Fail(
@@ -17,6 +18,7 @@ Fail(
                                         col: 5,
                                     },
                                 },
+                                space_type: None,
                                 uri: None,
                             },
                             NameDecl {
@@ -27,6 +29,7 @@ Fail(
                                         col: 10,
                                     },
                                 },
+                                space_type: None,
                                 uri: Some(
                                     Uri(
                                         "rho:io:stdout",
@@ -53,6 +56,7 @@ Fail(
                                                                 },
                                                             ),
                                                         ),
+                                                        hyperparams: None,
                                                         send_type: Single,
                                                         inputs: [
                                                             AnnProc {
@@ -134,6 +138,7 @@ Fail(
                                                                             ),
                                                                         ),
                                                                     },
+                                                                    similarity: None,
                                                                 },
                                                             ],
                                                         ],
@@ -152,6 +157,7 @@ Fail(
                                                                                 },
                                                                             ),
                                                                         ),
+                                                                        hyperparams: None,
                                                                         send_type: Single,
                                                                         inputs: [
                                                                             AnnProc {
@@ -298,6 +304,7 @@ Fail(
                                                                                 },
                                                                             ),
                                                                         ),
+                                                                        hyperparams: None,
                                                                         send_type: Single,
                                                                         inputs: [
                                                                             AnnProc {
@@ -398,6 +405,7 @@ Fail(
                                                                     ),
                                                                 ),
                                                             },
+                                                            similarity: None,
                                                         },
                                                     ],
                                                 ],
@@ -412,6 +420,7 @@ Fail(
                                                                         col: 10,
                                                                     },
                                                                 },
+                                                                space_type: None,
                                                                 uri: None,
                                                             },
                                                         ],
@@ -430,6 +439,7 @@ Fail(
                                                                                 },
                                                                             ),
                                                                         ),
+                                                                        hyperparams: None,
                                                                         send_type: Single,
                                                                         inputs: [
                                                                             AnnProc {
@@ -569,6 +579,7 @@ Fail(
                                                                                             ),
                                                                                         ),
                                                                                     },
+                                                                                    similarity: None,
                                                                                 },
                                                                             ],
                                                                         ],
@@ -585,6 +596,7 @@ Fail(
                                                                                         },
                                                                                     ),
                                                                                 ),
+                                                                                hyperparams: None,
                                                                                 send_type: Single,
                                                                                 inputs: [
                                                                                     AnnProc {
@@ -731,6 +743,7 @@ Fail(
                                                             ),
                                                         ),
                                                     },
+                                                    similarity: None,
                                                 },
                                             ],
                                         ],
@@ -749,6 +762,7 @@ Fail(
                                                                 },
                                                             ),
                                                         ),
+                                                        hyperparams: None,
                                                         send_type: Single,
                                                         inputs: [
                                                             AnnProc {
@@ -859,6 +873,7 @@ Fail(
                                                                 },
                                                             ),
                                                         ),
+                                                        hyperparams: None,
                                                         send_type: Single,
                                                         inputs: [
                                                             AnnProc {

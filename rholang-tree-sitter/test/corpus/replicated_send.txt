@@ -31,8 +31,9 @@ new HelloWorld, stdout(`rho:io:stdout`), stderr(`rho:io:stderr`) in {
           (send
             channel: (var)
             send_type: (send_multiple)
-            inputs: (inputs
-              (string_literal)))
+            inputs: (send_inputs
+              data: (send_data
+                (string_literal))))
           (input
             receipts: (receipts
               (receipt
@@ -46,8 +47,9 @@ new HelloWorld, stdout(`rho:io:stdout`), stderr(`rho:io:stderr`) in {
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (var))))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (var)))))))
         (input
           receipts: (receipts
             (receipt
@@ -61,5 +63,6 @@ new HelloWorld, stdout(`rho:io:stdout`), stderr(`rho:io:stderr`) in {
             (send
               channel: (var)
               send_type: (send_single)
-              inputs: (inputs
-                (var)))))))))
+              inputs: (send_inputs
+                data: (send_data
+                  (var))))))))))

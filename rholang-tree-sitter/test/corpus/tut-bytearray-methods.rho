@@ -32,37 +32,39 @@ new x, y, stdout(`rho:io:stdout`) in {
         (send
           channel: (var)
           send_type: (send_single)
-          inputs: (inputs
-            (collection
-              (map
-                (key_value_pair
-                  key: (string_literal)
-                  value: (method
-                    receiver: (method
-                      receiver: (string_literal)
+          inputs: (send_inputs
+            data: (send_data
+              (collection
+                (map
+                  (key_value_pair
+                    key: (string_literal)
+                    value: (method
+                      receiver: (method
+                        receiver: (string_literal)
+                        name: (var)
+                        args: (args))
                       name: (var)
-                      args: (args))
-                    name: (var)
-                    args: (args
-                      (long_literal))))
-                (key_value_pair
-                  key: (string_literal)
-                  value: (long_literal))))))
+                      args: (args
+                        (long_literal))))
+                  (key_value_pair
+                    key: (string_literal)
+                    value: (long_literal)))))))
         (send
           channel: (var)
           send_type: (send_single)
-          inputs: (inputs
-            (collection
-              (map
-                (key_value_pair
-                  key: (string_literal)
-                  value: (method
-                    receiver: (method
-                      receiver: (string_literal)
+          inputs: (send_inputs
+            data: (send_data
+              (collection
+                (map
+                  (key_value_pair
+                    key: (string_literal)
+                    value: (method
+                      receiver: (method
+                        receiver: (string_literal)
+                        name: (var)
+                        args: (args))
                       name: (var)
-                      args: (args))
-                    name: (var)
-                    args: (args)))
-                (key_value_pair
-                  key: (string_literal)
-                  value: (long_literal))))))))))
+                      args: (args)))
+                  (key_value_pair
+                    key: (string_literal)
+                    value: (long_literal)))))))))))

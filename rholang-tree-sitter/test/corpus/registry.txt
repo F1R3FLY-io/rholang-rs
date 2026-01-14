@@ -557,8 +557,9 @@ in {
                                                                   (eval
                                                                     (var)))))
                                                             send_type: (send_single)
-                                                            inputs: (inputs
-                                                              (var)))))
+                                                            inputs: (send_inputs
+                                                              data: (send_data
+                                                                (var))))))
                                                       (contract
                                                         name: (var)
                                                         formals: (names
@@ -583,8 +584,9 @@ in {
                                                               (send
                                                                 channel: (var)
                                                                 send_type: (send_single)
-                                                                inputs: (inputs
-                                                                  (var))))))))
+                                                                inputs: (send_inputs
+                                                                  data: (send_data
+                                                                    (var)))))))))
                                                     (contract
                                                       name: (var)
                                                       formals: (names
@@ -606,38 +608,40 @@ in {
                                                             (send
                                                               channel: (var)
                                                               send_type: (send_single)
-                                                              inputs: (inputs
-                                                                (var))))
+                                                              inputs: (send_inputs
+                                                                data: (send_data
+                                                                  (var)))))
                                                           alternative: (block
                                                             (send
                                                               channel: (var)
                                                               send_type: (send_single)
-                                                              inputs: (inputs
-                                                                (var)
-                                                                (add
+                                                              inputs: (send_inputs
+                                                                data: (send_data
                                                                   (var)
-                                                                  (long_literal))
-                                                                (var)
-                                                                (concat
+                                                                  (add
+                                                                    (var)
+                                                                    (long_literal))
                                                                   (var)
-                                                                  (collection
-                                                                    (list
-                                                                      (mod
-                                                                        (method
-                                                                          receiver: (var)
-                                                                          name: (var)
-                                                                          args: (args
-                                                                            (var)))
-                                                                        (long_literal))
-                                                                      (div
-                                                                        (method
-                                                                          receiver: (var)
-                                                                          name: (var)
-                                                                          args: (args
-                                                                            (var)))
-                                                                        (long_literal)))))
-                                                                (eval
-                                                                  (var)))))))))
+                                                                  (concat
+                                                                    (var)
+                                                                    (collection
+                                                                      (list
+                                                                        (mod
+                                                                          (method
+                                                                            receiver: (var)
+                                                                            name: (var)
+                                                                            args: (args
+                                                                              (var)))
+                                                                          (long_literal))
+                                                                        (div
+                                                                          (method
+                                                                            receiver: (var)
+                                                                            name: (var)
+                                                                            args: (args
+                                                                              (var)))
+                                                                          (long_literal)))))
+                                                                  (eval
+                                                                    (var))))))))))
                                                   (contract
                                                     name: (var)
                                                     formals: (names
@@ -657,14 +661,15 @@ in {
                                                               (send
                                                                 channel: (var)
                                                                 send_type: (send_single)
-                                                                inputs: (inputs
-                                                                  (long_literal)
-                                                                  (collection
-                                                                    (tuple
-                                                                      (eval
-                                                                        (var))
-                                                                      (collection
-                                                                        (list))))))
+                                                                inputs: (send_inputs
+                                                                  data: (send_data
+                                                                    (long_literal)
+                                                                    (collection
+                                                                      (tuple
+                                                                        (eval
+                                                                          (var))
+                                                                        (collection
+                                                                          (list)))))))
                                                               (send
                                                                 channel: (quote
                                                                   (collection
@@ -673,14 +678,16 @@ in {
                                                                         (var))
                                                                       (string_literal))))
                                                                 send_type: (send_multiple)
-                                                                inputs: (inputs
-                                                                  (var))))
+                                                                inputs: (send_inputs
+                                                                  data: (send_data
+                                                                    (var)))))
                                                             (send
                                                               channel: (var)
                                                               send_type: (send_single)
-                                                              inputs: (inputs
-                                                                (eval
-                                                                  (var))))))))))
+                                                              inputs: (send_inputs
+                                                                data: (send_data
+                                                                  (eval
+                                                                    (var)))))))))))
                                                 (contract
                                                   name: (var)
                                                   formals: (names
@@ -705,18 +712,19 @@ in {
                                                           (send
                                                             channel: (var)
                                                             send_type: (send_single)
-                                                            inputs: (inputs
-                                                              (collection
-                                                                (tuple
-                                                                  (var)
-                                                                  (method
-                                                                    receiver: (var)
-                                                                    name: (var)
-                                                                    args: (args
-                                                                      (long_literal)
-                                                                      (var)))))
-                                                              (eval
-                                                                (var))))
+                                                            inputs: (send_inputs
+                                                              data: (send_data
+                                                                (collection
+                                                                  (tuple
+                                                                    (var)
+                                                                    (method
+                                                                      receiver: (var)
+                                                                      name: (var)
+                                                                      args: (args
+                                                                        (long_literal)
+                                                                        (var)))))
+                                                                (eval
+                                                                  (var)))))
                                                           (input
                                                             receipts: (receipts
                                                               (receipt
@@ -735,12 +743,13 @@ in {
                                                                   (send
                                                                     channel: (var)
                                                                     send_type: (send_single)
-                                                                    inputs: (inputs
-                                                                      (method
-                                                                        receiver: (var)
-                                                                        name: (var)
-                                                                        args: (args
-                                                                          (var))))))
+                                                                    inputs: (send_inputs
+                                                                      data: (send_data
+                                                                        (method
+                                                                          receiver: (var)
+                                                                          name: (var)
+                                                                          args: (args
+                                                                            (var)))))))
                                                                 alternative: (block
                                                                   (ifElse
                                                                     condition: (eq
@@ -762,22 +771,24 @@ in {
                                                                       (send
                                                                         channel: (var)
                                                                         send_type: (send_single)
-                                                                        inputs: (inputs
-                                                                          (nil))))
+                                                                        inputs: (send_inputs
+                                                                          data: (send_data
+                                                                            (nil)))))
                                                                     alternative: (block
                                                                       (send
                                                                         channel: (var)
                                                                         send_type: (send_single)
-                                                                        inputs: (inputs
-                                                                          (var)
-                                                                          (var)
-                                                                          (add
+                                                                        inputs: (send_inputs
+                                                                          data: (send_data
                                                                             (var)
-                                                                            (long_literal))
-                                                                          (var)
-                                                                          (var)
-                                                                          (eval
-                                                                            (var))))))))))))))))
+                                                                            (var)
+                                                                            (add
+                                                                              (var)
+                                                                              (long_literal))
+                                                                            (var)
+                                                                            (var)
+                                                                            (eval
+                                                                              (var)))))))))))))))))
                                               (contract
                                                 name: (var)
                                                 formals: (names
@@ -803,13 +814,14 @@ in {
                                                         (send
                                                           channel: (var)
                                                           send_type: (send_single)
-                                                          inputs: (inputs
-                                                            (method
-                                                              receiver: (var)
-                                                              name: (var)
-                                                              args: (args))
-                                                            (eval
-                                                              (var))))
+                                                          inputs: (send_inputs
+                                                            data: (send_data
+                                                              (method
+                                                                receiver: (var)
+                                                                name: (var)
+                                                                args: (args))
+                                                              (eval
+                                                                (var)))))
                                                         (input
                                                           receipts: (receipts
                                                             (receipt
@@ -837,14 +849,15 @@ in {
                                                                   (send
                                                                     channel: (var)
                                                                     send_type: (send_single)
-                                                                    inputs: (inputs
-                                                                      (var)
-                                                                      (long_literal)
-                                                                      (var)
-                                                                      (collection
-                                                                        (list))
-                                                                      (eval
-                                                                        (var))))
+                                                                    inputs: (send_inputs
+                                                                      data: (send_data
+                                                                        (var)
+                                                                        (long_literal)
+                                                                        (var)
+                                                                        (collection
+                                                                          (list))
+                                                                        (eval
+                                                                          (var)))))
                                                                   (input
                                                                     receipts: (receipts
                                                                       (receipt
@@ -858,21 +871,22 @@ in {
                                                                       (send
                                                                         channel: (var)
                                                                         send_type: (send_single)
-                                                                        inputs: (inputs
-                                                                          (var)
-                                                                          (var)
-                                                                          (long_literal)
-                                                                          (mult
+                                                                        inputs: (send_inputs
+                                                                          data: (send_data
+                                                                            (var)
+                                                                            (var)
                                                                             (long_literal)
-                                                                            (var))
-                                                                          (method
-                                                                            receiver: (var)
-                                                                            name: (var)
-                                                                            args: (args
-                                                                              (var)
-                                                                              (long_literal)))
-                                                                          (eval
-                                                                            (var)))))))))))))))))
+                                                                            (mult
+                                                                              (long_literal)
+                                                                              (var))
+                                                                            (method
+                                                                              receiver: (var)
+                                                                              name: (var)
+                                                                              args: (args
+                                                                                (var)
+                                                                                (long_literal)))
+                                                                            (eval
+                                                                              (var))))))))))))))))))
                                             (contract
                                               name: (var)
                                               formals: (names
@@ -898,13 +912,14 @@ in {
                                                       (send
                                                         channel: (var)
                                                         send_type: (send_single)
-                                                        inputs: (inputs
-                                                          (method
-                                                            receiver: (var)
-                                                            name: (var)
-                                                            args: (args))
-                                                          (eval
-                                                            (var))))
+                                                        inputs: (send_inputs
+                                                          data: (send_data
+                                                            (method
+                                                              receiver: (var)
+                                                              name: (var)
+                                                              args: (args))
+                                                            (eval
+                                                              (var)))))
                                                       (input
                                                         receipts: (receipts
                                                           (receipt
@@ -932,14 +947,15 @@ in {
                                                                 (send
                                                                   channel: (var)
                                                                   send_type: (send_single)
-                                                                  inputs: (inputs
-                                                                    (var)
-                                                                    (long_literal)
-                                                                    (var)
-                                                                    (collection
-                                                                      (list))
-                                                                    (eval
-                                                                      (var))))
+                                                                  inputs: (send_inputs
+                                                                    data: (send_data
+                                                                      (var)
+                                                                      (long_literal)
+                                                                      (var)
+                                                                      (collection
+                                                                        (list))
+                                                                      (eval
+                                                                        (var)))))
                                                                 (input
                                                                   receipts: (receipts
                                                                     (receipt
@@ -961,13 +977,14 @@ in {
                                                                           (send
                                                                             channel: (var)
                                                                             send_type: (send_single)
-                                                                            inputs: (inputs
-                                                                              (collection
-                                                                                (tuple
-                                                                                  (var)
-                                                                                  (var)))
-                                                                              (eval
-                                                                                (var))))
+                                                                            inputs: (send_inputs
+                                                                              data: (send_data
+                                                                                (collection
+                                                                                  (tuple
+                                                                                    (var)
+                                                                                    (var)))
+                                                                                (eval
+                                                                                  (var)))))
                                                                           (input
                                                                             receipts: (receipts
                                                                               (receipt
@@ -981,17 +998,18 @@ in {
                                                                               (send
                                                                                 channel: (var)
                                                                                 send_type: (send_single)
-                                                                                inputs: (inputs
-                                                                                  (method
-                                                                                    receiver: (var)
-                                                                                    name: (var)
-                                                                                    args: (args
-                                                                                      (method
-                                                                                        receiver: (var)
-                                                                                        name: (var)
-                                                                                        args: (args
-                                                                                          (var)
-                                                                                          (long_literal)))))))))))))))))))))))))
+                                                                                inputs: (send_inputs
+                                                                                  data: (send_data
+                                                                                    (method
+                                                                                      receiver: (var)
+                                                                                      name: (var)
+                                                                                      args: (args
+                                                                                        (method
+                                                                                          receiver: (var)
+                                                                                          name: (var)
+                                                                                          args: (args
+                                                                                            (var)
+                                                                                            (long_literal))))))))))))))))))))))))))
                                           (contract
                                             name: (var)
                                             formals: (names
@@ -1078,17 +1096,19 @@ in {
                                                                                     (eval
                                                                                       (var)))))
                                                                               send_type: (send_single)
-                                                                              inputs: (inputs
-                                                                                (collection
-                                                                                  (map
-                                                                                    (key_value_pair
-                                                                                      key: (var)
-                                                                                      value: (var))))))
+                                                                              inputs: (send_inputs
+                                                                                data: (send_data
+                                                                                  (collection
+                                                                                    (map
+                                                                                      (key_value_pair
+                                                                                        key: (var)
+                                                                                        value: (var)))))))
                                                                             (send
                                                                               channel: (var)
                                                                               send_type: (send_single)
-                                                                              inputs: (inputs
-                                                                                (nil)))))
+                                                                              inputs: (send_inputs
+                                                                                data: (send_data
+                                                                                  (nil))))))
                                                                         alternative: (block
                                                                           (par
                                                                             (send
@@ -1099,18 +1119,20 @@ in {
                                                                                     (eval
                                                                                       (var)))))
                                                                               send_type: (send_single)
-                                                                              inputs: (inputs
-                                                                                (method
-                                                                                  receiver: (var)
-                                                                                  name: (var)
-                                                                                  args: (args
-                                                                                    (var)
-                                                                                    (var)))))
+                                                                              inputs: (send_inputs
+                                                                                data: (send_data
+                                                                                  (method
+                                                                                    receiver: (var)
+                                                                                    name: (var)
+                                                                                    args: (args
+                                                                                      (var)
+                                                                                      (var))))))
                                                                             (send
                                                                               channel: (var)
                                                                               send_type: (send_single)
-                                                                              inputs: (inputs
-                                                                                (nil)))))))))
+                                                                              inputs: (send_inputs
+                                                                                data: (send_data
+                                                                                  (nil))))))))))
                                                                 alternative: (block
                                                                   (ifElse
                                                                     condition: (eq
@@ -1166,19 +1188,20 @@ in {
                                                                                   (send
                                                                                     channel: (var)
                                                                                     send_type: (send_single)
-                                                                                    inputs: (inputs
-                                                                                      (long_literal)
-                                                                                      (collection
-                                                                                        (tuple
-                                                                                          (var)
-                                                                                          (method
-                                                                                            receiver: (var)
-                                                                                            name: (var)
-                                                                                            args: (args
-                                                                                              (long_literal)
-                                                                                              (add
-                                                                                                (var)
-                                                                                                (long_literal))))))))
+                                                                                    inputs: (send_inputs
+                                                                                      data: (send_data
+                                                                                        (long_literal)
+                                                                                        (collection
+                                                                                          (tuple
+                                                                                            (var)
+                                                                                            (method
+                                                                                              receiver: (var)
+                                                                                              name: (var)
+                                                                                              args: (args
+                                                                                                (long_literal)
+                                                                                                (add
+                                                                                                  (var)
+                                                                                                  (long_literal)))))))))
                                                                                   (match
                                                                                     expression: (method
                                                                                       receiver: (var)
@@ -1197,52 +1220,54 @@ in {
                                                                                                   (eval
                                                                                                     (var)))))
                                                                                             send_type: (send_single)
-                                                                                            inputs: (inputs
-                                                                                              (add
+                                                                                            inputs: (send_inputs
+                                                                                              data: (send_data
                                                                                                 (add
-                                                                                                  (mod
-                                                                                                    (var)
-                                                                                                    (method
-                                                                                                      receiver: (var)
-                                                                                                      name: (var)
-                                                                                                      args: (args
-                                                                                                        (var))))
-                                                                                                  (mult
-                                                                                                    (div
+                                                                                                  (add
+                                                                                                    (mod
                                                                                                       (var)
+                                                                                                      (method
+                                                                                                        receiver: (var)
+                                                                                                        name: (var)
+                                                                                                        args: (args
+                                                                                                          (var))))
+                                                                                                    (mult
+                                                                                                      (div
+                                                                                                        (var)
+                                                                                                        (method
+                                                                                                          receiver: (var)
+                                                                                                          name: (var)
+                                                                                                          args: (args
+                                                                                                            (add
+                                                                                                              (var)
+                                                                                                              (long_literal)))))
                                                                                                       (method
                                                                                                         receiver: (var)
                                                                                                         name: (var)
                                                                                                         args: (args
                                                                                                           (add
                                                                                                             (var)
-                                                                                                            (long_literal)))))
-                                                                                                    (method
-                                                                                                      receiver: (var)
-                                                                                                      name: (var)
-                                                                                                      args: (args
-                                                                                                        (add
-                                                                                                          (var)
-                                                                                                          (long_literal))))))
-                                                                                                (method
-                                                                                                  receiver: (var)
-                                                                                                  name: (var)
-                                                                                                  args: (args
-                                                                                                    (var)))))))))))
+                                                                                                            (long_literal))))))
+                                                                                                  (method
+                                                                                                    receiver: (var)
+                                                                                                    name: (var)
+                                                                                                    args: (args
+                                                                                                      (var))))))))))))
                                                                                 (send
                                                                                   channel: (var)
                                                                                   send_type: (send_single)
-                                                                                  inputs: (inputs
-                                                                                    (var)
-                                                                                    (var)
-                                                                                    (add
+                                                                                  inputs: (send_inputs
+                                                                                    data: (send_data
                                                                                       (var)
-                                                                                      (long_literal))
-                                                                                    (var)
-                                                                                    (var)
-                                                                                    (var)
-                                                                                    (eval
-                                                                                      (var))))))
+                                                                                      (var)
+                                                                                      (add
+                                                                                        (var)
+                                                                                        (long_literal))
+                                                                                      (var)
+                                                                                      (var)
+                                                                                      (var)
+                                                                                      (eval
+                                                                                        (var)))))))
                                                                             alternative: (block
                                                                               (par
                                                                                 (send
@@ -1253,37 +1278,40 @@ in {
                                                                                         (eval
                                                                                           (var)))))
                                                                                   send_type: (send_single)
-                                                                                  inputs: (inputs
-                                                                                    (var)))
+                                                                                  inputs: (send_inputs
+                                                                                    data: (send_data
+                                                                                      (var))))
                                                                                 (send
                                                                                   channel: (var)
                                                                                   send_type: (send_single)
-                                                                                  inputs: (inputs
-                                                                                    (var)
-                                                                                    (var)
-                                                                                    (add
+                                                                                  inputs: (send_inputs
+                                                                                    data: (send_data
                                                                                       (var)
-                                                                                      (long_literal))
-                                                                                    (var)
-                                                                                    (var)
-                                                                                    (var)
-                                                                                    (eval
-                                                                                      (var))))))))))
+                                                                                      (var)
+                                                                                      (add
+                                                                                        (var)
+                                                                                        (long_literal))
+                                                                                      (var)
+                                                                                      (var)
+                                                                                      (var)
+                                                                                      (eval
+                                                                                        (var)))))))))))
                                                                     alternative: (block
                                                                       (send
                                                                         channel: (var)
                                                                         send_type: (send_single)
-                                                                        inputs: (inputs
-                                                                          (var)
-                                                                          (var)
-                                                                          (add
+                                                                        inputs: (send_inputs
+                                                                          data: (send_data
                                                                             (var)
-                                                                            (long_literal))
-                                                                          (var)
-                                                                          (var)
-                                                                          (var)
-                                                                          (eval
-                                                                            (var)))))))))))))))))))
+                                                                            (var)
+                                                                            (add
+                                                                              (var)
+                                                                              (long_literal))
+                                                                            (var)
+                                                                            (var)
+                                                                            (var)
+                                                                            (eval
+                                                                              (var))))))))))))))))))))
                                         (contract
                                           name: (var)
                                           formals: (names
@@ -1311,13 +1339,14 @@ in {
                                                   (send
                                                     channel: (var)
                                                     send_type: (send_single)
-                                                    inputs: (inputs
-                                                      (method
-                                                        receiver: (var)
-                                                        name: (var)
-                                                        args: (args))
-                                                      (eval
-                                                        (var))))
+                                                    inputs: (send_inputs
+                                                      data: (send_data
+                                                        (method
+                                                          receiver: (var)
+                                                          name: (var)
+                                                          args: (args))
+                                                        (eval
+                                                          (var)))))
                                                   (input
                                                     receipts: (receipts
                                                       (receipt
@@ -1345,14 +1374,15 @@ in {
                                                             (send
                                                               channel: (var)
                                                               send_type: (send_single)
-                                                              inputs: (inputs
-                                                                (var)
-                                                                (long_literal)
-                                                                (var)
-                                                                (collection
-                                                                  (list))
-                                                                (eval
-                                                                  (var))))
+                                                              inputs: (send_inputs
+                                                                data: (send_data
+                                                                  (var)
+                                                                  (long_literal)
+                                                                  (var)
+                                                                  (collection
+                                                                    (list))
+                                                                  (eval
+                                                                    (var)))))
                                                             (input
                                                               receipts: (receipts
                                                                 (receipt
@@ -1366,22 +1396,23 @@ in {
                                                                 (send
                                                                   channel: (var)
                                                                   send_type: (send_single)
-                                                                  inputs: (inputs
-                                                                    (var)
-                                                                    (var)
-                                                                    (long_literal)
-                                                                    (mult
+                                                                  inputs: (send_inputs
+                                                                    data: (send_data
+                                                                      (var)
+                                                                      (var)
                                                                       (long_literal)
-                                                                      (var))
-                                                                    (var)
-                                                                    (method
-                                                                      receiver: (var)
-                                                                      name: (var)
-                                                                      args: (args
-                                                                        (var)
-                                                                        (long_literal)))
-                                                                    (eval
-                                                                      (var)))))))))))))))))
+                                                                      (mult
+                                                                        (long_literal)
+                                                                        (var))
+                                                                      (var)
+                                                                      (method
+                                                                        receiver: (var)
+                                                                        name: (var)
+                                                                        args: (args
+                                                                          (var)
+                                                                          (long_literal)))
+                                                                      (eval
+                                                                        (var))))))))))))))))))
                                       (contract
                                         name: (var)
                                         formals: (names
@@ -1406,18 +1437,19 @@ in {
                                                 (send
                                                   channel: (var)
                                                   send_type: (send_single)
-                                                  inputs: (inputs
-                                                    (collection
-                                                      (tuple
-                                                        (var)
-                                                        (method
-                                                          receiver: (var)
-                                                          name: (var)
-                                                          args: (args
-                                                            (long_literal)
-                                                            (var)))))
-                                                    (eval
-                                                      (var))))
+                                                  inputs: (send_inputs
+                                                    data: (send_data
+                                                      (collection
+                                                        (tuple
+                                                          (var)
+                                                          (method
+                                                            receiver: (var)
+                                                            name: (var)
+                                                            args: (args
+                                                              (long_literal)
+                                                              (var)))))
+                                                      (eval
+                                                        (var)))))
                                                 (input
                                                   receipts: (receipts
                                                     (receipt
@@ -1436,12 +1468,13 @@ in {
                                                         (send
                                                           channel: (var)
                                                           send_type: (send_single)
-                                                          inputs: (inputs
-                                                            (method
-                                                              receiver: (var)
-                                                              name: (var)
-                                                              args: (args
-                                                                (var))))))
+                                                          inputs: (send_inputs
+                                                            data: (send_data
+                                                              (method
+                                                                receiver: (var)
+                                                                name: (var)
+                                                                args: (args
+                                                                  (var)))))))
                                                       alternative: (block
                                                         (ifElse
                                                           condition: (eq
@@ -1463,22 +1496,24 @@ in {
                                                             (send
                                                               channel: (var)
                                                               send_type: (send_single)
-                                                              inputs: (inputs
-                                                                (bool_literal))))
+                                                              inputs: (send_inputs
+                                                                data: (send_data
+                                                                  (bool_literal)))))
                                                           alternative: (block
                                                             (send
                                                               channel: (var)
                                                               send_type: (send_single)
-                                                              inputs: (inputs
-                                                                (var)
-                                                                (var)
-                                                                (add
+                                                              inputs: (send_inputs
+                                                                data: (send_data
                                                                   (var)
-                                                                  (long_literal))
-                                                                (var)
-                                                                (var)
-                                                                (eval
-                                                                  (var))))))))))))))))
+                                                                  (var)
+                                                                  (add
+                                                                    (var)
+                                                                    (long_literal))
+                                                                  (var)
+                                                                  (var)
+                                                                  (eval
+                                                                    (var)))))))))))))))))
                                     (contract
                                       name: (var)
                                       formals: (names
@@ -1504,13 +1539,14 @@ in {
                                               (send
                                                 channel: (var)
                                                 send_type: (send_single)
-                                                inputs: (inputs
-                                                  (method
-                                                    receiver: (var)
-                                                    name: (var)
-                                                    args: (args))
-                                                  (eval
-                                                    (var))))
+                                                inputs: (send_inputs
+                                                  data: (send_data
+                                                    (method
+                                                      receiver: (var)
+                                                      name: (var)
+                                                      args: (args))
+                                                    (eval
+                                                      (var)))))
                                               (input
                                                 receipts: (receipts
                                                   (receipt
@@ -1538,14 +1574,15 @@ in {
                                                         (send
                                                           channel: (var)
                                                           send_type: (send_single)
-                                                          inputs: (inputs
-                                                            (var)
-                                                            (long_literal)
-                                                            (var)
-                                                            (collection
-                                                              (list))
-                                                            (eval
-                                                              (var))))
+                                                          inputs: (send_inputs
+                                                            data: (send_data
+                                                              (var)
+                                                              (long_literal)
+                                                              (var)
+                                                              (collection
+                                                                (list))
+                                                              (eval
+                                                                (var)))))
                                                         (input
                                                           receipts: (receipts
                                                             (receipt
@@ -1559,21 +1596,22 @@ in {
                                                             (send
                                                               channel: (var)
                                                               send_type: (send_single)
-                                                              inputs: (inputs
-                                                                (var)
-                                                                (var)
-                                                                (long_literal)
-                                                                (mult
+                                                              inputs: (send_inputs
+                                                                data: (send_data
+                                                                  (var)
+                                                                  (var)
                                                                   (long_literal)
-                                                                  (var))
-                                                                (method
-                                                                  receiver: (var)
-                                                                  name: (var)
-                                                                  args: (args
-                                                                    (var)
-                                                                    (long_literal)))
-                                                                (eval
-                                                                  (var)))))))))))))))))
+                                                                  (mult
+                                                                    (long_literal)
+                                                                    (var))
+                                                                  (method
+                                                                    receiver: (var)
+                                                                    name: (var)
+                                                                    args: (args
+                                                                      (var)
+                                                                      (long_literal)))
+                                                                  (eval
+                                                                    (var))))))))))))))))))
                                   (contract
                                     name: (var)
                                     formals: (names
@@ -1636,8 +1674,9 @@ in {
                                                               (send
                                                                 channel: (var)
                                                                 send_type: (send_single)
-                                                                inputs: (inputs
-                                                                  (nil))))
+                                                                inputs: (send_inputs
+                                                                  data: (send_data
+                                                                    (nil)))))
                                                             alternative: (block
                                                               (new
                                                                 decls: (name_decls
@@ -1663,14 +1702,15 @@ in {
                                                                         (send
                                                                           channel: (var)
                                                                           send_type: (send_single)
-                                                                          inputs: (inputs
-                                                                            (method
-                                                                              receiver: (var)
-                                                                              name: (var)
-                                                                              args: (args
-                                                                                (var)))
-                                                                            (eval
-                                                                              (var))))
+                                                                          inputs: (send_inputs
+                                                                            data: (send_data
+                                                                              (method
+                                                                                receiver: (var)
+                                                                                name: (var)
+                                                                                args: (args
+                                                                                  (var)))
+                                                                              (eval
+                                                                                (var)))))
                                                                         (input
                                                                           receipts: (receipts
                                                                             (receipt
@@ -1690,18 +1730,20 @@ in {
                                                                                       (eval
                                                                                         (var)))))
                                                                                 send_type: (send_single)
-                                                                                inputs: (inputs
-                                                                                  (method
-                                                                                    receiver: (var)
-                                                                                    name: (var)
-                                                                                    args: (args
-                                                                                      (var)
-                                                                                      (var)))))
+                                                                                inputs: (send_inputs
+                                                                                  data: (send_data
+                                                                                    (method
+                                                                                      receiver: (var)
+                                                                                      name: (var)
+                                                                                      args: (args
+                                                                                        (var)
+                                                                                        (var))))))
                                                                               (send
                                                                                 channel: (var)
                                                                                 send_type: (send_single)
-                                                                                inputs: (inputs
-                                                                                  (nil))))))))))))))
+                                                                                inputs: (send_inputs
+                                                                                  data: (send_data
+                                                                                    (nil)))))))))))))))
                                                         alternative: (block
                                                           (ifElse
                                                             condition: (eq
@@ -1723,24 +1765,26 @@ in {
                                                               (send
                                                                 channel: (var)
                                                                 send_type: (send_single)
-                                                                inputs: (inputs
-                                                                  (nil))))
+                                                                inputs: (send_inputs
+                                                                  data: (send_data
+                                                                    (nil)))))
                                                             alternative: (block
                                                               (send
                                                                 channel: (var)
                                                                 send_type: (send_single)
-                                                                inputs: (inputs
-                                                                  (var)
-                                                                  (var)
-                                                                  (add
+                                                                inputs: (send_inputs
+                                                                  data: (send_data
                                                                     (var)
-                                                                    (long_literal))
-                                                                  (var)
-                                                                  (eval
-                                                                    (var))
-                                                                  (var)
-                                                                  (eval
-                                                                    (var)))))))))))))))))))
+                                                                    (var)
+                                                                    (add
+                                                                      (var)
+                                                                      (long_literal))
+                                                                    (var)
+                                                                    (eval
+                                                                      (var))
+                                                                    (var)
+                                                                    (eval
+                                                                      (var))))))))))))))))))))
                                 (contract
                                   name: (var)
                                   formals: (names
@@ -1767,13 +1811,14 @@ in {
                                           (send
                                             channel: (var)
                                             send_type: (send_single)
-                                            inputs: (inputs
-                                              (method
-                                                receiver: (var)
-                                                name: (var)
-                                                args: (args))
-                                              (eval
-                                                (var))))
+                                            inputs: (send_inputs
+                                              data: (send_data
+                                                (method
+                                                  receiver: (var)
+                                                  name: (var)
+                                                  args: (args))
+                                                (eval
+                                                  (var)))))
                                           (input
                                             receipts: (receipts
                                               (receipt
@@ -1801,14 +1846,15 @@ in {
                                                     (send
                                                       channel: (var)
                                                       send_type: (send_single)
-                                                      inputs: (inputs
-                                                        (var)
-                                                        (long_literal)
-                                                        (var)
-                                                        (collection
-                                                          (list))
-                                                        (eval
-                                                          (var))))
+                                                      inputs: (send_inputs
+                                                        data: (send_data
+                                                          (var)
+                                                          (long_literal)
+                                                          (var)
+                                                          (collection
+                                                            (list))
+                                                          (eval
+                                                            (var)))))
                                                     (input
                                                       receipts: (receipts
                                                         (receipt
@@ -1822,31 +1868,33 @@ in {
                                                         (send
                                                           channel: (var)
                                                           send_type: (send_single)
-                                                          inputs: (inputs
-                                                            (var)
-                                                            (var)
-                                                            (long_literal)
-                                                            (mult
+                                                          inputs: (send_inputs
+                                                            data: (send_data
+                                                              (var)
+                                                              (var)
                                                               (long_literal)
-                                                              (var))
-                                                            (eval
-                                                              (var))
-                                                            (method
-                                                              receiver: (var)
-                                                              name: (var)
-                                                              args: (args
-                                                                (var)
-                                                                (long_literal)))
-                                                            (eval
-                                                              (var)))))))))))))))))))))))
+                                                              (mult
+                                                                (long_literal)
+                                                                (var))
+                                                              (eval
+                                                                (var))
+                                                              (method
+                                                                receiver: (var)
+                                                                name: (var)
+                                                                args: (args
+                                                                  (var)
+                                                                  (long_literal)))
+                                                              (eval
+                                                                (var))))))))))))))))))))))))
                   (send
                     channel: (var)
                     send_type: (send_single)
-                    inputs: (inputs
-                      (string_literal)
-                      (long_literal)
-                      (eval
-                        (var)))))
+                    inputs: (send_inputs
+                      data: (send_data
+                        (string_literal)
+                        (long_literal)
+                        (eval
+                          (var))))))
                 (new
                   decls: (name_decls
                     (name_decl
@@ -1865,17 +1913,18 @@ in {
                           (send
                             channel: (var)
                             send_type: (send_single)
-                            inputs: (inputs
-                              (string_literal)
-                              (var)
-                              (uri_literal)
-                              (bundle
-                                bundle_type: (bundle_write)
-                                proc: (block
-                                  (eval
-                                    (var))))
-                              (eval
-                                (var))))))
+                            inputs: (send_inputs
+                              data: (send_data
+                                (string_literal)
+                                (var)
+                                (uri_literal)
+                                (bundle
+                                  bundle_type: (bundle_write)
+                                  proc: (block
+                                    (eval
+                                      (var))))
+                                (eval
+                                  (var)))))))
                       (input
                         receipts: (receipts
                           (receipt
@@ -1889,9 +1938,10 @@ in {
                             (send
                               channel: (var)
                               send_type: (send_single)
-                              inputs: (inputs
-                                (eval
-                                  (var))))
+                              inputs: (send_inputs
+                                data: (send_data
+                                  (eval
+                                    (var)))))
                             (input
                               receipts: (receipts
                                 (receipt
@@ -1951,23 +2001,25 @@ in {
                                                 (send
                                                   channel: (var)
                                                   send_type: (send_single)
-                                                  inputs: (inputs
-                                                    (string_literal)
-                                                    (var)
-                                                    (method
-                                                      receiver: (var)
-                                                      name: (var)
-                                                      args: (args
-                                                        (var)
-                                                        (var)))
-                                                    (eval
-                                                      (var)))))))))))))))))))))
+                                                  inputs: (send_inputs
+                                                    data: (send_data
+                                                      (string_literal)
+                                                      (var)
+                                                      (method
+                                                        receiver: (var)
+                                                        name: (var)
+                                                        args: (args
+                                                          (var)
+                                                          (var)))
+                                                      (eval
+                                                        (var))))))))))))))))))))))
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (eval
-                    (var)))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (eval
+                      (var))))))
             (input
               receipts: (receipts
                 (receipt
@@ -1995,15 +2047,16 @@ in {
                           (send
                             channel: (var)
                             send_type: (send_single)
-                            inputs: (inputs
-                              (string_literal)
-                              (method
-                                receiver: (eval
-                                  (var))
-                                name: (var)
-                                args: (args))
-                              (eval
-                                (var))))
+                            inputs: (send_inputs
+                              data: (send_data
+                                (string_literal)
+                                (method
+                                  receiver: (eval
+                                    (var))
+                                  name: (var)
+                                  args: (args))
+                                (eval
+                                  (var)))))
                           (input
                             receipts: (receipts
                               (receipt
@@ -2032,13 +2085,14 @@ in {
                                         (send
                                           channel: (var)
                                           send_type: (send_single)
-                                          inputs: (inputs
-                                            (string_literal)
-                                            (var)
-                                            (var)
-                                            (var)
-                                            (eval
-                                              (var))))
+                                          inputs: (send_inputs
+                                            data: (send_data
+                                              (string_literal)
+                                              (var)
+                                              (var)
+                                              (var)
+                                              (eval
+                                                (var)))))
                                         (input
                                           receipts: (receipts
                                             (receipt
@@ -2051,14 +2105,16 @@ in {
                                             (send
                                               channel: (var)
                                               send_type: (send_single)
-                                              inputs: (inputs
-                                                (var))))))))))))))))))))
+                                              inputs: (send_inputs
+                                                data: (send_data
+                                                  (var)))))))))))))))))))))
           (send
             channel: (var)
             send_type: (send_single)
-            inputs: (inputs
-              (eval
-                (var)))))
+            inputs: (send_inputs
+              data: (send_data
+                (eval
+                  (var))))))
         (input
           receipts: (receipts
             (receipt
@@ -2101,16 +2157,17 @@ in {
                               (send
                                 channel: (var)
                                 send_type: (send_single)
-                                inputs: (inputs
-                                  (method
-                                    receiver: (collection
-                                      (tuple
-                                        (var)
-                                        (var)))
-                                    name: (var)
-                                    args: (args))
-                                  (eval
-                                    (var))))
+                                inputs: (send_inputs
+                                  data: (send_data
+                                    (method
+                                      receiver: (collection
+                                        (tuple
+                                          (var)
+                                          (var)))
+                                      name: (var)
+                                      args: (args))
+                                    (eval
+                                      (var)))))
                               (input
                                 receipts: (receipts
                                   (receipt
@@ -2125,12 +2182,13 @@ in {
                                     (send
                                       channel: (var)
                                       send_type: (send_single)
-                                      inputs: (inputs
-                                        (var)
-                                        (var)
-                                        (var)
-                                        (eval
-                                          (var))))
+                                      inputs: (send_inputs
+                                        data: (send_data
+                                          (var)
+                                          (var)
+                                          (var)
+                                          (eval
+                                            (var)))))
                                     (input
                                       receipts: (receipts
                                         (receipt
@@ -2148,11 +2206,12 @@ in {
                                               (send
                                                 channel: (var)
                                                 send_type: (send_single)
-                                                inputs: (inputs
-                                                  (string_literal)
-                                                  (var)
-                                                  (eval
-                                                    (var))))
+                                                inputs: (send_inputs
+                                                  data: (send_data
+                                                    (string_literal)
+                                                    (var)
+                                                    (eval
+                                                      (var)))))
                                               (input
                                                 receipts: (receipts
                                                   (receipt
@@ -2181,12 +2240,13 @@ in {
                                                             (send
                                                               channel: (var)
                                                               send_type: (send_single)
-                                                              inputs: (inputs
-                                                                (string_literal)
-                                                                (var)
-                                                                (var)
-                                                                (eval
-                                                                  (var))))
+                                                              inputs: (send_inputs
+                                                                data: (send_data
+                                                                  (string_literal)
+                                                                  (var)
+                                                                  (var)
+                                                                  (eval
+                                                                    (var)))))
                                                             (input
                                                               receipts: (receipts
                                                                 (receipt
@@ -2212,16 +2272,17 @@ in {
                                                                               (send
                                                                                 channel: (var)
                                                                                 send_type: (send_single)
-                                                                                inputs: (inputs
-                                                                                  (string_literal)
-                                                                                  (var)
-                                                                                  (var)
-                                                                                  (collection
-                                                                                    (tuple
-                                                                                      (var)
-                                                                                      (var)))
-                                                                                  (eval
-                                                                                    (var))))
+                                                                                inputs: (send_inputs
+                                                                                  data: (send_data
+                                                                                    (string_literal)
+                                                                                    (var)
+                                                                                    (var)
+                                                                                    (collection
+                                                                                      (tuple
+                                                                                        (var)
+                                                                                        (var)))
+                                                                                    (eval
+                                                                                      (var)))))
                                                                               (input
                                                                                 receipts: (receipts
                                                                                   (receipt
@@ -2234,8 +2295,9 @@ in {
                                                                                   (send
                                                                                     channel: (var)
                                                                                     send_type: (send_single)
-                                                                                    inputs: (inputs
-                                                                                      (var))))))))))
+                                                                                    inputs: (send_inputs
+                                                                                      data: (send_data
+                                                                                        (var)))))))))))
                                                                     (case
                                                                       pattern: (collection
                                                                         (tuple
@@ -2256,16 +2318,17 @@ in {
                                                                                   (send
                                                                                     channel: (var)
                                                                                     send_type: (send_single)
-                                                                                    inputs: (inputs
-                                                                                      (string_literal)
-                                                                                      (var)
-                                                                                      (var)
-                                                                                      (collection
-                                                                                        (tuple
-                                                                                          (var)
-                                                                                          (var)))
-                                                                                      (eval
-                                                                                        (var))))
+                                                                                    inputs: (send_inputs
+                                                                                      data: (send_data
+                                                                                        (string_literal)
+                                                                                        (var)
+                                                                                        (var)
+                                                                                        (collection
+                                                                                          (tuple
+                                                                                            (var)
+                                                                                            (var)))
+                                                                                        (eval
+                                                                                          (var)))))
                                                                                   (input
                                                                                     receipts: (receipts
                                                                                       (receipt
@@ -2278,17 +2341,20 @@ in {
                                                                                       (send
                                                                                         channel: (var)
                                                                                         send_type: (send_single)
-                                                                                        inputs: (inputs
-                                                                                          (var)))))))))
+                                                                                        inputs: (send_inputs
+                                                                                          data: (send_data
+                                                                                            (var))))))))))
                                                                           alternative: (block
                                                                             (send
                                                                               channel: (var)
                                                                               send_type: (send_single)
-                                                                              inputs: (inputs
-                                                                                (nil))))))))))))))))))))
+                                                                              inputs: (send_inputs
+                                                                                data: (send_data
+                                                                                  (nil)))))))))))))))))))))
                                           alternative: (block
                                             (send
                                               channel: (var)
                                               send_type: (send_single)
-                                              inputs: (inputs
-                                                (nil)))))))))))))))))))))))))
+                                              inputs: (send_inputs
+                                                data: (send_data
+                                                  (nil))))))))))))))))))))))))))

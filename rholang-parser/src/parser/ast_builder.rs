@@ -2,8 +2,9 @@ use smallvec::ToSmallVec;
 use typed_arena::Arena;
 
 use crate::ast::{
-    AnnProc, BinaryExpOp, Bind, BundleType, Case, Collection, Id, KeyValuePair, LetBinding, Name,
-    NameDecl, Names, Proc, SendType, SimpleType, SyncSendCont, UnaryExpOp, Var, VarRefKind,
+    AnnProc, BinaryExpOp, Bind, BundleType, Case, Collection, HyperparamList, Id, KeyValuePair,
+    LetBinding, Name, NameDecl, Names, Proc, SendType, SimpleType, SyncSendCont, TheoryCall,
+    UnaryExpOp, Var, VarRefKind,
 };
 
 pub struct ASTBuilder<'ast> {
@@ -18,6 +19,7 @@ pub struct ASTBuilder<'ast> {
     bad: Proc<'ast>,
     empty_list: Proc<'ast>,
     empty_map: Proc<'ast>,
+    empty_pathmap: Proc<'ast>,
     zero: Proc<'ast>,
     one: Proc<'ast>,
 }
@@ -41,6 +43,10 @@ impl<'ast> ASTBuilder<'ast> {
                 remainder: None,
             }),
             empty_map: Proc::Collection(Collection::Map {
+                elements: Vec::new(),
+                remainder: None,
+            }),
+            empty_pathmap: Proc::Collection(Collection::PathMap {
                 elements: Vec::new(),
                 remainder: None,
             }),
@@ -76,6 +82,10 @@ impl<'ast> ASTBuilder<'ast> {
 
     pub(crate) fn const_empty_map(&self) -> &Proc<'ast> {
         &self.empty_map
+    }
+
+    pub(crate) fn const_empty_pathmap(&self) -> &Proc<'ast> {
+        &self.empty_pathmap
     }
 
     pub(crate) fn bad_const(&self) -> &Proc<'ast> {
@@ -236,10 +246,12 @@ impl<'ast> ASTBuilder<'ast> {
         &self,
         send_type: SendType,
         channel: Name<'ast>,
+        hyperparams: Option<HyperparamList<'ast>>,
         inputs: &[AnnProc<'ast>],
     ) -> &Proc<'ast> {
         self.arena.alloc(Proc::Send {
             channel,
+            hyperparams,
             send_type,
             inputs: inputs.to_smallvec(),
         })
@@ -257,6 +269,12 @@ impl<'ast> ASTBuilder<'ast> {
                 .collect(),
             proc,
         })
+    }
+
+    /// Allocate a UseBlock node for Reified RSpaces.
+    /// Sets the default space for nested processes.
+    pub fn alloc_use_block(&self, space: Name<'ast>, proc: AnnProc<'ast>) -> &Proc<'ast> {
+        self.arena.alloc(Proc::UseBlock { space, proc })
     }
 
     pub fn alloc_proc_var(&self, var: Var<'ast>) -> &Proc<'ast> {
@@ -311,10 +329,12 @@ impl<'ast> ASTBuilder<'ast> {
     pub(crate) fn alloc_send_sync(
         &self,
         channel: Name<'ast>,
+        hyperparams: Option<HyperparamList<'ast>>,
         messages: &[AnnProc<'ast>],
     ) -> &Proc<'ast> {
         self.arena.alloc(Proc::SendSync {
             channel,
+            hyperparams,
             inputs: messages.to_smallvec(),
             cont: SyncSendCont::Empty,
         })
@@ -323,11 +343,13 @@ impl<'ast> ASTBuilder<'ast> {
     pub(crate) fn alloc_send_sync_with_cont(
         &self,
         channel: Name<'ast>,
+        hyperparams: Option<HyperparamList<'ast>>,
         messages: &[AnnProc<'ast>],
         cont: AnnProc<'ast>,
     ) -> &Proc<'ast> {
         self.arena.alloc(Proc::SendSync {
             channel,
+            hyperparams,
             inputs: messages.to_smallvec(),
             cont: SyncSendCont::NonEmpty(cont),
         })
@@ -365,6 +387,11 @@ impl<'ast> ASTBuilder<'ast> {
 
     pub fn alloc_var_ref(&self, kind: VarRefKind, var: Id<'ast>) -> &Proc<'ast> {
         self.arena.alloc(Proc::VarRef { kind, var })
+    }
+
+    /// Allocate a theory call for Reified RSpaces: free Nat(), free Int(), etc.
+    pub fn alloc_theory_call(&self, name: &'ast str) -> &Proc<'ast> {
+        self.arena.alloc(Proc::TheoryCall(TheoryCall { name }))
     }
 
     pub fn alloc_str(&'ast self, s: &str) -> &'ast str {

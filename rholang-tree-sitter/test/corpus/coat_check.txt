@@ -78,9 +78,10 @@ new MakeCoatCheck in {
                       (send
                         channel: (var)
                         send_type: (send_single)
-                        inputs: (inputs
-                          (eval
-                            (var))))
+                        inputs: (send_inputs
+                          data: (send_data
+                            (eval
+                              (var)))))
                       (input
                         receipts: (receipts
                           (receipt
@@ -102,9 +103,10 @@ new MakeCoatCheck in {
                                 (send
                                   channel: (var)
                                   send_type: (send_single)
-                                  inputs: (inputs
-                                    (eval
-                                      (var))))
+                                  inputs: (send_inputs
+                                    data: (send_data
+                                      (eval
+                                        (var)))))
                                 (send
                                   channel: (quote
                                     (block
@@ -114,8 +116,9 @@ new MakeCoatCheck in {
                                         (eval
                                           (var)))))
                                   send_type: (send_single)
-                                  inputs: (inputs
-                                    (var)))))))))
+                                  inputs: (send_inputs
+                                    data: (send_data
+                                      (var))))))))))
                     (input
                       receipts: (receipts
                         (receipt
@@ -152,13 +155,15 @@ new MakeCoatCheck in {
                                       (eval
                                         (var)))))
                                 send_type: (send_single)
-                                inputs: (inputs
-                                  (var)))
+                                inputs: (send_inputs
+                                  data: (send_data
+                                    (var))))
                               (send
                                 channel: (var)
                                 send_type: (send_single)
-                                inputs: (inputs
-                                  (var)))))))))
+                                inputs: (send_inputs
+                                  data: (send_data
+                                    (var))))))))))
                   (input
                     receipts: (receipts
                       (receipt
@@ -196,13 +201,15 @@ new MakeCoatCheck in {
                                     (eval
                                       (var)))))
                               send_type: (send_single)
-                              inputs: (inputs
-                                (var)))
+                              inputs: (send_inputs
+                                data: (send_data
+                                  (var))))
                             (send
                               channel: (var)
                               send_type: (send_single)
-                              inputs: (inputs
-                                (bool_literal)))))))))))))
+                              inputs: (send_inputs
+                                data: (send_data
+                                  (bool_literal))))))))))))))
         (new
           decls: (name_decls
             (name_decl
@@ -216,9 +223,10 @@ new MakeCoatCheck in {
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (eval
-                    (var))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (eval
+                      (var)))))
               (input
                 receipts: (receipts
                   (receipt
@@ -232,11 +240,12 @@ new MakeCoatCheck in {
                     (send
                       channel: (var)
                       send_type: (send_single)
-                      inputs: (inputs
-                        (string_literal)
-                        (long_literal)
-                        (eval
-                          (var))))
+                      inputs: (send_inputs
+                        data: (send_data
+                          (string_literal)
+                          (long_literal)
+                          (eval
+                            (var)))))
                     (input
                       receipts: (receipts
                         (receipt
@@ -257,12 +266,13 @@ new MakeCoatCheck in {
                                   (send
                                     channel: (var)
                                     send_type: (send_single)
-                                    inputs: (inputs
-                                      (string_literal)
-                                      (eval
-                                        (var))
-                                      (eval
-                                        (var))))))
+                                    inputs: (send_inputs
+                                      data: (send_data
+                                        (string_literal)
+                                        (eval
+                                          (var))
+                                        (eval
+                                          (var)))))))
                               (contract
                                 name: (var)
                                 formals: (names
@@ -273,19 +283,21 @@ new MakeCoatCheck in {
                                   (send
                                     channel: (var)
                                     send_type: (send_single)
-                                    inputs: (inputs
-                                      (string_literal)
-                                      (eval
-                                        (var))
-                                      (var)
-                                      (eval
-                                        (var)))))))
+                                    inputs: (send_inputs
+                                      data: (send_data
+                                        (string_literal)
+                                        (eval
+                                          (var))
+                                        (var)
+                                        (eval
+                                          (var))))))))
                             (send
                               channel: (var)
                               send_type: (send_single)
-                              inputs: (inputs
-                                (eval
-                                  (var)))))
+                              inputs: (send_inputs
+                                data: (send_data
+                                  (eval
+                                    (var))))))
                           (input
                             receipts: (receipts
                               (receipt
@@ -300,10 +312,11 @@ new MakeCoatCheck in {
                                 (send
                                   channel: (var)
                                   send_type: (send_single)
-                                  inputs: (inputs
-                                    (long_literal)
-                                    (eval
-                                      (var))))
+                                  inputs: (send_inputs
+                                    data: (send_data
+                                      (long_literal)
+                                      (eval
+                                        (var)))))
                                 (input
                                   receipts: (receipts
                                     (receipt
@@ -317,9 +330,10 @@ new MakeCoatCheck in {
                                       (send
                                         channel: (var)
                                         send_type: (send_single)
-                                        inputs: (inputs
-                                          (eval
-                                            (var))))
+                                        inputs: (send_inputs
+                                          data: (send_data
+                                            (eval
+                                              (var)))))
                                       (input
                                         receipts: (receipts
                                           (receipt

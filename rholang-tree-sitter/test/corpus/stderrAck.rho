@@ -27,10 +27,11 @@ new ack, stderr(`rho:io:stderr`), stderrAck(`rho:io:stderrAck`) in {
         (send
           channel: (var)
           send_type: (send_single)
-          inputs: (inputs
-            (string_literal)
-            (eval
-              (var))))
+          inputs: (send_inputs
+            data: (send_data
+              (string_literal)
+              (eval
+                (var)))))
         (input
           receipts: (receipts
             (receipt
@@ -43,5 +44,6 @@ new ack, stderr(`rho:io:stderr`), stderrAck(`rho:io:stderrAck`) in {
             (send
               channel: (var)
               send_type: (send_single)
-              inputs: (inputs
-                (string_literal)))))))))
+              inputs: (send_inputs
+                data: (send_data
+                  (string_literal))))))))))

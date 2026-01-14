@@ -38,21 +38,39 @@ new stdout(`rho:io:stdout`) in {
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (method
-                    receiver: (collection
-                      (list
-                        (string_literal)
-                        (string_literal)
-                        (string_literal)
-                        (string_literal)))
-                    name: (var)
-                    args: (args
-                      (long_literal)))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (method
+                      receiver: (collection
+                        (list
+                          (string_literal)
+                          (string_literal)
+                          (string_literal)
+                          (string_literal)))
+                      name: (var)
+                      args: (args
+                        (long_literal))))))
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
+                inputs: (send_inputs
+                  data: (send_data
+                    (method
+                      receiver: (collection
+                        (list
+                          (string_literal)
+                          (string_literal)
+                          (string_literal)
+                          (string_literal)))
+                      name: (var)
+                      args: (args
+                        (long_literal)
+                        (long_literal)))))))
+            (send
+              channel: (var)
+              send_type: (send_single)
+              inputs: (send_inputs
+                data: (send_data
                   (method
                     receiver: (collection
                       (list
@@ -61,43 +79,30 @@ new stdout(`rho:io:stdout`) in {
                         (string_literal)
                         (string_literal)))
                     name: (var)
-                    args: (args
-                      (long_literal)
-                      (long_literal))))))
-            (send
-              channel: (var)
-              send_type: (send_single)
-              inputs: (inputs
-                (method
-                  receiver: (collection
-                    (list
-                      (string_literal)
-                      (string_literal)
-                      (string_literal)
-                      (string_literal)))
-                  name: (var)
-                  args: (args)))))
+                    args: (args))))))
           (send
             channel: (var)
             send_type: (send_single)
-            inputs: (inputs
-              (concat
-                (collection
-                  (list
-                    (string_literal)
-                    (string_literal)))
-                (collection
-                  (list
-                    (string_literal)
-                    (string_literal)))))))
+            inputs: (send_inputs
+              data: (send_data
+                (concat
+                  (collection
+                    (list
+                      (string_literal)
+                      (string_literal)))
+                  (collection
+                    (list
+                      (string_literal)
+                      (string_literal))))))))
         (send
           channel: (var)
           send_type: (send_single)
-          inputs: (inputs
-            (method
-              receiver: (collection
-                (list
-                  (string_literal)
-                  (string_literal)))
-              name: (var)
-              args: (args))))))))
+          inputs: (send_inputs
+            data: (send_data
+              (method
+                receiver: (collection
+                  (list
+                    (string_literal)
+                    (string_literal)))
+                name: (var)
+                args: (args)))))))))

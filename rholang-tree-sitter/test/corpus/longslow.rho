@@ -31,8 +31,9 @@ new x, loop in {
         (send
           channel: (var)
           send_type: (send_single)
-          inputs: (inputs
-            (string_literal)))
+          inputs: (send_inputs
+            data: (send_data
+              (string_literal))))
         (new
           decls: (name_decls
             (name_decl
@@ -56,10 +57,11 @@ new x, loop in {
                         proc: (send
                           channel: (var)
                           send_type: (send_single)
-                          inputs: (inputs
-                            (sub
-                              (var)
-                              (long_literal)))))))))
+                          inputs: (send_inputs
+                            data: (send_data
+                              (sub
+                                (var)
+                                (long_literal))))))))))
               (input
                 receipts: (receipts
                   (receipt
@@ -73,8 +75,9 @@ new x, loop in {
                   (send
                     channel: (var)
                     send_type: (send_single)
-                    inputs: (inputs
-                      (method
-                        receiver: (var)
-                        name: (var)
-                        args: (args)))))))))))))
+                    inputs: (send_inputs
+                      data: (send_data
+                        (method
+                          receiver: (var)
+                          name: (var)
+                          args: (args))))))))))))))

@@ -56,17 +56,32 @@ new orExample, stdout(`rho:io:stdout`) in {
                     proc: (send
                       channel: (var)
                       send_type: (send_single)
-                      inputs: (inputs
-                        (collection
-                          (list
-                            (string_literal)
-                            (var)
-                            (string_literal)
-                            (var))))))))))
+                      inputs: (send_inputs
+                        data: (send_data
+                          (collection
+                            (list
+                              (string_literal)
+                              (var)
+                              (string_literal)
+                              (var)))))))))))
           (send
             channel: (var)
             send_type: (send_single)
-            inputs: (inputs
+            inputs: (send_inputs
+              data: (send_data
+                (collection
+                  (map
+                    (key_value_pair
+                      key: (string_literal)
+                      value: (string_literal))
+                    (key_value_pair
+                      key: (string_literal)
+                      value: (long_literal))))))))
+        (send
+          channel: (var)
+          send_type: (send_single)
+          inputs: (send_inputs
+            data: (send_data
               (collection
                 (map
                   (key_value_pair
@@ -74,16 +89,4 @@ new orExample, stdout(`rho:io:stdout`) in {
                     value: (string_literal))
                   (key_value_pair
                     key: (string_literal)
-                    value: (long_literal)))))))
-        (send
-          channel: (var)
-          send_type: (send_single)
-          inputs: (inputs
-            (collection
-              (map
-                (key_value_pair
-                  key: (string_literal)
-                  value: (string_literal))
-                (key_value_pair
-                  key: (string_literal)
-                  value: (string_literal))))))))))
+                    value: (string_literal)))))))))))

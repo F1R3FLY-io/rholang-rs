@@ -46,9 +46,10 @@ new map, stdout(`rho:io:stdout`) in {
             (send
               channel: (var)
               send_type: (send_single)
-              inputs: (inputs
-                (collection
-                  (map))))
+              inputs: (send_inputs
+                data: (send_data
+                  (collection
+                    (map)))))
             (input
               receipts: (receipts
                 (receipt
@@ -63,18 +64,20 @@ new map, stdout(`rho:io:stdout`) in {
                   (send
                     channel: (var)
                     send_type: (send_single)
-                    inputs: (inputs
-                      (method
-                        receiver: (var)
-                        name: (var)
-                        args: (args
-                          (string_literal)
-                          (string_literal)))))
+                    inputs: (send_inputs
+                      data: (send_data
+                        (method
+                          receiver: (var)
+                          name: (var)
+                          args: (args
+                            (string_literal)
+                            (string_literal))))))
                   (send
                     channel: (var)
                     send_type: (send_single)
-                    inputs: (inputs
-                      (string_literal)))))))
+                    inputs: (send_inputs
+                      data: (send_data
+                        (string_literal))))))))
           (input
             receipts: (receipts
               (receipt
@@ -93,11 +96,12 @@ new map, stdout(`rho:io:stdout`) in {
                     (send
                       channel: (var)
                       send_type: (send_single)
-                      inputs: (inputs
-                        (string_literal)
-                        (string_literal)
-                        (eval
-                          (var))))
+                      inputs: (send_inputs
+                        data: (send_data
+                          (string_literal)
+                          (string_literal)
+                          (eval
+                            (var)))))
                     (input
                       receipts: (receipts
                         (receipt
@@ -111,8 +115,9 @@ new map, stdout(`rho:io:stdout`) in {
                         (send
                           channel: (var)
                           send_type: (send_single)
-                          inputs: (inputs
-                            (var)))))))))))
+                          inputs: (send_inputs
+                            data: (send_data
+                              (var))))))))))))
         (input
           receipts: (receipts
             (receipt
@@ -127,14 +132,16 @@ new map, stdout(`rho:io:stdout`) in {
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (method
-                    receiver: (var)
-                    name: (var)
-                    args: (args
-                      (string_literal)))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (method
+                      receiver: (var)
+                      name: (var)
+                      args: (args
+                        (string_literal))))))
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (string_literal))))))))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (string_literal)))))))))))
