@@ -804,8 +804,8 @@ impl<'a> Collection<'a> {
         match self {
             Collection::List { remainder, .. }
             | Collection::Set { remainder, .. }
-            | Collection::Map { remainder, .. }
-            | Collection::PathMap { remainder, .. } => *remainder,
+            | Collection::PathMap { remainder, .. }
+            | Collection::Map { remainder, .. } => *remainder,
             Collection::Tuple(_) => None,
         }
     }
