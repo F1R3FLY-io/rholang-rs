@@ -72,22 +72,25 @@ new server, stdout(`rho:io:stdout`) in {
                             (send
                               channel: (var)
                               send_type: (send_single)
-                              inputs: (inputs
-                                (concat
-                                  (string_literal)
-                                  (var))))
+                              inputs: (send_inputs
+                                data: (send_data
+                                  (concat
+                                    (string_literal)
+                                    (var)))))
                             (send
                               channel: (quote
                                 (var))
                               send_type: (send_single)
-                              inputs: (inputs
-                                (string_literal))))))))))
+                              inputs: (send_inputs
+                                data: (send_data
+                                  (string_literal)))))))))))
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (eval
-                    (var)))))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (eval
+                      (var))))))))
         (new
           decls: (name_decls
             (name_decl
@@ -106,16 +109,17 @@ new server, stdout(`rho:io:stdout`) in {
                   (send
                     channel: (var)
                     send_type: (send_single)
-                    inputs: (inputs
-                      (collection
-                        (map
-                          (key_value_pair
-                            key: (string_literal)
-                            value: (string_literal))
-                          (key_value_pair
-                            key: (string_literal)
-                            value: (eval
-                              (var)))))))
+                    inputs: (send_inputs
+                      data: (send_data
+                        (collection
+                          (map
+                            (key_value_pair
+                              key: (string_literal)
+                              value: (string_literal))
+                            (key_value_pair
+                              key: (string_literal)
+                              value: (eval
+                                (var))))))))
                   (input
                     receipts: (receipts
                       (receipt
@@ -129,7 +133,8 @@ new server, stdout(`rho:io:stdout`) in {
                       (send
                         channel: (var)
                         send_type: (send_single)
-                        inputs: (inputs
-                          (concat
-                            (string_literal)
-                            (var)))))))))))))))
+                        inputs: (send_inputs
+                          data: (send_data
+                            (concat
+                              (string_literal)
+                              (var))))))))))))))))

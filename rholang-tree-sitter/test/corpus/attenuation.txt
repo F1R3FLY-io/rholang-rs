@@ -36,9 +36,10 @@ new MakeGetForwarder in {
                 (send
                   channel: (var)
                   send_type: (send_single)
-                  inputs: (inputs
-                    (eval
-                      (var))))
+                  inputs: (send_inputs
+                    data: (send_data
+                      (eval
+                        (var)))))
                 (contract
                   name: (var)
                   formals: (names
@@ -58,8 +59,9 @@ new MakeGetForwarder in {
                           proc: (send
                             channel: (var)
                             send_type: (send_single)
-                            inputs: (inputs
-                              (string_literal)
-                              (var)
-                              (eval
-                                (var)))))))))))))))))
+                            inputs: (send_inputs
+                              data: (send_data
+                                (string_literal)
+                                (var)
+                                (eval
+                                  (var))))))))))))))))))

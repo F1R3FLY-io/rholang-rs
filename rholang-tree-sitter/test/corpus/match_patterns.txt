@@ -102,13 +102,14 @@ new sumProd in {
                                         (send
                                           channel: (var)
                                           send_type: (send_single)
-                                          inputs: (inputs
-                                            (var)
-                                            (eval
-                                              (var))
-                                            (var)
-                                            (eval
-                                              (var))))
+                                          inputs: (send_inputs
+                                            data: (send_data
+                                              (var)
+                                              (eval
+                                                (var))
+                                              (var)
+                                              (eval
+                                                (var)))))
                                         (input
                                           receipts: (receipts
                                             (receipt
@@ -122,19 +123,21 @@ new sumProd in {
                                             (send
                                               channel: (var)
                                               send_type: (send_single)
-                                              inputs: (inputs
-                                                (var)
-                                                (var)
-                                                (eval
-                                                  (var)))))))))))
+                                              inputs: (send_inputs
+                                                data: (send_data
+                                                  (var)
+                                                  (var)
+                                                  (eval
+                                                    (var))))))))))))
                               (case
                                 pattern: (collection
                                   (list))
                                 proc: (send
                                   channel: (var)
                                   send_type: (send_single)
-                                  inputs: (inputs
-                                    (var))))))))
+                                  inputs: (send_inputs
+                                    data: (send_data
+                                      (var)))))))))
                       (contract
                         name: (var)
                         formals: (names
@@ -160,20 +163,22 @@ new sumProd in {
                                     (send
                                       channel: (var)
                                       send_type: (send_single)
-                                      inputs: (inputs
-                                        (add
-                                          (var)
-                                          (var))))))
+                                      inputs: (send_inputs
+                                        data: (send_data
+                                          (add
+                                            (var)
+                                            (var)))))))
                                 (send
                                   channel: (var)
                                   send_type: (send_single)
-                                  inputs: (inputs
-                                    (long_literal)
-                                    (eval
-                                      (var))
-                                    (var)
-                                    (eval
-                                      (var))))))))))
+                                  inputs: (send_inputs
+                                    data: (send_data
+                                      (long_literal)
+                                      (eval
+                                        (var))
+                                      (var)
+                                      (eval
+                                        (var)))))))))))
                     (contract
                       name: (var)
                       formals: (names
@@ -199,20 +204,22 @@ new sumProd in {
                                   (send
                                     channel: (var)
                                     send_type: (send_single)
-                                    inputs: (inputs
-                                      (mult
-                                        (var)
-                                        (var))))))
+                                    inputs: (send_inputs
+                                      data: (send_data
+                                        (mult
+                                          (var)
+                                          (var)))))))
                               (send
                                 channel: (var)
                                 send_type: (send_single)
-                                inputs: (inputs
-                                  (long_literal)
-                                  (eval
-                                    (var))
-                                  (var)
-                                  (eval
-                                    (var))))))))))
+                                inputs: (send_inputs
+                                  data: (send_data
+                                    (long_literal)
+                                    (eval
+                                      (var))
+                                    (var)
+                                    (eval
+                                      (var)))))))))))
                   (new
                     decls: (name_decls
                       (name_decl
@@ -225,17 +232,19 @@ new sumProd in {
                           (send
                             channel: (var)
                             send_type: (send_single)
-                            inputs: (inputs
-                              (var)
-                              (eval
-                                (var))))
+                            inputs: (send_inputs
+                              data: (send_data
+                                (var)
+                                (eval
+                                  (var)))))
                           (send
                             channel: (var)
                             send_type: (send_single)
-                            inputs: (inputs
-                              (var)
-                              (eval
-                                (var)))))
+                            inputs: (send_inputs
+                              data: (send_data
+                                (var)
+                                (eval
+                                  (var))))))
                         (input
                           receipts: (receipts
                             (receipt
@@ -256,18 +265,20 @@ new sumProd in {
                             (send
                               channel: (var)
                               send_type: (send_single)
-                              inputs: (inputs
-                                (collection
-                                  (list
-                                    (var)
-                                    (var)))))))))))))))
+                              inputs: (send_inputs
+                                data: (send_data
+                                  (collection
+                                    (list
+                                      (var)
+                                      (var))))))))))))))))
         (send
           channel: (var)
           send_type: (send_single)
-          inputs: (inputs
-            (collection
-              (list
-                (long_literal)
-                (long_literal)
-                (long_literal)))
-            (string_literal)))))))
+          inputs: (send_inputs
+            data: (send_data
+              (collection
+                (list
+                  (long_literal)
+                  (long_literal)
+                  (long_literal)))
+              (string_literal))))))))

@@ -22,15 +22,17 @@ new z, stdout(`rho:io:stdout`) in {
       (send
         channel: (var)
         send_type: (send_single)
-        inputs: (inputs
-          (string_literal)
-          (eval
-            (var))))))
+        inputs: (send_inputs
+          data: (send_data
+            (string_literal)
+            (eval
+              (var)))))))
   (block
     (send
       channel: (var)
       send_type: (send_single)
-      inputs: (inputs
-        (string_literal)
-        (eval
-          (var))))))
+      inputs: (send_inputs
+        data: (send_data
+          (string_literal)
+          (eval
+            (var)))))))

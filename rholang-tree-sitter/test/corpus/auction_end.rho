@@ -35,8 +35,9 @@ new anyone, unused_rtn in {
                 args: (args
                   (string_literal))))
             send_type: (send_single)
-            inputs: (inputs
-              (collection
-                (list
-                  (var)
-                  (var))))))))))
+            inputs: (send_inputs
+              data: (send_data
+                (collection
+                  (list
+                    (var)
+                    (var)))))))))))

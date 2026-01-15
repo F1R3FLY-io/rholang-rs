@@ -50,8 +50,9 @@ new helloAgain, stdout(`rho:io:stdout`), stdoutAck(`rho:io:stdoutAck`) in {
                     (send
                       channel: (var)
                       send_type: (send_single)
-                      inputs: (inputs
-                        (string_literal)))
+                      inputs: (send_inputs
+                        data: (send_data
+                          (string_literal))))
                     (input
                       receipts: (receipts
                         (receipt
@@ -71,10 +72,11 @@ new helloAgain, stdout(`rho:io:stdout`), stdoutAck(`rho:io:stdoutAck`) in {
                               (send
                                 channel: (var)
                                 send_type: (send_single)
-                                inputs: (inputs
-                                  (var)
-                                  (eval
-                                    (var))))
+                                inputs: (send_inputs
+                                  data: (send_data
+                                    (var)
+                                    (eval
+                                      (var)))))
                               (input
                                 receipts: (receipts
                                   (receipt
@@ -87,15 +89,18 @@ new helloAgain, stdout(`rho:io:stdout`), stdoutAck(`rho:io:stdoutAck`) in {
                                   (send
                                     channel: (var)
                                     send_type: (send_single)
-                                    inputs: (inputs
-                                      (string_literal)))))))))))))))
+                                    inputs: (send_inputs
+                                      data: (send_data
+                                        (string_literal))))))))))))))))
           (send
             channel: (var)
             send_type: (send_single)
-            inputs: (inputs
-              (nil))))
+            inputs: (send_inputs
+              data: (send_data
+                (nil)))))
         (send
           channel: (var)
           send_type: (send_single)
-          inputs: (inputs
-            (nil)))))))
+          inputs: (send_inputs
+            data: (send_data
+              (nil))))))))

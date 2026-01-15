@@ -46,17 +46,19 @@ new AddData(`rho:registry:lookup`), GetData(`rho:registry:lookup`), ack, ret in 
           (send
             channel: (var)
             send_type: (send_single)
-            inputs: (inputs
-              (string_literal)
-              (eval
-                (var))))
+            inputs: (send_inputs
+              data: (send_data
+                (string_literal)
+                (eval
+                  (var)))))
           (send
             channel: (var)
             send_type: (send_single)
-            inputs: (inputs
-              (string_literal)
-              (eval
-                (var)))))
+            inputs: (send_inputs
+              data: (send_data
+                (string_literal)
+                (eval
+                  (var))))))
         (input
           receipts: (receipts
             (receipt
@@ -87,10 +89,11 @@ new AddData(`rho:registry:lookup`), GetData(`rho:registry:lookup`), ack, ret in 
                     (send
                       channel: (var)
                       send_type: (send_single)
-                      inputs: (inputs
-                        (var)
-                        (var)
-                        (var)))))
+                      inputs: (send_inputs
+                        data: (send_data
+                          (var)
+                          (var)
+                          (var))))))
                 (contract
                   name: (var)
                   formals: (names
@@ -101,9 +104,10 @@ new AddData(`rho:registry:lookup`), GetData(`rho:registry:lookup`), ack, ret in 
                     (send
                       channel: (var)
                       send_type: (send_single)
-                      inputs: (inputs
-                        (var)
-                        (var))))))
+                      inputs: (send_inputs
+                        data: (send_data
+                          (var)
+                          (var)))))))
               (new
                 decls: (name_decls
                   (name_decl
@@ -117,24 +121,27 @@ new AddData(`rho:registry:lookup`), GetData(`rho:registry:lookup`), ack, ret in 
                         (send
                           channel: (var)
                           send_type: (send_single)
-                          inputs: (inputs
-                            (string_literal)))
+                          inputs: (send_inputs
+                            data: (send_data
+                              (string_literal))))
                         (send
                           channel: (var)
                           send_type: (send_single)
-                          inputs: (inputs
-                            (method
-                              receiver: (string_literal)
-                              name: (var)
-                              args: (args)))))
+                          inputs: (send_inputs
+                            data: (send_data
+                              (method
+                                receiver: (string_literal)
+                                name: (var)
+                                args: (args))))))
                       (send
                         channel: (var)
                         send_type: (send_single)
-                        inputs: (inputs
-                          (eval
-                            (var))
-                          (eval
-                            (var)))))
+                        inputs: (send_inputs
+                          data: (send_data
+                            (eval
+                              (var))
+                            (eval
+                              (var))))))
                     (input
                       receipts: (receipts
                         (receipt
@@ -148,10 +155,11 @@ new AddData(`rho:registry:lookup`), GetData(`rho:registry:lookup`), ack, ret in 
                           (send
                             channel: (var)
                             send_type: (send_single)
-                            inputs: (inputs
-                              (eval
-                                (var))
-                              (var)))
+                            inputs: (send_inputs
+                              data: (send_data
+                                (eval
+                                  (var))
+                                (var))))
                           (input
                             receipts: (receipts
                               (receipt
@@ -165,5 +173,6 @@ new AddData(`rho:registry:lookup`), GetData(`rho:registry:lookup`), ack, ret in 
                               (send
                                 channel: (var)
                                 send_type: (send_single)
-                                inputs: (inputs
-                                  (var))))))))))))))))))
+                                inputs: (send_inputs
+                                  data: (send_data
+                                    (var)))))))))))))))))))

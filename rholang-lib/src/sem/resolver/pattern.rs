@@ -234,6 +234,19 @@ fn resolve_proc_pattern_rec<'a>(
                 )
             }
         }
+        FunctionCall { args, .. } => {
+            for arg in args {
+                resolve_proc_pattern_rec(db, env, res, arg);
+            }
+
+            if res.top_level() {
+                db.warning(
+                    res.id,
+                    WarningKind::TopLevelPatternExpr { span: pattern.span },
+                    None,
+                )
+            }
+        }
         Match { expression, cases } => {
             resolve_proc_pattern_rec(db, env, res, expression);
             for ast::Case { pattern, proc } in cases {
@@ -254,7 +267,10 @@ fn resolve_proc_pattern_rec<'a>(
             use ast::Collection::*;
 
             match collection {
-                List { elements, .. } | Set { elements, .. } | PathMap { elements, .. } | Tuple(elements) => {
+                List { elements, .. }
+                | Set { elements, .. }
+                | PathMap { elements, .. }
+                | Tuple(elements) => {
                     for elt in elements {
                         resolve_proc_pattern_rec(db, env, res, elt);
                     }
@@ -290,6 +306,7 @@ fn resolve_proc_pattern_rec<'a>(
             channel,
             inputs,
             cont: SyncSendCont::Empty,
+            ..
         } => {
             resolve_send_pattern(channel, inputs, None, db, env, res);
         }
@@ -297,6 +314,7 @@ fn resolve_proc_pattern_rec<'a>(
             channel,
             inputs,
             cont: SyncSendCont::NonEmpty(cont),
+            ..
         } => {
             resolve_send_pattern(channel, inputs, Some(cont), db, env, res);
         }
@@ -368,7 +386,7 @@ fn resolve_proc_pattern_rec<'a>(
             resolve_proc_pattern_rec(db, env, res, proc);
         }
 
-        Bundle { .. } => {
+        Bundle { .. } | UseBlock { .. } => {
             db.error(
                 res.id,
                 ErrorKind::BundleInsidePattern,
@@ -378,6 +396,8 @@ fn resolve_proc_pattern_rec<'a>(
         Select { branches: _ } => {
             unimplemented!("Select is not implemented in this version of Rholang")
         }
+        // TheoryCall is only valid in space constructor arguments, not in patterns
+        TheoryCall(_) => {}
         Bad => unreachable!(),
     }
 }

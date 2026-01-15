@@ -9,6 +9,46 @@ use crate::{SourcePos, SourceSpan, traverse::*};
 
 pub type ProcList<'a> = SmallVec<[AnnProc<'a>; 1]>;
 
+/// A hyperparameter in a send operation.
+/// Can be either positional (just a value) or named (key=value).
+/// Syntax: channel!(data; param1, key=value, param2)
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Hyperparam<'ast> {
+    /// Positional hyperparam: just a process value
+    Positional(AnnProc<'ast>),
+    /// Named hyperparam: key=value
+    Named {
+        key: Id<'ast>,
+        value: AnnProc<'ast>,
+    },
+}
+
+impl<'ast> Hyperparam<'ast> {
+    /// Get the value of this hyperparam
+    pub fn value(&self) -> &AnnProc<'ast> {
+        match self {
+            Hyperparam::Positional(v) => v,
+            Hyperparam::Named { value, .. } => value,
+        }
+    }
+
+    /// Get the key if this is a named hyperparam
+    pub fn key(&self) -> Option<&Id<'ast>> {
+        match self {
+            Hyperparam::Named { key, .. } => Some(key),
+            Hyperparam::Positional(_) => None,
+        }
+    }
+
+    /// Check if this hyperparam has the given key name
+    pub fn has_key(&self, name: &str) -> bool {
+        self.key().map(|k| k.name == name).unwrap_or(false)
+    }
+}
+
+/// List of hyperparams (using SmallVec for efficiency)
+pub type HyperparamList<'ast> = SmallVec<[Hyperparam<'ast>; 2]>;
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Proc<'ast> {
     Nil,
@@ -36,8 +76,17 @@ pub enum Proc<'ast> {
 
     Send {
         channel: Name<'ast>,
+        /// Hyperparameters for space-specific behavior.
+        /// Syntax: channel!(data; param1, key=value, param2)
+        /// None = no semicolon, Some([]) = explicit empty hyperparams
+        hyperparams: Option<HyperparamList<'ast>>,
         send_type: SendType,
         inputs: ProcList<'ast>,
+    },
+
+    UseBlock {
+        space: Name<'ast>,
+        proc: AnnProc<'ast>,
     },
 
     ForComprehension {
@@ -78,6 +127,9 @@ pub enum Proc<'ast> {
 
     SendSync {
         channel: Name<'ast>,
+        /// Hyperparameters for space-specific behavior.
+        /// Syntax: channel!?(data; param1, key=value); continuation
+        hyperparams: Option<HyperparamList<'ast>>,
         inputs: ProcList<'ast>,
         cont: SyncSendCont<'ast>,
     },
@@ -88,6 +140,11 @@ pub enum Proc<'ast> {
     },
     Method {
         receiver: AnnProc<'ast>,
+        name: Id<'ast>,
+        args: ProcList<'ast>,
+    },
+    /// Built-in function call: getSpaceAgent(space), etc.
+    FunctionCall {
         name: Id<'ast>,
         args: ProcList<'ast>,
     },
@@ -107,6 +164,9 @@ pub enum Proc<'ast> {
         kind: VarRefKind,
         var: Id<'ast>,
     },
+
+    /// Theory specification for Reified RSpaces: free Nat(), free Int(), etc.
+    TheoryCall(TheoryCall<'ast>),
 
     Bad, // bad process usually represents a parsing error
 }
@@ -495,6 +555,14 @@ pub enum UnaryExpOp {
     Neg,
     Negation,
 }
+
+/// Theory invocation for Reified RSpaces - free Nat(), free Int(), etc.
+/// Used to specify the type theory for space construction.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct TheoryCall<'ast> {
+    pub name: &'ast str,
+}
+
 impl UnaryExpOp {
     pub fn is_connective(self) -> bool {
         self == UnaryExpOp::Negation
@@ -535,6 +603,49 @@ impl BinaryExpOp {
 pub type Receipts<'a> = SmallVec<[Receipt<'a>; 1]>;
 pub type Receipt<'a> = SmallVec<[Bind<'a>; 1]>;
 
+/// Parameters for pattern modifiers (up to 4 inline, then heap)
+pub type ModifierParams<'ast> = SmallVec<[AnnProc<'ast>; 4]>;
+
+/// Generic pattern modifier for VectorDB operations.
+/// This is a backend-agnostic representation that captures any modifier (sim, rank, or custom)
+/// with its function identifier and parameters. The backend interprets the modifier name.
+///
+/// Examples:
+///   - PatternModifier { name: "sim", function: "cos", params: ["0.7"] }
+///   - PatternModifier { name: "rank", function: "topk", params: [3] }
+///   - PatternModifier { name: "custom", function: "my_fn", params: [...] }
+///
+/// Formal Correspondence: GenericRSpace.v (VectorDB pattern matching)
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct PatternModifier<'ast> {
+    /// Modifier name: "sim", "rank", or any identifier (interpreted by backend)
+    pub name: &'ast str,
+    /// Function identifier (first argument to the modifier)
+    pub function: AnnProc<'ast>,
+    /// Additional parameters (all args after the function identifier)
+    pub params: ModifierParams<'ast>,
+}
+
+/// Pattern matching specification for VectorDB operations.
+/// Enables similarity-based matching instead of exact structural matching.
+///
+/// Compositional syntax:
+///   - `~ query`                                    - basic query (space defaults)
+///   - `~ sim("cos") ~ query`                       - explicit metric
+///   - `~ sim("cos", "0.7") ~ query`                - explicit metric and threshold
+///   - `~ rank("topk", 3) ~ query`                  - top-K selection
+///   - `~ sim("cos", "0.7") ~ rank("topk", 3) ~ query` - full composition
+///
+/// All arguments can be parameterized: `modifier(fn, params...)`, `~ queryVec`
+/// Formal Correspondence: GenericRSpace.v (VectorDB similarity matching)
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct PatternMatchSpec<'ast> {
+    /// Modifiers processed left-to-right (sim, rank, or any custom modifier)
+    pub modifiers: SmallVec<[PatternModifier<'ast>; 2]>,
+    /// The query vector/pattern (required)
+    pub query: AnnProc<'ast>,
+}
+
 pub fn source_names<'a>(
     receipt: &'a [Bind<'a>],
 ) -> impl DoubleEndedIterator<Item = &'a Name<'a>> + ExactSizeIterator {
@@ -547,7 +658,12 @@ pub fn inputs<'a>(receipt: &'a [Bind<'a>]) -> impl DoubleEndedIterator<Item = &'
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Bind<'ast> {
-    Linear { lhs: Names<'ast>, rhs: Source<'ast> },
+    Linear {
+        lhs: Names<'ast>,
+        rhs: Source<'ast>,
+        /// Optional pattern match specification for VectorDB operations
+        pattern_match: Option<PatternMatchSpec<'ast>>,
+    },
     Repeated { lhs: Names<'ast>, rhs: Name<'ast> },
     Peek { lhs: Names<'ast>, rhs: Name<'ast> },
 }
@@ -555,20 +671,20 @@ pub enum Bind<'ast> {
 impl<'a> Bind<'a> {
     pub fn source_name(&self) -> &Name<'a> {
         match self {
-            Bind::Linear { lhs: _, rhs } => match rhs {
+            Bind::Linear { rhs, .. } => match rhs {
                 Source::Simple { name }
                 | Source::ReceiveSend { name }
                 | Source::SendReceive { name, .. } => name,
             },
-            Bind::Repeated { lhs: _, rhs } | Bind::Peek { lhs: _, rhs } => rhs,
+            Bind::Repeated { rhs, .. } | Bind::Peek { rhs, .. } => rhs,
         }
     }
 
     pub fn input(&self) -> Option<&[AnnProc<'a>]> {
         match self {
-            Bind::Linear { lhs: _, rhs } => match rhs {
+            Bind::Linear { rhs, .. } => match rhs {
                 Source::Simple { .. } | Source::ReceiveSend { .. } => None,
-                Source::SendReceive { name: _, inputs } => Some(inputs),
+                Source::SendReceive { inputs, .. } => Some(inputs),
             },
             Bind::Repeated { .. } | Bind::Peek { .. } => None,
         }
@@ -576,9 +692,9 @@ impl<'a> Bind<'a> {
 
     pub fn names(&self) -> &Names<'a> {
         match self {
-            Bind::Linear { lhs, rhs: _ }
-            | Bind::Repeated { lhs, rhs: _ }
-            | Bind::Peek { lhs, rhs: _ } => lhs,
+            Bind::Linear { lhs, .. }
+            | Bind::Repeated { lhs, .. }
+            | Bind::Peek { lhs, .. } => lhs,
         }
     }
 
@@ -599,6 +715,8 @@ pub enum Source<'ast> {
     },
     SendReceive {
         name: Name<'ast>,
+        /// Hyperparameters for space-specific behavior.
+        hyperparams: Option<HyperparamList<'ast>>,
         inputs: ProcList<'ast>,
     },
 }
@@ -758,6 +876,8 @@ impl<'a> LetBinding<'a> {
 #[derive(Debug, Clone, Copy)]
 pub struct NameDecl<'ast> {
     pub id: Id<'ast>,
+    /// Space type for channel allocation (e.g., `new x : space_type in { ... }`)
+    pub space_type: Option<Name<'ast>>,
     pub uri: Option<Uri<'ast>>,
 }
 
@@ -843,5 +963,26 @@ impl Display for NameDecl<'_> {
 
         f.write_char(':')?;
         Display::fmt(&self.id.pos, f)
+    }
+}
+
+impl Display for PatternModifier<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, " ~ {}({:?}", self.name, self.function.proc)?;
+        for param in &self.params {
+            write!(f, ", {:?}", param.proc)?;
+        }
+        write!(f, ")")
+    }
+}
+
+impl Display for PatternMatchSpec<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Format all modifiers in order
+        for modifier in &self.modifiers {
+            Display::fmt(modifier, f)?;
+        }
+        // Format query
+        write!(f, " ~ {:?}", self.query.proc)
     }
 }

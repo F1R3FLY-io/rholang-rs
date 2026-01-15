@@ -35,15 +35,17 @@ new ret in {
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (var)))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (var))))))
           (send
             channel: (var)
             send_type: (send_single)
-            inputs: (inputs
-              (string_literal)
-              (eval
-                (var)))))
+            inputs: (send_inputs
+              data: (send_data
+                (string_literal)
+                (eval
+                  (var))))))
         (input
           receipts: (receipts
             (receipt
@@ -57,5 +59,6 @@ new ret in {
             (send
               channel: (var)
               send_type: (send_single)
-              inputs: (inputs
-                (var)))))))))
+              inputs: (send_inputs
+                data: (send_data
+                  (var))))))))))

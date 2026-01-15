@@ -14,7 +14,8 @@ use crate::parser::errors::{self, ParsingFailure};
 use crate::{
     SourceSpan,
     ast::{
-        AnnProc, BinaryExpOp, Bind, BundleType, Id, LetBinding, NameDecl, Names, Proc, SendType,
+        AnnProc, BinaryExpOp, Bind, BundleType, Hyperparam, HyperparamList, Id,
+        LetBinding, NameDecl, Names, PatternMatchSpec, PatternModifier, Proc, SendType,
         SimpleType, Source, UnaryExpOp, VarRefKind,
     },
     parser::{
@@ -173,6 +174,25 @@ pub(super) fn node_to_ast<'ast>(
                     node = receiver_node;
                     continue 'parse;
                 }
+                kind!("function_call") => {
+                    let name_node = get_field(&node, field!("function"));
+                    let args_node = get_field(&node, field!("args"));
+
+                    let arity = args_node.named_child_count();
+                    cont_stack.push(K::ConsumeFunctionCall {
+                        id: Id {
+                            name: get_node_value(&name_node, source),
+                            pos: name_node.start_position().into(),
+                        },
+                        arity,
+                        span,
+                    });
+
+                    if arity > 0 {
+                        cont_stack.push(K::EvalList(args_node.walk()));
+                    }
+                    // Fall through - no node to recursively parse (no receiver like method)
+                }
                 kind!("or")
                 | kind!("and")
                 | kind!("matches")
@@ -233,6 +253,16 @@ pub(super) fn node_to_ast<'ast>(
                     });
                     node = proc_node;
                     continue 'parse;
+                }
+
+                // Reified RSpaces: theory specification - free Nat(), free Int(), etc.
+                kind!("free") => {
+                    let theory_call_node = get_first_child(&node);
+                    let name_node = theory_call_node
+                        .child_by_field_id(field!("name"))
+                        .expect("theory_call must have name field");
+                    let name = get_node_value(&name_node, source);
+                    proc_stack.push(ast_builder.alloc_theory_call(name), span);
                 }
 
                 kind!("collection") => {
@@ -319,15 +349,86 @@ pub(super) fn node_to_ast<'ast>(
                         kind!("send_multiple") => SendType::Multiple,
                         _ => unreachable!("Send type can only be: single or multiple"),
                     };
-                    let arity = inputs_node.named_child_count();
+
+                    // Parse send_inputs: data and hyperparams sections
+                    // Grammar: send_inputs -> '(' data? hyperparams_section? ')'
+                    let data_node = inputs_node.child_by_field_id(field!("data"));
+                    let hyperparams_section_node = inputs_node.child_by_field_id(field!("hyperparams"));
+
+                    let data_arity = data_node
+                        .map(|d| d.named_child_count())
+                        .unwrap_or(0);
+
+                    // Parse hyperparams: collect key names for named params
+                    let hyperparams: Option<Vec<ParsedHyperparam>> = hyperparams_section_node.and_then(|hp_section| {
+                        hp_section.child_by_field_id(field!("params")).map(|hp_list| {
+                            let mut hps = Vec::with_capacity(hp_list.named_child_count());
+                            for hp_node in hp_list.named_children(&mut hp_list.walk()) {
+                                // hp_node is a `hyperparam` node - get its first child (named_hyperparam or positional_hyperparam)
+                                let inner = get_first_child(&hp_node);
+                                match inner.kind_id() {
+                                    kind!("named_hyperparam") => {
+                                        let key_node = get_field(&inner, field!("key"));
+                                        let key = Id {
+                                            name: get_node_value(&key_node, source),
+                                            pos: key_node.start_position().into(),
+                                        };
+                                        hps.push(ParsedHyperparam::Named { key });
+                                    }
+                                    kind!("positional_hyperparam") => {
+                                        hps.push(ParsedHyperparam::Positional);
+                                    }
+                                    _ => {
+                                        // Shouldn't happen with correct grammar
+                                        hps.push(ParsedHyperparam::Positional);
+                                    }
+                                }
+                            }
+                            hps
+                        })
+                    });
+
+                    // Determine if we have explicit (possibly empty) hyperparams
+                    let has_hyperparam_section = hyperparams_section_node.is_some();
+
                     cont_stack.push(K::ConsumeSend {
                         send_type,
-                        arity,
+                        data_arity,
+                        hyperparams: if has_hyperparam_section { Some(hyperparams.unwrap_or_default()) } else { None },
                         span,
                     });
-                    if arity > 0 {
-                        cont_stack.push(K::EvalList(inputs_node.walk()));
+
+                    // Push data procs for evaluation
+                    if let Some(data) = data_node {
+                        if data_arity > 0 {
+                            cont_stack.push(K::EvalList(data.walk()));
+                        }
                     }
+
+                    // Push hyperparam values for evaluation
+                    if let Some(hp_section) = hyperparams_section_node {
+                        if let Some(hp_list) = hp_section.child_by_field_id(field!("params")) {
+                            for hp_node in hp_list.named_children(&mut hp_list.walk()) {
+                                // hp_node is a `hyperparam` node - get its first child
+                                let inner = get_first_child(&hp_node);
+                                match inner.kind_id() {
+                                    kind!("named_hyperparam") => {
+                                        let value_node = get_field(&inner, field!("value"));
+                                        cont_stack.push(K::EvalDelayed(value_node));
+                                    }
+                                    kind!("positional_hyperparam") => {
+                                        // positional_hyperparam contains _proc as its first child
+                                        let proc_node = get_first_child(&inner);
+                                        cont_stack.push(K::EvalDelayed(proc_node));
+                                    }
+                                    _ => {
+                                        cont_stack.push(K::EvalDelayed(inner));
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     node = name_node;
                     continue 'parse;
                 }
@@ -422,12 +523,10 @@ pub(super) fn node_to_ast<'ast>(
                         let mut receipt_len = 0;
 
                         for bind_node in receipt_node.named_children(&mut receipt_node.walk()) {
-                            let (names_node, source_node) = if bind_node.named_child_count() > 1 {
-                                let (ns, s) = get_left_and_right(&bind_node);
-                                (Some(ns), s)
-                            } else {
-                                (None, get_first_child(&bind_node))
-                            };
+                            // Use field-based access to handle optional qualifier, names, and similarity
+                            let names_node = bind_node.child_by_field_id(field!("names"));
+                            let source_node = bind_node.child_by_field_id(field!("input"))
+                                .unwrap_or_else(|| get_first_child(&bind_node)); // fallback for repeated/peek binds
                             let (name_count, cont_present) = match names_node {
                                 Some(names) => (
                                     names.named_child_count(),
@@ -453,10 +552,44 @@ pub(super) fn node_to_ast<'ast>(
                                         ),
                                     };
 
+                                    // VectorDB: parse optional similarity modifier
+                                    // Agnostic structure: [sim(fn, params...)] [rank(fn, params...)] ~ query
+                                    let similarity = bind_node.child_by_field_id(field!("similarity"))
+                                        .map(|sim_node| {
+                                            // Count procs in sim modifier: sim(function_id, params...)
+                                            // Grammar: metric (function), threshold (opt), extra (extra_args)
+                                            let (has_sim, sim_params_count) = sim_node.child_by_field_id(field!("sim"))
+                                                .map(|sim_mod| {
+                                                    // Count params after function identifier
+                                                    let has_threshold = sim_mod.child_by_field_id(field!("threshold")).is_some();
+                                                    let extra_count = sim_mod.child_by_field_id(field!("extra"))
+                                                        .map(|extra| extra.named_child_count())
+                                                        .unwrap_or(0);
+                                                    // params = threshold (if present) + extra args
+                                                    let params_count = if has_threshold { 1 + extra_count } else { 0 };
+                                                    (true, params_count)
+                                                })
+                                                .unwrap_or((false, 0));
+
+                                            // Count procs in rank modifier: rank(function_id, params...)
+                                            // Grammar: function, params (extra_args)
+                                            let (has_rank, rank_params_count) = sim_node.child_by_field_id(field!("rank"))
+                                                .map(|rank_mod| {
+                                                    let params_count = rank_mod.child_by_field_id(field!("params"))
+                                                        .map(|params| params.named_child_count())
+                                                        .unwrap_or(0);
+                                                    (true, params_count)
+                                                })
+                                                .unwrap_or((false, 0));
+
+                                            PatternMatchDesc::new(has_sim, sim_params_count, has_rank, rank_params_count)
+                                        });
+
                                     BindDesc::Linear {
                                         name_count,
                                         cont_present,
                                         source: source_desc,
+                                        similarity,
                                     }
                                 }
                                 kind!("repeated_bind") => BindDesc::Repeated {
@@ -493,6 +626,45 @@ pub(super) fn node_to_ast<'ast>(
 
                             if let Some(names) = names_node {
                                 temp_cont_stack.push(K::EvalList(names.walk()));
+                            }
+
+                            // VectorDB: push similarity procs for evaluation
+                            // These are pushed after names so they appear at the end of the proc slice
+                            // Order: sim_function, sim_params..., rank_function, rank_params..., query
+                            if let Some(sim_modifier_node) = bind_node.child_by_field_id(field!("similarity")) {
+                                // Check for sim modifier: ~ sim(function[, params...])
+                                // Grammar fields: metric (function), threshold (first param), extra (extra_args)
+                                if let Some(sim_node) = sim_modifier_node.child_by_field_id(field!("sim")) {
+                                    // Push function identifier (metric in grammar)
+                                    let function_node = get_field(&sim_node, field!("metric"));
+                                    temp_cont_stack.push(K::EvalDelayed(function_node));
+                                    // Push params: threshold (if present), then extra args
+                                    if let Some(threshold_node) = sim_node.child_by_field_id(field!("threshold")) {
+                                        temp_cont_stack.push(K::EvalDelayed(threshold_node));
+                                        // Push extra args (each named child of extra_args)
+                                        if let Some(extra_node) = sim_node.child_by_field_id(field!("extra")) {
+                                            for child in extra_node.named_children(&mut extra_node.walk()) {
+                                                temp_cont_stack.push(K::EvalDelayed(child));
+                                            }
+                                        }
+                                    }
+                                }
+                                // Check for rank modifier: ~ rank(function[, params...])
+                                // Grammar fields: function, params (extra_args)
+                                if let Some(rank_node) = sim_modifier_node.child_by_field_id(field!("rank")) {
+                                    // Push function identifier
+                                    let function_node = get_field(&rank_node, field!("function"));
+                                    temp_cont_stack.push(K::EvalDelayed(function_node));
+                                    // Push params (each named child of extra_args)
+                                    if let Some(params_node) = rank_node.child_by_field_id(field!("params")) {
+                                        for child in params_node.named_children(&mut params_node.walk()) {
+                                            temp_cont_stack.push(K::EvalDelayed(child));
+                                        }
+                                    }
+                                }
+                                // Always push the query
+                                let query_node = get_field(&sim_modifier_node, field!("query"));
+                                temp_cont_stack.push(K::EvalDelayed(query_node));
                             }
 
                             bs.push(bind_desc);
@@ -627,26 +799,113 @@ pub(super) fn node_to_ast<'ast>(
                     continue 'parse;
                 }
 
+                // Reified RSpaces: UseBlock for scoped default space selection
+                kind!("use_block") => {
+                    let space_node = get_field(&node, field!("space"));
+                    let proc_node = get_field(&node, field!("proc"));
+                    cont_stack.push(K::ConsumeUseBlock { span });
+                    cont_stack.push(K::EvalDelayed(proc_node));
+                    node = space_node;
+                    continue 'parse;
+                }
+
                 kind!("send_sync") => {
                     let name_node = get_field(&node, field!("channel"));
-                    let messages_node = get_field(&node, field!("inputs"));
-                    let arity = messages_node.named_child_count();
+                    let inputs_node = get_field(&node, field!("inputs"));
                     let sync_send_cont_node = get_field(&node, field!("cont"));
                     let choice_node = get_first_child(&sync_send_cont_node);
+
+                    // Parse send_inputs: data and hyperparams sections (same as send)
+                    let data_node = inputs_node.child_by_field_id(field!("data"));
+                    let hyperparams_section_node = inputs_node.child_by_field_id(field!("hyperparams"));
+
+                    let data_arity = data_node
+                        .map(|d| d.named_child_count())
+                        .unwrap_or(0);
+
+                    // Parse hyperparams
+                    let hyperparams: Option<Vec<ParsedHyperparam>> = hyperparams_section_node.and_then(|hp_section| {
+                        hp_section.child_by_field_id(field!("params")).map(|hp_list| {
+                            let mut hps = Vec::with_capacity(hp_list.named_child_count());
+                            for hp_node in hp_list.named_children(&mut hp_list.walk()) {
+                                // hp_node is a `hyperparam` node - get its first child (named_hyperparam or positional_hyperparam)
+                                let inner = get_first_child(&hp_node);
+                                match inner.kind_id() {
+                                    kind!("named_hyperparam") => {
+                                        let key_node = get_field(&inner, field!("key"));
+                                        let key = Id {
+                                            name: get_node_value(&key_node, source),
+                                            pos: key_node.start_position().into(),
+                                        };
+                                        hps.push(ParsedHyperparam::Named { key });
+                                    }
+                                    kind!("positional_hyperparam") => {
+                                        hps.push(ParsedHyperparam::Positional);
+                                    }
+                                    _ => {
+                                        hps.push(ParsedHyperparam::Positional);
+                                    }
+                                }
+                            }
+                            hps
+                        })
+                    });
+
+                    let has_hyperparam_section = hyperparams_section_node.is_some();
+
                     match choice_node.kind_id() {
                         kind!("empty_cont") => {
-                            cont_stack.push(K::ConsumeSendSync { span, arity });
+                            cont_stack.push(K::ConsumeSendSync {
+                                span,
+                                data_arity,
+                                hyperparams: if has_hyperparam_section { Some(hyperparams.unwrap_or_default()) } else { None },
+                            });
                         }
                         kind!("non_empty_cont") => {
                             let cont_node = get_first_child(&choice_node);
-                            cont_stack.push(K::ConsumeSendSyncWithCont { span, arity });
+                            cont_stack.push(K::ConsumeSendSyncWithCont {
+                                span,
+                                data_arity,
+                                hyperparams: if has_hyperparam_section { Some(hyperparams.unwrap_or_default()) } else { None },
+                            });
                             cont_stack.push(K::EvalDelayed(cont_node));
                         }
                         _ => {
                             unreachable!("Continuations of send_sync are either empty or non-empty")
                         }
                     };
-                    cont_stack.push(K::EvalList(messages_node.walk()));
+
+                    // Push data procs for evaluation
+                    if let Some(data) = data_node {
+                        if data_arity > 0 {
+                            cont_stack.push(K::EvalList(data.walk()));
+                        }
+                    }
+
+                    // Push hyperparam values for evaluation
+                    if let Some(hp_section) = hyperparams_section_node {
+                        if let Some(hp_list) = hp_section.child_by_field_id(field!("params")) {
+                            for hp_node in hp_list.named_children(&mut hp_list.walk()) {
+                                // hp_node is a `hyperparam` node - get its first child
+                                let inner = get_first_child(&hp_node);
+                                match inner.kind_id() {
+                                    kind!("named_hyperparam") => {
+                                        let value_node = get_field(&inner, field!("value"));
+                                        cont_stack.push(K::EvalDelayed(value_node));
+                                    }
+                                    kind!("positional_hyperparam") => {
+                                        // positional_hyperparam contains _proc as its first child
+                                        let proc_node = get_first_child(&inner);
+                                        cont_stack.push(K::EvalDelayed(proc_node));
+                                    }
+                                    _ => {
+                                        cont_stack.push(K::EvalDelayed(inner));
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     node = name_node;
                     continue 'parse;
                 }
@@ -721,11 +980,39 @@ fn parse_decls<'a>(from: &tree_sitter::Node, source: &'a str) -> Vec<NameDecl<'a
             name: get_node_value(&var_node, source),
             pos: var_node.start_position().into(),
         };
+
+        // Parse optional space_type field
+        // Grammar: name_decl -> var ':' space_type? uri?
+        // space_type is a `name` which can be var, wildcard, or quote
+        let space_type = decl_node
+            .child_by_field_id(field!("space_type"))
+            .map(|space_node| {
+                // space_node is a `name` node - check its first child's kind
+                let inner_node = get_first_child(&space_node);
+                match inner_node.kind() {
+                    "var" => {
+                        let space_id = Id {
+                            name: get_node_value(&inner_node, source),
+                            pos: inner_node.start_position().into(),
+                        };
+                        Name::NameVar(Var::Id(space_id))
+                    }
+                    "wildcard" => Name::NameVar(Var::Wildcard),
+                    "quote" => {
+                        // Quote space types require proc evaluation - not supported in parse_decls
+                        // For now, treat as wildcard (any space) with a TODO for full support
+                        // TODO: Support quoted space types like @"my_space"
+                        Name::NameVar(Var::Wildcard)
+                    }
+                    other => panic!("unexpected node kind in space_type: {}", other),
+                }
+            });
+
         let uri = decl_node
             .child_by_field_id(field!("uri"))
             .map(|uri_literal| get_node_value(&uri_literal, source).into());
 
-        result.push(NameDecl { id, uri });
+        result.push(NameDecl { id, space_type, uri });
     }
 
     result
@@ -914,6 +1201,11 @@ fn apply_cont<'tree, 'ast>(
                                 ast_builder.alloc_method(id, recv, args).ann(span)
                             })
                         }
+                        K::ConsumeFunctionCall { span, id, arity } => {
+                            proc_stack.replace_top_slice(arity, |args| {
+                                ast_builder.alloc_function_call(id, args).ann(span)
+                            })
+                        }
                         K::ConsumeNew { decls, span } => proc_stack
                             .replace_top(|body| ast_builder.alloc_new(body, decls).ann(span)),
                         K::ConsumePar { span } => proc_stack.replace_top2(|left, right| {
@@ -921,37 +1213,90 @@ fn apply_cont<'tree, 'ast>(
                         }),
                         K::ConsumeSend {
                             send_type,
-                            arity,
+                            data_arity,
+                            hyperparams,
                             span,
                         } => {
-                            proc_stack.replace_top_slice_with_mask(arity + 1, |name_args, mask| {
+                            // Stack layout: channel, hyperparam_values..., data...
+                            // (hyperparams are pushed last on cont_stack, so evaluated first via LIFO)
+                            let hp_count = hyperparams.as_ref().map(|h| h.len()).unwrap_or(0);
+                            let items_to_consume = 1 + data_arity + hp_count;
+                            proc_stack.replace_top_slice_with_mask(items_to_consume, |name_args, mask| {
                                 let channel = into_name(name_args[0], mask[0]);
-                                let inputs = &name_args[1..];
-                                ast_builder.alloc_send(send_type, channel, inputs).ann(span)
+                                let hp_values = &name_args[1..1 + hp_count];
+                                let data = &name_args[1 + hp_count..1 + hp_count + data_arity];
+
+                                // Build hyperparams list from descriptors and values
+                                let built_hyperparams: Option<HyperparamList> = hyperparams.as_ref().map(|hp_descs| {
+                                    hp_descs.iter().zip(hp_values.iter()).map(|(desc, value)| {
+                                        match desc {
+                                            ParsedHyperparam::Positional => Hyperparam::Positional(*value),
+                                            ParsedHyperparam::Named { key } => Hyperparam::Named {
+                                                key: key.clone(),
+                                                value: *value,
+                                            },
+                                        }
+                                    }).collect()
+                                });
+
+                                ast_builder.alloc_send(send_type, channel, built_hyperparams, data).ann(span)
                             })
                         }
-                        K::ConsumeSendSync { span, arity } => proc_stack
-                            .replace_top_slice_with_mask(arity + 1, |name_inputs, mask| {
-                                let channel = into_name(name_inputs[0], mask[0]);
+                        K::ConsumeSendSync { span, data_arity, hyperparams } => {
+                            // Stack layout: channel, hyperparam_values..., data...
+                            // (hyperparams are pushed last on cont_stack, so evaluated first via LIFO)
+                            let hp_count = hyperparams.as_ref().map(|h| h.len()).unwrap_or(0);
+                            let items_to_consume = 1 + data_arity + hp_count;
+                            proc_stack.replace_top_slice_with_mask(items_to_consume, |name_args, mask| {
+                                let channel = into_name(name_args[0], mask[0]);
+                                let hp_values = &name_args[1..1 + hp_count];
+                                let data = &name_args[1 + hp_count..1 + hp_count + data_arity];
+
+                                let built_hyperparams: Option<HyperparamList> = hyperparams.as_ref().map(|hp_descs| {
+                                    hp_descs.iter().zip(hp_values.iter()).map(|(desc, value)| {
+                                        match desc {
+                                            ParsedHyperparam::Positional => Hyperparam::Positional(*value),
+                                            ParsedHyperparam::Named { key } => Hyperparam::Named {
+                                                key: key.clone(),
+                                                value: *value,
+                                            },
+                                        }
+                                    }).collect()
+                                });
+
                                 ast_builder
-                                    .alloc_send_sync(channel, &name_inputs[1..])
+                                    .alloc_send_sync(channel, built_hyperparams, data)
                                     .ann(span)
-                            }),
-                        K::ConsumeSendSyncWithCont { span, arity } => {
-                            proc_stack.replace_top_slice_with_mask(
-                                arity + 2,
-                                |name_inputs_cont, mask| {
-                                    let channel = into_name(name_inputs_cont[0], mask[0]);
-                                    // SAFETY: Because we successfully consumed |arity + 2|
-                                    // elements, then the slice.len() is greater or equal 2
-                                    let (last, messages) =
-                                        name_inputs_cont[1..].split_last().unwrap_unchecked();
-                                    let cont = *last;
-                                    ast_builder
-                                        .alloc_send_sync_with_cont(channel, messages, cont)
-                                        .ann(span)
-                                },
-                            )
+                            })
+                        }
+                        K::ConsumeSendSyncWithCont { span, data_arity, hyperparams } => {
+                            // Stack layout: channel, hyperparam_values..., data..., continuation
+                            // (hyperparams pushed last on cont_stack → evaluated first via LIFO)
+                            let hp_count = hyperparams.as_ref().map(|h| h.len()).unwrap_or(0);
+                            // +1 for channel, +1 for continuation
+                            let items_to_consume = 1 + data_arity + hp_count + 1;
+                            proc_stack.replace_top_slice_with_mask(items_to_consume, |name_args, mask| {
+                                let channel = into_name(name_args[0], mask[0]);
+                                let hp_values = &name_args[1..1 + hp_count];
+                                let data = &name_args[1 + hp_count..1 + hp_count + data_arity];
+                                let cont = name_args[name_args.len() - 1];
+
+                                let built_hyperparams: Option<HyperparamList> = hyperparams.as_ref().map(|hp_descs| {
+                                    hp_descs.iter().zip(hp_values.iter()).map(|(desc, value)| {
+                                        match desc {
+                                            ParsedHyperparam::Positional => Hyperparam::Positional(*value),
+                                            ParsedHyperparam::Named { key } => Hyperparam::Named {
+                                                key: key.clone(),
+                                                value: *value,
+                                            },
+                                        }
+                                    }).collect()
+                                });
+
+                                ast_builder
+                                    .alloc_send_sync_with_cont(channel, built_hyperparams, data, cont)
+                                    .ann(span)
+                            })
                         }
                         K::ConsumeSet {
                             arity,
@@ -974,6 +1319,15 @@ fn apply_cont<'tree, 'ast>(
                             }),
                         K::ConsumeUnaryExp { op, span } => proc_stack
                             .replace_top(|top| ast_builder.alloc_unary_exp(op, top).ann(span)),
+                        // Reified RSpaces: UseBlock for scoped default space selection
+                        K::ConsumeUseBlock { span } => proc_stack.replace_top_slice_with_mask(
+                            2,
+                            |space_body, mask| {
+                                let space = into_name(space_body[0], mask[0]);
+                                let body = space_body[1];
+                                ast_builder.alloc_use_block(space, body).ann(span)
+                            },
+                        ),
                         _ => unreachable!("Eval continuations are handled in another branch"),
                     };
 
@@ -996,6 +1350,14 @@ enum Step<'a> {
 type LetDecls = SmallVec<[LetDecl; 1]>;
 type ReceiptDescripts = SmallVec<[ReceiptDesc; 1]>;
 type BindDescripts = SmallVec<[BindDesc; 1]>;
+
+/// Parsed hyperparam description (before AST allocation).
+/// Named hyperparams store the key, positional just need a marker.
+#[derive(Debug, Clone)]
+enum ParsedHyperparam<'a> {
+    Positional,
+    Named { key: Id<'a> },
+}
 
 #[derive(Clone)]
 enum K<'tree, 'ast> {
@@ -1056,6 +1418,11 @@ enum K<'tree, 'ast> {
         id: Id<'ast>,
         arity: usize,
     },
+    ConsumeFunctionCall {
+        span: SourceSpan,
+        id: Id<'ast>,
+        arity: usize,
+    },
     ConsumeNew {
         decls: Vec<NameDecl<'ast>>,
         span: SourceSpan,
@@ -1066,16 +1433,19 @@ enum K<'tree, 'ast> {
     ConsumeQuote,
     ConsumeSend {
         send_type: SendType,
-        arity: usize,
+        data_arity: usize,
+        hyperparams: Option<Vec<ParsedHyperparam<'ast>>>,  // Hyperparam descriptors (if ; present)
         span: SourceSpan,
     },
     ConsumeSendSync {
         span: SourceSpan,
-        arity: usize,
+        data_arity: usize,
+        hyperparams: Option<Vec<ParsedHyperparam<'ast>>>,
     },
     ConsumeSendSyncWithCont {
         span: SourceSpan,
-        arity: usize,
+        data_arity: usize,
+        hyperparams: Option<Vec<ParsedHyperparam<'ast>>>,
     },
     ConsumeSet {
         arity: usize,
@@ -1088,6 +1458,10 @@ enum K<'tree, 'ast> {
     },
     ConsumeUnaryExp {
         op: UnaryExpOp,
+        span: SourceSpan,
+    },
+    // Reified RSpaces: UseBlock for scoped default space selection
+    ConsumeUseBlock {
         span: SourceSpan,
     },
     EvalDelayed(tree_sitter::Node<'tree>),
@@ -1170,6 +1544,12 @@ impl Debug for K<'_, '_> {
                 .field("arity", arity)
                 .field("span", span)
                 .finish(),
+            Self::ConsumeFunctionCall { span, id, arity } => f
+                .debug_struct("ConsumeFunctionCall")
+                .field("id", &id.name)
+                .field("arity", arity)
+                .field("span", span)
+                .finish(),
             Self::ConsumeNew { decls, span } => f
                 .debug_struct("ConsumeNew")
                 .field("decls", decls)
@@ -1179,22 +1559,26 @@ impl Debug for K<'_, '_> {
             Self::ConsumeQuote => f.debug_struct("ConsumeQuote").finish(),
             Self::ConsumeSend {
                 send_type,
-                arity,
+                data_arity,
+                hyperparams,
                 span,
             } => f
                 .debug_struct("ConsumeSend")
                 .field("send_type", send_type)
-                .field("arity", arity)
+                .field("data_arity", data_arity)
+                .field("hyperparams", hyperparams)
                 .field("span", span)
                 .finish(),
-            Self::ConsumeSendSync { span, arity } => f
+            Self::ConsumeSendSync { span, data_arity, hyperparams } => f
                 .debug_struct("ConsumeSendSync")
-                .field("arity", arity)
+                .field("data_arity", data_arity)
+                .field("hyperparams", hyperparams)
                 .field("span", span)
                 .finish(),
-            Self::ConsumeSendSyncWithCont { span, arity } => f
+            Self::ConsumeSendSyncWithCont { span, data_arity, hyperparams } => f
                 .debug_struct("ConsumeSendSyncWithCont")
-                .field("arity", arity)
+                .field("data_arity", data_arity)
+                .field("hyperparams", hyperparams)
                 .field("span", span)
                 .finish(),
             Self::ConsumeSet { arity, span, .. } => f
@@ -1210,6 +1594,10 @@ impl Debug for K<'_, '_> {
             Self::ConsumeUnaryExp { op, span } => f
                 .debug_struct("ConsumeUnaryExp")
                 .field("op", op)
+                .field("span", span)
+                .finish(),
+            Self::ConsumeUseBlock { span } => f
+                .debug_struct("ConsumeUseBlock")
                 .field("span", span)
                 .finish(),
             Self::EvalDelayed(arg0) => f.debug_tuple("EvalDelayed").field(arg0).finish(),
@@ -1513,12 +1901,48 @@ impl SourceDesc {
     }
 }
 
+/// Descriptor for pattern modifiers during parsing (before AST allocation)
+/// Compositional structure: [sim(fn, params...)] [rank(fn, params...)] ~ query
+#[derive(Debug, Clone, Copy)]
+struct PatternMatchDesc {
+    /// Whether sim modifier is present (1 = function identifier)
+    has_sim: bool,
+    /// Number of params in sim modifier (after function identifier)
+    sim_params_count: usize,
+    /// Whether rank modifier is present (1 = function identifier)
+    has_rank: bool,
+    /// Number of params in rank modifier (after function identifier)
+    rank_params_count: usize,
+    // Query is always 1 proc
+    /// H1 Optimization: Precomputed total proc count for this pattern match.
+    /// = (has_sim ? 1 + sim_params : 0) + (has_rank ? 1 + rank_params : 0) + 1 (query)
+    cached_len: usize,
+}
+
+impl PatternMatchDesc {
+    /// Create a new PatternMatchDesc with precomputed length (H1 optimization)
+    #[inline]
+    fn new(has_sim: bool, sim_params_count: usize, has_rank: bool, rank_params_count: usize) -> Self {
+        let sim_procs = if has_sim { 1 + sim_params_count } else { 0 };
+        let rank_procs = if has_rank { 1 + rank_params_count } else { 0 };
+        let cached_len = sim_procs + rank_procs + 1; // +1 for query
+        Self { has_sim, sim_params_count, has_rank, rank_params_count, cached_len }
+    }
+
+    /// Returns the total number of procs in this pattern match
+    #[inline]
+    fn len(&self) -> usize {
+        self.cached_len
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 enum BindDesc {
     Linear {
         name_count: usize,
         cont_present: bool,
         source: SourceDesc,
+        similarity: Option<PatternMatchDesc>,  // VectorDB pattern match
     },
     Repeated {
         name_count: usize,
@@ -1534,8 +1958,12 @@ impl BindDesc {
     fn len(&self) -> usize {
         match self {
             BindDesc::Linear {
-                name_count, source, ..
-            } => name_count + source.len(),
+                name_count, source, similarity, ..
+            } => {
+                // H1 Optimization: Use cached length from PatternMatchDesc for pattern match
+                let sim_len = similarity.map(|s| s.len()).unwrap_or(0);
+                name_count + source.len() + sim_len
+            }
             BindDesc::Repeated { name_count, .. } | BindDesc::Peek { name_count, .. } => {
                 name_count + 1
             }
@@ -1556,6 +1984,7 @@ impl BindDesc {
                 BindDesc::Linear {
                     cont_present,
                     source,
+                    similarity,
                     ..
                 } => {
                     let rhs = match source {
@@ -1565,15 +1994,59 @@ impl BindDesc {
                             let inputs = &rest[..arity];
                             Source::SendReceive {
                                 name: channel_name,
+                                hyperparams: None, // TODO: Parse from send_receive_source
                                 inputs: inputs.to_smallvec(),
                             }
                         }
                     };
 
-                    let lhs_start = source.len() - 1;
-                    let lhs = into_names(&rest[lhs_start..], &qs[lhs_start..], cont_present);
+                    // H1 Optimization: Use cached pattern match length
+                    let pattern_len = similarity.map(|s| s.len()).unwrap_or(0);
 
-                    Bind::Linear { lhs, rhs }
+                    // Build pattern match spec from procs at the end of the slice
+                    // Procs are in order: [sim_function, sim_params...] [rank_function, rank_params...] [query]
+                    let pattern_spec = if let Some(desc) = similarity {
+                        let pattern_start = rest.len() - pattern_len;
+                        let pattern_procs = &rest[pattern_start..];
+
+                        let mut offset = 0;
+                        let mut modifiers = SmallVec::new();
+
+                        // Build sim modifier if present: function + params SmallVec
+                        if desc.has_sim {
+                            let function = pattern_procs[offset];
+                            offset += 1;
+                            let params = pattern_procs[offset..offset + desc.sim_params_count].to_smallvec();
+                            offset += desc.sim_params_count;
+                            modifiers.push(PatternModifier { name: "sim", function, params });
+                        }
+
+                        // Build rank modifier if present: function + params SmallVec
+                        if desc.has_rank {
+                            let function = pattern_procs[offset];
+                            offset += 1;
+                            let params = pattern_procs[offset..offset + desc.rank_params_count].to_smallvec();
+                            offset += desc.rank_params_count;
+                            modifiers.push(PatternModifier { name: "rank", function, params });
+                        }
+
+                        // Query is always last
+                        let query = pattern_procs[offset];
+
+                        Some(PatternMatchSpec {
+                            modifiers,
+                            query,
+                        })
+                    } else {
+                        None
+                    };
+
+                    // Calculate lhs range (excluding pattern match procs at the end)
+                    let lhs_start = source.len() - 1;
+                    let lhs_end = rest.len() - pattern_len;
+                    let lhs = into_names(&rest[lhs_start..lhs_end], &qs[lhs_start..lhs_end], cont_present);
+
+                    Bind::Linear { lhs, rhs, pattern_match: pattern_spec }
                 }
 
                 BindDesc::Repeated { cont_present, .. } => Bind::Repeated {

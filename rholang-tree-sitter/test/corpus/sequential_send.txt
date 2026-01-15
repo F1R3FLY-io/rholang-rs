@@ -30,8 +30,9 @@ new chan, ack, stdoutAck(`rho:io:stdoutAck`) in {
           (send
             channel: (var)
             send_type: (send_single)
-            inputs: (inputs
-              (long_literal)))
+            inputs: (send_inputs
+              data: (send_data
+                (long_literal))))
           (input
             receipts: (receipts
               (receipt
@@ -44,8 +45,9 @@ new chan, ack, stdoutAck(`rho:io:stdoutAck`) in {
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (long_literal))))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (long_literal)))))))
         (input
           receipts: (receipts
             (receipt
@@ -58,7 +60,8 @@ new chan, ack, stdoutAck(`rho:io:stdoutAck`) in {
             (send
               channel: (var)
               send_type: (send_single)
-              inputs: (inputs
-                (var)
-                (eval
-                  (var))))))))))
+              inputs: (send_inputs
+                data: (send_data
+                  (var)
+                  (eval
+                    (var)))))))))))

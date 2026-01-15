@@ -1,0 +1,301 @@
+====================
+UseBlock Basic
+====================
+
+use HMB { x!(42) }
+
+---
+
+(source_file
+  (use_block
+    space: (var)
+    proc: (block
+      (send
+        channel: (var)
+        send_type: (send_single)
+        inputs: (send_inputs
+          data: (send_data
+            (long_literal)))))))
+
+====================
+UseBlock with Quoted Space
+====================
+
+use @"my_space" { Nil }
+
+---
+
+(source_file
+  (use_block
+    space: (quote
+      (string_literal))
+    proc: (block
+      (nil))))
+
+====================
+Free Operator with Theory Call
+====================
+
+free Nat()
+
+---
+
+(source_file
+  (free
+    (theory_call
+      name: (var))))
+
+====================
+Free in Space Constructor
+====================
+
+HMB!?("default", free Int()).
+
+---
+
+(source_file
+  (send_sync
+    channel: (var)
+    inputs: (send_inputs
+      data: (send_data
+        (string_literal)
+        (free
+          (theory_call
+            name: (var)))))
+    cont: (sync_send_cont
+      (empty_cont))))
+
+====================
+Free with Any Theory
+====================
+
+free Any()
+
+---
+
+(source_file
+  (free
+    (theory_call
+      name: (var))))
+
+====================
+Similarity Basic Query
+====================
+
+for (@doc <- channel ~ [1, 2, 3]) { Nil }
+
+---
+
+(source_file
+  (input
+    receipts: (receipts
+      (receipt
+        (linear_bind
+          names: (names
+            (quote
+              (var)))
+          input: (simple_source
+            (var))
+          similarity: (similarity_modifier
+            query: (collection
+              (list
+                (long_literal)
+                (long_literal)
+                (long_literal)))))))
+    proc: (block
+      (nil))))
+
+====================
+Similarity with sim Modifier
+====================
+
+for (@x <- vectorChan ~ sim("cos", "0.75") ~ [90, 10, 5]) { x }
+
+---
+
+(source_file
+  (input
+    receipts: (receipts
+      (receipt
+        (linear_bind
+          names: (names
+            (quote
+              (var)))
+          input: (simple_source
+            (var))
+          similarity: (similarity_modifier
+            sim: (sim_modifier
+              metric: (string_literal)
+              threshold: (string_literal))
+            query: (collection
+              (list
+                (long_literal)
+                (long_literal)
+                (long_literal)))))))
+    proc: (block
+      (var))))
+
+====================
+Similarity with rank Modifier
+====================
+
+for (@results <- docs ~ rank("topk", 3) ~ queryVec) { results }
+
+---
+
+(source_file
+  (input
+    receipts: (receipts
+      (receipt
+        (linear_bind
+          names: (names
+            (quote
+              (var)))
+          input: (simple_source
+            (var))
+          similarity: (similarity_modifier
+            rank: (rank_modifier
+              function: (string_literal)
+              params: (extra_args
+                (long_literal)))
+            query: (var)))))
+    proc: (block
+      (var))))
+
+====================
+Similarity Combined sim and rank
+====================
+
+for (@results <- embeddings ~ sim("cos", "0.8") ~ rank("topk", 5) ~ [50, 50, 10]) { results }
+
+---
+
+(source_file
+  (input
+    receipts: (receipts
+      (receipt
+        (linear_bind
+          names: (names
+            (quote
+              (var)))
+          input: (simple_source
+            (var))
+          similarity: (similarity_modifier
+            sim: (sim_modifier
+              metric: (string_literal)
+              threshold: (string_literal))
+            rank: (rank_modifier
+              function: (string_literal)
+              params: (extra_args
+                (long_literal)))
+            query: (collection
+              (list
+                (long_literal)
+                (long_literal)
+                (long_literal)))))))
+    proc: (block
+      (var))))
+
+====================
+Similarity in UseBlock
+====================
+
+use VectorDB {
+  for (@doc <- embeddings ~ [50, 50, 10]) {
+    stdout!(doc)
+  }
+}
+
+---
+
+(source_file
+  (use_block
+    space: (var)
+    proc: (block
+      (input
+        receipts: (receipts
+          (receipt
+            (linear_bind
+              names: (names
+                (quote
+                  (var)))
+              input: (simple_source
+                (var))
+              similarity: (similarity_modifier
+                query: (collection
+                  (list
+                    (long_literal)
+                    (long_literal)
+                    (long_literal)))))))
+        proc: (block
+          (send
+            channel: (var)
+            send_type: (send_single)
+            inputs: (send_inputs
+              data: (send_data
+                (var)))))))))
+
+====================
+Name Declaration with Space Type
+====================
+
+new x : HMBSpace in { x!(42) }
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var)
+        space_type: (var)))
+    proc: (block
+      (send
+        channel: (var)
+        send_type: (send_single)
+        inputs: (send_inputs
+          data: (send_data
+            (long_literal)))))))
+
+====================
+Name Declaration with Space Type and URI
+====================
+
+new x : HMBSpace(`rho:id:abc123`) in { Nil }
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var)
+        space_type: (var)
+        uri: (uri_literal)))
+    proc: (block
+      (nil))))
+
+====================
+Multiple Name Declarations with Mixed Types
+====================
+
+new x1 : space_1, x2 : space_1, x3 : space_2, x4 in { Nil }
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var)
+        space_type: (var))
+      (name_decl
+        (var)
+        space_type: (var))
+      (name_decl
+        (var)
+        space_type: (var))
+      (name_decl
+        (var)))
+    proc: (block
+      (nil))))

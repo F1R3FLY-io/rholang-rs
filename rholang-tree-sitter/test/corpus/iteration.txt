@@ -62,10 +62,11 @@ new iterate in {
                           (send
                             channel: (var)
                             send_type: (send_single)
-                            inputs: (inputs
-                              (var)
-                              (eval
-                                (var))))
+                            inputs: (send_inputs
+                              data: (send_data
+                                (var)
+                                (eval
+                                  (var)))))
                           (input
                             receipts: (receipts
                               (receipt
@@ -78,19 +79,21 @@ new iterate in {
                               (send
                                 channel: (var)
                                 send_type: (send_single)
-                                inputs: (inputs
-                                  (var)
-                                  (eval
-                                    (var))
-                                  (eval
-                                    (var)))))))))))
+                                inputs: (send_inputs
+                                  data: (send_data
+                                    (var)
+                                    (eval
+                                      (var))
+                                    (eval
+                                      (var))))))))))))
                 (case
                   pattern: (wildcard)
                   proc: (send
                     channel: (var)
                     send_type: (send_single)
-                    inputs: (inputs
-                      (nil))))))))
+                    inputs: (send_inputs
+                      data: (send_data
+                        (nil)))))))))
         (new
           decls: (name_decls
             (name_decl
@@ -103,16 +106,17 @@ new iterate in {
                 (send
                   channel: (var)
                   send_type: (send_single)
-                  inputs: (inputs
-                    (collection
-                      (list
-                        (long_literal)
-                        (long_literal)
-                        (long_literal)))
-                    (eval
-                      (var))
-                    (eval
-                      (var))))
+                  inputs: (send_inputs
+                    data: (send_data
+                      (collection
+                        (list
+                          (long_literal)
+                          (long_literal)
+                          (long_literal)))
+                      (eval
+                        (var))
+                      (eval
+                        (var)))))
                 (contract
                   name: (var)
                   formals: (names
@@ -123,8 +127,9 @@ new iterate in {
                     (send
                       channel: (var)
                       send_type: (send_single)
-                      inputs: (inputs
-                        (nil))))))
+                      inputs: (send_inputs
+                        data: (send_data
+                          (nil)))))))
               (input
                 receipts: (receipts
                   (receipt

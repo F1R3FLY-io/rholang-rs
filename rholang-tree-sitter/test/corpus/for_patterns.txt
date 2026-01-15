@@ -33,38 +33,80 @@ new people, stdout(`rho:io:stdout`) in {
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (par
+                inputs: (send_inputs
+                  data: (send_data
                     (par
                       (par
+                        (par
+                          (send
+                            channel: (quote
+                              (string_literal))
+                            send_type: (send_single)
+                            inputs: (send_inputs
+                              data: (send_data
+                                (string_literal))))
+                          (send
+                            channel: (quote
+                              (string_literal))
+                            send_type: (send_single)
+                            inputs: (send_inputs
+                              data: (send_data
+                                (long_literal)))))
                         (send
                           channel: (quote
                             (string_literal))
                           send_type: (send_single)
-                          inputs: (inputs
-                            (string_literal)))
-                        (send
-                          channel: (quote
-                            (string_literal))
-                          send_type: (send_single)
-                          inputs: (inputs
-                            (long_literal))))
+                          inputs: (send_inputs
+                            data: (send_data
+                              (string_literal)))))
                       (send
                         channel: (quote
                           (string_literal))
                         send_type: (send_single)
-                        inputs: (inputs
-                          (string_literal))))
-                    (send
-                      channel: (quote
-                        (string_literal))
-                      send_type: (send_single)
-                      inputs: (inputs
-                        (long_literal))))))
+                        inputs: (send_inputs
+                          data: (send_data
+                            (long_literal))))))))
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
+                inputs: (send_inputs
+                  data: (send_data
+                    (par
+                      (par
+                        (par
+                          (send
+                            channel: (quote
+                              (string_literal))
+                            send_type: (send_single)
+                            inputs: (send_inputs
+                              data: (send_data
+                                (string_literal))))
+                          (send
+                            channel: (quote
+                              (string_literal))
+                            send_type: (send_single)
+                            inputs: (send_inputs
+                              data: (send_data
+                                (long_literal)))))
+                        (send
+                          channel: (quote
+                            (string_literal))
+                          send_type: (send_single)
+                          inputs: (send_inputs
+                            data: (send_data
+                              (string_literal)))))
+                      (send
+                        channel: (quote
+                          (string_literal))
+                        send_type: (send_single)
+                        inputs: (send_inputs
+                          data: (send_data
+                            (long_literal)))))))))
+            (send
+              channel: (var)
+              send_type: (send_single)
+              inputs: (send_inputs
+                data: (send_data
                   (par
                     (par
                       (par
@@ -72,30 +114,35 @@ new people, stdout(`rho:io:stdout`) in {
                           channel: (quote
                             (string_literal))
                           send_type: (send_single)
-                          inputs: (inputs
-                            (string_literal)))
+                          inputs: (send_inputs
+                            data: (send_data
+                              (string_literal))))
                         (send
                           channel: (quote
                             (string_literal))
                           send_type: (send_single)
-                          inputs: (inputs
-                            (long_literal))))
+                          inputs: (send_inputs
+                            data: (send_data
+                              (long_literal)))))
                       (send
                         channel: (quote
                           (string_literal))
                         send_type: (send_single)
-                        inputs: (inputs
-                          (string_literal))))
+                        inputs: (send_inputs
+                          data: (send_data
+                            (string_literal)))))
                     (send
                       channel: (quote
                         (string_literal))
                       send_type: (send_single)
-                      inputs: (inputs
-                        (long_literal)))))))
-            (send
-              channel: (var)
-              send_type: (send_single)
-              inputs: (inputs
+                      inputs: (send_inputs
+                        data: (send_data
+                          (long_literal)))))))))
+          (send
+            channel: (var)
+            send_type: (send_single)
+            inputs: (send_inputs
+              data: (send_data
                 (par
                   (par
                     (par
@@ -103,57 +150,30 @@ new people, stdout(`rho:io:stdout`) in {
                         channel: (quote
                           (string_literal))
                         send_type: (send_single)
-                        inputs: (inputs
-                          (string_literal)))
+                        inputs: (send_inputs
+                          data: (send_data
+                            (string_literal))))
                       (send
                         channel: (quote
                           (string_literal))
                         send_type: (send_single)
-                        inputs: (inputs
-                          (long_literal))))
+                        inputs: (send_inputs
+                          data: (send_data
+                            (long_literal)))))
                     (send
                       channel: (quote
                         (string_literal))
                       send_type: (send_single)
-                      inputs: (inputs
-                        (string_literal))))
+                      inputs: (send_inputs
+                        data: (send_data
+                          (string_literal)))))
                   (send
                     channel: (quote
                       (string_literal))
                     send_type: (send_single)
-                    inputs: (inputs
-                      (long_literal)))))))
-          (send
-            channel: (var)
-            send_type: (send_single)
-            inputs: (inputs
-              (par
-                (par
-                  (par
-                    (send
-                      channel: (quote
-                        (string_literal))
-                      send_type: (send_single)
-                      inputs: (inputs
-                        (string_literal)))
-                    (send
-                      channel: (quote
-                        (string_literal))
-                      send_type: (send_single)
-                      inputs: (inputs
-                        (long_literal))))
-                  (send
-                    channel: (quote
-                      (string_literal))
-                    send_type: (send_single)
-                    inputs: (inputs
-                      (string_literal))))
-                (send
-                  channel: (quote
-                    (string_literal))
-                  send_type: (send_single)
-                  inputs: (inputs
-                    (long_literal)))))))
+                    inputs: (send_inputs
+                      data: (send_data
+                        (long_literal)))))))))
         (input
           receipts: (receipts
             (receipt
@@ -166,8 +186,9 @@ new people, stdout(`rho:io:stdout`) in {
                           channel: (quote
                             (string_literal))
                           send_type: (send_single)
-                          inputs: (inputs
-                            (long_literal)))
+                          inputs: (send_inputs
+                            data: (send_data
+                              (long_literal))))
                         (block
                           (conjunction
                             (var)
@@ -178,14 +199,16 @@ new people, stdout(`rho:io:stdout`) in {
                                     channel: (quote
                                       (string_literal))
                                     send_type: (send_single)
-                                    inputs: (inputs
-                                      (var)))
+                                    inputs: (send_inputs
+                                      data: (send_data
+                                        (var))))
                                   (send
                                     channel: (quote
                                       (string_literal))
                                     send_type: (send_single)
-                                    inputs: (inputs
-                                      (var))))
+                                    inputs: (send_inputs
+                                      data: (send_data
+                                        (var)))))
                                 (wildcard)))))))))
                 input: (var))))
           proc: (block
@@ -198,20 +221,23 @@ new people, stdout(`rho:io:stdout`) in {
                   (send
                     channel: (var)
                     send_type: (send_single)
-                    inputs: (inputs
-                      (collection
-                        (list
-                          (var)
-                          (var)))))))
+                    inputs: (send_inputs
+                      data: (send_data
+                        (collection
+                          (list
+                            (var)
+                            (var))))))))
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (par
-                    (var)
-                    (send
-                      channel: (quote
-                        (string_literal))
-                      send_type: (send_single)
-                      inputs: (inputs
-                        (long_literal)))))))))))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (par
+                      (var)
+                      (send
+                        channel: (quote
+                          (string_literal))
+                        send_type: (send_single)
+                        inputs: (send_inputs
+                          data: (send_data
+                            (long_literal)))))))))))))))

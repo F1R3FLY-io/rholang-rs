@@ -77,49 +77,67 @@ new stdout(`rho:io:stdout`) in {
                                 (send
                                   channel: (var)
                                   send_type: (send_single)
-                                  inputs: (inputs
-                                    (method
-                                      receiver: (collection
-                                        (set
-                                          (long_literal)
-                                          (long_literal)
-                                          (long_literal)))
-                                      name: (var)
-                                      args: (args
-                                        (long_literal)))))
+                                  inputs: (send_inputs
+                                    data: (send_data
+                                      (method
+                                        receiver: (collection
+                                          (set
+                                            (long_literal)
+                                            (long_literal)
+                                            (long_literal)))
+                                        name: (var)
+                                        args: (args
+                                          (long_literal))))))
                                 (send
                                   channel: (var)
                                   send_type: (send_single)
-                                  inputs: (inputs
-                                    (method
-                                      receiver: (collection
-                                        (set
-                                          (long_literal)
-                                          (long_literal)
-                                          (long_literal)))
-                                      name: (var)
-                                      args: (args
-                                        (long_literal))))))
+                                  inputs: (send_inputs
+                                    data: (send_data
+                                      (method
+                                        receiver: (collection
+                                          (set
+                                            (long_literal)
+                                            (long_literal)
+                                            (long_literal)))
+                                        name: (var)
+                                        args: (args
+                                          (long_literal)))))))
                               (send
                                 channel: (var)
                                 send_type: (send_single)
-                                inputs: (inputs
-                                  (method
-                                    receiver: (method
-                                      receiver: (collection
-                                        (set
-                                          (long_literal)
-                                          (long_literal)
+                                inputs: (send_inputs
+                                  data: (send_data
+                                    (method
+                                      receiver: (method
+                                        receiver: (collection
+                                          (set
+                                            (long_literal)
+                                            (long_literal)
+                                            (long_literal)))
+                                        name: (var)
+                                        args: (args
                                           (long_literal)))
                                       name: (var)
-                                      args: (args
-                                        (long_literal)))
-                                    name: (var)
-                                    args: (args)))))
+                                      args: (args))))))
                             (send
                               channel: (var)
                               send_type: (send_single)
-                              inputs: (inputs
+                              inputs: (send_inputs
+                                data: (send_data
+                                  (method
+                                    receiver: (collection
+                                      (set
+                                        (long_literal)
+                                        (long_literal)
+                                        (long_literal)))
+                                    name: (var)
+                                    args: (args
+                                      (long_literal)))))))
+                          (send
+                            channel: (var)
+                            send_type: (send_single)
+                            inputs: (send_inputs
+                              data: (send_data
                                 (method
                                   receiver: (collection
                                     (set
@@ -128,11 +146,12 @@ new stdout(`rho:io:stdout`) in {
                                       (long_literal)))
                                   name: (var)
                                   args: (args
-                                    (long_literal))))))
-                          (send
-                            channel: (var)
-                            send_type: (send_single)
-                            inputs: (inputs
+                                    (long_literal)))))))
+                        (send
+                          channel: (var)
+                          send_type: (send_single)
+                          inputs: (send_inputs
+                            data: (send_data
                               (method
                                 receiver: (collection
                                   (set
@@ -141,11 +160,12 @@ new stdout(`rho:io:stdout`) in {
                                     (long_literal)))
                                 name: (var)
                                 args: (args
-                                  (long_literal))))))
-                        (send
-                          channel: (var)
-                          send_type: (send_single)
-                          inputs: (inputs
+                                  (long_literal)))))))
+                      (send
+                        channel: (var)
+                        send_type: (send_single)
+                        inputs: (send_inputs
+                          data: (send_data
                             (method
                               receiver: (collection
                                 (set
@@ -154,11 +174,16 @@ new stdout(`rho:io:stdout`) in {
                                   (long_literal)))
                               name: (var)
                               args: (args
-                                (long_literal))))))
-                      (send
-                        channel: (var)
-                        send_type: (send_single)
-                        inputs: (inputs
+                                (collection
+                                  (set
+                                    (long_literal)
+                                    (long_literal)
+                                    (long_literal)))))))))
+                    (send
+                      channel: (var)
+                      send_type: (send_single)
+                      inputs: (send_inputs
+                        data: (send_data
                           (method
                             receiver: (collection
                               (set
@@ -169,13 +194,12 @@ new stdout(`rho:io:stdout`) in {
                             args: (args
                               (collection
                                 (set
-                                  (long_literal)
-                                  (long_literal)
-                                  (long_literal))))))))
-                    (send
-                      channel: (var)
-                      send_type: (send_single)
-                      inputs: (inputs
+                                  (long_literal)))))))))
+                  (send
+                    channel: (var)
+                    send_type: (send_single)
+                    inputs: (send_inputs
+                      data: (send_data
                         (method
                           receiver: (collection
                             (set
@@ -186,11 +210,12 @@ new stdout(`rho:io:stdout`) in {
                           args: (args
                             (collection
                               (set
-                                (long_literal))))))))
-                  (send
-                    channel: (var)
-                    send_type: (send_single)
-                    inputs: (inputs
+                                (long_literal)))))))))
+                (send
+                  channel: (var)
+                  send_type: (send_single)
+                  inputs: (send_inputs
+                    data: (send_data
                       (method
                         receiver: (collection
                           (set
@@ -201,22 +226,7 @@ new stdout(`rho:io:stdout`) in {
                         args: (args
                           (collection
                             (set
-                              (long_literal))))))))
-                (send
-                  channel: (var)
-                  send_type: (send_single)
-                  inputs: (inputs
-                    (method
-                      receiver: (collection
-                        (set
-                          (long_literal)
-                          (long_literal)
-                          (long_literal)))
-                      name: (var)
-                      args: (args
-                        (collection
-                          (set
-                            (long_literal))))))))
+                              (long_literal)))))))))
               (new
                 decls: (name_decls
                   (name_decl
@@ -225,22 +235,25 @@ new stdout(`rho:io:stdout`) in {
                   (send
                     channel: (var)
                     send_type: (send_single)
-                    inputs: (inputs
-                      (method
-                        receiver: (collection
-                          (set
+                    inputs: (send_inputs
+                      data: (send_data
+                        (method
+                          receiver: (collection
+                            (set
+                              (send
+                                channel: (var)
+                                send_type: (send_single)
+                                inputs: (send_inputs
+                                  data: (send_data
+                                    (long_literal))))))
+                          name: (var)
+                          args: (args
                             (send
                               channel: (var)
                               send_type: (send_single)
-                              inputs: (inputs
-                                (long_literal)))))
-                        name: (var)
-                        args: (args
-                          (send
-                            channel: (var)
-                            send_type: (send_single)
-                            inputs: (inputs
-                              (long_literal))))))))))
+                              inputs: (send_inputs
+                                data: (send_data
+                                  (long_literal))))))))))))
             (new
               decls: (name_decls
                 (name_decl
@@ -249,32 +262,35 @@ new stdout(`rho:io:stdout`) in {
                 (send
                   channel: (var)
                   send_type: (send_single)
-                  inputs: (inputs
-                    (method
-                      receiver: (collection
-                        (set
-                          (send
-                            channel: (var)
-                            send_type: (send_single)
-                            inputs: (inputs
-                              (long_literal)))))
-                      name: (var)
-                      args: (args
-                        (input
-                          receipts: (receipts
-                            (receipt
-                              (linear_bind
-                                names: (names
-                                  (quote
-                                    (var)))
-                                input: (simple_source
-                                  (var)))))
-                          proc: (block
+                  inputs: (send_inputs
+                    data: (send_data
+                      (method
+                        receiver: (collection
+                          (set
                             (send
                               channel: (var)
                               send_type: (send_single)
-                              inputs: (inputs
-                                (var))))))))))))
+                              inputs: (send_inputs
+                                data: (send_data
+                                  (long_literal))))))
+                        name: (var)
+                        args: (args
+                          (input
+                            receipts: (receipts
+                              (receipt
+                                (linear_bind
+                                  names: (names
+                                    (quote
+                                      (var)))
+                                  input: (simple_source
+                                    (var)))))
+                            proc: (block
+                              (send
+                                channel: (var)
+                                send_type: (send_single)
+                                inputs: (send_inputs
+                                  data: (send_data
+                                    (var))))))))))))))
           (new
             decls: (name_decls
               (name_decl
@@ -284,8 +300,9 @@ new stdout(`rho:io:stdout`) in {
                 (send
                   channel: (var)
                   send_type: (send_single)
-                  inputs: (inputs
-                    (long_literal)))
+                  inputs: (send_inputs
+                    data: (send_data
+                      (long_literal))))
                 (input
                   receipts: (receipts
                     (receipt
@@ -298,32 +315,35 @@ new stdout(`rho:io:stdout`) in {
                     (send
                       channel: (var)
                       send_type: (send_single)
-                      inputs: (inputs
-                        (method
-                          receiver: (method
-                            receiver: (collection
-                              (set
-                                (send
-                                  channel: (var)
-                                  send_type: (send_single)
-                                  inputs: (inputs
-                                    (long_literal)))))
+                      inputs: (send_inputs
+                        data: (send_data
+                          (method
+                            receiver: (method
+                              receiver: (collection
+                                (set
+                                  (send
+                                    channel: (var)
+                                    send_type: (send_single)
+                                    inputs: (send_inputs
+                                      data: (send_data
+                                        (long_literal))))))
+                              name: (var)
+                              args: (args
+                                (eval
+                                  (var))))
                             name: (var)
                             args: (args
-                              (eval
-                                (var))))
-                          name: (var)
-                          args: (args
-                            (long_literal)))))))))))
+                              (long_literal))))))))))))
         (send
           channel: (var)
           send_type: (send_single)
-          inputs: (inputs
-            (method
-              receiver: (collection
-                (set
-                  (long_literal)
-                  (long_literal)
-                  (long_literal)))
-              name: (var)
-              args: (args))))))))
+          inputs: (send_inputs
+            data: (send_data
+              (method
+                receiver: (collection
+                  (set
+                    (long_literal)
+                    (long_literal)
+                    (long_literal)))
+                name: (var)
+                args: (args)))))))))

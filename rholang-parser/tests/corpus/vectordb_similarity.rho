@@ -1,0 +1,10 @@
+// VectorDB Similarity Tests
+
+// Test 1: Implicit threshold
+for (@x <- channel ~ [1, 2, 3]) { Nil }
+
+// Test 2: Explicit threshold
+| for (@y <- docs ~> 75 ~ [90, 10, 5]) { y }
+
+// Test 3: Similarity with simple name
+| for (@data <- embeddings ~ queryVec) { data }

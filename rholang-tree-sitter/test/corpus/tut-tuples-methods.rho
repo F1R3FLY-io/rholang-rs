@@ -25,25 +25,27 @@ new stdout(`rho:io:stdout`) in {
         (send
           channel: (var)
           send_type: (send_single)
-          inputs: (inputs
-            (method
-              receiver: (collection
-                (tuple
-                  (long_literal)
-                  (long_literal)
-                  (long_literal)))
-              name: (var)
-              args: (args
-                (long_literal)))))
+          inputs: (send_inputs
+            data: (send_data
+              (method
+                receiver: (collection
+                  (tuple
+                    (long_literal)
+                    (long_literal)
+                    (long_literal)))
+                name: (var)
+                args: (args
+                  (long_literal))))))
         (send
           channel: (var)
           send_type: (send_single)
-          inputs: (inputs
-            (method
-              receiver: (collection
-                (tuple
-                  (long_literal)
-                  (long_literal)
-                  (long_literal)))
-              name: (var)
-              args: (args))))))))
+          inputs: (send_inputs
+            data: (send_data
+              (method
+                receiver: (collection
+                  (tuple
+                    (long_literal)
+                    (long_literal)
+                    (long_literal)))
+                name: (var)
+                args: (args)))))))))

@@ -64,18 +64,20 @@ new AddData, GetData, store, stdout(`rho:io:stdout`) in {
                       (send
                         channel: (var)
                         send_type: (send_single)
-                        inputs: (inputs
-                          (method
-                            receiver: (var)
-                            name: (var)
-                            args: (args
-                              (var)
-                              (var)))))
+                        inputs: (send_inputs
+                          data: (send_data
+                            (method
+                              receiver: (var)
+                              name: (var)
+                              args: (args
+                                (var)
+                                (var))))))
                       (send
                         channel: (var)
                         send_type: (send_single)
-                        inputs: (inputs
-                          (nil))))))))
+                        inputs: (send_inputs
+                          data: (send_data
+                            (nil)))))))))
             (contract
               name: (var)
               formals: (names
@@ -96,18 +98,20 @@ new AddData, GetData, store, stdout(`rho:io:stdout`) in {
                     (send
                       channel: (var)
                       send_type: (send_single)
-                      inputs: (inputs
-                        (method
-                          receiver: (var)
-                          name: (var)
-                          args: (args
-                            (var))))))))))
+                      inputs: (send_inputs
+                        data: (send_data
+                          (method
+                            receiver: (var)
+                            name: (var)
+                            args: (args
+                              (var)))))))))))
           (send
             channel: (var)
             send_type: (send_single)
-            inputs: (inputs
-              (collection
-                (map)))))
+            inputs: (send_inputs
+              data: (send_data
+                (collection
+                  (map))))))
         (new
           decls: (name_decls
             (name_decl
@@ -123,25 +127,27 @@ new AddData, GetData, store, stdout(`rho:io:stdout`) in {
                 (send
                   channel: (var)
                   send_type: (send_single)
-                  inputs: (inputs
-                    (bundle
-                      bundle_type: (bundle_write)
-                      proc: (block
-                        (eval
-                          (var))))
-                    (eval
-                      (var))))
+                  inputs: (send_inputs
+                    data: (send_data
+                      (bundle
+                        bundle_type: (bundle_write)
+                        proc: (block
+                          (eval
+                            (var))))
+                      (eval
+                        (var)))))
                 (send
                   channel: (var)
                   send_type: (send_single)
-                  inputs: (inputs
-                    (bundle
-                      bundle_type: (bundle_write)
-                      proc: (block
-                        (eval
-                          (var))))
-                    (eval
-                      (var)))))
+                  inputs: (send_inputs
+                    data: (send_data
+                      (bundle
+                        bundle_type: (bundle_write)
+                        proc: (block
+                          (eval
+                            (var))))
+                      (eval
+                        (var))))))
               (input
                 receipts: (receipts
                   (receipt
@@ -162,12 +168,13 @@ new AddData, GetData, store, stdout(`rho:io:stdout`) in {
                   (send
                     channel: (var)
                     send_type: (send_single)
-                    inputs: (inputs
-                      (collection
-                        (map
-                          (key_value_pair
-                            key: (string_literal)
-                            value: (var))
-                          (key_value_pair
-                            key: (string_literal)
-                            value: (var)))))))))))))))
+                    inputs: (send_inputs
+                      data: (send_data
+                        (collection
+                          (map
+                            (key_value_pair
+                              key: (string_literal)
+                              value: (var))
+                            (key_value_pair
+                              key: (string_literal)
+                              value: (var))))))))))))))))

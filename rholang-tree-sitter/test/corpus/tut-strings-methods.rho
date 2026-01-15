@@ -36,41 +36,46 @@ new stdout(`rho:io:stdout`) in {
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (method
-                    receiver: (string_literal)
-                    name: (var)
-                    args: (args))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (method
+                      receiver: (string_literal)
+                      name: (var)
+                      args: (args)))))
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (method
-                    receiver: (string_literal)
-                    name: (var)
-                    args: (args
-                      (long_literal)
-                      (long_literal))))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (method
+                      receiver: (string_literal)
+                      name: (var)
+                      args: (args
+                        (long_literal)
+                        (long_literal)))))))
             (send
               channel: (var)
               send_type: (send_single)
-              inputs: (inputs
-                (concat
-                  (string_literal)
-                  (string_literal)))))
+              inputs: (send_inputs
+                data: (send_data
+                  (concat
+                    (string_literal)
+                    (string_literal))))))
           (send
             channel: (var)
             send_type: (send_single)
-            inputs: (inputs
-              (method
-                receiver: (string_literal)
-                name: (var)
-                args: (args)))))
+            inputs: (send_inputs
+              data: (send_data
+                (method
+                  receiver: (string_literal)
+                  name: (var)
+                  args: (args))))))
         (send
           channel: (var)
           send_type: (send_single)
-          inputs: (inputs
-            (method
-              receiver: (string_literal)
-              name: (var)
-              args: (args))))))))
+          inputs: (send_inputs
+            data: (send_data
+              (method
+                receiver: (string_literal)
+                name: (var)
+                args: (args)))))))))

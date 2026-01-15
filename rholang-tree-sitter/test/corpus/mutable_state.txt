@@ -66,8 +66,9 @@ new MakeCell in {
                     (send
                       channel: (var)
                       send_type: (send_single)
-                      inputs: (inputs
-                        (var)))
+                      inputs: (send_inputs
+                        data: (send_data
+                          (var))))
                     (contract
                       name: (var)
                       formals: (names
@@ -87,13 +88,15 @@ new MakeCell in {
                               (send
                                 channel: (var)
                                 send_type: (send_single)
-                                inputs: (inputs
-                                  (var)))
+                                inputs: (send_inputs
+                                  data: (send_data
+                                    (var))))
                               (send
                                 channel: (var)
                                 send_type: (send_single)
-                                inputs: (inputs
-                                  (var)))))))))
+                                inputs: (send_inputs
+                                  data: (send_data
+                                    (var))))))))))
                   (contract
                     name: (var)
                     formals: (names
@@ -114,13 +117,15 @@ new MakeCell in {
                             (send
                               channel: (var)
                               send_type: (send_single)
-                              inputs: (inputs
-                                (var)))
+                              inputs: (send_inputs
+                                data: (send_data
+                                  (var))))
                             (send
                               channel: (var)
                               send_type: (send_single)
-                              inputs: (inputs
-                                (bool_literal)))))))))))))
+                              inputs: (send_inputs
+                                data: (send_data
+                                  (bool_literal))))))))))))))
         (new
           decls: (name_decls
             (name_decl
@@ -132,12 +137,13 @@ new MakeCell in {
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (long_literal)
-                  (eval
-                    (var))
-                  (eval
-                    (var))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (long_literal)
+                    (eval
+                      (var))
+                    (eval
+                      (var)))))
               (new
                 decls: (name_decls
                   (name_decl
@@ -147,9 +153,10 @@ new MakeCell in {
                     (send
                       channel: (var)
                       send_type: (send_single)
-                      inputs: (inputs
-                        (eval
-                          (var))))
+                      inputs: (send_inputs
+                        data: (send_data
+                          (eval
+                            (var)))))
                     (input
                       receipts: (receipts
                         (receipt
@@ -164,10 +171,11 @@ new MakeCell in {
                           (send
                             channel: (var)
                             send_type: (send_single)
-                            inputs: (inputs
-                              (long_literal)
-                              (eval
-                                (var))))
+                            inputs: (send_inputs
+                              data: (send_data
+                                (long_literal)
+                                (eval
+                                  (var)))))
                           (input
                             receipts: (receipts
                               (receipt
@@ -181,9 +189,10 @@ new MakeCell in {
                                 (send
                                   channel: (var)
                                   send_type: (send_single)
-                                  inputs: (inputs
-                                    (eval
-                                      (var))))
+                                  inputs: (send_inputs
+                                    data: (send_data
+                                      (eval
+                                        (var)))))
                                 (input
                                   receipts: (receipts
                                     (receipt

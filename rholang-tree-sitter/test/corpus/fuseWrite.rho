@@ -82,27 +82,30 @@ new MapStore, stdout(`rho:io:stdout`) in {
                             (send
                               channel: (var)
                               send_type: (send_single)
-                              inputs: (inputs
-                                (string_literal)))
+                              inputs: (send_inputs
+                                data: (send_data
+                                  (string_literal))))
                             (send
                               channel: (var)
                               send_type: (send_single)
-                              inputs: (inputs
-                                (collection
-                                  (map
-                                    (key_value_pair
-                                      key: (var)
-                                      value: (var)))))))
+                              inputs: (send_inputs
+                                data: (send_data
+                                  (collection
+                                    (map
+                                      (key_value_pair
+                                        key: (var)
+                                        value: (var))))))))
                           (send
                             channel: (var)
                             send_type: (send_single)
-                            inputs: (inputs
-                              (collection
-                                (tuple
-                                  (string_literal)
-                                  (var)
-                                  (string_literal)
-                                  (var))))))))
+                            inputs: (send_inputs
+                              data: (send_data
+                                (collection
+                                  (tuple
+                                    (string_literal)
+                                    (var)
+                                    (string_literal)
+                                    (var)))))))))
                     (case
                       pattern: (string_literal)
                       proc: (block
@@ -120,23 +123,25 @@ new MapStore, stdout(`rho:io:stdout`) in {
                               (send
                                 channel: (var)
                                 send_type: (send_single)
-                                inputs: (inputs
-                                  (method
-                                    receiver: (var)
-                                    name: (var)
-                                    args: (args
-                                      (var)
-                                      (var)))))
+                                inputs: (send_inputs
+                                  data: (send_data
+                                    (method
+                                      receiver: (var)
+                                      name: (var)
+                                      args: (args
+                                        (var)
+                                        (var))))))
                               (send
                                 channel: (var)
                                 send_type: (send_single)
-                                inputs: (inputs
-                                  (collection
-                                    (tuple
-                                      (string_literal)
-                                      (var)
-                                      (string_literal)
-                                      (var))))))))))
+                                inputs: (send_inputs
+                                  data: (send_data
+                                    (collection
+                                      (tuple
+                                        (string_literal)
+                                        (var)
+                                        (string_literal)
+                                        (var)))))))))))
                     (case
                       pattern: (string_literal)
                       proc: (block
@@ -154,29 +159,32 @@ new MapStore, stdout(`rho:io:stdout`) in {
                               (send
                                 channel: (var)
                                 send_type: (send_single)
-                                inputs: (inputs
-                                  (method
-                                    receiver: (var)
-                                    name: (var)
-                                    args: (args
-                                      (var)))))
+                                inputs: (send_inputs
+                                  data: (send_data
+                                    (method
+                                      receiver: (var)
+                                      name: (var)
+                                      args: (args
+                                        (var))))))
                               (send
                                 channel: (var)
                                 send_type: (send_single)
-                                inputs: (inputs
-                                  (collection
-                                    (tuple
-                                      (string_literal)
-                                      (var)
-                                      (string_literal))))))))))
+                                inputs: (send_inputs
+                                  data: (send_data
+                                    (collection
+                                      (tuple
+                                        (string_literal)
+                                        (var)
+                                        (string_literal)))))))))))
                     (case
                       pattern: (wildcard)
                       proc: (block
                         (send
                           channel: (var)
                           send_type: (send_single)
-                          inputs: (inputs
-                            (string_literal)))))))))))
+                          inputs: (send_inputs
+                            data: (send_data
+                              (string_literal))))))))))))
         (new
           decls: (name_decls
             (name_decl
@@ -188,17 +196,19 @@ new MapStore, stdout(`rho:io:stdout`) in {
                   (send
                     channel: (var)
                     send_type: (send_single)
-                    inputs: (inputs
-                      (string_literal)))
+                    inputs: (send_inputs
+                      data: (send_data
+                        (string_literal))))
                   (send
                     channel: (var)
                     send_type: (send_single)
-                    inputs: (inputs
-                      (string_literal)
-                      (string_literal)
-                      (string_literal)
-                      (eval
-                        (var)))))
+                    inputs: (send_inputs
+                      data: (send_data
+                        (string_literal)
+                        (string_literal)
+                        (string_literal)
+                        (eval
+                          (var))))))
                 (input
                   receipts: (receipts
                     (receipt
@@ -213,15 +223,18 @@ new MapStore, stdout(`rho:io:stdout`) in {
                       (send
                         channel: (var)
                         send_type: (send_single)
-                        inputs: (inputs
-                          (var)))
+                        inputs: (send_inputs
+                          data: (send_data
+                            (var))))
                       (send
                         channel: (var)
                         send_type: (send_single)
-                        inputs: (inputs
-                          (string_literal)))))))
+                        inputs: (send_inputs
+                          data: (send_data
+                            (string_literal))))))))
               (send
                 channel: (var)
                 send_type: (send_single)
-                inputs: (inputs
-                  (string_literal))))))))))
+                inputs: (send_inputs
+                  data: (send_data
+                    (string_literal)))))))))))
