@@ -50,30 +50,33 @@ export default function App() {
     <div style={{ fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif', margin: '2rem' }}>
       <h1>Rholang WASM (React)</h1>
       <p>Status: <strong>{status}</strong></p>
-      <div style={{ display: 'grid', gap: '1rem' }}>
-        <label htmlFor="code">Rholang code</label>
-        <textarea
-          id="code"
-          value={code}
-          onChange={e => setCode(e.target.value)}
-          placeholder="// Type Rholang here"
-          style={{ width: '100%', height: '220px', fontFamily: 'monospace' }}
-        />
-        <div>
-          <button onClick={run} disabled={status !== 'ready' || !interpreter}>Run</button>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          <div>
-            <h3 style={{ marginTop: 0 }}>Result</h3>
-            <div style={{ whiteSpace: 'pre-wrap', background: '#111', color: '#0f0', padding: '1rem', borderRadius: 6, minHeight: 120 }}>
-              {output}
+      <div style={{ display: 'grid', gap: '1rem', gridTemplateRows: '4fr 1fr', minHeight: '80vh' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', alignItems: 'start' }}>
+          <div style={{ display: 'grid', gap: '0.5rem', height: '100%' }}>
+            <label htmlFor="code">Rholang code</label>
+            <textarea
+              id="code"
+              value={code}
+              onChange={e => setCode(e.target.value)}
+              placeholder="// Type Rholang here"
+              style={{ width: '100%', height: '100%', minHeight: 240, fontFamily: 'monospace' }}
+            />
+            <div>
+              <button onClick={run} disabled={status !== 'ready' || !interpreter}>Run</button>
             </div>
           </div>
-          <div>
+          <div style={{ display: 'grid', gridTemplateRows: 'auto 1fr', gap: '0.5rem', height: '100%' }}>
             <h3 style={{ marginTop: 0 }}>Disassembly</h3>
-            <div style={{ whiteSpace: 'pre-wrap', background: '#0a0a0a', color: '#0ff', padding: '1rem', borderRadius: 6, minHeight: 120 }}>
+            <div style={{ whiteSpace: 'pre-wrap', background: '#0a0a0a', color: '#0ff', padding: '1rem', borderRadius: 6, minHeight: 240, overflow: 'auto' }}>
               {disassembly}
             </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 style={{ marginTop: 0 }}>Result</h3>
+          <div style={{ whiteSpace: 'pre-wrap', background: '#111', color: '#0f0', padding: '1rem', borderRadius: 6, minHeight: 120 }}>
+            {output}
           </div>
         </div>
       </div>

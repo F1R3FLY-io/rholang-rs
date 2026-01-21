@@ -60,6 +60,7 @@ const DEFAULT_PROMPT: &str = ">>> ";
 fn is_tty_stdout() -> bool {
     atty::is(atty::Stream::Stdout)
 }
+#[allow(dead_code)]
 fn is_tty_stderr() -> bool {
     atty::is(atty::Stream::Stderr)
 }
@@ -85,6 +86,7 @@ fn label_warn(s: &str) -> String {
 fn label_err_out(s: &str) -> String {
     colorize(s, "31", is_tty_stdout())
 } // red for stdout-bound errors
+#[allow(dead_code)]
 fn label_err_err(s: &str) -> String {
     colorize(s, "31", is_tty_stderr())
 } // red for stderr-bound errors

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use rholang_shell::{
     handle_interrupt, help_message, process_multiline_input, process_special_command,
-    providers::InterpretationResult, Args,
+    providers::InterpretationResult,
 };
 use std::io::Cursor;
 
@@ -356,7 +356,7 @@ fn test_process_multiline_input_nonempty_buffer_empty_line() -> Result<()> {
 #[test]
 fn test_handle_interrupt() -> Result<()> {
     let mut buffer = vec!["line1".to_string(), "line2".to_string()];
-    let multiline = true;
+    let _multiline = true;
     let mut stdout = Cursor::new(Vec::new());
     let interpreter = MockInterpreterProvider::with_processes(vec![
         (1, "process1".to_string()),
@@ -376,7 +376,7 @@ fn test_handle_interrupt() -> Result<()> {
 #[test]
 fn test_handle_interrupt_single_line() -> Result<()> {
     let mut buffer = vec!["line1".to_string(), "line2".to_string()];
-    let multiline = false;
+    let _multiline = false;
     let mut stdout = Cursor::new(Vec::new());
     let interpreter = MockInterpreterProvider::with_processes(vec![
         (1, "process1".to_string()),

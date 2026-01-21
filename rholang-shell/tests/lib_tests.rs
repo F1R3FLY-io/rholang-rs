@@ -360,7 +360,7 @@ async fn test_process_multiline_input_open_bracket_not_execute() -> Result<()> {
 #[tokio::test]
 async fn test_handle_interrupt_multiline() -> Result<()> {
     let mut buffer = vec!["line1".to_string(), "line2".to_string()];
-    let multiline = true;
+    let _multiline = true;
     let mut stdout = Cursor::new(Vec::new());
     let interpreter = create_fake_interpreter();
 

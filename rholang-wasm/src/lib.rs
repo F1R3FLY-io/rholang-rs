@@ -5,10 +5,11 @@ use rholang_compiler::{compile_first_process_async, Disassembler};
 #[cfg(feature = "vm-eval")]
 use rholang_interpreter::{InterpreterProvider, RholangCompilerInterpreterProvider};
 #[cfg(feature = "vm-eval")]
-use rholang_vm::api::{Process, VM, Value};
+use rholang_vm::api::Value;
 
 // Render VM values similarly to the shell provider so outputs match across targets.
 #[cfg(feature = "vm-eval")]
+#[allow(dead_code)]
 fn pretty_value(v: &Value) -> String {
     match v {
         Value::Int(n) => format!("Int({})", n),
