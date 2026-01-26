@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use crate::execute::{self, StepResult};
 use crate::process::Process;
-use crate::rspace::{InMemoryRSpace, RSpace};
+use rholang_rspace::{InMemoryRSpace, RSpace};
 use crate::value::Value;
 
 pub struct VM {

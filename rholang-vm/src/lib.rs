@@ -4,7 +4,6 @@
 mod error;
 mod execute;
 mod process;
-mod rspace;
 mod value;
 mod vm;
 

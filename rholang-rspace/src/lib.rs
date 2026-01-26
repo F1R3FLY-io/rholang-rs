@@ -1,4 +1,26 @@
-use crate::value::Value;
+#[derive(Clone, Debug, PartialEq)]
+pub enum Value {
+    Int(i64),
+    Bool(bool),
+    Str(String),
+    Name(String),
+    List(Vec<Value>),
+    Tuple(Vec<Value>),
+    Map(Vec<(Value, Value)>),
+    Nil,
+}
+
+impl Value {
+    #[allow(dead_code)]
+    pub fn as_int(&self) -> Option<i64> {
+        if let Value::Int(n) = self {
+            Some(*n)
+        } else {
+            None
+        }
+    }
+}
+
 use anyhow::Result;
 use std::collections::HashMap;
 
@@ -72,5 +94,33 @@ impl RSpace for InMemoryRSpace {
 
     fn reset(&mut self) {
         self.store.clear();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_in_memory_rspace_basic() -> Result<()> {
+        let mut rspace = InMemoryRSpace::new();
+        let channel = "@0:test".to_string();
+        let val = Value::Int(42);
+
+        rspace.tell(0, channel.clone(), val.clone())?;
+        assert_eq!(rspace.peek(0, channel.clone())?, Some(val.clone()));
+        assert_eq!(rspace.ask(0, channel.clone())?, Some(val));
+        assert_eq!(rspace.ask(0, channel.clone())?, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_mismatch_kind() {
+        let mut rspace = InMemoryRSpace::new();
+        let channel = "@0:test".to_string();
+        let val = Value::Int(42);
+
+        assert!(rspace.tell(1, channel.clone(), val).is_err());
     }
 }
