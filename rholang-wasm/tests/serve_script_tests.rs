@@ -83,7 +83,7 @@ fn serve_wasm_script_serves_index() {
             Ok((status, body)) => {
                 if status.starts_with("HTTP/1.0 200") || status.starts_with("HTTP/1.1 200") {
                     // Check for a stable marker text from the page
-                    if body.contains("Rholang WebAssembly Shell") || body.contains("Rholang WASM Eval") {
+                    if body.contains("Rholang WASM (React)") || body.contains("Rholang WebAssembly Shell") || body.contains("Rholang WASM Eval") {
                         ok = true;
                         break;
                     }
