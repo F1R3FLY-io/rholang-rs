@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use crate::execute::{self, StepResult};
 use crate::process::Process;
-use rholang_rspace::{InMemoryRSpace, RSpace};
+use rholang_rspace::{DefaultRSpace, RSpace};
 use crate::value::Value;
 
 pub struct VM {
@@ -26,7 +26,7 @@ impl VM {
     pub fn new() -> Self {
         VM {
             stack: Vec::new(),
-            rspace: Box::new(InMemoryRSpace::new()),
+            rspace: Box::new(DefaultRSpace::new()),
             cont_last: None,
             next_cont_id: 1,
             next_name_id: 1,
