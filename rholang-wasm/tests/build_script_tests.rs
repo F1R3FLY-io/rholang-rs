@@ -19,9 +19,7 @@ fn build_wasm_script_produces_artifacts() {
         .unwrap_or(false);
 
     if !has_wasm_pack {
-        eprintln!(
-            "skipped: wasm-pack not found in PATH. Install with `cargo install wasm-pack`."
-        );
+        eprintln!("skipped: wasm-pack not found in PATH. Install with `cargo install wasm-pack`.");
         return;
     }
 
@@ -32,12 +30,19 @@ fn build_wasm_script_produces_artifacts() {
         .status()
         .expect("failed to invoke wasm_build.sh");
 
-    assert!(status.success(), "wasm_build.sh exited with non-zero status");
+    assert!(
+        status.success(),
+        "wasm_build.sh exited with non-zero status"
+    );
 
     // Verify artifacts exist in the default out-dir (pkg)
     let js = Path::new("pkg").join("rholang_wasm.js");
     let wasm = Path::new("pkg").join("rholang_wasm_bg.wasm");
 
     assert!(js.exists(), "expected JS shim not found at {:?}", js);
-    assert!(wasm.exists(), "expected WASM binary not found at {:?}", wasm);
+    assert!(
+        wasm.exists(),
+        "expected WASM binary not found at {:?}",
+        wasm
+    );
 }

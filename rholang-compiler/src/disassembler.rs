@@ -15,13 +15,13 @@
 //!     .show_hex(true)
 //!     .show_comments(true);
 //!
-//! let output = disasm.disassemble(&process);
-//! println!("{}", output);
+//! // let output = disasm.disassemble(&process);
+//! // println!("{}", output);
 //! ```
 
 use rholang_bytecode::core::instructions::Instruction;
 use rholang_bytecode::core::opcodes::Opcode;
-use rholang_vm::api::Process;
+use rholang_process::Process;
 use std::io::Write;
 use std::path::Path;
 

@@ -5,7 +5,7 @@ const STORE_CONC: u16 = 3;
 
 #[test]
 fn test_contract_operation_examples_minimal() {
-    let mut vm = VM::new();
+    let vm = VM::new();
 
     let prog = vec![
         // Create top-level contract channel
@@ -28,13 +28,14 @@ fn test_contract_operation_examples_minimal() {
     ];
 
     let mut p = Process::new(prog, "contract:minimal");
-    let out = vm.execute(&mut p).expect("exec ok");
+    p.vm = Some(vm.clone());
+    let out = p.execute().expect("exec ok");
     assert_eq!(out, Value::List(vec![Value::Int(42)]));
 }
 
 #[test]
 fn test_contract_persistent_peek_then_consume() {
-    let mut vm = VM::new();
+    let vm = VM::new();
 
     // Setup and persistent peek twice
     let prog1 = vec![
@@ -54,8 +55,11 @@ fn test_contract_persistent_peek_then_consume() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p1 = Process::new(prog1, "contract:peek");
-    let out1 = vm.execute(&mut p1).expect("exec ok");
+    p1.vm = Some(vm);
+    let out1 = p1.execute().expect("exec ok");
     assert_eq!(out1, Value::List(vec![Value::Int(1)]));
+
+    let vm = p1.vm.take().expect("vm retained");
 
     // Now consume then peek -> Nil
     let prog2 = vec![
@@ -73,13 +77,14 @@ fn test_contract_persistent_peek_then_consume() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p2 = Process::new(prog2, "contract:consume");
-    let out2 = vm.execute(&mut p2).expect("exec ok");
+    p2.vm = Some(vm);
+    let out2 = p2.execute().expect("exec ok");
     assert_eq!(out2, Value::Nil);
 }
 
 #[test]
 fn test_contract_multiple_sends_and_persistent_peek() {
-    let mut vm = VM::new();
+    let vm = VM::new();
     let prog = vec![
         Instruction::unary(Opcode::NAME_CREATE, STORE_CONC),
         Instruction::nullary(Opcode::ALLOC_LOCAL),
@@ -106,13 +111,14 @@ fn test_contract_multiple_sends_and_persistent_peek() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p = Process::new(prog, "contract:multi");
-    let out = vm.execute(&mut p).expect("exec ok");
+    p.vm = Some(vm.clone());
+    let out = p.execute().expect("exec ok");
     assert_eq!(out, Value::List(vec![Value::Int(2)]));
 }
 
 #[test]
 fn test_continuation_store_and_resume() {
-    let mut vm = VM::new();
+    let vm = VM::new();
     let prog = vec![
         Instruction::unary(Opcode::PUSH_INT, 99),
         Instruction::nullary(Opcode::CONT_STORE),  // -> id
@@ -120,6 +126,7 @@ fn test_continuation_store_and_resume() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p = Process::new(prog, "contract:cont");
-    let out = vm.execute(&mut p).expect("exec ok");
+    p.vm = Some(vm);
+    let out = p.execute().expect("exec ok");
     assert_eq!(out, Value::Int(99));
 }

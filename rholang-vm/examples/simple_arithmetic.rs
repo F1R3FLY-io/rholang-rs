@@ -9,7 +9,7 @@ fn main() -> Result<()> {
     println!("-----------------------------------------");
 
     // Create a new VM instance
-    let mut vm = VM::new();
+    let vm = VM::new();
     println!("VM created successfully");
 
     // Program: 2 + 3 -> 5
@@ -20,9 +20,10 @@ fn main() -> Result<()> {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut process = Process::new(program, "simple_arithmetic: add");
+    process.vm = Some(vm.clone());
 
     println!("Executing 2 + 3 ...");
-    let result = vm.execute(&mut process)?;
+    let result = process.execute()?;
     println!("Result: {:?}", result);
     assert_eq!(result, Value::Int(5));
 
@@ -38,9 +39,10 @@ fn main() -> Result<()> {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut process2 = Process::new(program2, "simple_arithmetic: complex");
+    process2.vm = Some(vm);
 
     println!("Executing ((10 - 5) + 4) * 2 ...");
-    let result2 = vm.execute(&mut process2)?;
+    let result2 = process2.execute()?;
     println!("Result: {:?}", result2);
     assert_eq!(result2, Value::Int(18));
 

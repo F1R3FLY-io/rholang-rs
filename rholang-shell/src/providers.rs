@@ -508,6 +508,10 @@ impl RholangCompilerInterpreterProvider {
                     .collect();
                 format!("{{{}}}", inner.join(", "))
             }
+            VmValue::Par(procs) => {
+                let inner: Vec<String> = procs.iter().map(|p| p.to_string()).collect();
+                inner.join(" | ")
+            }
             VmValue::Nil => "Nil".to_string(),
         }
     }
@@ -653,8 +657,8 @@ impl InterpreterProvider for RholangCompilerInterpreterProvider {
                     };
 
                     // Execute the process
-                    let mut vm = VM::new();
-                    let value = match vm.execute(&mut process) {
+                    process.vm = Some(VM::new());
+                    let value = match process.execute() {
                         Ok(v) => v,
                         Err(e) => {
                             return InterpretationResult::Error(InterpreterError::other_error(

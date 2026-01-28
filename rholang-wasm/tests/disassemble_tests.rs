@@ -28,7 +28,10 @@ fn disassemble_complex_structure_contains_instructions() {
     let input = "new x in { x!(42) | for (y <- x) { y } }";
     let disasm = disassemble(input);
     assert!(
-        disasm.contains("SEND") || disasm.contains("RECV") || disasm.contains("TELL") || disasm.contains("ASK"),
+        disasm.contains("SEND")
+            || disasm.contains("RECV")
+            || disasm.contains("TELL")
+            || disasm.contains("ASK"),
         "expected disassembly to include send/receive instructions, got: {disasm}"
     );
 }

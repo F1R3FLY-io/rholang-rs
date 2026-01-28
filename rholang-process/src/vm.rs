@@ -1,5 +1,4 @@
 use anyhow::Result;
-use rholang_bytecode::core::instructions::Instruction as CoreInst;
 use std::collections::HashMap;
 
 use crate::execute::{self, StepResult};
@@ -130,16 +129,26 @@ impl VM {
         }
     }
 
-    pub fn reset_stack(&mut self) {
+    // Execute a provided Process (the only entry point)
+    pub fn execute(&mut self, process: &mut Process) -> Result<Value, ExecError> {
+        // Reset VM stack per process execution to avoid contamination between runs
         self.stack.clear();
-    }
-
-    // Execute a single instruction for a Process
-    pub fn execute(
-        &mut self,
-        process: &mut Process,
-        inst: CoreInst,
-    ) -> Result<StepResult, ExecError> {
-        execute::step(self, process, inst)
+        let mut pc = 0usize;
+        let code = process.code.clone(); // Clone code to avoid borrowing process as whole
+        while pc < code.len() {
+            let inst = code[pc];
+            match execute::step(self, process, inst)? {
+                StepResult::Next => {
+                    pc += 1;
+                }
+                StepResult::Stop => {
+                    break;
+                }
+                StepResult::Jump(target) => {
+                    pc = target;
+                }
+            }
+        }
+        Ok(self.stack.last().cloned().unwrap_or(Value::Nil))
     }
 }

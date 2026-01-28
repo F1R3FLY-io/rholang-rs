@@ -243,14 +243,14 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
 
     /// Verify that a channel exists and is properly bound
     fn verify_channel_exists(&self, name: &Name<'ast>) -> ValidationResult {
-        if let Name::NameVar(rholang_parser::ast::Var::Id(id)) = name {
-            if self.db.binder_of_id(*id).is_none() {
-                let sym = self.db.intern(id.name);
-                return Err(ValidationError::UnboundVariable {
-                    var: sym,
-                    pos: id.pos,
-                });
-            }
+        if let Name::NameVar(rholang_parser::ast::Var::Id(id)) = name
+            && self.db.binder_of_id(*id).is_none()
+        {
+            let sym = self.db.intern(id.name);
+            return Err(ValidationError::UnboundVariable {
+                var: sym,
+                pos: id.pos,
+            });
         }
         // Wildcards and quoted processes are always valid as channels
         Ok(())

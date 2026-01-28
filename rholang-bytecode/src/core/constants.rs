@@ -668,13 +668,13 @@ impl BytecodeSerializer {
                     )));
                 }
 
-                if let Some(type_constraint) = binding.type_constraint {
-                    if type_constraint > 6 {
-                        // We have 7 type constraints (0-6)
-                        return Err(BytecodeError::ValidationError(format!(
-                            "Invalid type constraint {type_constraint} in binding {j} of pattern {i}"
-                        )));
-                    }
+                if let Some(type_constraint) = binding.type_constraint
+                    && type_constraint > 6
+                {
+                    // We have 7 type constraints (0-6)
+                    return Err(BytecodeError::ValidationError(format!(
+                        "Invalid type constraint {type_constraint} in binding {j} of pattern {i}"
+                    )));
                 }
             }
         }

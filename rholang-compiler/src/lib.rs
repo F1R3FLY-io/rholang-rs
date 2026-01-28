@@ -3,7 +3,7 @@
 //! ## Usage
 //! ```ignore
 //! use rholang_compiler::Compiler;
-//! use rholang_lib::sem::{SemanticDb, Pipeline};
+//! use librho::sem::{SemanticDb, Pipeline};
 //! use rholang_parser::RholangParser;
 //!
 //! let parser = RholangParser::new();
@@ -22,7 +22,7 @@ mod disassembler;
 use anyhow::Result;
 use librho::sem::SemanticDb;
 use rholang_parser::ast::AnnProc;
-use rholang_vm::api::Process;
+pub use rholang_process::Process;
 
 pub use codegen::CodegenContext;
 pub use disassembler::{Disassembler, DisassemblerConfig, DisassemblyFormat};
@@ -75,16 +75,16 @@ impl<'a> Compiler<'a> {
 }
 
 // -------------------- High-level async facade (parsing + sem + codegen) --------------------
-use librho::sem::{pipeline::Pipeline, EnclosureAnalysisPass, ForCompElaborationPass, ResolverPass};
+use librho::sem::{
+    pipeline::Pipeline, EnclosureAnalysisPass, ForCompElaborationPass, ResolverPass,
+};
 use rholang_parser::RholangParser;
 
 /// Parse, run semantic pipeline, and compile all top-level processes from a Rholang source string.
 ///
 /// This is an async function because the semantic `Pipeline::run` is async. On wasm this runs
 /// sequentially; on native it may use concurrency internally.
-pub async fn compile_source_async(
-    src: &str,
-) -> Result<Vec<rholang_vm::api::Process>> {
+pub async fn compile_source_async(src: &str) -> Result<Vec<Process>> {
     // Parse
     let parser = RholangParser::new();
     let validated = parser.parse(src);
@@ -118,11 +118,9 @@ pub async fn compile_source_async(
 /// Convenience: compile only the first top-level process in the source.
 pub async fn compile_first_process_async(src: &str) -> Result<Process> {
     let procs = compile_source_async(src).await?;
-    Ok(
-        procs
-            .into_iter()
-            .next()
-            // Treat empty sources as a valid no-op process so callers (e.g. WASM) get `Nil` instead of an error.
-            .unwrap_or_else(|| Process::new(Vec::new(), "<empty>")),
-    )
+    Ok(procs
+        .into_iter()
+        .next()
+        // Treat empty sources as a valid no-op process so callers (e.g. WASM) get `Nil` instead of an error.
+        .unwrap_or_else(|| Process::new(Vec::new(), "<empty>")))
 }

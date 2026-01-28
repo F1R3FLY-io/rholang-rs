@@ -108,13 +108,19 @@ fn get_examples() -> Vec<(&'static str, &'static str)> {
         // Control Flow
         ("If True Branch", "if (true) { 1 } else { 2 }"),
         ("If False Branch", "if (false) { 1 } else { 2 }"),
-        ("If With Comparison", r#"if (1 < 2) { "yes" } else { "no" }"#),
+        (
+            "If With Comparison",
+            r#"if (1 < 2) { "yes" } else { "no" }"#,
+        ),
         // Parallel Composition
         ("Parallel", "1 | 2"),
         ("Multiple Parallel", "Nil | Nil | 42"),
         // Channels
         ("New Channel", "new x in { Nil }"),
-        ("Send and Receive", "new x in { x!(42) | for (y <- x) { y } }"),
+        (
+            "Send and Receive",
+            "new x in { x!(42) | for (y <- x) { y } }",
+        ),
         (
             "Multiple Channels",
             "new a, b in { a!(1) | b!(2) | for (x <- a) { x } }",
@@ -176,8 +182,8 @@ pub fn compile_and_disassemble(source: &str) -> Result<(Process, String)> {
 /// Compile and run Rholang code, returning the result value
 pub fn compile_and_run(source: &str) -> Result<Value> {
     let (mut process, _) = compile_and_disassemble(source)?;
-    let mut vm = VM::new();
-    let result = vm.execute(&mut process)?;
+    process.vm = Some(VM::new());
+    let result = process.execute()?;
     Ok(result)
 }
 
@@ -203,6 +209,10 @@ pub fn format_value(v: &Value) -> String {
                 .map(|(k, v)| format!("{}: {}", format_value(k), format_value(v)))
                 .collect();
             format!("{{{}}}", inner.join(", "))
+        }
+        Value::Par(ps) => {
+            let inner: Vec<String> = ps.iter().map(|p| p.to_string()).collect();
+            inner.join(" | ")
         }
     }
 }
@@ -234,8 +244,8 @@ fn process_example(name: &str, code: &str, show_disassembly: bool, format: &str)
             }
 
             // Execute
-            let mut vm = VM::new();
-            match vm.execute(&mut process) {
+            process.vm = Some(VM::new());
+            match process.execute() {
                 Ok(result) => {
                     if format == "markdown" {
                         println!("**Result:** `{}`\n", format_value(&result));
@@ -297,7 +307,10 @@ fn run_example_by_name(name: &str, show_disassembly: bool, format: &str) -> bool
             return true;
         }
     }
-    eprintln!("Example '{}' not found. Use --list to see available examples.", name);
+    eprintln!(
+        "Example '{}' not found. Use --list to see available examples.",
+        name
+    );
     false
 }
 
@@ -346,21 +359,24 @@ fn get_project_root() -> Option<std::path::PathBuf> {
 }
 
 /// Run all .rho files from a directory
-fn run_files_from_directory(dir_path: &std::path::Path, show_disassembly: bool, format: &str) -> usize {
+fn run_files_from_directory(
+    dir_path: &std::path::Path,
+    show_disassembly: bool,
+    format: &str,
+) -> usize {
     let mut count = 0;
     if let Ok(entries) = fs::read_dir(dir_path) {
         let mut files: Vec<_> = entries
             .filter_map(|e| e.ok())
-            .filter(|e| {
-                e.path().extension().map_or(false, |ext| ext == "rho")
-            })
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "rho"))
             .collect();
         files.sort_by_key(|e| e.path());
-        
+
         for entry in files {
             let path = entry.path();
             if let Ok(code) = fs::read_to_string(&path) {
-                let name = path.file_name()
+                let name = path
+                    .file_name()
                     .and_then(|n| n.to_str())
                     .unwrap_or("unknown");
                 process_example(name, &code, show_disassembly, format);
@@ -590,7 +606,11 @@ mod tests {
     #[test]
     fn test_maximum_complexity_compiles() {
         let result = compile_and_run(MAXIMUM_COMPLEXITY);
-        assert!(result.is_ok(), "Maximum complexity example failed: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Maximum complexity example failed: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -617,7 +637,10 @@ mod tests {
     #[test]
     fn test_boolean_operations() {
         assert_eq!(compile_and_run("true and true").unwrap(), Value::Bool(true));
-        assert_eq!(compile_and_run("true and false").unwrap(), Value::Bool(false));
+        assert_eq!(
+            compile_and_run("true and false").unwrap(),
+            Value::Bool(false)
+        );
         assert_eq!(compile_and_run("true or false").unwrap(), Value::Bool(true));
     }
 

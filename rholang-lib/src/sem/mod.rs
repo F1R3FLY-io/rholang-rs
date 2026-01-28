@@ -723,7 +723,7 @@ mod tests {
             }
 
             pub fn for_with_channel<'a>(expected: &str) -> impl ProcMatch<'a> {
-                fn has_source_name<'x>(receipts: &[ast::Receipt], expected: &str) -> bool {
+                fn has_source_name(receipts: &[ast::Receipt], expected: &str) -> bool {
                     receipts
                         .iter()
                         .flatten()
@@ -769,11 +769,11 @@ mod tests {
                 F: Fn(ProcRef<'a>) -> bool,
             {
                 fn resolve(self, db: &SemanticDb<'a>) -> Option<PID> {
-                    db.find_proc(|node| self(node)).map(|(pid, _)| pid)
+                    db.find_proc(self).map(|(pid, _)| pid)
                 }
 
                 fn matches(&self, db: &SemanticDb<'a>, pid: PID) -> bool {
-                    db.get(pid).is_some_and(|node| self(node))
+                    db.get(pid).is_some_and(self)
                 }
             }
 
@@ -822,8 +822,8 @@ mod tests {
             assert!(expected.is_ground(), "expect::ground_scope {expected:#?}");
         }
 
-        pub fn name_decls<'test>(
-            db: &'test SemanticDb,
+        pub fn name_decls(
+            db: &SemanticDb,
             name_decls: &[ast::NameDecl],
             scope: &ScopeInfo,
         ) -> impl DoubleEndedIterator<Item = BinderId> + ExactSizeIterator {

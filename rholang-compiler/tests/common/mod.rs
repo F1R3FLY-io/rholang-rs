@@ -20,6 +20,7 @@ use validated::Validated;
 /// # Errors
 ///
 /// Returns an error if parsing, semantic analysis, compilation, or execution fails.
+#[allow(dead_code)]
 pub fn compile_and_run(source: &str) -> Result<Value> {
     // Parse
     let parser = RholangParser::new();
@@ -68,8 +69,8 @@ pub fn compile_and_run(source: &str) -> Result<Value> {
     let mut processes = compiler.compile(&ast)?;
 
     // Execute
-    let mut vm = VM::new();
-    let result = vm.execute(&mut processes[0])?;
+    processes[0].vm = Some(VM::new());
+    let result = processes[0].execute()?;
 
     Ok(result)
 }

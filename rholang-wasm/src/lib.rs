@@ -31,6 +31,10 @@ fn pretty_value(v: &Value) -> String {
                 .collect();
             format!("Map({{{}}})", elems.join(", "))
         }
+        Value::Par(ps) => {
+            let elems: Vec<String> = ps.iter().map(|p| p.to_string()).collect();
+            format!("Par({})", elems.join(" | "))
+        }
         Value::Nil => "Nil".to_string(),
     }
 }
@@ -41,9 +45,7 @@ fn pretty_value(v: &Value) -> String {
 #[wasm_bindgen]
 pub fn eval(rholang_code: &str) -> String {
     // Use a minimal current-thread runtime to block on the async interpreter.
-    match futures::executor::block_on(eval_async(rholang_code)) {
-        s => s,
-    }
+    futures::executor::block_on(eval_async(rholang_code))
 }
 
 #[cfg(not(feature = "vm-eval"))]
@@ -58,9 +60,7 @@ pub fn eval(rholang_code: &str) -> String {
 #[cfg(feature = "vm-eval")]
 #[wasm_bindgen]
 pub fn disassemble(rholang_code: &str) -> String {
-    match futures::executor::block_on(disassemble_async(rholang_code)) {
-        s => s,
-    }
+    futures::executor::block_on(disassemble_async(rholang_code))
 }
 
 #[cfg(not(feature = "vm-eval"))]
@@ -112,6 +112,12 @@ pub async fn disassemble_async(rholang_code: &str) -> String {
 // Optional class-style API similar to the draft crate, convenient for JS callers
 #[wasm_bindgen]
 pub struct WasmInterpreter;
+
+impl Default for WasmInterpreter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[wasm_bindgen]
 impl WasmInterpreter {

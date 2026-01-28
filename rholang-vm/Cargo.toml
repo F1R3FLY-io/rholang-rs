@@ -7,16 +7,10 @@ description = "New Rholang VM (from scratch) based on rholang-bytecode"
 [dependencies]
 anyhow = { workspace = true }
 rholang-bytecode = { path = "../rholang-bytecode" }
-rholang-rspace = { path = "../rholang-rspace" }
-crossbeam = { version = "0.8", optional = true }
-num_cpus = { version = "1", optional = true }
 
 [lib]
 name = "rholang_vm"
 path = "src/lib.rs"
-
-[features]
-parallel-exec = ["crossbeam", "num_cpus"]
 
 [dev-dependencies]
 rholang-compiler = { path = "../rholang-compiler" }

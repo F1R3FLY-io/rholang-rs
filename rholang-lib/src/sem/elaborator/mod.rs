@@ -351,6 +351,7 @@ impl crate::sem::FactPass for ForCompElaborationPass {
     /// 1. Finds all `ForComprehension` nodes in the subtree rooted at `self.root`
     /// 2. For each for-comprehension, runs the `ForComprehensionElaborator`
     /// 3. Collects and emits all diagnostics to the semantic database
+    ///
     /// If ResolverPass hasn't run, elaboration will fail with appropriate diagnostics.
     fn run(&self, db: &mut SemanticDb) {
         use rholang_parser::ast::Proc;

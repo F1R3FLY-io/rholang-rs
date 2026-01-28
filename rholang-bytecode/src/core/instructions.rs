@@ -10,7 +10,7 @@ use std::fmt;
 
 /// 32-bit fixed-width instruction
 /// Layout: [opcode:8][flags:8][operand1:8][operand2:8]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(C, align(4))]
 pub struct Instruction {
     pub opcode: u8,
@@ -498,8 +498,7 @@ impl InstructionBuilder {
         // Pattern: PUSH_X followed by POP -> NOP (can be eliminated entirely)
         if let (Ok(first_op), Ok(second_op)) =
             (first.instruction.opcode(), second.instruction.opcode())
-        {
-            if matches!(
+            && matches!(
                 first_op,
                 Opcode::PUSH_INT
                     | Opcode::PUSH_STR
@@ -507,11 +506,11 @@ impl InstructionBuilder {
                     | Opcode::PUSH_PROC
                     | Opcode::PUSH_NAME
                     | Opcode::PUSH_NIL
-            ) && matches!(second_op, Opcode::POP)
-            {
-                // This pair can be eliminated (push followed immediately by pop)
-                return Some(2);
-            }
+            )
+            && matches!(second_op, Opcode::POP)
+        {
+            // This pair can be eliminated (push followed immediately by pop)
+            return Some(2);
         }
 
         None

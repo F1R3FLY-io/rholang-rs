@@ -34,6 +34,7 @@ impl DependencyGraph {
     }
 
     /// Add a dependency edge: `from` depends on `to`
+    #[cfg(test)]
     fn add_dependency(&mut self, from: Symbol, to: Symbol) {
         self.add_channel(from);
         self.add_channel(to);
@@ -235,21 +236,14 @@ impl<'a, 'ast> JoinValidator<'a, 'ast> {
 
     /// Verify that a channel exists and is properly bound
     fn verify_channel_exists(&self, name: &Name<'ast>) -> ValidationResult {
-        match name {
-            Name::NameVar(var) => {
-                if let rholang_parser::ast::Var::Id(id) = var {
-                    if self.db.binder_of_id(*id).is_none() {
-                        let sym = self.db.intern(id.name);
-                        return Err(ValidationError::UnboundVariable {
-                            var: sym,
-                            pos: id.pos,
-                        });
-                    }
-                }
-            }
-            Name::Quote(_) => {
-                // Quoted processes are always valid as channels
-            }
+        if let Name::NameVar(rholang_parser::ast::Var::Id(id)) = name
+            && self.db.binder_of_id(*id).is_none()
+        {
+            let sym = self.db.intern(id.name);
+            return Err(ValidationError::UnboundVariable {
+                var: sym,
+                pos: id.pos,
+            });
         }
         Ok(())
     }

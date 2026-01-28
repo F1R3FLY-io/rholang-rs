@@ -2,7 +2,7 @@ use rholang_vm::{api::Instruction, api::Opcode, api::Process, api::Value, VM};
 
 #[test]
 fn test_create_list_and_concat() {
-    let mut vm = VM::new();
+    let vm = VM::new();
     // Build [1,2]
     let prog = vec![
         Instruction::unary(Opcode::PUSH_INT, 1),
@@ -16,7 +16,8 @@ fn test_create_list_and_concat() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut process = Process::new(prog, "collections");
-    let out = vm.execute(&mut process).expect("exec ok");
+    process.vm = Some(vm.clone());
+    let out = process.execute().expect("exec ok");
     assert_eq!(
         out,
         Value::List(vec![Value::Int(1), Value::Int(2), Value::Int(3)])
@@ -25,7 +26,7 @@ fn test_create_list_and_concat() {
 
 #[test]
 fn test_create_tuple_and_map() {
-    let mut vm = VM::new();
+    let vm = VM::new();
     // Tuple (1,2,3)
     let prog1 = vec![
         Instruction::unary(Opcode::PUSH_INT, 1),
@@ -35,7 +36,8 @@ fn test_create_tuple_and_map() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut process1 = Process::new(prog1, "collections");
-    let out1 = vm.execute(&mut process1).expect("exec ok");
+    process1.vm = Some(vm.clone());
+    let out1 = process1.execute().expect("exec ok");
     assert_eq!(
         out1,
         Value::Tuple(vec![Value::Int(1), Value::Int(2), Value::Int(3)])
@@ -51,7 +53,8 @@ fn test_create_tuple_and_map() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut process2 = Process::new(prog2, "collections");
-    let out2 = vm.execute(&mut process2).expect("exec ok");
+    process2.vm = Some(vm);
+    let out2 = process2.execute().expect("exec ok");
     assert_eq!(
         out2,
         Value::Map(vec![

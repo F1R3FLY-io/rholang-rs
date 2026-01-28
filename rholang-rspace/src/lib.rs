@@ -1,48 +1,36 @@
 pub mod in_memory;
 pub mod path_map;
-
 pub use in_memory::InMemoryRSpace;
 pub use path_map::PathMapRSpace;
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum Value {
-    Int(i64),
-    Bool(bool),
-    Str(String),
-    Name(String),
-    List(Vec<Value>),
-    Tuple(Vec<Value>),
-    Map(Vec<(Value, Value)>),
-    Nil,
-}
-
-impl Value {
-    #[allow(dead_code)]
-    pub fn as_int(&self) -> Option<i64> {
-        if let Value::Int(n) = self {
-            Some(*n)
-        } else {
-            None
-        }
-    }
-}
-
-use anyhow::Result;
-
-// Minimal abstract interface for different RSpace implementations used by the current VM
-pub trait RSpace {
-    // Put data into a channel queue (append), return true-like confirmation via Bool(true) at opcode level
-    fn tell(&mut self, kind: u16, channel: String, data: Value) -> Result<()>;
-    // Destructive read: remove and return oldest value, or Nil if empty / missing
-    fn ask(&mut self, kind: u16, channel: String) -> Result<Option<Value>>;
-    // Non-destructive read: return oldest value without removing
-    fn peek(&self, kind: u16, channel: String) -> Result<Option<Value>>;
-    // Reset storage (used by tests)
-    fn reset(&mut self);
-}
+pub use rholang_process::{
+    step, ExecError, Process, ProcessEvent, ProcessEventHandler, ProcessState, RSpace, StepResult,
+    Value, VM,
+};
 
 // Set PathMapRSpace as the default implementation
 pub type DefaultRSpace = PathMapRSpace;
+
+/// Drain ready processes from a channel and re-store non-ready processes.
+pub fn drain_ready_processes(
+    rspace: &mut dyn RSpace,
+    kind: u16,
+    channel: String,
+) -> anyhow::Result<Vec<Process>> {
+    match rspace.ask(kind, channel.clone())? {
+        Some(Value::Par(procs)) => {
+            let (ready, pending): (Vec<_>, Vec<_>) = procs.into_iter().partition(|p| p.is_ready());
+            if !pending.is_empty() {
+                rspace.tell(kind, channel, Value::Par(pending))?;
+            }
+            Ok(ready)
+        }
+        Some(other) => {
+            rspace.tell(kind, channel, other)?;
+            Ok(Vec::new())
+        }
+        None => Ok(Vec::new()),
+    }
+}
 
 pub(crate) fn ensure_kind_matches_channel(kind: u16, channel: &str) -> anyhow::Result<()> {
     if !channel.starts_with(&format!("@{}:", kind)) {
@@ -58,45 +46,40 @@ pub(crate) fn ensure_kind_matches_channel(kind: u16, channel: &str) -> anyhow::R
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_value_as_int() {
-        assert_eq!(Value::Int(42).as_int(), Some(42));
-        assert_eq!(Value::Bool(true).as_int(), None);
-        assert_eq!(Value::Str("test".to_string()).as_int(), None);
-        assert_eq!(Value::Nil.as_int(), None);
-    }
-
-    #[test]
-    fn test_value_equality() {
-        assert_eq!(Value::Int(1), Value::Int(1));
-        assert_ne!(Value::Int(1), Value::Int(2));
-        assert_eq!(Value::Bool(true), Value::Bool(true));
-        assert_ne!(Value::Bool(true), Value::Bool(false));
-        assert_eq!(Value::Str("a".into()), Value::Str("a".into()));
-        assert_eq!(Value::Name("x".into()), Value::Name("x".into()));
-        assert_eq!(Value::Nil, Value::Nil);
-        assert_eq!(Value::List(vec![Value::Int(1)]), Value::List(vec![Value::Int(1)]));
-        assert_eq!(Value::Tuple(vec![Value::Int(1)]), Value::Tuple(vec![Value::Int(1)]));
-        assert_eq!(Value::Map(vec![(Value::Int(1), Value::Int(2))]), Value::Map(vec![(Value::Int(1), Value::Int(2))]));
-    }
-
-    #[test]
-    fn test_value_clone() {
-        let val = Value::List(vec![Value::Int(1), Value::Str("s".into())]);
-        assert_eq!(val.clone(), val);
-    }
-
-    #[test]
-    fn test_value_debug() {
-        let val = Value::Int(1);
-        assert!(!format!("{:?}", val).is_empty());
-    }
+    use rholang_bytecode::core::instructions::Instruction;
+    use rholang_bytecode::core::Opcode;
 
     #[test]
     fn test_default_rspace() {
         let rspace = DefaultRSpace::default();
         // Just verify it's the right type
         let _: PathMapRSpace = rspace;
+    }
+
+    #[test]
+    fn test_drain_ready_processes() -> anyhow::Result<()> {
+        let mut rspace: Box<dyn RSpace> = Box::new(DefaultRSpace::default());
+        let channel = "@0:test_ready".to_string();
+
+        let ready_proc = Process::new(vec![Instruction::nullary(Opcode::HALT)], "ready_proc");
+        let wait_proc = Process::new(vec![Instruction::nullary(Opcode::HALT)], "wait_proc")
+            .with_state(ProcessState::Wait);
+
+        rspace.tell(0, channel.clone(), Value::Par(vec![ready_proc, wait_proc]))?;
+
+        let ready = drain_ready_processes(rspace.as_mut(), 0, channel.clone())?;
+        assert_eq!(ready.len(), 1);
+        assert!(ready[0].is_ready());
+
+        let pending = rspace.ask(0, channel.clone())?;
+        match pending {
+            Some(Value::Par(pending)) => {
+                assert_eq!(pending.len(), 1);
+                assert!(matches!(pending[0].state, ProcessState::Wait));
+            }
+            _ => panic!("expected pending process stored back"),
+        }
+
+        Ok(())
     }
 }

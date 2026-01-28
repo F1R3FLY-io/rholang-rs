@@ -9,7 +9,7 @@ use rholang_bytecode::core::{instructions::Instruction, opcodes::Opcode};
 use rholang_parser::ast::{
     AnnProc, BinaryExpOp, Bind, Collection, Name, Proc, Receipts, Source, Var,
 };
-use rholang_vm::api::{Process, Value};
+use rholang_process::{Process, Value};
 use std::collections::HashMap;
 
 /// Compilation context for generating bytecode from Rholang AST

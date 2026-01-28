@@ -212,20 +212,26 @@ fn test_environment_memory_efficiency() {
 
     // Create parent environment
     let parent = Environment::new();
-    parent.bind(0, TypeRef::Integer(IntegerRef::Small(42)));
-    parent.bind(
-        1,
-        TypeRef::String(StringRef {
-            id: 0,
-            data: Arc::from("test"),
-        }),
-    );
+    parent
+        .bind(0, TypeRef::Integer(IntegerRef::Small(42)))
+        .unwrap();
+    parent
+        .bind(
+            1,
+            TypeRef::String(StringRef {
+                id: 0,
+                data: Arc::from("test"),
+            }),
+        )
+        .unwrap();
 
     // Create many child environments that share the parent
     let mut children = Vec::new();
     for i in 0..100 {
         let child = Environment::with_parent(parent.clone());
-        child.bind(2, TypeRef::Integer(IntegerRef::Small(i)));
+        child
+            .bind(2, TypeRef::Integer(IntegerRef::Small(i)))
+            .unwrap();
         children.push(child);
     }
 

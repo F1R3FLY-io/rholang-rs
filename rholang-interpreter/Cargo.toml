@@ -15,6 +15,9 @@ async-trait = { workspace = true }
 # Optional runtime for native cancellation/timeouts. Not used on wasm32.
 tokio = { workspace = true, optional = true }
 
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+
 [features]
 default = []
 native-runtime = ["tokio"]

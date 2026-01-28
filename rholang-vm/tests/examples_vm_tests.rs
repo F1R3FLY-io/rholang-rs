@@ -69,8 +69,8 @@ fn compile_and_run(source: &str) -> Result<Value> {
     let mut processes = compiler.compile(&ast)?;
 
     // Execute
-    let mut vm = VM::new();
-    let result = vm.execute(&mut processes[0])?;
+    processes[0].vm = Some(VM::new());
+    let result = processes[0].execute()?;
 
     Ok(result)
 }
@@ -314,7 +314,11 @@ fn test_vm_boolean_list() {
     let result = compile_and_run("[true, false, true]").unwrap();
     assert_eq!(
         result,
-        Value::List(vec![Value::Bool(true), Value::Bool(false), Value::Bool(true)])
+        Value::List(vec![
+            Value::Bool(true),
+            Value::Bool(false),
+            Value::Bool(true)
+        ])
     );
 }
 
@@ -459,10 +463,8 @@ fn test_vm_if_with_comparison() {
 #[test]
 fn test_vm_nested_if() {
     // Code: if (true) { if (1 < 2) { 10 } else { 20 } } else { 30 }
-    let result = compile_and_run(
-        "if (true) { if (1 < 2) { 10 } else { 20 } } else { 30 }",
-    )
-    .unwrap();
+    let result =
+        compile_and_run("if (true) { if (1 < 2) { 10 } else { 20 } } else { 30 }").unwrap();
     assert_eq!(result, Value::Int(10));
 }
 
@@ -511,12 +513,10 @@ fn test_vm_deeply_nested_if() {
 #[test]
 fn test_vm_if_with_complex_condition() {
     // Code: if ((1 + 2) == 3) { if ((4 * 5) > 15) { [(1 + 1), (2 + 2)] } else { 0 } } else { 0 }
-    let code = "if ((1 + 2) == 3) { if ((4 * 5) > 15) { [(1 + 1), (2 + 2)] } else { 0 } } else { 0 }";
+    let code =
+        "if ((1 + 2) == 3) { if ((4 * 5) > 15) { [(1 + 1), (2 + 2)] } else { 0 } } else { 0 }";
     let result = compile_and_run(code).unwrap();
-    assert_eq!(
-        result,
-        Value::List(vec![Value::Int(2), Value::Int(4)])
-    );
+    assert_eq!(result, Value::List(vec![Value::Int(2), Value::Int(4)]));
 }
 
 // ============================================================================
@@ -573,10 +573,7 @@ fn test_vm_send_receive() {
 #[test]
 fn test_vm_multiple_sends() {
     // Code: new x in { x!(1) | x!(2) | for (a <- x) { a } }
-    let result = compile_and_run(
-        r#"new x in { x!(1) | x!(2) | for (a <- x) { a } }"#,
-    )
-    .unwrap();
+    let result = compile_and_run(r#"new x in { x!(1) | x!(2) | for (a <- x) { a } }"#).unwrap();
     // Should receive first message 1
     assert_eq!(result, Value::Int(1));
 }
@@ -584,14 +581,16 @@ fn test_vm_multiple_sends() {
 #[test]
 fn test_vm_send_string() {
     // Code: new ch in { ch!("hello") | for (msg <- ch) { msg } }
-    let result = compile_and_run(r#"new ch in { ch!("hello") | for (msg <- ch) { msg } }"#).unwrap();
+    let result =
+        compile_and_run(r#"new ch in { ch!("hello") | for (msg <- ch) { msg } }"#).unwrap();
     assert_eq!(result, Value::Str("hello".to_string()));
 }
 
 #[test]
 fn test_vm_send_list() {
     // Code: new ch in { ch!([1, 2, 3]) | for (data <- ch) { data } }
-    let result = compile_and_run("new ch in { ch!([1, 2, 3]) | for (data <- ch) { data } }").unwrap();
+    let result =
+        compile_and_run("new ch in { ch!([1, 2, 3]) | for (data <- ch) { data } }").unwrap();
     assert_eq!(
         result,
         Value::List(vec![Value::Int(1), Value::Int(2), Value::Int(3)])
@@ -601,7 +600,8 @@ fn test_vm_send_list() {
 #[test]
 fn test_vm_multiple_channels() {
     // Code: new ch1, ch2 in { ch1!(10) | ch2!(20) | for (x <- ch1) { x } }
-    let result = compile_and_run("new ch1, ch2 in { ch1!(10) | ch2!(20) | for (x <- ch1) { x } }").unwrap();
+    let result =
+        compile_and_run("new ch1, ch2 in { ch1!(10) | ch2!(20) | for (x <- ch1) { x } }").unwrap();
     assert_eq!(result, Value::Int(10));
 }
 
@@ -684,7 +684,11 @@ fn test_vm_complex_example() {
     "#;
     // Test passes if it compiles and runs without error
     let result = compile_and_run(code);
-    assert!(result.is_ok(), "Complex example should execute: {:?}", result);
+    assert!(
+        result.is_ok(),
+        "Complex example should execute: {:?}",
+        result
+    );
 }
 
 #[test]
@@ -838,10 +842,14 @@ fn test_vm_maximum_complexity() {
             logger!("complete")
         }
     "#;
-    
+
     // Test passes if it compiles and runs without error
     let result = compile_and_run(code);
-    assert!(result.is_ok(), "Maximum complexity example should execute: {:?}", result);
+    assert!(
+        result.is_ok(),
+        "Maximum complexity example should execute: {:?}",
+        result
+    );
 }
 
 // ============================================================================
@@ -886,6 +894,10 @@ fn test_vm_empty_string() {
 #[test]
 fn test_vm_long_string() {
     // Code: "this is a longer string with spaces and punctuation!"
-    let result = compile_and_run(r#""this is a longer string with spaces and punctuation!""#).unwrap();
-    assert_eq!(result, Value::Str("this is a longer string with spaces and punctuation!".to_string()));
+    let result =
+        compile_and_run(r#""this is a longer string with spaces and punctuation!""#).unwrap();
+    assert_eq!(
+        result,
+        Value::Str("this is a longer string with spaces and punctuation!".to_string())
+    );
 }

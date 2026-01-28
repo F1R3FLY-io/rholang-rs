@@ -6,7 +6,7 @@ use std::fmt;
 use std::sync::{Arc, Mutex};
 
 use rholang_compiler::compile_source_async;
-use rholang_vm::api::{Value as VmValue, VM};
+use rholang_vm::api::Value as VmValue;
 
 #[cfg(feature = "native-runtime")]
 use tokio::sync::oneshot;
@@ -98,6 +98,10 @@ impl RholangCompilerInterpreterProvider {
                     .collect();
                 format!("{{{}}}", inner.join(", "))
             }
+            VmValue::Par(procs) => {
+                let inner: Vec<String> = procs.iter().map(|p| p.to_string()).collect();
+                inner.join(" | ")
+            }
             VmValue::Nil => "Nil".to_string(),
         }
     }
@@ -157,11 +161,72 @@ impl InterpreterProvider for RholangCompilerInterpreterProvider {
                 return InterpretationResult::Success("Nil".to_string());
             }
 
-            let mut vm = VM::new();
             let mut last_val = VmValue::Nil;
             for mut proc in processes.into_iter() {
-                match vm.execute(&mut proc) {
-                    Ok(val) => last_val = val,
+                // --- NEW FLOW: store in RSpace then retrieve and execute ---
+                let process_id = format!("proc_{}", pid);
+                let channel = format!("@0:{}", process_id);
+
+                let vm = proc.vm.take().unwrap_or_default();
+
+                // Store the process in RSpace
+                {
+                    let mut rspace = match vm.rspace.lock() {
+                        Ok(r) => r,
+                        Err(e) => {
+                            return InterpretationResult::Error(InterpreterError::new(format!(
+                                "RSpace lock error: {}",
+                                e
+                            )))
+                        }
+                    };
+                    if let Err(e) = rspace.tell(0, channel.clone(), VmValue::Par(vec![proc])) {
+                        return InterpretationResult::Error(InterpreterError::new(format!(
+                            "RSpace tell error: {}",
+                            e
+                        )));
+                    }
+                }
+
+                // Retrieve the process from RSpace
+                let mut retrieved_proc = {
+                    let mut rspace = match vm.rspace.lock() {
+                        Ok(r) => r,
+                        Err(e) => {
+                            return InterpretationResult::Error(InterpreterError::new(format!(
+                                "RSpace lock error: {}",
+                                e
+                            )))
+                        }
+                    };
+                    match rspace.ask(0, channel.clone()) {
+                        Ok(Some(VmValue::Par(mut procs))) if !procs.is_empty() => procs.remove(0),
+                        Ok(Some(other)) => {
+                            return InterpretationResult::Error(InterpreterError::new(format!(
+                                "Expected process in RSpace, found: {:?}",
+                                other
+                            )))
+                        }
+                        Ok(None) => {
+                            return InterpretationResult::Error(InterpreterError::new(
+                                "Process not found in RSpace after tell",
+                            ))
+                        }
+                        Err(e) => {
+                            return InterpretationResult::Error(InterpreterError::new(format!(
+                                "RSpace ask error: {}",
+                                e
+                            )))
+                        }
+                    }
+                };
+
+                // Execute the retrieved process
+                retrieved_proc.vm = Some(vm);
+                match retrieved_proc.execute() {
+                    Ok(val) => {
+                        last_val = val;
+                    }
                     Err(e) => {
                         return InterpretationResult::Error(InterpreterError::new(format!(
                             "Execution error: {}",
@@ -211,10 +276,10 @@ impl InterpreterProvider for RholangCompilerInterpreterProvider {
             .processes
             .lock()
             .map_err(|e| anyhow!("Failed to lock processes: {}", e))?;
-        if let Some(mut info) = procs.remove(&pid) {
+        if let Some(_info) = procs.remove(&pid) {
             #[cfg(feature = "native-runtime")]
-            if let Some(sender) = info.cancel.take() {
-                let _ = sender.send(());
+            {
+                // the sender is dropped, which cancels the receiver
             }
             Ok(true)
         } else {
@@ -239,5 +304,31 @@ impl InterpreterProvider for RholangCompilerInterpreterProvider {
             procs.clear();
         }
         Ok(count)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_interpreter_storage_flow() -> Result<()> {
+        let provider = RholangCompilerInterpreterProvider::new()?;
+
+        // This code will be compiled to bytecode
+        let code = "1 + 2";
+
+        // Execute the code.
+        // The implementation now:
+        // 1. Compiles "1 + 2" to a Process
+        // 2. Stores it in RSpace under "proc_1"
+        // 3. Retrieves it from RSpace
+        // 4. Executes it
+        let result = provider.interpret(code).await;
+
+        assert!(result.is_success());
+        assert_eq!(result.unwrap(), "3");
+
+        Ok(())
     }
 }

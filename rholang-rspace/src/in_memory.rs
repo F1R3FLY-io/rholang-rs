@@ -74,15 +74,15 @@ mod tests {
     fn test_in_memory_rspace_fifo() -> Result<()> {
         let mut rspace = InMemoryRSpace::new();
         let channel = "@0:fifo".to_string();
-        
+
         rspace.tell(0, channel.clone(), Value::Int(1))?;
         rspace.tell(0, channel.clone(), Value::Int(2))?;
-        
+
         assert_eq!(rspace.peek(0, channel.clone())?, Some(Value::Int(1)));
         assert_eq!(rspace.ask(0, channel.clone())?, Some(Value::Int(1)));
         assert_eq!(rspace.ask(0, channel.clone())?, Some(Value::Int(2)));
         assert_eq!(rspace.ask(0, channel.clone())?, None);
-        
+
         Ok(())
     }
 
@@ -90,11 +90,11 @@ mod tests {
     fn test_in_memory_rspace_reset() -> Result<()> {
         let mut rspace = InMemoryRSpace::new();
         let channel = "@0:reset".to_string();
-        
+
         rspace.tell(0, channel.clone(), Value::Int(1))?;
         rspace.reset();
         assert_eq!(rspace.ask(0, channel.clone())?, None);
-        
+
         Ok(())
     }
 
@@ -119,17 +119,17 @@ mod tests {
     fn test_ask_peek_empty_channel() -> Result<()> {
         let mut rspace = InMemoryRSpace::new();
         let channel = "@0:empty".to_string();
-        
+
         // Peek/Ask on non-existent channel
         assert_eq!(rspace.peek(0, channel.clone())?, None);
         assert_eq!(rspace.ask(0, channel.clone())?, None);
-        
+
         // Peek/Ask on channel that was once populated but now empty
         rspace.tell(0, channel.clone(), Value::Nil)?;
         rspace.ask(0, channel.clone())?;
         assert_eq!(rspace.peek(0, channel.clone())?, None);
         assert_eq!(rspace.ask(0, channel.clone())?, None);
-        
+
         Ok(())
     }
 }

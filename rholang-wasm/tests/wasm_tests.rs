@@ -27,12 +27,18 @@ fn eval_runs_multiline_input() {
 fn eval_returns_arithmetic_result() {
     let input = "2 + 2";
     let out = eval(input);
-    assert_eq!("4", out, "expected arithmetic expression to evaluate to 4, got {out}");
+    assert_eq!(
+        "4", out,
+        "expected arithmetic expression to evaluate to 4, got {out}"
+    );
 }
 
 #[wasm_bindgen_test]
 fn eval_handles_empty_input_as_nil() {
     let input = "   \n\t";
     let out = eval(input);
-    assert_eq!("Nil", out, "empty/whitespace input should yield Nil, got {out}");
+    assert_eq!(
+        "Nil", out,
+        "empty/whitespace input should yield Nil, got {out}"
+    );
 }

@@ -7,7 +7,7 @@ const STORE_CONC: u16 = 3;
 
 #[test]
 fn test_name_creation_and_tell() {
-    let mut vm = VM::new();
+    let vm = VM::new();
 
     // Top-level names (use STORE_CONC kind code)
     let prog1 = vec![
@@ -32,7 +32,8 @@ fn test_name_creation_and_tell() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p1 = Process::new(prog1, "rspace1");
-    let out1 = vm.execute(&mut p1).expect("exec ok");
+    p1.vm = Some(vm.clone());
+    let out1 = p1.execute().expect("exec ok");
     assert_eq!(out1, Value::Bool(true));
 
     // Local concurrent name used twice
@@ -53,7 +54,8 @@ fn test_name_creation_and_tell() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p2 = Process::new(prog2, "rspace2");
-    let out2 = vm.execute(&mut p2).expect("exec ok");
+    p2.vm = Some(vm.clone());
+    let out2 = p2.execute().expect("exec ok");
     assert_eq!(out2, Value::Bool(true));
 
     // Sequential local name single use (we just reuse MEM_SEQ kind code)
@@ -68,13 +70,14 @@ fn test_name_creation_and_tell() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p3 = Process::new(prog3, "rspace3");
-    let out3 = vm.execute(&mut p3).expect("exec ok");
+    p3.vm = Some(vm);
+    let out3 = p3.execute().expect("exec ok");
     assert_eq!(out3, Value::Bool(true));
 }
 
 #[test]
 fn test_send_and_receive() {
-    let mut vm = VM::new();
+    let vm = VM::new();
 
     // Top-level: tell then ask should yield the list
     let prog1 = vec![
@@ -90,7 +93,8 @@ fn test_send_and_receive() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p1 = Process::new(prog1, "send_recv1");
-    let out1 = vm.execute(&mut p1).expect("exec ok");
+    p1.vm = Some(vm.clone());
+    let out1 = p1.execute().expect("exec ok");
     assert_eq!(out1, Value::List(vec![Value::Int(5)]));
 
     // Local: tell then ask yields the list
@@ -107,13 +111,14 @@ fn test_send_and_receive() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p2 = Process::new(prog2, "send_recv2");
-    let out2 = vm.execute(&mut p2).expect("exec ok");
+    p2.vm = Some(vm);
+    let out2 = p2.execute().expect("exec ok");
     assert_eq!(out2, Value::List(vec![Value::Int(10)]));
 }
 
 #[test]
 fn test_let_binding_and_persistent_peek() {
-    let mut vm = VM::new();
+    let vm = VM::new();
 
     // let x = 5; ch!([x]);
     let prog = vec![
@@ -130,8 +135,11 @@ fn test_let_binding_and_persistent_peek() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p = Process::new(prog, "let_bind");
-    let out = vm.execute(&mut p).expect("exec ok");
+    p.vm = Some(vm);
+    let out = p.execute().expect("exec ok");
     assert_eq!(out, Value::Bool(true));
+
+    let vm = p.vm.take().expect("vm retained");
 
     // Multiple sends then peek should show the head element without removing it
     let prog2 = vec![
@@ -154,6 +162,7 @@ fn test_let_binding_and_persistent_peek() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p2 = Process::new(prog2, "peek");
-    let out2 = vm.execute(&mut p2).expect("exec ok");
+    p2.vm = Some(vm);
+    let out2 = p2.execute().expect("exec ok");
     assert_eq!(out2, Value::List(vec![Value::Int(1)]));
 }

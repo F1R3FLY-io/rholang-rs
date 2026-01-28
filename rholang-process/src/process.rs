@@ -1,4 +1,3 @@
-use crate::execute::StepResult;
 use crate::{ExecError, Value, VM};
 use rholang_bytecode::core::instructions::Instruction as CoreInst;
 use std::fmt;
@@ -59,51 +58,8 @@ impl Process {
         &mut self,
         handler: Option<&ProcessEventHandler>,
     ) -> Result<Value, ExecError> {
-        // Terminal states (value, error) must not be re-executed (rspace.md rule)
-        match &self.state {
-            ProcessState::Value(val) => return Ok(val.clone()),
-            ProcessState::Error(msg) => {
-                return Err(ExecError::OpcodeParamError {
-                    opcode: "EXECUTE",
-                    message: format!("cannot re-execute process in error state: {}", msg),
-                })
-            }
-            ProcessState::Wait => {
-                return Err(ExecError::OpcodeParamError {
-                    opcode: "EXECUTE",
-                    message: "cannot execute process in wait state".to_string(),
-                })
-            }
-            ProcessState::Ready => {} // OK to execute
-        }
-
         let mut vm = self.vm.take().unwrap_or_default();
-        vm.reset_stack();
-
-        let mut pc = 0usize;
-        let code = self.code.clone();
-        let result = loop {
-            if pc >= code.len() {
-                break Ok(vm.stack.last().cloned().unwrap_or(Value::Nil));
-            }
-
-            let inst = code[pc];
-            match vm.execute(self, inst) {
-                Ok(StepResult::Next) => {
-                    pc += 1;
-                }
-                Ok(StepResult::Stop) => {
-                    break Ok(vm.stack.last().cloned().unwrap_or(Value::Nil));
-                }
-                Ok(StepResult::Jump(target)) => {
-                    pc = target;
-                }
-                Err(err) => {
-                    break Err(err);
-                }
-            }
-        };
-
+        let result = vm.execute(self);
         self.vm = Some(vm);
 
         match result {

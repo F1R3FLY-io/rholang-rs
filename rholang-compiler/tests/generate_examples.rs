@@ -83,12 +83,18 @@ fn format_value(v: &Value) -> String {
                 .collect();
             format!("{{{}}}", inner.join(", "))
         }
+        Value::Par(ps) => {
+            let inner: Vec<String> = ps.iter().map(|p| p.to_string()).collect();
+            inner.join(" | ")
+        }
     }
 }
 
 // Shell examples loaded from external files
-const COMPLEX_EXAMPLE: &str = include_str!("../../rholang-shell/tests/examples/complex_example.rho");
-const MAXIMUM_COMPLEXITY: &str = include_str!("../../rholang-shell/tests/examples/maximum_complexity.rho");
+const COMPLEX_EXAMPLE: &str =
+    include_str!("../../rholang-shell/tests/examples/complex_example.rho");
+const MAXIMUM_COMPLEXITY: &str =
+    include_str!("../../rholang-shell/tests/examples/maximum_complexity.rho");
 
 #[test]
 fn generate_examples_markdown() {
@@ -128,14 +134,23 @@ fn generate_examples_markdown() {
         // Control Flow
         ("If True Branch", "if (true) { 1 } else { 2 }"),
         ("If False Branch", "if (false) { 1 } else { 2 }"),
-        ("If With Comparison", r#"if (1 < 2) { "yes" } else { "no" }"#),
+        (
+            "If With Comparison",
+            r#"if (1 < 2) { "yes" } else { "no" }"#,
+        ),
         // Parallel Composition
         ("Parallel", "1 | 2"),
         ("Multiple Parallel", "Nil | Nil | 42"),
         // Channels
         ("New Channel", "new x in { Nil }"),
-        ("Send and Receive", "new x in { x!(42) | for (y <- x) { y } }"),
-        ("Multiple Channels", "new a, b in { a!(1) | b!(2) | for (x <- a) { x } }"),
+        (
+            "Send and Receive",
+            "new x in { x!(42) | for (y <- x) { y } }",
+        ),
+        (
+            "Multiple Channels",
+            "new a, b in { a!(1) | b!(2) | for (x <- a) { x } }",
+        ),
         // Shell examples (from rholang-shell/tests/examples/)
         ("Complex Example (from shell tests)", COMPLEX_EXAMPLE),
         ("Maximum Complexity (from shell tests)", MAXIMUM_COMPLEXITY),
@@ -161,8 +176,8 @@ fn generate_examples_markdown() {
                 println!("```\n");
 
                 // Execute
-                let mut vm = rholang_vm::VM::new();
-                match vm.execute(&mut process) {
+                process.vm = Some(rholang_vm::VM::new());
+                match process.execute() {
                     Ok(result) => {
                         println!("**Result:** `{}`\n", format_value(&result));
                     }

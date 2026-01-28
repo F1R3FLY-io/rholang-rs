@@ -79,17 +79,17 @@ fn serve_wasm_script_serves_index() {
     let deadline = Instant::now() + Duration::from_secs(40);
     let mut ok = false;
     while Instant::now() < deadline {
-        match http_get("127.0.0.1", port, "/") {
-            Ok((status, body)) => {
-                if status.starts_with("HTTP/1.0 200") || status.starts_with("HTTP/1.1 200") {
-                    // Check for a stable marker text from the page
-                    if body.contains("Rholang WASM (React)") || body.contains("Rholang WebAssembly Shell") || body.contains("Rholang WASM Eval") {
-                        ok = true;
-                        break;
-                    }
+        if let Ok((status, body)) = http_get("127.0.0.1", port, "/") {
+            if status.starts_with("HTTP/1.0 200") || status.starts_with("HTTP/1.1 200") {
+                // Check for a stable marker text from the page
+                if body.contains("Rholang WASM (React)")
+                    || body.contains("Rholang WebAssembly Shell")
+                    || body.contains("Rholang WASM Eval")
+                {
+                    ok = true;
+                    break;
                 }
             }
-            Err(_) => {}
         }
         thread::sleep(Duration::from_millis(250));
     }
@@ -98,5 +98,8 @@ fn serve_wasm_script_serves_index() {
     let _ = child.kill();
     let _ = child.wait();
 
-    assert!(ok, "server did not serve expected index.html content on time");
+    assert!(
+        ok,
+        "server did not serve expected index.html content on time"
+    );
 }

@@ -15,7 +15,7 @@ fn main() -> Result<()> {
     println!("Rholang VM Greeter Contract Example (new)");
     println!("-------------------------------------------");
 
-    let mut vm = VM::new();
+    let vm = VM::new();
 
     // Program outline:
     // new greeter, stdout in {
@@ -53,7 +53,8 @@ fn main() -> Result<()> {
     ];
 
     let mut process = Process::new(program, "greeter_contract: example");
-    let result = vm.execute(&mut process)?;
+    process.vm = Some(vm);
+    let result = process.execute()?;
 
     println!("Final result: {:?}", result);
     assert_eq!(result, Value::List(vec![Value::Int(2)]));

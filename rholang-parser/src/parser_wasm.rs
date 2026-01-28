@@ -1,6 +1,6 @@
 use validated::Validated;
 
-use crate::{ast::AnnProc, ParseFailure};
+use crate::{ParseFailure, ast::AnnProc};
 
 /// Minimal wasm-friendly parser stub.
 ///
@@ -13,7 +13,9 @@ pub struct RholangParser<'a> {
 
 impl<'a> RholangParser<'a> {
     pub fn new() -> Self {
-        RholangParser { _phantom: core::marker::PhantomData }
+        RholangParser {
+            _phantom: core::marker::PhantomData,
+        }
     }
 
     pub fn parse<'code: 'a>(
