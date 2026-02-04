@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 description = "Process management for Rholang execution"
 
+[lib]
+doctest = false
+
 [dependencies]
 anyhow = { workspace = true }
 rholang-bytecode = { path = "../rholang-bytecode" }

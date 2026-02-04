@@ -5,6 +5,9 @@ edition = "2021"
 license = "Apache-2.0"
 description = "Shared interpreter provider for Rholang (compiler + VM), reusable by shell and wasm"
 
+[lib]
+doctest = false
+
 [dependencies]
 anyhow = { workspace = true }
 validated = { workspace = true }
