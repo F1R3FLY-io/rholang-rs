@@ -5,7 +5,7 @@ use librho::sem::{
 };
 use rholang_compiler::Compiler;
 use rholang_parser::parser::RholangParser;
-use rholang_vm::{api::Value, VM};
+use rholang_vm::api::Value;
 use validated::Validated;
 
 /// Compile and run a Rholang source string, returning the final result
@@ -68,8 +68,7 @@ pub fn compile_and_run(source: &str) -> Result<Value> {
     let compiler = Compiler::new(&db);
     let mut processes = compiler.compile(&ast)?;
 
-    // Execute
-    processes[0].vm = Some(VM::new());
+    // Execute (VM is already embedded in Process)
     let result = processes[0].execute()?;
 
     Ok(result)

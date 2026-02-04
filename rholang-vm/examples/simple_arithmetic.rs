@@ -2,15 +2,12 @@
 // Demonstrates the new VM executing basic arithmetic using rholang-bytecode opcodes
 
 use anyhow::Result;
-use rholang_vm::{api::Instruction, api::Opcode, api::Process, api::Value, VM};
+use rholang_process::Process;
+use rholang_vm::api::{Instruction, Opcode, Value};
 
 fn main() -> Result<()> {
     println!("Rholang VM Simple Arithmetic Example (new)");
     println!("-----------------------------------------");
-
-    // Create a new VM instance
-    let vm = VM::new();
-    println!("VM created successfully");
 
     // Program: 2 + 3 -> 5
     let program = vec![
@@ -20,7 +17,6 @@ fn main() -> Result<()> {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut process = Process::new(program, "simple_arithmetic: add");
-    process.vm = Some(vm.clone());
 
     println!("Executing 2 + 3 ...");
     let result = process.execute()?;
@@ -39,7 +35,6 @@ fn main() -> Result<()> {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut process2 = Process::new(program2, "simple_arithmetic: complex");
-    process2.vm = Some(vm);
 
     println!("Executing ((10 - 5) + 4) * 2 ...");
     let result2 = process2.execute()?;

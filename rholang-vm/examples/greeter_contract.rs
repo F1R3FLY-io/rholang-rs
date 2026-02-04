@@ -6,7 +6,8 @@
 // - We avoid label/jump control flow since the minimal VM focuses on a linear sequence.
 
 use anyhow::Result;
-use rholang_vm::{api::Instruction, api::Opcode, api::Process, api::Value, VM};
+use rholang_process::Process;
+use rholang_vm::api::{Instruction, Opcode, Value};
 
 // RSpace kind code used in tests/examples to separate spaces
 const STORE_CONC: u16 = 3;
@@ -14,8 +15,6 @@ const STORE_CONC: u16 = 3;
 fn main() -> Result<()> {
     println!("Rholang VM Greeter Contract Example (new)");
     println!("-------------------------------------------");
-
-    let vm = VM::new();
 
     // Program outline:
     // new greeter, stdout in {
@@ -53,7 +52,6 @@ fn main() -> Result<()> {
     ];
 
     let mut process = Process::new(program, "greeter_contract: example");
-    process.vm = Some(vm);
     let result = process.execute()?;
 
     println!("Final result: {:?}", result);

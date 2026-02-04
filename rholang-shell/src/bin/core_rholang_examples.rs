@@ -20,10 +20,9 @@ use librho::sem::{
     pipeline::Pipeline, DiagnosticKind, EnclosureAnalysisPass, ErrorKind, ForCompElaborationPass,
     ResolverPass, SemanticDb,
 };
-use rholang_compiler::{Compiler, Disassembler, DisassemblyFormat};
+use rholang_compiler::{Compiler, Disassembler, DisassemblyFormat, Process};
 use rholang_parser::parser::RholangParser;
-use rholang_vm::api::{Process, Value};
-use rholang_vm::VM;
+use rholang_vm::api::Value;
 use std::fs;
 use std::io::{self, BufRead};
 use validated::Validated;
@@ -182,7 +181,7 @@ pub fn compile_and_disassemble(source: &str) -> Result<(Process, String)> {
 /// Compile and run Rholang code, returning the result value
 pub fn compile_and_run(source: &str) -> Result<Value> {
     let (mut process, _) = compile_and_disassemble(source)?;
-    process.vm = Some(VM::new());
+    // VM is already embedded in Process
     let result = process.execute()?;
     Ok(result)
 }
@@ -211,7 +210,7 @@ pub fn format_value(v: &Value) -> String {
             format!("{{{}}}", inner.join(", "))
         }
         Value::Par(ps) => {
-            let inner: Vec<String> = ps.iter().map(|p| p.to_string()).collect();
+            let inner: Vec<String> = ps.iter().map(|p| format!("<{}>", p.source_ref())).collect();
             inner.join(" | ")
         }
     }
@@ -243,8 +242,7 @@ fn process_example(name: &str, code: &str, show_disassembly: bool, format: &str)
                 }
             }
 
-            // Execute
-            process.vm = Some(VM::new());
+            // Execute (VM is already embedded in Process)
             match process.execute() {
                 Ok(result) => {
                     if format == "markdown" {

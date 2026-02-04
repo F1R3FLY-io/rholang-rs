@@ -2,18 +2,30 @@ use rholang_bytecode::core::instructions::Instruction as CoreInst;
 use rholang_bytecode::core::opcodes::Opcode;
 use std::result::Result;
 
-use crate::error::ExecError;
-use crate::process::Process;
-use crate::value::Value;
 use crate::VM;
+use rholang_rspace::{ExecError, Value};
 
 pub enum StepResult {
     Next,
     Stop,
     Jump(usize),
+    /// EVAL opcode encountered - Process should handle executing the value
+    Eval(Value),
 }
 
-pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepResult, ExecError> {
+/// Execute a single bytecode instruction.
+///
+/// # Arguments
+/// * `vm` - The VM state (stack, rspace, continuations, name counter)
+/// * `locals` - The process's local variable slots
+/// * `names` - The process's string pool for PUSH_STR
+/// * `inst` - The instruction to execute
+pub fn step(
+    vm: &mut VM,
+    locals: &mut Vec<Value>,
+    names: &[Value],
+    inst: CoreInst,
+) -> Result<StepResult, ExecError> {
     let opcode = inst.opcode().map_err(|e| ExecError::OpcodeParamError {
         opcode: "OPCODE",
         message: e.to_string(),
@@ -33,7 +45,7 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
         }
         Opcode::PUSH_STR => {
             let idx = inst.op16() as usize;
-            match process.names.get(idx) {
+            match names.get(idx) {
                 Some(Value::Str(s)) => vm.stack.push(Value::Str(s.clone())),
                 Some(other) => {
                     return Err(ExecError::OpcodeParamError {
@@ -279,11 +291,11 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
 
         // Local variables
         Opcode::ALLOC_LOCAL => {
-            process.locals.push(Value::Nil);
+            locals.push(Value::Nil);
         }
         Opcode::LOAD_LOCAL => {
             let idx = inst.op16() as usize;
-            match process.locals.get(idx) {
+            match locals.get(idx) {
                 Some(v) => vm.stack.push(v.clone()),
                 None => {
                     return Err(ExecError::OpcodeParamError {
@@ -296,10 +308,10 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
         Opcode::STORE_LOCAL => {
             let idx = inst.op16() as usize;
             let value = vm.stack.pop().unwrap_or(Value::Nil);
-            if process.locals.len() <= idx {
-                process.locals.resize(idx + 1, Value::Nil);
+            if locals.len() <= idx {
+                locals.resize(idx + 1, Value::Nil);
             }
-            process.locals[idx] = value;
+            locals[idx] = value;
         }
 
         // Conditional and jumps
@@ -477,15 +489,16 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
         }
 
         // RSpace interactions
+        // Note: kind (op16) is ignored in the new unified API - names are unique identifiers
         Opcode::TELL => {
-            let kind = inst.op16();
+            let _kind = inst.op16(); // Kept for bytecode compatibility
             let data = vm.stack.pop().unwrap_or(Value::Nil);
             let chan = vm.stack.pop().unwrap_or(Value::Nil);
             match chan {
                 Value::Name(name) => {
                     if let Ok(mut rspace) = vm.rspace.lock() {
                         rspace
-                            .tell(kind, name, data)
+                            .tell(&name, data)
                             .map_err(|e| ExecError::OpcodeParamError {
                                 opcode: "TELL",
                                 message: e.to_string(),
@@ -502,18 +515,16 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
             }
         }
         Opcode::ASK => {
-            let kind = inst.op16();
+            let _kind = inst.op16(); // Kept for bytecode compatibility
             let chan = vm.stack.pop().unwrap_or(Value::Nil);
             match chan {
                 Value::Name(name) => {
                     if let Ok(mut rspace) = vm.rspace.lock() {
                         let result =
-                            rspace
-                                .ask(kind, name)
-                                .map_err(|e| ExecError::OpcodeParamError {
-                                    opcode: "ASK",
-                                    message: e.to_string(),
-                                })?;
+                            rspace.ask(&name).map_err(|e| ExecError::OpcodeParamError {
+                                opcode: "ASK",
+                                message: e.to_string(),
+                            })?;
                         vm.stack.push(result.unwrap_or(Value::Nil));
                     } else {
                         vm.stack.push(Value::Nil);
@@ -528,14 +539,14 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
             }
         }
         Opcode::PEEK => {
-            let kind = inst.op16();
+            let _kind = inst.op16(); // Kept for bytecode compatibility
             let chan = vm.stack.pop().unwrap_or(Value::Nil);
             match chan {
                 Value::Name(name) => {
                     if let Ok(rspace) = vm.rspace.lock() {
                         let result =
                             rspace
-                                .peek(kind, name)
+                                .peek(&name)
                                 .map_err(|e| ExecError::OpcodeParamError {
                                     opcode: "PEEK",
                                     message: e.to_string(),
@@ -586,30 +597,13 @@ pub fn step(vm: &mut VM, process: &mut Process, inst: CoreInst) -> Result<StepRe
         }
 
         // Process invocation / evaluation
-        // EVAL handles both:
-        // 1. Par values: execute ready processes and return list of results
-        // 2. Other values: return them as-is (they're already evaluated)
+        // EVAL returns the target value to be handled by Process
+        // Process will:
+        // 1. For Par values: execute ready processes and return list of results
+        // 2. For other values: return them as-is (already evaluated)
         Opcode::EVAL => {
             let target = vm.stack.pop().unwrap_or(Value::Nil);
-            match target {
-                Value::Par(mut procs) => {
-                    let mut results = Vec::new();
-                    for proc in procs.iter_mut() {
-                        if proc.is_ready() {
-                            let result = proc.execute()?;
-                            results.push(result);
-                        }
-                    }
-                    // If only one result, return it directly; otherwise return list
-                    if results.len() == 1 {
-                        vm.stack.push(results.pop().unwrap());
-                    } else {
-                        vm.stack.push(Value::List(results));
-                    }
-                }
-                // Non-Par values are already evaluated, just pass through
-                other => vm.stack.push(other),
-            }
+            return Ok(StepResult::Eval(target));
         }
 
         // Fallback for unimplemented opcodes

@@ -1,13 +1,43 @@
-use crate::{ensure_kind_matches_channel, RSpace, Value};
-use anyhow::Result;
+//! In-memory RSpace implementation using HashMap-based Entry storage.
+//!
+//! This is a simple, fast implementation suitable for testing and single-process
+//! execution. For production use with hierarchical channel names, consider
+//! PathMapRSpace from the rholang-rspace-pathmap crate.
+
+use crate::entry::Entry;
+use crate::rspace::RSpace;
+use crate::value::{ProcessState, Value};
+use anyhow::{bail, Result};
 use std::collections::HashMap;
 
-// Default in-memory sequential implementation that mirrors previous VM behaviour
+/// In-memory RSpace implementation using HashMap-based Entry storage.
+///
+/// This implementation provides O(1) average-case lookup, insertion, and deletion
+/// for flat channel names. It's ideal for:
+///
+/// - Unit testing
+/// - Simple scripts
+/// - Development and debugging
+///
+/// For production use with hierarchical channel names like `inbox/messages/1`,
+/// consider using `PathMapRSpace` from the `rholang-rspace-pathmap` crate.
+///
+/// # Example
+///
+/// ```
+/// use rholang_rspace::{InMemoryRSpace, RSpace, Value};
+///
+/// let mut rspace = InMemoryRSpace::new();
+/// rspace.tell("test", Value::Int(42)).unwrap();
+/// assert_eq!(rspace.peek("test").unwrap(), Some(Value::Int(42)));
+/// ```
+#[derive(Default)]
 pub struct InMemoryRSpace {
-    pub(crate) store: HashMap<(u16, String), Vec<Value>>,
+    store: HashMap<String, Entry>,
 }
 
 impl InMemoryRSpace {
+    /// Create a new empty InMemoryRSpace.
     pub fn new() -> Self {
         Self {
             store: HashMap::new(),
@@ -15,37 +45,109 @@ impl InMemoryRSpace {
     }
 }
 
-impl Default for InMemoryRSpace {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl RSpace for InMemoryRSpace {
-    fn tell(&mut self, kind: u16, channel: String, data: Value) -> Result<()> {
-        ensure_kind_matches_channel(kind, &channel)?;
-        let key = (kind, channel);
-        self.store.entry(key).or_default().push(data);
+    // === Entry-based API ===
+
+    fn get_entry(&self, name: &str) -> Option<Entry> {
+        self.store.get(name).cloned()
+    }
+
+    // === Channel operations ===
+
+    fn tell(&mut self, name: &str, data: Value) -> Result<()> {
+        match self.store.get_mut(name) {
+            Some(Entry::Channel(queue)) => {
+                queue.push(data);
+                Ok(())
+            }
+            Some(_) => {
+                bail!("entry '{}' exists but is not a channel", name)
+            }
+            None => {
+                self.store
+                    .insert(name.to_string(), Entry::Channel(vec![data]));
+                Ok(())
+            }
+        }
+    }
+
+    fn ask(&mut self, name: &str) -> Result<Option<Value>> {
+        match self.store.get_mut(name) {
+            Some(Entry::Channel(queue)) => {
+                if queue.is_empty() {
+                    Ok(None)
+                } else {
+                    Ok(Some(queue.remove(0)))
+                }
+            }
+            Some(_) => {
+                bail!("entry '{}' exists but is not a channel", name)
+            }
+            None => Ok(None),
+        }
+    }
+
+    fn peek(&self, name: &str) -> Result<Option<Value>> {
+        match self.store.get(name) {
+            Some(Entry::Channel(queue)) => Ok(queue.first().cloned()),
+            Some(_) => {
+                bail!("entry '{}' exists but is not a channel", name)
+            }
+            None => Ok(None),
+        }
+    }
+
+    // === Process operations ===
+
+    fn register_process(&mut self, name: &str, state: ProcessState) -> Result<()> {
+        if self.store.contains_key(name) {
+            bail!("entry '{}' already exists", name)
+        }
+        self.store
+            .insert(name.to_string(), Entry::Process { state });
         Ok(())
     }
 
-    fn ask(&mut self, kind: u16, channel: String) -> Result<Option<Value>> {
-        ensure_kind_matches_channel(kind, &channel)?;
-        let key = (kind, channel);
-        Ok(self.store.get_mut(&key).and_then(|q| {
-            if q.is_empty() {
-                None
-            } else {
-                Some(q.remove(0))
+    fn update_process(&mut self, name: &str, state: ProcessState) -> Result<()> {
+        match self.store.get_mut(name) {
+            Some(Entry::Process { state: s }) => {
+                *s = state;
+                Ok(())
             }
-        }))
+            Some(_) => {
+                bail!("entry '{}' exists but is not a process", name)
+            }
+            None => {
+                bail!("no process registered with name '{}'", name)
+            }
+        }
     }
 
-    fn peek(&self, kind: u16, channel: String) -> Result<Option<Value>> {
-        ensure_kind_matches_channel(kind, &channel)?;
-        let key = (kind, channel);
-        Ok(self.store.get(&key).and_then(|q| q.first()).cloned())
+    fn get_process_state(&self, name: &str) -> Option<ProcessState> {
+        match self.store.get(name) {
+            Some(Entry::Process { state }) => Some(state.clone()),
+            _ => None,
+        }
     }
+
+    // === Value operations ===
+
+    fn set_value(&mut self, name: &str, value: Value) -> Result<()> {
+        if self.store.contains_key(name) {
+            bail!("entry '{}' already exists", name)
+        }
+        self.store.insert(name.to_string(), Entry::Value(value));
+        Ok(())
+    }
+
+    fn get_value(&self, name: &str) -> Option<Value> {
+        match self.store.get(name) {
+            Some(Entry::Value(val)) => Some(val.clone()),
+            _ => None,
+        }
+    }
+
+    // === Utility ===
 
     fn reset(&mut self) {
         self.store.clear();
@@ -56,80 +158,171 @@ impl RSpace for InMemoryRSpace {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_in_memory_rspace_basic() -> Result<()> {
-        let mut rspace = InMemoryRSpace::new();
-        let channel = "@0:test".to_string();
-        let val = Value::Int(42);
+    // =========================================================================
+    // Channel operations
+    // =========================================================================
 
-        rspace.tell(0, channel.clone(), val.clone())?;
-        assert_eq!(rspace.peek(0, channel.clone())?, Some(val.clone()));
-        assert_eq!(rspace.ask(0, channel.clone())?, Some(val));
-        assert_eq!(rspace.ask(0, channel.clone())?, None);
+    #[test]
+    fn test_channel_basic() -> Result<()> {
+        let mut rspace = InMemoryRSpace::new();
+
+        rspace.tell("inbox", Value::Int(42))?;
+        assert_eq!(rspace.peek("inbox")?, Some(Value::Int(42)));
+        assert_eq!(rspace.ask("inbox")?, Some(Value::Int(42)));
+        assert_eq!(rspace.ask("inbox")?, None);
 
         Ok(())
     }
 
     #[test]
-    fn test_in_memory_rspace_fifo() -> Result<()> {
+    fn test_channel_fifo() -> Result<()> {
         let mut rspace = InMemoryRSpace::new();
-        let channel = "@0:fifo".to_string();
 
-        rspace.tell(0, channel.clone(), Value::Int(1))?;
-        rspace.tell(0, channel.clone(), Value::Int(2))?;
+        rspace.tell("queue", Value::Int(1))?;
+        rspace.tell("queue", Value::Int(2))?;
+        rspace.tell("queue", Value::Int(3))?;
 
-        assert_eq!(rspace.peek(0, channel.clone())?, Some(Value::Int(1)));
-        assert_eq!(rspace.ask(0, channel.clone())?, Some(Value::Int(1)));
-        assert_eq!(rspace.ask(0, channel.clone())?, Some(Value::Int(2)));
-        assert_eq!(rspace.ask(0, channel.clone())?, None);
+        assert_eq!(rspace.ask("queue")?, Some(Value::Int(1)));
+        assert_eq!(rspace.ask("queue")?, Some(Value::Int(2)));
+        assert_eq!(rspace.ask("queue")?, Some(Value::Int(3)));
+        assert_eq!(rspace.ask("queue")?, None);
 
         Ok(())
     }
 
     #[test]
-    fn test_in_memory_rspace_reset() -> Result<()> {
+    fn test_channel_is_solved() -> Result<()> {
         let mut rspace = InMemoryRSpace::new();
-        let channel = "@0:reset".to_string();
 
-        rspace.tell(0, channel.clone(), Value::Int(1))?;
+        assert!(!rspace.is_solved("inbox")); // Doesn't exist
+
+        rspace.tell("inbox", Value::Int(42))?;
+        assert!(rspace.is_solved("inbox")); // Non-empty channel
+
+        rspace.ask("inbox")?;
+        assert!(!rspace.is_solved("inbox")); // Empty channel
+
+        Ok(())
+    }
+
+    // =========================================================================
+    // Process operations
+    // =========================================================================
+
+    #[test]
+    fn test_process_registration() -> Result<()> {
+        let mut rspace = InMemoryRSpace::new();
+
+        rspace.register_process("worker", ProcessState::Ready)?;
+        assert_eq!(
+            rspace.get_process_state("worker"),
+            Some(ProcessState::Ready)
+        );
+        assert!(!rspace.is_solved("worker")); // Ready is not solved
+
+        rspace.update_process("worker", ProcessState::Value(Value::Int(100)))?;
+        assert!(rspace.is_solved("worker")); // Value is solved
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_process_already_exists() -> Result<()> {
+        let mut rspace = InMemoryRSpace::new();
+
+        rspace.register_process("worker", ProcessState::Ready)?;
+        assert!(rspace
+            .register_process("worker", ProcessState::Ready)
+            .is_err());
+
+        Ok(())
+    }
+
+    // =========================================================================
+    // Value operations
+    // =========================================================================
+
+    #[test]
+    fn test_value_storage() -> Result<()> {
+        let mut rspace = InMemoryRSpace::new();
+
+        rspace.set_value("config", Value::Str("production".to_string()))?;
+        assert_eq!(
+            rspace.get_value("config"),
+            Some(Value::Str("production".to_string()))
+        );
+        assert!(rspace.is_solved("config")); // Value is always solved
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_value_already_exists() -> Result<()> {
+        let mut rspace = InMemoryRSpace::new();
+
+        rspace.set_value("config", Value::Int(1))?;
+        assert!(rspace.set_value("config", Value::Int(2)).is_err());
+
+        Ok(())
+    }
+
+    // =========================================================================
+    // Entry type checking
+    // =========================================================================
+
+    #[test]
+    fn test_entry_type_mismatch() -> Result<()> {
+        let mut rspace = InMemoryRSpace::new();
+
+        // Create a channel
+        rspace.tell("mixed", Value::Int(1))?;
+
+        // Try to use it as a process - should fail
+        assert!(rspace
+            .register_process("mixed", ProcessState::Ready)
+            .is_err());
+        assert!(rspace.update_process("mixed", ProcessState::Ready).is_err());
+        assert!(rspace.set_value("mixed", Value::Int(2)).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_entry() -> Result<()> {
+        let mut rspace = InMemoryRSpace::new();
+
+        rspace.tell("channel", Value::Int(1))?;
+        rspace.register_process("process", ProcessState::Ready)?;
+        rspace.set_value("value", Value::Bool(true))?;
+
+        assert!(rspace.get_entry("channel").unwrap().is_channel());
+        assert!(rspace.get_entry("process").unwrap().is_process());
+        assert!(rspace.get_entry("value").unwrap().is_value());
+        assert!(rspace.get_entry("nonexistent").is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_reset() -> Result<()> {
+        let mut rspace = InMemoryRSpace::new();
+
+        rspace.tell("channel", Value::Int(1))?;
+        rspace.register_process("process", ProcessState::Ready)?;
+        rspace.set_value("value", Value::Bool(true))?;
+
         rspace.reset();
-        assert_eq!(rspace.ask(0, channel.clone())?, None);
+
+        assert!(rspace.get_entry("channel").is_none());
+        assert!(rspace.get_entry("process").is_none());
+        assert!(rspace.get_entry("value").is_none());
 
         Ok(())
     }
 
     #[test]
-    fn test_in_memory_rspace_default() {
+    fn test_default() {
         let rspace: InMemoryRSpace = Default::default();
         assert!(rspace.store.is_empty());
-    }
-
-    #[test]
-    fn test_mismatch_kind() {
-        let mut rspace = InMemoryRSpace::new();
-        let channel = "@0:test".to_string();
-        let val = Value::Int(42);
-
-        assert!(rspace.tell(1, channel.clone(), val.clone()).is_err());
-        assert!(rspace.ask(1, channel.clone()).is_err());
-        assert!(rspace.peek(1, channel.clone()).is_err());
-    }
-
-    #[test]
-    fn test_ask_peek_empty_channel() -> Result<()> {
-        let mut rspace = InMemoryRSpace::new();
-        let channel = "@0:empty".to_string();
-
-        // Peek/Ask on non-existent channel
-        assert_eq!(rspace.peek(0, channel.clone())?, None);
-        assert_eq!(rspace.ask(0, channel.clone())?, None);
-
-        // Peek/Ask on channel that was once populated but now empty
-        rspace.tell(0, channel.clone(), Value::Nil)?;
-        rspace.ask(0, channel.clone())?;
-        assert_eq!(rspace.peek(0, channel.clone())?, None);
-        assert_eq!(rspace.ask(0, channel.clone())?, None);
-
-        Ok(())
     }
 }

@@ -368,9 +368,10 @@ impl Default for Disassembler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Process;
     use rholang_bytecode::core::instructions::Instruction;
     use rholang_bytecode::core::opcodes::Opcode;
-    use rholang_vm::api::{Process, Value};
+    use rholang_vm::api::Value;
 
     fn create_test_process() -> Process {
         let mut process = Process::new(

@@ -74,9 +74,8 @@ pub struct WasmVmInterpreterProvider;
 impl InterpreterProvider for WasmVmInterpreterProvider {
     async fn interpret(&self, _code: &str) -> Result<String> {
         // TODO: when parser->bytecode is available, translate `_code` into `Process`.
-        let vm = VM::new();
+        // VM is already embedded in Process
         let mut proc = Process::new(vec![], "wasm-draft");
-        proc.vm = Some(vm);
         let val = proc.execute()?;
         Ok(pretty_value(&val))
     }

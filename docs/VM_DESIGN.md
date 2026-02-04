@@ -23,23 +23,26 @@ Out of scope for the current milestone:
 
 ## Crate Architecture
 
-The implementation is split across three crates:
+The implementation is split across three crates with clear separation of concerns:
 
-### rholang-vm (Source of Truth)
+### rholang-vm (Source of Truth for Execution)
 Core types, traits, and execution logic:
-- `Value` enum: runtime values (Int, Bool, Str, Name, List, Tuple, Map, Par, Nil)
-- `Process` struct: code, source_ref, locals, names, vm, state
-- `ProcessState` enum: Wait, Ready, Value, Error
-- `ProcessEvent` enum: Value, Error (for callbacks)
-- `RSpace` trait: abstract storage interface (tell, ask, peek, reset)
-- `VM` struct: stack, rspace, continuation storage, name counter
-- `execute::step()`: instruction dispatcher
-- `ExecError`: execution error type
+- **Execution**: `execute::step(vm, locals, names, inst)` - single instruction dispatcher that operates on VM state and process-provided locals/names
+- **VM state**: `VM` struct with stack, rspace, continuation storage, name counter
+- **Values**: `Value` enum (Int, Bool, Str, Name, List, Tuple, Map, Par, Nil)
+- **Process**: `Process` struct manages execution state, event callbacks, and drives the step loop
+- **State machine**: `ProcessState` enum (Wait, Ready, Value, Error) for scheduling
+- **Events**: `ProcessEvent` enum (Value, Error) for execution callbacks
+- **RSpace trait**: abstract storage interface (tell, ask, peek, reset)
+- **Errors**: `ExecError` type for execution errors
+
+Key design: `step()` takes `locals: &mut Vec<Value>` and `names: &[Value]` instead of a Process reference, allowing clean separation between execution logic and process management. The EVAL opcode returns `StepResult::Eval(Value)` which Process handles for sub-process execution.
 
 ### rholang-process (Re-export Facade)
 Re-exports all public types from rholang-vm:
 - Provides a stable API for downstream crates
-- Breaks circular dependency between rholang-vm and rholang-rspace
+- Enables dependency inversion between rholang-vm and rholang-rspace
+- Contains only `lib.rs` with re-exports (no duplicate source files)
 
 ### rholang-rspace
 RSpace implementations and utilities:
@@ -85,8 +88,96 @@ Executable unit with state:
 - `source_ref: String` - provenance/debug tag (stable name for callbacks)
 - `locals: Vec<Value>` - local variable slots
 - `names: Vec<Value>` - string pool for PUSH_STR
-- `vm: Option<VM>` - preserved VM instance across executions
+- `vm: VM` - embedded VM instance for execution
 - `state: ProcessState` - current process state
+- `parameters: Vec<Parameter>` - named bindings to RSpace channels
+
+### Parameter
+Named binding that relates a process to an entry (channel, process, or value) in RSpace:
+- `name: String` - unique name identifying the entry in RSpace
+
+A parameter represents a dependency that must be resolved before a process can execute. The parameter's name identifies an entry in RSpace, and the parameter is "solved" based on the entry's type and state.
+
+**Entry Types in RSpace:**
+```rust
+pub enum Entry {
+    /// Channel with FIFO queue of values
+    Channel(Vec<Value>),
+    /// Registered process with state tracking
+    Process { state: ProcessState },
+    /// Direct terminal value
+    Value(Value),
+}
+```
+
+**Solved State Rules:**
+1. A parameter is **unsolved** if no entry exists with that name
+2. A parameter is **solved** if the entry is `Entry::Channel` with a non-empty queue
+3. A parameter is **solved** if the entry is `Entry::Process` in terminal `ProcessState::Value` state
+4. A parameter is **unsolved** if the entry is `Entry::Process` in `Wait`, `Ready`, or `Error` state
+5. A parameter is **solved** if the entry is `Entry::Value` (always terminal)
+
+**Process Ready State:**
+- A process with zero parameters is always ready (if in `ProcessState::Ready`)
+- A process with one or more parameters is ready only if ALL parameters are solved
+- The `is_ready()` method checks both the process state and parameter states
+
+```rust
+pub struct Parameter {
+    pub name: String,  // Entry name (e.g., "input", "worker_result")
+}
+
+impl Parameter {
+    /// Check if this parameter is solved by looking up entry state in RSpace
+    pub fn is_solved(&self, rspace: &dyn RSpace) -> bool;
+}
+```
+
+**Name Resolution Flow:**
+```
+                    ┌─────────────────────┐
+                    │ Parameter with name │
+                    └──────────┬──────────┘
+                               │
+                    ┌──────────▼──────────┐
+                    │ Look up entry in    │
+                    │ RSpace by name      │
+                    └──────────┬──────────┘
+                               │
+         ┌─────────────────────┼─────────────────────┐
+         │ Not found           │ Found               │
+         │                     │                     │
+   ┌─────▼─────┐    ┌──────────▼──────────┐   ┌─────▼─────┐
+   │ UNSOLVED  │    │ Check entry type    │   │           │
+   └───────────┘    └──────────┬──────────┘   └───────────┘
+                               │
+         ┌─────────────────────┼─────────────────────┐
+         │                     │                     │
+   ┌─────▼─────┐         ┌─────▼─────┐         ┌─────▼─────┐
+   │ Channel   │         │ Process   │         │ Value     │
+   └─────┬─────┘         └─────┬─────┘         └─────┬─────┘
+         │                     │                     │
+   ┌─────▼─────┐         ┌─────▼─────┐         ┌─────▼─────┐
+   │ Non-empty?│         │ In Value  │         │ SOLVED    │
+   │ → SOLVED  │         │ state?    │         │ (always)  │
+   │ Empty?    │         │ → SOLVED  │         └───────────┘
+   │ → UNSOLVED│         │ Other?    │
+   └───────────┘         │ → UNSOLVED│
+                         └───────────┘
+```
+
+**Process Dependency Example:**
+```
+Process A (name="worker"):
+  - Registered in RSpace as Entry::Process
+  - Executes and produces result
+  - State changes to Value(result)
+
+Process B (parameters=["worker"]):
+  - Waits for "worker" entry to be solved
+  - When Process A completes, "worker" entry becomes solved
+  - Process B can now execute
+```
 
 ### ProcessState
 Execution state machine:
@@ -106,15 +197,72 @@ Virtual machine state:
 - `next_name_id: u64` - monotonic fresh-name counter
 
 ### RSpace Trait
-Abstract storage interface (from rholang-vm, re-exported via rholang-process):
+Unified storage interface for channels, processes, and values (from rholang-vm, re-exported via rholang-process):
+
 ```rust
+/// Entry types that can be stored in RSpace
+pub enum Entry {
+    /// Channel with FIFO queue of values
+    Channel(Vec<Value>),
+    /// Registered process with state tracking
+    Process { state: ProcessState },
+    /// Direct terminal value
+    Value(Value),
+}
+
 pub trait RSpace: Send + Sync {
-    fn tell(&mut self, kind: u16, channel: String, data: Value) -> Result<()>;
-    fn ask(&mut self, kind: u16, channel: String) -> Result<Option<Value>>;
-    fn peek(&self, kind: u16, channel: String) -> Result<Option<Value>>;
+    // === Entry-based API (unified) ===
+
+    /// Get entry by name
+    fn get_entry(&self, name: &str) -> Option<Entry>;
+
+    /// Check if an entry exists and is in a solved state
+    fn is_solved(&self, name: &str) -> bool;
+
+    // === Channel operations (for Entry::Channel) ===
+
+    /// Put data into a channel (creates channel if not exists)
+    fn tell(&mut self, name: &str, data: Value) -> Result<()>;
+
+    /// Destructive read: remove and return oldest value from channel
+    fn ask(&mut self, name: &str) -> Result<Option<Value>>;
+
+    /// Non-destructive read: return oldest value without removing
+    fn peek(&self, name: &str) -> Result<Option<Value>>;
+
+    // === Process operations (for Entry::Process) ===
+
+    /// Register a process by name (initial state)
+    fn register_process(&mut self, name: &str, state: ProcessState) -> Result<()>;
+
+    /// Update a registered process's state
+    fn update_process(&mut self, name: &str, state: ProcessState) -> Result<()>;
+
+    /// Get a registered process's state
+    fn get_process_state(&self, name: &str) -> Option<ProcessState>;
+
+    // === Value operations (for Entry::Value) ===
+
+    /// Store a direct value (terminal, immutable)
+    fn set_value(&mut self, name: &str, value: Value) -> Result<()>;
+
+    /// Get a stored value
+    fn get_value(&self, name: &str) -> Option<Value>;
+
+    // === Utility ===
+
+    /// Reset all storage
     fn reset(&mut self);
 }
 ```
+
+**Entry Semantics:**
+- **Channel**: FIFO queue, supports multiple values, `tell` appends, `ask` pops first
+- **Process**: State tracked, solved when in `ProcessState::Value` state
+- **Value**: Immutable once set, always considered solved
+
+**Name Uniqueness:**
+Each name in RSpace identifies exactly one entry. You cannot have a channel and a process with the same name. Attempting to use channel operations on a process entry (or vice versa) results in an error.
 
 
 ## Channel Naming and Kinds
@@ -132,7 +280,11 @@ pub trait RSpace: Send + Sync {
 - With event callback: `Process::execute_with_event(&mut self, handler) -> Result<Value, ExecError>`
 - The VM clears its stack at the start of each execution for isolation.
 - A PC-based loop fetches instructions and dispatches them to `execute::step()`.
-- step() returns `StepResult`: Next, Stop, or Jump(usize).
+- step() signature: `step(vm, locals, names, inst) -> Result<StepResult, ExecError>`
+  - Takes process locals and names by reference, not the Process itself
+  - Allows clean separation between VM execution and process management
+- step() returns `StepResult`: Next, Stop, Jump(usize), or Eval(Value).
+  - `Eval(Value)`: returned by EVAL opcode; Process handles sub-process execution
 - The result is the top of the stack at termination or Value::Nil if empty.
 - Process state transitions to Value or Error after execution.
 - Event callback fires with the process source_ref.
@@ -235,17 +387,36 @@ The `execute_ready_processes()` helper in rholang-vm:
 
 ## RSpace Implementations
 
+Both implementations use unified Entry-based storage.
+
 ### InMemoryRSpace
-- HashMap<(u16, String), Vec<Value>> storage
-- FIFO queue semantics per channel
-- Channel-kind validation on all operations
+- `HashMap<String, Entry>` storage
+- Name-based lookup for all entry types
+- FIFO queue semantics for channels
 - Suitable for tests and simple runs
 
 ### PathMapRSpace
-- PathMap<Vec<Value>> storage with hierarchical keys
-- FIFO queue semantics per channel
-- Channel-kind validation on all operations
+- `PathMap<Entry>` storage with hierarchical keys
+- Name-based lookup for all entry types
+- FIFO queue semantics for channels
 - Default implementation for the system
+
+### Entry Storage Example
+```rust
+// Channel entry (FIFO queue)
+rspace.tell("inbox", Value::Int(42));    // Creates Entry::Channel
+rspace.tell("inbox", Value::Int(43));    // Appends to queue
+rspace.ask("inbox");                      // Returns Some(42), removes it
+
+// Process entry (state tracked)
+rspace.register_process("worker", ProcessState::Ready);
+rspace.update_process("worker", ProcessState::Value(Value::Int(100)));
+rspace.is_solved("worker");               // Returns true
+
+// Value entry (immutable)
+rspace.set_value("config", Value::Str("production".into()));
+rspace.get_value("config");               // Returns Some(Str("production"))
+```
 
 
 ## Concurrency Rules

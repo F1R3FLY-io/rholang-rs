@@ -8,9 +8,10 @@ use librho::sem::{
     pipeline::Pipeline, DiagnosticKind, EnclosureAnalysisPass, ErrorKind, ForCompElaborationPass,
     ResolverPass, SemanticDb,
 };
+use rholang_compiler::Process;
 use rholang_compiler::{Compiler, Disassembler, DisassemblyFormat};
 use rholang_parser::parser::RholangParser;
-use rholang_vm::api::{Process, Value};
+use rholang_vm::api::Value;
 use validated::Validated;
 
 /// Compile source and return (Process, disassembly string)
@@ -84,7 +85,7 @@ fn format_value(v: &Value) -> String {
             format!("{{{}}}", inner.join(", "))
         }
         Value::Par(ps) => {
-            let inner: Vec<String> = ps.iter().map(|p| p.to_string()).collect();
+            let inner: Vec<String> = ps.iter().map(|p| format!("<{}>", p.source_ref())).collect();
             inner.join(" | ")
         }
     }
@@ -175,8 +176,7 @@ fn generate_examples_markdown() {
                 println!("{}", disasm.trim());
                 println!("```\n");
 
-                // Execute
-                process.vm = Some(rholang_vm::VM::new());
+                // Execute (VM is already embedded in Process)
                 match process.execute() {
                     Ok(result) => {
                         println!("**Result:** `{}`\n", format_value(&result));

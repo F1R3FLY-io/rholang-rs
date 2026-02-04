@@ -1,8 +1,8 @@
-use rholang_vm::{api::Instruction, api::Opcode, api::Process, api::Value, VM};
+use rholang_process::Process;
+use rholang_vm::api::{Instruction, Opcode, Value};
 
 #[test]
 fn test_list_diff_basic() {
-    let vm = VM::new();
     // [1,2,2,3] DIFF [2,4] => [1,2,3]
     let prog = vec![
         Instruction::unary(Opcode::PUSH_INT, 1),
@@ -17,7 +17,6 @@ fn test_list_diff_basic() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut process = Process::new(prog, "diff");
-    process.vm = Some(vm.clone());
     let out = process.execute().expect("exec ok");
     assert_eq!(
         out,
@@ -27,7 +26,6 @@ fn test_list_diff_basic() {
 
 #[test]
 fn test_list_diff_no_overlap() {
-    let vm = VM::new();
     // [1,2] DIFF [3] => [1,2]
     let prog = vec![
         Instruction::unary(Opcode::PUSH_INT, 1),
@@ -39,7 +37,6 @@ fn test_list_diff_no_overlap() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut process2 = Process::new(prog, "diff");
-    process2.vm = Some(vm);
     let out = process2.execute().expect("exec ok");
     assert_eq!(out, Value::List(vec![Value::Int(1), Value::Int(2)]));
 }

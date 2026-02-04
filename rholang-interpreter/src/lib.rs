@@ -99,7 +99,10 @@ impl RholangCompilerInterpreterProvider {
                 format!("{{{}}}", inner.join(", "))
             }
             VmValue::Par(procs) => {
-                let inner: Vec<String> = procs.iter().map(|p| p.to_string()).collect();
+                let inner: Vec<String> = procs
+                    .iter()
+                    .map(|p| format!("<{}>", p.source_ref()))
+                    .collect();
                 inner.join(" | ")
             }
             VmValue::Nil => "Nil".to_string(),
@@ -162,16 +165,17 @@ impl InterpreterProvider for RholangCompilerInterpreterProvider {
             }
 
             let mut last_val = VmValue::Nil;
-            for mut proc in processes.into_iter() {
+            for proc in processes.into_iter() {
                 // --- NEW FLOW: store in RSpace then retrieve and execute ---
                 let process_id = format!("proc_{}", pid);
                 let channel = format!("@0:{}", process_id);
 
-                let vm = proc.vm.take().unwrap_or_default();
+                // Use the process's VM's rspace for storage (Arc is shared)
+                let rspace_arc = proc.vm.rspace.clone();
 
                 // Store the process in RSpace
                 {
-                    let mut rspace = match vm.rspace.lock() {
+                    let mut rspace = match rspace_arc.lock() {
                         Ok(r) => r,
                         Err(e) => {
                             return InterpretationResult::Error(InterpreterError::new(format!(
@@ -180,7 +184,7 @@ impl InterpreterProvider for RholangCompilerInterpreterProvider {
                             )))
                         }
                     };
-                    if let Err(e) = rspace.tell(0, channel.clone(), VmValue::Par(vec![proc])) {
+                    if let Err(e) = rspace.tell(&channel, VmValue::Par(vec![proc.boxed()])) {
                         return InterpretationResult::Error(InterpreterError::new(format!(
                             "RSpace tell error: {}",
                             e
@@ -190,7 +194,7 @@ impl InterpreterProvider for RholangCompilerInterpreterProvider {
 
                 // Retrieve the process from RSpace
                 let mut retrieved_proc = {
-                    let mut rspace = match vm.rspace.lock() {
+                    let mut rspace = match rspace_arc.lock() {
                         Ok(r) => r,
                         Err(e) => {
                             return InterpretationResult::Error(InterpreterError::new(format!(
@@ -199,7 +203,7 @@ impl InterpreterProvider for RholangCompilerInterpreterProvider {
                             )))
                         }
                     };
-                    match rspace.ask(0, channel.clone()) {
+                    match rspace.ask(&channel) {
                         Ok(Some(VmValue::Par(mut procs))) if !procs.is_empty() => procs.remove(0),
                         Ok(Some(other)) => {
                             return InterpretationResult::Error(InterpreterError::new(format!(
@@ -221,8 +225,7 @@ impl InterpreterProvider for RholangCompilerInterpreterProvider {
                     }
                 };
 
-                // Execute the retrieved process
-                retrieved_proc.vm = Some(vm);
+                // Execute the retrieved process (VM is already embedded, RSpace is shared via Arc)
                 match retrieved_proc.execute() {
                     Ok(val) => {
                         last_val = val;

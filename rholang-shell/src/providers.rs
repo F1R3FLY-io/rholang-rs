@@ -14,7 +14,7 @@ use librho::sem::{
     ResolverPass, SemanticDb,
 };
 use rholang_compiler::Compiler;
-use rholang_vm::api::{Value as VmValue, VM};
+use rholang_vm::api::Value as VmValue;
 
 /// Remove source position/span information from a pretty-printed AST/debug output
 fn strip_sourcepos(input: &str) -> String {
@@ -509,7 +509,10 @@ impl RholangCompilerInterpreterProvider {
                 format!("{{{}}}", inner.join(", "))
             }
             VmValue::Par(procs) => {
-                let inner: Vec<String> = procs.iter().map(|p| p.to_string()).collect();
+                let inner: Vec<String> = procs
+                    .iter()
+                    .map(|p| format!("<{}>", p.source_ref()))
+                    .collect();
                 inner.join(" | ")
             }
             VmValue::Nil => "Nil".to_string(),
@@ -656,8 +659,7 @@ impl InterpreterProvider for RholangCompilerInterpreterProvider {
                         }
                     };
 
-                    // Execute the process
-                    process.vm = Some(VM::new());
+                    // Execute the process (VM is initialized by default)
                     let value = match process.execute() {
                         Ok(v) => v,
                         Err(e) => {

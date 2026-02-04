@@ -1,8 +1,8 @@
-use rholang_vm::{api::Instruction, api::Opcode, api::Process, api::Value, VM};
+use rholang_process::Process;
+use rholang_vm::api::{Instruction, Opcode, Value};
 
 #[test]
 fn test_nop_and_halt() {
-    let vm = VM::new();
     let prog = vec![
         Instruction::unary(Opcode::PUSH_INT, 1),
         Instruction::nullary(Opcode::NOP),
@@ -12,7 +12,6 @@ fn test_nop_and_halt() {
         Instruction::unary(Opcode::PUSH_INT, 999),
     ];
     let mut p = Process::new(prog, "cf_nop_halt");
-    p.vm = Some(vm);
     let out = p.execute().expect("exec ok");
     assert_eq!(out, Value::Int(2));
 }
@@ -20,7 +19,6 @@ fn test_nop_and_halt() {
 #[test]
 fn test_jump_to_index() {
     // Jump uses an immediate absolute index now.
-    let vm = VM::new();
     let prog = vec![
         // Jump to index 3 (0-based)
         Instruction::unary(Opcode::JUMP, 3),
@@ -33,7 +31,6 @@ fn test_jump_to_index() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p = Process::new(prog.clone(), "cf_jump_ok");
-    p.vm = Some(vm);
     let out = p.execute().expect("exec ok");
     assert_eq!(out, Value::Int(42));
 }
@@ -42,7 +39,6 @@ fn test_jump_to_index() {
 fn test_branch_true_and_false() {
     // BRANCH_TRUE immediate index
     // Case true: jump
-    let vm = VM::new();
     let prog_true = vec![
         Instruction::unary(Opcode::PUSH_BOOL, 1),   // true
         Instruction::unary(Opcode::BRANCH_TRUE, 3), // jump to index 3
@@ -53,12 +49,10 @@ fn test_branch_true_and_false() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p_true = Process::new(prog_true, "cf_bt_true");
-    p_true.vm = Some(vm);
     let out_true = p_true.execute().expect("exec ok");
     assert_eq!(out_true, Value::Int(10));
 
     // Case false: fall through
-    let vm2 = VM::new();
     let prog_false = vec![
         Instruction::unary(Opcode::PUSH_BOOL, 0),   // false
         Instruction::unary(Opcode::BRANCH_TRUE, 3), // would jump to index 3 if true
@@ -67,12 +61,10 @@ fn test_branch_true_and_false() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p_false = Process::new(prog_false, "cf_bt_false");
-    p_false.vm = Some(vm2);
     let out_false = p_false.execute().expect("exec ok");
     assert_eq!(out_false, Value::Int(7));
 
     // BRANCH_FALSE: true fallthrough, false jumps
-    let vm3 = VM::new();
     let prog_bf = vec![
         Instruction::unary(Opcode::PUSH_BOOL, 0), // false -> should jump
         Instruction::unary(Opcode::BRANCH_FALSE, 3), // jump to index 3
@@ -83,7 +75,6 @@ fn test_branch_true_and_false() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p_bf = Process::new(prog_bf, "cf_bf");
-    p_bf.vm = Some(vm3);
     let out_bf = p_bf.execute().expect("exec ok");
     assert_eq!(out_bf, Value::Int(3));
 }
@@ -91,7 +82,6 @@ fn test_branch_true_and_false() {
 #[test]
 fn test_branch_success_true_and_false() {
     // success true: jump using immediate target index
-    let vm = VM::new();
     let prog = vec![
         Instruction::unary(Opcode::PUSH_BOOL, 1),
         Instruction::unary(Opcode::BRANCH_SUCCESS, 3),
@@ -102,12 +92,10 @@ fn test_branch_success_true_and_false() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p = Process::new(prog, "cf_bs_true");
-    p.vm = Some(vm);
     let out = p.execute().expect("exec ok");
     assert_eq!(out, Value::Int(123));
 
     // success false: should fall through
-    let vm2 = VM::new();
     let prog2 = vec![
         Instruction::unary(Opcode::PUSH_BOOL, 0),
         Instruction::unary(Opcode::BRANCH_SUCCESS, 3),
@@ -115,7 +103,6 @@ fn test_branch_success_true_and_false() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p2 = Process::new(prog2, "cf_bs_false");
-    p2.vm = Some(vm2);
     let out2 = p2.execute().expect("exec ok");
     assert_eq!(out2, Value::Int(77));
 }
@@ -123,25 +110,21 @@ fn test_branch_success_true_and_false() {
 #[test]
 fn test_branch_true_param_errors() {
     // Missing bool -> error
-    let vm = VM::new();
     let prog = vec![
         Instruction::unary(Opcode::BRANCH_TRUE, 0), // target irrelevant
     ];
     let mut p = Process::new(prog, "cf_bt_err1");
-    p.vm = Some(vm);
     let err = p.execute().expect_err("should error for missing condition");
     let msg = err.to_string().to_lowercase();
     assert!(msg.contains("branch_true") && msg.contains("expects bool"));
 
     // Wrong type for condition -> error
-    let vm2 = VM::new();
     let prog2 = vec![
         // Put non-bool on stack
         Instruction::unary(Opcode::PUSH_INT, 1),
         Instruction::unary(Opcode::BRANCH_TRUE, 0),
     ];
     let mut p2 = Process::new(prog2, "cf_bt_err2");
-    p2.vm = Some(vm2);
     let err2 = p2.execute().expect_err("should error for wrong cond type");
     let msg2 = err2.to_string().to_lowercase();
     assert!(msg2.contains("branch_true") && msg2.contains("expects bool"));

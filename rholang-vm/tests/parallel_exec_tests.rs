@@ -1,6 +1,6 @@
 use rholang_bytecode::core::instructions::Instruction;
 use rholang_bytecode::core::Opcode;
-use rholang_vm::{api::Process, execute_ready_processes, ProcessEvent, ProcessState};
+use rholang_process::{execute_ready_processes, Process, ProcessEvent, ProcessState};
 use std::sync::{Arc, Mutex};
 
 #[test]

@@ -32,7 +32,7 @@ fn pretty_value(v: &Value) -> String {
             format!("Map({{{}}})", elems.join(", "))
         }
         Value::Par(ps) => {
-            let elems: Vec<String> = ps.iter().map(|p| p.to_string()).collect();
+            let elems: Vec<String> = ps.iter().map(|p| format!("<{}>", p.source_ref())).collect();
             format!("Par({})", elems.join(" | "))
         }
         Value::Nil => "Nil".to_string(),

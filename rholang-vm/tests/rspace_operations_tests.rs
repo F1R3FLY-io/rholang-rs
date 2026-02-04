@@ -1,4 +1,5 @@
-use rholang_vm::{api::Instruction, api::Opcode, api::Process, api::Value, VM};
+use rholang_process::Process;
+use rholang_vm::api::{Instruction, Opcode, Value};
 
 // Helper constants for kind codes (encoded in op16 immediate)
 const MEM_SEQ: u16 = 0;
@@ -7,8 +8,6 @@ const STORE_CONC: u16 = 3;
 
 #[test]
 fn test_name_creation_and_tell() {
-    let vm = VM::new();
-
     // Top-level names (use STORE_CONC kind code)
     let prog1 = vec![
         // Create x
@@ -32,7 +31,6 @@ fn test_name_creation_and_tell() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p1 = Process::new(prog1, "rspace1");
-    p1.vm = Some(vm.clone());
     let out1 = p1.execute().expect("exec ok");
     assert_eq!(out1, Value::Bool(true));
 
@@ -54,7 +52,6 @@ fn test_name_creation_and_tell() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p2 = Process::new(prog2, "rspace2");
-    p2.vm = Some(vm.clone());
     let out2 = p2.execute().expect("exec ok");
     assert_eq!(out2, Value::Bool(true));
 
@@ -70,15 +67,12 @@ fn test_name_creation_and_tell() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p3 = Process::new(prog3, "rspace3");
-    p3.vm = Some(vm);
     let out3 = p3.execute().expect("exec ok");
     assert_eq!(out3, Value::Bool(true));
 }
 
 #[test]
 fn test_send_and_receive() {
-    let vm = VM::new();
-
     // Top-level: tell then ask should yield the list
     let prog1 = vec![
         Instruction::unary(Opcode::NAME_CREATE, STORE_CONC),
@@ -93,7 +87,6 @@ fn test_send_and_receive() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p1 = Process::new(prog1, "send_recv1");
-    p1.vm = Some(vm.clone());
     let out1 = p1.execute().expect("exec ok");
     assert_eq!(out1, Value::List(vec![Value::Int(5)]));
 
@@ -111,15 +104,12 @@ fn test_send_and_receive() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p2 = Process::new(prog2, "send_recv2");
-    p2.vm = Some(vm);
     let out2 = p2.execute().expect("exec ok");
     assert_eq!(out2, Value::List(vec![Value::Int(10)]));
 }
 
 #[test]
 fn test_let_binding_and_persistent_peek() {
-    let vm = VM::new();
-
     // let x = 5; ch!([x]);
     let prog = vec![
         Instruction::unary(Opcode::NAME_CREATE, MEM_CONC),
@@ -135,11 +125,11 @@ fn test_let_binding_and_persistent_peek() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p = Process::new(prog, "let_bind");
-    p.vm = Some(vm);
     let out = p.execute().expect("exec ok");
     assert_eq!(out, Value::Bool(true));
 
-    let vm = p.vm.take().expect("vm retained");
+    // Use the same VM (with shared RSpace state) for the next process
+    let vm = p.vm.clone();
 
     // Multiple sends then peek should show the head element without removing it
     let prog2 = vec![
@@ -161,8 +151,7 @@ fn test_let_binding_and_persistent_peek() {
         Instruction::unary(Opcode::PEEK, MEM_CONC),
         Instruction::nullary(Opcode::HALT),
     ];
-    let mut p2 = Process::new(prog2, "peek");
-    p2.vm = Some(vm);
+    let mut p2 = Process::with_vm(prog2, "peek", vm);
     let out2 = p2.execute().expect("exec ok");
     assert_eq!(out2, Value::List(vec![Value::Int(1)]));
 }

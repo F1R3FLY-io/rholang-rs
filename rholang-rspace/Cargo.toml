@@ -2,10 +2,28 @@
 name = "rholang-rspace"
 version = "0.1.0"
 edition = "2021"
+description = "RSpace - Rholang's tuple space storage with dependency injection"
+
+[features]
+# Default implementation is PathMap (production-ready)
+default = ["pathmap-impl"]
+
+# PathMap-based implementation - production default
+# Optimized for hierarchical channel names like "inbox/messages/1"
+pathmap-impl = ["dep:pathmap"]
+
+# InMemory implementation - for testing and simple use cases
+# Lightweight HashMap-based implementation
+inmemory-impl = []
 
 [dependencies]
 anyhow = { workspace = true }
-pathmap = "0.2.2"
+
+# Optional: PathMap for hierarchical key storage (default)
+pathmap = { version = "0.2.2", optional = true }
+
+[dev-dependencies]
+# For integration tests that need Process type
 rholang-bytecode = { path = "../rholang-bytecode" }
 rholang-process = { path = "../rholang-process" }
 

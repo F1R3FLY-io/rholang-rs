@@ -1,12 +1,11 @@
-use rholang_vm::{api::Instruction, api::Opcode, api::Process, api::Value, VM};
+use rholang_process::Process;
+use rholang_vm::api::{Instruction, Opcode, Value};
 
 // kind codes aligned with other tests
 const STORE_CONC: u16 = 3;
 
 #[test]
 fn test_contract_operation_examples_minimal() {
-    let vm = VM::new();
-
     let prog = vec![
         // Create top-level contract channel
         Instruction::unary(Opcode::NAME_CREATE, STORE_CONC),
@@ -28,15 +27,12 @@ fn test_contract_operation_examples_minimal() {
     ];
 
     let mut p = Process::new(prog, "contract:minimal");
-    p.vm = Some(vm.clone());
     let out = p.execute().expect("exec ok");
     assert_eq!(out, Value::List(vec![Value::Int(42)]));
 }
 
 #[test]
 fn test_contract_persistent_peek_then_consume() {
-    let vm = VM::new();
-
     // Setup and persistent peek twice
     let prog1 = vec![
         Instruction::unary(Opcode::NAME_CREATE, STORE_CONC),
@@ -55,11 +51,11 @@ fn test_contract_persistent_peek_then_consume() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p1 = Process::new(prog1, "contract:peek");
-    p1.vm = Some(vm);
     let out1 = p1.execute().expect("exec ok");
     assert_eq!(out1, Value::List(vec![Value::Int(1)]));
 
-    let vm = p1.vm.take().expect("vm retained");
+    // Use the same VM (with shared RSpace state) for the next process
+    let vm = p1.vm.clone();
 
     // Now consume then peek -> Nil
     let prog2 = vec![
@@ -76,15 +72,13 @@ fn test_contract_persistent_peek_then_consume() {
         Instruction::unary(Opcode::PEEK, STORE_CONC),
         Instruction::nullary(Opcode::HALT),
     ];
-    let mut p2 = Process::new(prog2, "contract:consume");
-    p2.vm = Some(vm);
+    let mut p2 = Process::with_vm(prog2, "contract:consume", vm);
     let out2 = p2.execute().expect("exec ok");
     assert_eq!(out2, Value::Nil);
 }
 
 #[test]
 fn test_contract_multiple_sends_and_persistent_peek() {
-    let vm = VM::new();
     let prog = vec![
         Instruction::unary(Opcode::NAME_CREATE, STORE_CONC),
         Instruction::nullary(Opcode::ALLOC_LOCAL),
@@ -111,14 +105,12 @@ fn test_contract_multiple_sends_and_persistent_peek() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p = Process::new(prog, "contract:multi");
-    p.vm = Some(vm.clone());
     let out = p.execute().expect("exec ok");
     assert_eq!(out, Value::List(vec![Value::Int(2)]));
 }
 
 #[test]
 fn test_continuation_store_and_resume() {
-    let vm = VM::new();
     let prog = vec![
         Instruction::unary(Opcode::PUSH_INT, 99),
         Instruction::nullary(Opcode::CONT_STORE),  // -> id
@@ -126,7 +118,6 @@ fn test_continuation_store_and_resume() {
         Instruction::nullary(Opcode::HALT),
     ];
     let mut p = Process::new(prog, "contract:cont");
-    p.vm = Some(vm);
     let out = p.execute().expect("exec ok");
     assert_eq!(out, Value::Int(99));
 }
