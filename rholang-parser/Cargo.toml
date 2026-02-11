@@ -14,16 +14,18 @@ harness = false
 
 [dependencies]
 bitvec = { workspace = true }
-nonempty-collections = "1.2.1"
-rholang-tree-sitter = { path = "../rholang-tree-sitter" }
-rholang-tree-sitter-proc-macro = { path = "../rholang-tree-sitter-proc-macro/" }
+nonempty-collections = "1.0.1"
 smallvec = { workspace = true }
-tree-sitter = { workspace = true }
 typed-arena = "2.0.2"
 validated = { workspace = true }
 
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rholang-tree-sitter = { path = "../rholang-tree-sitter" }
+rholang-tree-sitter-proc-macro = { path = "../rholang-tree-sitter-proc-macro/" }
+tree-sitter = { workspace = true }
+
 [dev-dependencies]
 divan = { workspace = true }
-insta = "1.44.1"
+insta = "1.43.2"
 pretty_assertions = { workspace = true }
 rstest = { workspace = true }

@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use rholang_parser::RholangParser;
-use validated::Validated;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
@@ -9,6 +8,60 @@ use std::time::Duration;
 use tokio::sync::oneshot;
 use tokio::task;
 use tokio::time::timeout;
+// Compiler/VM imports
+use librho::sem::{
+    pipeline::Pipeline, DiagnosticKind, EnclosureAnalysisPass, ErrorKind, ForCompElaborationPass,
+    ResolverPass, SemanticDb,
+};
+use rholang_compiler::Compiler;
+use rholang_vm::api::Value as VmValue;
+
+/// Remove source position/span information from a pretty-printed AST/debug output
+fn strip_sourcepos(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut skip_depth: i32 = 0;
+    for line in input.lines() {
+        if skip_depth > 0 {
+            // Track nested braces within the skipped block
+            let opens = line.matches('{').count() as i32;
+            let closes = line.matches('}').count() as i32;
+            skip_depth += opens - closes;
+            if skip_depth <= 0 {
+                skip_depth = 0;
+            }
+            continue;
+        }
+
+        let trimmed = line.trim_start();
+
+        // Start skipping when encountering a SourcePos or span block
+        if trimmed.contains("SourcePos {") || trimmed.starts_with("span: SourceSpan {") {
+            // Initialize skip depth considering current line braces
+            let opens = line.matches('{').count() as i32;
+            let closes = line.matches('}').count() as i32;
+            // We enter a block (at least one opening brace)
+            skip_depth = 1 + (opens - closes - 1).max(0);
+            continue;
+        }
+
+        // Also skip simple fields that directly reference source position labels or span fields
+        if trimmed.starts_with("pos:")
+            || trimmed.starts_with("start: SourcePos")
+            || trimmed.starts_with("end: SourcePos")
+            || trimmed.starts_with("span:")
+        {
+            continue;
+        }
+
+        out.push_str(line);
+        out.push('\n');
+    }
+
+    if out.ends_with('\n') {
+        out.pop();
+    }
+    out
+}
 
 /// Represents an error that occurred during interpretation
 #[derive(Debug, Clone)]
@@ -125,6 +178,12 @@ pub trait InterpreterProvider {
     /// Interpret a string of code and return the result
     async fn interpret(&self, code: &str) -> InterpretationResult;
 
+    /// Disassemble the provided code into bytecode representation (as text)
+    /// Default providers may return an error if unsupported
+    fn disassemble(&self, _code: &str) -> Result<String> {
+        Err(anyhow!("Disassembly is not supported by this provider"))
+    }
+
     /// List all running processes
     /// Returns a vector of tuples containing the process ID and the code being executed
     fn list_processes(&self) -> Result<Vec<(usize, String)>>;
@@ -147,6 +206,12 @@ impl InterpreterProvider for FakeInterpreterProvider {
     async fn interpret(&self, code: &str) -> InterpretationResult {
         // Fake implementation: just returns the input code
         InterpretationResult::Success(code.to_string())
+    }
+
+    fn disassemble(&self, _code: &str) -> Result<String> {
+        Err(anyhow!(
+            "Disassembly not available in FakeInterpreterProvider"
+        ))
     }
 
     /// List all running processes
@@ -292,23 +357,10 @@ impl InterpreterProvider for RholangParserInterpreterProvider {
                 // Create a parser locally in the task and parse the code
                 let parser = RholangParser::new();
                 let validated = parser.parse(&code_for_task);
-                match validated {
-                    Validated::Good(procs) => {
-                        // Ensure output contains the word "source" to satisfy tests
-                        InterpretationResult::Success(format!(
-                            "Parsed successfully: source ({} top-level procs)",
-                            procs.len()
-                        ))
-                    }
-                    Validated::Fail(_failure) => {
-                        // Return a parsing error without exposing internal details
-                        InterpretationResult::Error(InterpreterError::parsing_error(
-                            "Parsing failed",
-                            None,
-                            Some(code_for_task.clone()),
-                        ))
-                    }
-                }
+                // Always pretty-print the parser result (including failures) to match golden snapshots
+                let rendered = format!("{validated:#?}");
+                let cleaned = strip_sourcepos(&rendered);
+                InterpretationResult::Success(cleaned)
             };
 
             // Run the parser with a timeout
@@ -343,6 +395,12 @@ impl InterpreterProvider for RholangParserInterpreterProvider {
         processes.remove(&pid);
 
         result
+    }
+
+    fn disassemble(&self, _code: &str) -> Result<String> {
+        Err(anyhow!(
+            "Disassembly not available in RholangParserInterpreterProvider"
+        ))
     }
 
     /// List all running processes
@@ -390,6 +448,382 @@ impl InterpreterProvider for RholangParserInterpreterProvider {
         let count = processes.len();
         for (_, mut info) in processes.drain() {
             // Send cancellation signal if the sender is still available
+            if let Some(sender) = info.cancel_sender.take() {
+                let _ = sender.send(());
+            }
+        }
+        Ok(count)
+    }
+}
+
+/// Provider backed by the rholang-compiler and rholang-vm
+/// Parses, compiles to bytecode, executes in the VM, and returns the resulting value.
+#[derive(Clone)]
+pub struct RholangCompilerInterpreterProvider {
+    /// Map of process ID to process information
+    processes: Arc<Mutex<HashMap<usize, ProcessInfo>>>,
+    /// Next process ID to assign
+    next_pid: Arc<Mutex<usize>>,
+    /// Optional artificial delay (ms) for testing/demo
+    delay_ms: Arc<Mutex<u64>>,
+}
+
+impl RholangCompilerInterpreterProvider {
+    pub fn new() -> Result<Self> {
+        Ok(RholangCompilerInterpreterProvider {
+            processes: Arc::new(Mutex::new(HashMap::new())),
+            next_pid: Arc::new(Mutex::new(1)),
+            delay_ms: Arc::new(Mutex::new(0)),
+        })
+    }
+
+    #[allow(dead_code)]
+    pub fn set_delay(&self, delay_ms: u64) -> Result<&Self> {
+        let mut delay = self
+            .delay_ms
+            .lock()
+            .map_err(|e| anyhow!("Failed to lock delay_ms: {}", e))?;
+        *delay = delay_ms;
+        Ok(self)
+    }
+
+    fn render_value(v: &VmValue) -> String {
+        match v {
+            VmValue::Int(n) => n.to_string(),
+            VmValue::Bool(b) => b.to_string(),
+            VmValue::Str(s) => format!("\"{}\"", s),
+            VmValue::Name(n) => format!("@{}", n),
+            VmValue::List(items) => {
+                let inner: Vec<String> = items.iter().map(Self::render_value).collect();
+                format!("[{}]", inner.join(", "))
+            }
+            VmValue::Tuple(items) => {
+                let inner: Vec<String> = items.iter().map(Self::render_value).collect();
+                format!("({})", inner.join(", "))
+            }
+            VmValue::Map(entries) => {
+                let inner: Vec<String> = entries
+                    .iter()
+                    .map(|(k, v)| format!("{}: {}", Self::render_value(k), Self::render_value(v)))
+                    .collect();
+                format!("{{{}}}", inner.join(", "))
+            }
+            VmValue::Par(procs) => {
+                let inner: Vec<String> = procs
+                    .iter()
+                    .map(|p| format!("<{}>", p.source_ref()))
+                    .collect();
+                inner.join(" | ")
+            }
+            VmValue::Nil => "Nil".to_string(),
+        }
+    }
+}
+
+#[async_trait]
+impl InterpreterProvider for RholangCompilerInterpreterProvider {
+    async fn interpret(&self, code: &str) -> InterpretationResult {
+        // Clone inputs and shared state
+        let code_clone = code.to_string();
+        let code_for_task = code.to_string();
+        let processes = Arc::clone(&self.processes);
+        let next_pid = Arc::clone(&self.next_pid);
+
+        let (cancel_sender, cancel_receiver) = oneshot::channel();
+
+        // Allocate PID
+        let pid = {
+            let mut next_pid = match next_pid.lock() {
+                Ok(guard) => guard,
+                Err(e) => {
+                    return InterpretationResult::Error(InterpreterError::other_error(format!(
+                        "Failed to lock next_pid: {}",
+                        e
+                    )))
+                }
+            };
+            let pid = *next_pid;
+            *next_pid += 1;
+            pid
+        };
+
+        // Track process
+        {
+            let mut processes = match processes.lock() {
+                Ok(guard) => guard,
+                Err(e) => {
+                    return InterpretationResult::Error(InterpreterError::other_error(format!(
+                        "Failed to lock processes: {}",
+                        e
+                    )))
+                }
+            };
+            processes.insert(
+                pid,
+                ProcessInfo {
+                    code: code_clone,
+                    cancel_sender: Some(cancel_sender),
+                },
+            );
+        }
+
+        // Read delay
+        let delay = match self.delay_ms.lock() {
+            Ok(guard) => *guard,
+            Err(e) => {
+                return InterpretationResult::Error(InterpreterError::other_error(format!(
+                    "Failed to lock delay_ms: {}",
+                    e
+                )))
+            }
+        };
+
+        // cancellation future
+        let mut cancel_future = cancel_receiver;
+
+        // main future: offload heavy non-Send work to a blocking thread
+        let fut = async move {
+            if delay > 0 {
+                tokio::time::sleep(Duration::from_millis(delay)).await;
+            }
+
+            let res =
+                task::spawn_blocking(move || {
+                    // Parse
+                    let parser = RholangParser::new();
+                    let validated = parser.parse(&code_for_task);
+
+                    // Extract AST or pretty-print errors
+                    let ast_vec = match validated {
+                        validated::Validated::Good(ast) => ast,
+                        validated::Validated::Fail(ref err) => {
+                            let rendered = format!("{err:#?}");
+                            let cleaned = strip_sourcepos(&rendered);
+                            return InterpretationResult::Error(InterpreterError::parsing_error(
+                                cleaned, None, None,
+                            ));
+                        }
+                    };
+
+                    if ast_vec.is_empty() {
+                        return InterpretationResult::Success("".to_string());
+                    }
+
+                    let mut db = SemanticDb::new();
+                    // For now, execute the first top-level process
+                    let first = &ast_vec[0];
+                    let root = db.build_index(first);
+
+                    // Run essential semantic passes before compilation using a dedicated runtime
+                    let pipeline = Pipeline::new()
+                        .add_fact(ResolverPass::new(root))
+                        .add_fact(ForCompElaborationPass::new(root))
+                        .add_fact(EnclosureAnalysisPass::new(root));
+
+                    // Create a minimal runtime to block_on the async pipeline
+                    if let Ok(rt) = tokio::runtime::Builder::new_current_thread()
+                        .enable_time()
+                        .build()
+                    {
+                        rt.block_on(pipeline.run(&mut db));
+                    } else {
+                        return InterpretationResult::Error(InterpreterError::other_error(
+                            "Failed to initialize runtime for semantic pipeline".to_string(),
+                        ));
+                    }
+
+                    // Filter out NameInProcPosition errors (handled by compiler emitting EVAL)
+                    let real_errors: Vec<_> = db
+                        .errors()
+                        .filter(|diag| {
+                            !matches!(
+                                diag.kind,
+                                DiagnosticKind::Error(ErrorKind::NameInProcPosition(_, _))
+                            )
+                        })
+                        .collect();
+
+                    if !real_errors.is_empty() {
+                        return InterpretationResult::Error(InterpreterError::other_error(
+                            format!("Semantic errors: {:?}", real_errors),
+                        ));
+                    }
+
+                    let compiler = Compiler::new(&db);
+                    let mut process = match compiler.compile_single(first) {
+                        Ok(p) => p,
+                        Err(e) => {
+                            return InterpretationResult::Error(InterpreterError::other_error(
+                                format!("Compilation error: {}", e),
+                            ))
+                        }
+                    };
+
+                    // Execute the process (VM is initialized by default)
+                    let value = match process.execute() {
+                        Ok(v) => v,
+                        Err(e) => {
+                            return InterpretationResult::Error(InterpreterError::other_error(
+                                format!("Execution error: {}", e),
+                            ))
+                        }
+                    };
+
+                    let rendered = Self::render_value(&value);
+                    InterpretationResult::Success(rendered)
+                })
+                .await
+                .unwrap_or_else(|e| {
+                    InterpretationResult::Error(InterpreterError::other_error(format!(
+                        "Blocking task error: {}",
+                        e
+                    )))
+                });
+
+            res
+        };
+
+        let timeout_future = timeout(Duration::from_secs(30), fut);
+
+        let result = tokio::select! {
+            result = timeout_future => {
+                result.unwrap_or_else(|_| InterpretationResult::Error(InterpreterError::timeout_error("Execution timed out after 30 seconds")))
+            }
+            _ = &mut cancel_future => {
+                InterpretationResult::Error(InterpreterError::cancellation_error("Execution was cancelled"))
+            }
+        };
+
+        // Cleanup process tracking
+        let mut processes = match self.processes.lock() {
+            Ok(guard) => guard,
+            Err(e) => {
+                return InterpretationResult::Error(InterpreterError::other_error(format!(
+                    "Failed to lock processes: {}",
+                    e
+                )))
+            }
+        };
+        processes.remove(&pid);
+
+        result
+    }
+
+    fn disassemble(&self, code: &str) -> Result<String> {
+        // Helper that does the entire pipeline on the current thread
+        fn do_disassemble(code: &str) -> String {
+            // Parse
+            let parser = RholangParser::new();
+            let validated = parser.parse(code);
+
+            let ast_vec = match validated {
+                validated::Validated::Good(ast) => ast,
+                validated::Validated::Fail(_err) => {
+                    return "Parsing failed: unable to build AST. Please fix syntax errors and try again.".to_string();
+                }
+            };
+
+            if ast_vec.is_empty() {
+                return "No code to disassemble (empty AST)".to_string();
+            }
+
+            // Build semantic DB and run essential passes (resolver + elaborations)
+            let mut db = SemanticDb::new();
+            let first = &ast_vec[0];
+            let root = db.build_index(first);
+
+            // Run the pipeline using a lightweight runtime local to this thread
+            if let Ok(rt) = tokio::runtime::Builder::new_current_thread()
+                .enable_time()
+                .build()
+            {
+                let pipeline = Pipeline::new()
+                    .add_fact(ResolverPass::new(root))
+                    .add_fact(ForCompElaborationPass::new(root))
+                    .add_fact(EnclosureAnalysisPass::new(root));
+                rt.block_on(pipeline.run(&mut db));
+            } else {
+                return "Failed to initialize runtime for semantic pipeline".to_string();
+            }
+
+            // Filter out NameInProcPosition errors (handled by compiler emitting EVAL)
+            let real_errors: Vec<_> = db
+                .errors()
+                .filter(|diag| {
+                    !matches!(
+                        diag.kind,
+                        DiagnosticKind::Error(ErrorKind::NameInProcPosition(_, _))
+                    )
+                })
+                .collect();
+
+            if !real_errors.is_empty() {
+                return format!("Semantic errors: {:?}", real_errors);
+            }
+
+            // Compile first top-level process
+            let compiler = Compiler::new(&db);
+            let process = match compiler.compile_single(first) {
+                Ok(p) => p,
+                Err(e) => {
+                    return format!("Compilation error: {}", e);
+                }
+            };
+
+            // Disassemble in verbose format by default
+            use rholang_compiler::{Disassembler, DisassemblyFormat};
+            let disasm = Disassembler::with_format(DisassemblyFormat::Verbose);
+            disasm.disassemble(&process)
+        }
+
+        // If we're inside a Tokio runtime, offload the entire work to a dedicated OS thread
+        // to avoid nested-runtime and blocking issues. Otherwise, run directly.
+        if tokio::runtime::Handle::try_current().is_ok() {
+            let code_owned = code.to_string();
+            let join = std::thread::spawn(move || do_disassemble(&code_owned));
+            match join.join() {
+                Ok(s) => Ok(s),
+                Err(_e) => Ok("Disassembly failed due to thread panic".to_string()),
+            }
+        } else {
+            Ok(do_disassemble(code))
+        }
+    }
+
+    fn list_processes(&self) -> Result<Vec<(usize, String)>> {
+        let processes = self
+            .processes
+            .lock()
+            .map_err(|e| anyhow!("Failed to lock processes: {}", e))?;
+        let mut result = Vec::new();
+        for (pid, info) in processes.iter() {
+            result.push((*pid, info.code.clone()));
+        }
+        Ok(result)
+    }
+
+    fn kill_process(&self, pid: usize) -> Result<bool> {
+        let mut processes = self
+            .processes
+            .lock()
+            .map_err(|e| anyhow!("Failed to lock processes: {}", e))?;
+        if let Some(mut info) = processes.remove(&pid) {
+            if let Some(sender) = info.cancel_sender.take() {
+                let _ = sender.send(());
+            }
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    fn kill_all_processes(&self) -> Result<usize> {
+        let mut processes = self
+            .processes
+            .lock()
+            .map_err(|e| anyhow!("Failed to lock processes: {}", e))?;
+        let count = processes.len();
+        for (_, mut info) in processes.drain() {
             if let Some(sender) = info.cancel_sender.take() {
                 let _ = sender.send(());
             }

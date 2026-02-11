@@ -1,89 +1,68 @@
 [workspace]
-resolver = "3"
 members = [
-    "rholang-tree-sitter",
-    "rholang-parser",
-    "rholang-tree-sitter-proc-macro",
-    "rholang-shell",
+    "rholang-bytecode",
     "rholang-lib",
-    "test-macros"
+    "rholang-parser",
+    "rholang-shell",
+    "rholang-interpreter",
+    "rholang-tree-sitter",
+    "rholang-tree-sitter-proc-macro",
+    "rholang-process",
+    "rholang-vm",
+    "rholang-compiler",
+    "rholang-rspace",
+    "test-macros",
+    "rholang-wasm",
 ]
+resolver = "3"
 
 [workspace.dependencies]
-# Used by: librho
 ahash = "0.8.12"
-
-# Used by: rholang-shell, rholang-jni-bridge
 anyhow = "1.0.98"
-
-# General purpose for dynamic metaprogramming
 as-any = "0.3.2"
-
-# Used by: rholang-shell, librho
-async-scoped = { version = "0.9.0", features = ["use-tokio"] }
 async-trait = "0.1.89"
-
-# General purpose, used mostly by librho
 bitvec = "1.0.1"
+bracket-parser = "0.1.0"
+divan = "0.1.21"
 i256 = "0.2.3"
 indexmap = "2.12.1"
 intmap = "3.1.2"
-
-# Used by: rholang-shell, librho
+is-terminal = "0.4.12"
+jni = "0.21.1"
 parking_lot = { version = "0.12.5" }
 tokio = { version = "1.48.0", features = ["rt", "rt-multi-thread", "test-util", "parking_lot", "sync", "macros"] }
-
-# Used by: rholang-shell
 rustyline-async = "0.4.6"
+rustyline = "*"
+serde_json = "1.0.107"
+tree-sitter = "0.25.10"
+tree-sitter-language = "0.1.5"
+validated = "1.0.0"
+
+clap = { version = "4.5.40", features = ["derive"] }
+
+async-std = { version = "1.13.1", features = ["attributes"] }
 
 # Used by: rholang-shell, rholang-parser
 rstest = "0.26.1"
 
-# Used by: rholang-shell
-clap = { version = "4.5.40", features = ["derive"] }
-
-# Used by: rholang-shell
-async-std = { version = "1.13.1", features = ["attributes"] }
-
-# Used by: rholang-shell
-bracket-parser = "0.1.0"
-
 # Library for benchmarking
-divan = "0.1.21"
-
-# Used by: rholang-parser, librho
-smallvec = { version = "1.15.1", features = ["union", "const_generics", "const_new", "may_dangle"] }
-
-# Used by: rholang-parser, rholang-tree-sitter
-tree-sitter = "0.25.10"
-
-# Used by: rholang-tree-sitter
-tree-sitter-language = "0.1.5"
-
-# Used by: rholang-parser
-validated = "1.0.0"
-
-# Used by: rholang-jni-bridge
-serde = { version = "1.0.188", features = ["derive"] }
-
-# Used by: rholang-jni-bridge
-serde_json = "1.0.107"
-
-# Used by: rholang-jni-bridge
-jni = "0.21.1"
-
+pretty_assertions = { version = "1.4.1", features = ["unstable"] }
 # Used by: rholang-tree-sitter-proc-macro
 quote = "1.0.42"
 syn = "2.0.111"
 
-# Used by: rholang-tree-sitter-proc-macro examples
-is-terminal = "0.4.12"
+# Used by: rholang-parser, librho
+smallvec = { version = "1.15.1", features = ["union", "const_generics", "const_new", "may_dangle"] }
 
-# Macros used everywhere
-pretty_assertions = { version = "1.4.1", features = ["unstable"] }
+# Used by: rholang-tree-sitter-proc-macro
+serde = { version = "1.0.188", features = ["derive"] }
 
-[profile.dev]
-debug = true
+[workspace.dependencies.async-scoped]
+version = "0.9.0"
+features = ["use-tokio"]
 
 [profile.bench]
 debug = "line-tables-only"
+
+[profile.dev]
+debug = 2

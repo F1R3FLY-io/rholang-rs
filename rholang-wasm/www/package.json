@@ -1,0 +1,31 @@
+{
+  "name": "rholang-wasm-www",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "wasm:build": "cd .. && wasm-pack build --target web --release",
+    "dev": "vite",
+    "dev:wasm": "npm run wasm:build && vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.11",
+    "@types/react-dom": "18.3.1",
+    "@testing-library/jest-dom": "6.6.3",
+    "@testing-library/react": "16.2.0",
+    "@testing-library/user-event": "14.5.2",
+    "jsdom": "25.0.1",
+    "typescript": "5.6.3",
+    "vite": "5.4.8",
+    "vitest": "2.1.4"
+  },
+  "vitest": {}
+}

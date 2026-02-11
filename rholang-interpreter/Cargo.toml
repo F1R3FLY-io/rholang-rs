@@ -1,0 +1,26 @@
+[package]
+name = "rholang-interpreter"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Shared interpreter provider for Rholang (compiler + VM), reusable by shell and wasm"
+
+[lib]
+doctest = false
+
+[dependencies]
+anyhow = { workspace = true }
+validated = { workspace = true }
+rholang-compiler = { path = "../rholang-compiler" }
+rholang-vm = { path = "../rholang-vm" }
+async-trait = { workspace = true }
+
+# Optional runtime for native cancellation/timeouts. Not used on wasm32.
+tokio = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+
+[features]
+default = []
+native-runtime = ["tokio"]

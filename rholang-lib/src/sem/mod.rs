@@ -10,6 +10,7 @@ use rholang_parser::{SourcePos, SourceSpan, ast};
 
 pub mod db;
 pub mod diagnostics;
+mod elaborator;
 mod enclosure_analysis;
 mod interner;
 pub mod pipeline;
@@ -46,6 +47,7 @@ pub trait DiagnosticPass: Pass + Send + Sync {
     fn run(&self, db: &SemanticDb) -> Vec<Diagnostic>;
 }
 
+pub use elaborator::ForCompElaborationPass;
 pub use enclosure_analysis::EnclosureAnalysisPass;
 pub use resolver::ResolverPass;
 
@@ -75,13 +77,15 @@ impl IntKey for PID {
 }
 
 /// Interned strings
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Symbol(u32);
 
 impl Symbol {
     const MIN: Symbol = Symbol(u32::MIN);
     #[allow(dead_code)]
     const MAX: Symbol = Symbol(u32::MAX);
+    /// Sentinel symbol used for wildcards and quoted-process channels in analyses
+    pub const DUMMY: Symbol = Symbol(u32::MAX);
 }
 
 impl Display for Symbol {
@@ -121,7 +125,7 @@ pub struct BoundOccurence {
 }
 
 /// ID of a binder (variable or name)
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BinderId(u32);
 
 impl BinderId {
@@ -485,6 +489,8 @@ pub enum ErrorKind {
     ConnectiveOutsidePattern,
     BundleInsidePattern,
     UnmatchedVarInDisjunction(Symbol),
+    FreeVariable(SymbolOccurrence),
+    BadCode,
 }
 
 impl ErrorKind {
@@ -717,7 +723,7 @@ mod tests {
             }
 
             pub fn for_with_channel<'a>(expected: &str) -> impl ProcMatch<'a> {
-                fn has_source_name<'x>(receipts: &[ast::Receipt], expected: &str) -> bool {
+                fn has_source_name(receipts: &[ast::Receipt], expected: &str) -> bool {
                     receipts
                         .iter()
                         .flatten()
@@ -763,11 +769,11 @@ mod tests {
                 F: Fn(ProcRef<'a>) -> bool,
             {
                 fn resolve(self, db: &SemanticDb<'a>) -> Option<PID> {
-                    db.find_proc(|node| self(node)).map(|(pid, _)| pid)
+                    db.find_proc(self).map(|(pid, _)| pid)
                 }
 
                 fn matches(&self, db: &SemanticDb<'a>, pid: PID) -> bool {
-                    db.get(pid).is_some_and(|node| self(node))
+                    db.get(pid).is_some_and(self)
                 }
             }
 
@@ -816,8 +822,8 @@ mod tests {
             assert!(expected.is_ground(), "expect::ground_scope {expected:#?}");
         }
 
-        pub fn name_decls<'test>(
-            db: &'test SemanticDb,
+        pub fn name_decls(
+            db: &SemanticDb,
             name_decls: &[ast::NameDecl],
             scope: &ScopeInfo,
         ) -> impl DoubleEndedIterator<Item = BinderId> + ExactSizeIterator {

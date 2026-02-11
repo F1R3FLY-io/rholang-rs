@@ -1,16 +1,21 @@
 [package]
-name = "shell"
+name = "rholang-shell"
 version = "0.1.2"
 edition = "2021"
 
 # Add lib configuration to expose crate modules to tests
 [lib]
-name = "shell"
+name = "rholang_shell"
 path = "src/lib.rs"
+doctest = false
 
 [[bin]]
 name = "rhosh"
 path = "src/main.rs"
+
+[[bin]]
+name = "core_rholang_examples"
+path = "src/bin/core_rholang_examples.rs"
 
 [features]
 with-file-history = []
@@ -23,7 +28,11 @@ rustyline-async = { workspace = true }
 clap = { workspace = true }
 bracket-parser = { workspace = true }
 rholang-parser = { path = "../rholang-parser" }
+rholang-lib = { path = "../rholang-lib" }
+rholang-compiler = { path = "../rholang-compiler" }
+rholang-vm = { path = "../rholang-vm" }
 validated = { workspace = true }
+atty = "0.2"
 
 
 [[example]]
@@ -33,3 +42,4 @@ path = "examples/process_examples.rs"
 [dev-dependencies]
 rstest = { workspace = true }
 async-std = { workspace = true }
+insta = "1.43.1"

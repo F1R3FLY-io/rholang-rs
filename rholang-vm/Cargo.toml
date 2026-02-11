@@ -1,0 +1,23 @@
+[package]
+name = "rholang-vm"
+version = "0.2.0"
+edition = "2021"
+description = "Rholang VM execution engine based on rholang-bytecode"
+
+[dependencies]
+anyhow = { workspace = true }
+rholang-bytecode = { path = "../rholang-bytecode" }
+# Core types from rholang-rspace (without pathmap feature to avoid circular dep)
+rholang-rspace = { path = "../rholang-rspace", default-features = false }
+
+[lib]
+name = "rholang_vm"
+path = "src/lib.rs"
+
+[dev-dependencies]
+rholang-compiler = { path = "../rholang-compiler" }
+rholang-parser = { path = "../rholang-parser" }
+rholang-lib = { path = "../rholang-lib" }
+rholang-process = { path = "../rholang-process" }
+tokio = { workspace = true }
+validated = { workspace = true }
