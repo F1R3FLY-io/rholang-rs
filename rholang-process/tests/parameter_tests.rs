@@ -690,6 +690,80 @@ fn test_parameter_becomes_solved_when_process_completes() {
     assert!(process.is_ready());
 }
 
+#[test]
+fn test_execute_processes_linked_by_parameters_wait_for_values() {
+    let rspace = shared_rspace();
+
+    {
+        let mut rspace_guard = rspace.lock().unwrap();
+        rspace_guard
+            .register_process("proc_b", ProcessState::Wait)
+            .unwrap();
+        rspace_guard
+            .register_process("proc_c", ProcessState::Wait)
+            .unwrap();
+    }
+
+    let vm_a = vm_with_shared_rspace(rspace.clone());
+    let params = vec![Parameter::new("proc_b"), Parameter::new("proc_c")];
+    let mut proc_a = Process::with_vm(
+        vec![
+            Instruction::unary(Opcode::PUSH_BOOL, 1),
+            Instruction::nullary(Opcode::HALT),
+        ],
+        "proc_a",
+        vm_a,
+    )
+    .with_parameters(params);
+
+    assert!(!proc_a.is_ready());
+    assert!(proc_a.execute().is_err());
+
+    let vm_b = vm_with_shared_rspace(rspace.clone());
+    let mut proc_b = Process::with_vm(
+        vec![
+            Instruction::unary(Opcode::PUSH_INT, 10),
+            Instruction::nullary(Opcode::HALT),
+        ],
+        "proc_b",
+        vm_b,
+    );
+    let value_b = proc_b.execute().expect("proc_b executes");
+
+    {
+        let mut rspace_guard = rspace.lock().unwrap();
+        rspace_guard
+            .update_process("proc_b", ProcessState::Value(value_b))
+            .unwrap();
+    }
+
+    assert!(!proc_a.is_ready());
+
+    let vm_c = vm_with_shared_rspace(rspace.clone());
+    let mut proc_c = Process::with_vm(
+        vec![
+            Instruction::unary(Opcode::PUSH_INT, 20),
+            Instruction::nullary(Opcode::HALT),
+        ],
+        "proc_c",
+        vm_c,
+    );
+    let value_c = proc_c.execute().expect("proc_c executes");
+
+    {
+        let mut rspace_guard = rspace.lock().unwrap();
+        rspace_guard
+            .update_process("proc_c", ProcessState::Value(value_c))
+            .unwrap();
+    }
+
+    assert!(proc_a.is_ready());
+
+    let result = proc_a.execute().expect("proc_a executes");
+    assert_eq!(result, Value::Bool(true));
+    assert!(matches!(proc_a.state, ProcessState::Value(_)));
+}
+
 // ============================================================================
 // Test: ProcessHolder trait is_ready reflects parameter state
 // ============================================================================
