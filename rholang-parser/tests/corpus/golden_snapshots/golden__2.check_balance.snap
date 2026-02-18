@@ -9,10 +9,34 @@ Good(
                 decls: [
                     NameDecl {
                         id: Id {
+                            name: "rl",
+                            pos: SourcePos {
+                                line: 2,
+                                col: 3,
+                            },
+                        },
+                        uri: Some(
+                            Uri(
+                                "rho:registry:lookup",
+                            ),
+                        ),
+                    },
+                    NameDecl {
+                        id: Id {
                             name: "RevVaultCh",
                             pos: SourcePos {
                                 line: 2,
                                 col: 30,
+                            },
+                        },
+                        uri: None,
+                    },
+                    NameDecl {
+                        id: Id {
+                            name: "vaultCh",
+                            pos: SourcePos {
+                                line: 3,
+                                col: 3,
                             },
                         },
                         uri: None,
@@ -29,20 +53,6 @@ Good(
                     },
                     NameDecl {
                         id: Id {
-                            name: "rl",
-                            pos: SourcePos {
-                                line: 2,
-                                col: 3,
-                            },
-                        },
-                        uri: Some(
-                            Uri(
-                                "rho:registry:lookup",
-                            ),
-                        ),
-                    },
-                    NameDecl {
-                        id: Id {
                             name: "stdout",
                             pos: SourcePos {
                                 line: 4,
@@ -54,16 +64,6 @@ Good(
                                 "rho:io:stdout",
                             ),
                         ),
-                    },
-                    NameDecl {
-                        id: Id {
-                            name: "vaultCh",
-                            pos: SourcePos {
-                                line: 3,
-                                col: 3,
-                            },
-                        },
-                        uri: None,
                     },
                 ],
                 proc: AnnProc {

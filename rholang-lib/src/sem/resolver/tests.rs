@@ -520,7 +520,7 @@ fn test_pattern_recursive<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'te
     expect::bound_in_scope(
         db,
         &[
-            VarBinding::Bound(root_binders[1]), // contract name
+            VarBinding::Bound(root_binders[0]), // contract name
             // contract arguments
             VarBinding::Free { index: 0 },
             VarBinding::Free { index: 1 },
@@ -535,7 +535,7 @@ fn test_pattern_recursive<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'te
     expect::bound_in_scope(
         db,
         &[
-            VarBinding::Bound(root_binders[0]), // contract name
+            VarBinding::Bound(root_binders[1]), // contract name
             // contract arguments
             VarBinding::Free { index: 0 },
             VarBinding::Free { index: 1 },

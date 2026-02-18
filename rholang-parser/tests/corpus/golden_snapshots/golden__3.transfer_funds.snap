@@ -9,16 +9,6 @@ Good(
                 decls: [
                     NameDecl {
                         id: Id {
-                            name: "RevVaultCh",
-                            pos: SourcePos {
-                                line: 2,
-                                col: 30,
-                            },
-                        },
-                        uri: None,
-                    },
-                    NameDecl {
-                        id: Id {
                             name: "rl",
                             pos: SourcePos {
                                 line: 2,
@@ -30,6 +20,16 @@ Good(
                                 "rho:registry:lookup",
                             ),
                         ),
+                    },
+                    NameDecl {
+                        id: Id {
+                            name: "RevVaultCh",
+                            pos: SourcePos {
+                                line: 2,
+                                col: 30,
+                            },
+                        },
+                        uri: None,
                     },
                     NameDecl {
                         id: Id {
@@ -406,24 +406,10 @@ Good(
                                                                 decls: [
                                                                     NameDecl {
                                                                         id: Id {
-                                                                            name: "deployerId",
+                                                                            name: "vaultCh",
                                                                             pos: SourcePos {
                                                                                 line: 19,
-                                                                                col: 52,
-                                                                            },
-                                                                        },
-                                                                        uri: Some(
-                                                                            Uri(
-                                                                                "rho:rchain:deployerId",
-                                                                            ),
-                                                                        ),
-                                                                    },
-                                                                    NameDecl {
-                                                                        id: Id {
-                                                                            name: "revVaultkeyCh",
-                                                                            pos: SourcePos {
-                                                                                line: 19,
-                                                                                col: 37,
+                                                                                col: 13,
                                                                             },
                                                                         },
                                                                         uri: None,
@@ -440,13 +426,27 @@ Good(
                                                                     },
                                                                     NameDecl {
                                                                         id: Id {
-                                                                            name: "vaultCh",
+                                                                            name: "revVaultkeyCh",
                                                                             pos: SourcePos {
                                                                                 line: 19,
-                                                                                col: 13,
+                                                                                col: 37,
                                                                             },
                                                                         },
                                                                         uri: None,
+                                                                    },
+                                                                    NameDecl {
+                                                                        id: Id {
+                                                                            name: "deployerId",
+                                                                            pos: SourcePos {
+                                                                                line: 19,
+                                                                                col: 52,
+                                                                            },
+                                                                        },
+                                                                        uri: Some(
+                                                                            Uri(
+                                                                                "rho:rchain:deployerId",
+                                                                            ),
+                                                                        ),
                                                                     },
                                                                 ],
                                                                 proc: AnnProc {

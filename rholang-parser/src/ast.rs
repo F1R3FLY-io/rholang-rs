@@ -675,6 +675,11 @@ pub enum Collection<'ast> {
         elements: Vec<KeyValuePair<'ast>>,
         remainder: Option<Var<'ast>>,
     },
+
+    PathMap {
+        elements: Vec<AnnProc<'ast>>,
+        remainder: Option<Var<'ast>>,
+    },
 }
 
 impl<'a> Collection<'a> {
@@ -682,6 +687,7 @@ impl<'a> Collection<'a> {
         match self {
             Collection::List { remainder, .. }
             | Collection::Set { remainder, .. }
+            | Collection::PathMap { remainder, .. }
             | Collection::Map { remainder, .. } => *remainder,
             Collection::Tuple(_) => None,
         }
@@ -694,6 +700,10 @@ impl<'a> Collection<'a> {
                 remainder,
             }
             | Collection::Set {
+                elements,
+                remainder,
+            }
+            | Collection::PathMap {
                 elements,
                 remainder,
             } => elements.is_empty() && remainder.is_none(),

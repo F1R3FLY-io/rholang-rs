@@ -339,7 +339,7 @@ fn resolve_collection<'a>(
     use ast::Collection::*;
 
     match collection {
-        List { elements, .. } | Set { elements, .. } | Tuple(elements) => {
+        List { elements, .. } | Set { elements, .. } | PathMap { elements, .. } | Tuple(elements) => {
             for elt in elements {
                 resolve_unguarded(db, stack, elt);
             }

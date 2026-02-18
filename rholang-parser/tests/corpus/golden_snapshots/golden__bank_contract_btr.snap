@@ -9,13 +9,17 @@ Good(
                 decls: [
                     NameDecl {
                         id: Id {
-                            name: "makeBank",
+                            name: "stdout",
                             pos: SourcePos {
-                                line: 5,
+                                line: 2,
                                 col: 3,
                             },
                         },
-                        uri: None,
+                        uri: Some(
+                            Uri(
+                                "rho:io:stdout",
+                            ),
+                        ),
                     },
                     NameDecl {
                         id: Id {
@@ -47,9 +51,9 @@ Good(
                     },
                     NameDecl {
                         id: Id {
-                            name: "return",
+                            name: "makeBank",
                             pos: SourcePos {
-                                line: 6,
+                                line: 5,
                                 col: 3,
                             },
                         },
@@ -57,17 +61,13 @@ Good(
                     },
                     NameDecl {
                         id: Id {
-                            name: "stdout",
+                            name: "return",
                             pos: SourcePos {
-                                line: 2,
+                                line: 6,
                                 col: 3,
                             },
                         },
-                        uri: Some(
-                            Uri(
-                                "rho:io:stdout",
-                            ),
-                        ),
+                        uri: None,
                     },
                 ],
                 proc: AnnProc {
@@ -133,20 +133,20 @@ Good(
                                                 decls: [
                                                     NameDecl {
                                                         id: Id {
-                                                            name: "balances",
+                                                            name: "bank",
                                                             pos: SourcePos {
                                                                 line: 10,
-                                                                col: 15,
+                                                                col: 9,
                                                             },
                                                         },
                                                         uri: None,
                                                     },
                                                     NameDecl {
                                                         id: Id {
-                                                            name: "bank",
+                                                            name: "balances",
                                                             pos: SourcePos {
                                                                 line: 10,
-                                                                col: 9,
+                                                                col: 15,
                                                             },
                                                         },
                                                         uri: None,
