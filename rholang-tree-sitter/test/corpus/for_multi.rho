@@ -1,0 +1,154 @@
+==========
+for-comp multi-binding
+==========
+
+contract rewardsInfo(retCh) = {
+new posBalanceCh, totalActiveBondCh, totalBondCh, totalWithdrawCh, committedRewardsCh in {
+    @posVault!("balance", *posBalanceCh) |
+    accumulateItemInState!(*totalBondCh, "allBonds", *accumulateSndNum) |
+    calTotalActiveBonds!(*totalActiveBondCh) |
+    accumulateItemInState!(*totalWithdrawCh, "withdrawers", *accumulateFstOfSndArg) |
+    accumulateItemInState!(*committedRewardsCh, "committedRewards", *accumulateSndNum) |
+    for (@posBalance <- posBalanceCh;
+         @totalBond <- totalBondCh;
+         @activeBonds <- totalActiveBondCh;
+         @totalWithdraw <- totalWithdrawCh;
+         @totalCommittedRewards <- committedRewardsCh;
+         @state <<- stateCh) {
+                retCh!((posBalance , totalBond , activeBonds, totalWithdraw, totalCommittedRewards, state.get("allBonds"), state.get("activeValidators")))
+    }
+}
+}
+
+---
+
+(source_file
+  (contract
+    name: (var)
+    formals: (names
+      (var))
+    proc: (block
+      (new
+        decls: (name_decls
+          (name_decl
+            (var))
+          (name_decl
+            (var))
+          (name_decl
+            (var))
+          (name_decl
+            (var))
+          (name_decl
+            (var)))
+        proc: (block
+          (par
+            (par
+              (par
+                (par
+                  (par
+                    (send
+                      channel: (quote
+                        (var))
+                      send_type: (send_single)
+                      inputs: (inputs
+                        (string_literal)
+                        (eval
+                          (var))))
+                    (send
+                      channel: (var)
+                      send_type: (send_single)
+                      inputs: (inputs
+                        (eval
+                          (var))
+                        (string_literal)
+                        (eval
+                          (var)))))
+                  (send
+                    channel: (var)
+                    send_type: (send_single)
+                    inputs: (inputs
+                      (eval
+                        (var)))))
+                (send
+                  channel: (var)
+                  send_type: (send_single)
+                  inputs: (inputs
+                    (eval
+                      (var))
+                    (string_literal)
+                    (eval
+                      (var)))))
+              (send
+                channel: (var)
+                send_type: (send_single)
+                inputs: (inputs
+                  (eval
+                    (var))
+                  (string_literal)
+                  (eval
+                    (var)))))
+            (input
+              receipts: (receipts
+                (receipt
+                  (linear_bind
+                    names: (names
+                      (quote
+                        (var)))
+                    input: (simple_source
+                      (var))))
+                (receipt
+                  (linear_bind
+                    names: (names
+                      (quote
+                        (var)))
+                    input: (simple_source
+                      (var))))
+                (receipt
+                  (linear_bind
+                    names: (names
+                      (quote
+                        (var)))
+                    input: (simple_source
+                      (var))))
+                (receipt
+                  (linear_bind
+                    names: (names
+                      (quote
+                        (var)))
+                    input: (simple_source
+                      (var))))
+                (receipt
+                  (linear_bind
+                    names: (names
+                      (quote
+                        (var)))
+                    input: (simple_source
+                      (var))))
+                (receipt
+                  (peek_bind
+                    names: (names
+                      (quote
+                        (var)))
+                    input: (var))))
+              proc: (block
+                (send
+                  channel: (var)
+                  send_type: (send_single)
+                  inputs: (inputs
+                    (collection
+                      (tuple
+                        (var)
+                        (var)
+                        (var)
+                        (var)
+                        (var)
+                        (method
+                          receiver: (var)
+                          name: (var)
+                          args: (args
+                            (string_literal)))
+                        (method
+                          receiver: (var)
+                          name: (var)
+                          args: (args
+                            (string_literal)))))))))))))))

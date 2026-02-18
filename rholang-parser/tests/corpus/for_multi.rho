@@ -1,0 +1,17 @@
+contract rewardsInfo(retCh) = {
+new posBalanceCh, totalActiveBondCh, totalBondCh, totalWithdrawCh, committedRewardsCh in {
+    @posVault!("balance", *posBalanceCh) |
+    accumulateItemInState!(*totalBondCh, "allBonds", *accumulateSndNum) |
+    calTotalActiveBonds!(*totalActiveBondCh) |
+    accumulateItemInState!(*totalWithdrawCh, "withdrawers", *accumulateFstOfSndArg) |
+    accumulateItemInState!(*committedRewardsCh, "committedRewards", *accumulateSndNum) |
+    for (@posBalance <- posBalanceCh;
+         @totalBond <- totalBondCh;
+         @activeBonds <- totalActiveBondCh;
+         @totalWithdraw <- totalWithdrawCh;
+         @totalCommittedRewards <- committedRewardsCh;
+         @state <<- stateCh) {
+                retCh!((posBalance , totalBond , activeBonds, totalWithdraw, totalCommittedRewards, state.get("allBonds"), state.get("activeValidators")))
+    }
+}
+}
