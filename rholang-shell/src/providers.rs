@@ -10,10 +10,9 @@ use tokio::task;
 use tokio::time::timeout;
 // Compiler/VM imports
 use librho::sem::{
-    pipeline::Pipeline, DiagnosticKind, EnclosureAnalysisPass, ErrorKind, ForCompElaborationPass,
-    ResolverPass, SemanticDb,
+    pipeline::Pipeline, EnclosureAnalysisPass, ForCompElaborationPass, ResolverPass, SemanticDb,
 };
-use rholang_compiler::Compiler;
+use rholang_compiler::{Compiler, ErrorReporter};
 use rholang_vm::api::{Value as VmValue, VM};
 
 /// Remove source position/span information from a pretty-printed AST/debug output
@@ -625,30 +624,18 @@ impl InterpreterProvider for RholangCompilerInterpreterProvider {
                         ));
                     }
 
-                    // Filter out NameInProcPosition errors (handled by compiler emitting EVAL)
-                    let real_errors: Vec<_> = db
-                        .errors()
-                        .filter(|diag| {
-                            !matches!(
-                                diag.kind,
-                                DiagnosticKind::Error(ErrorKind::NameInProcPosition(_, _))
-                            )
-                        })
-                        .collect();
-
-                    if !real_errors.is_empty() {
-                        return InterpretationResult::Error(InterpreterError::other_error(
-                            format!("Semantic errors: {:?}", real_errors),
-                        ));
-                    }
-
+                    // compile_single_checked enforces the error gate;
+                    // Compiler::new filters recoverable errors (NameInProcPosition)
+                    // automatically, so no manual filtering is needed.
                     let compiler = Compiler::new(&db);
-                    let mut process = match compiler.compile_single(first) {
+                    let mut process = match compiler.compile_single_checked(first) {
                         Ok(p) => p,
                         Err(e) => {
+                            let reporter = ErrorReporter::default();
+                            let formatted = reporter.format_error(&e, &code_for_task, None);
                             return InterpretationResult::Error(InterpreterError::other_error(
-                                format!("Compilation error: {}", e),
-                            ))
+                                formatted,
+                            ));
                         }
                     };
 
@@ -740,27 +727,15 @@ impl InterpreterProvider for RholangCompilerInterpreterProvider {
                 return "Failed to initialize runtime for semantic pipeline".to_string();
             }
 
-            // Filter out NameInProcPosition errors (handled by compiler emitting EVAL)
-            let real_errors: Vec<_> = db
-                .errors()
-                .filter(|diag| {
-                    !matches!(
-                        diag.kind,
-                        DiagnosticKind::Error(ErrorKind::NameInProcPosition(_, _))
-                    )
-                })
-                .collect();
-
-            if !real_errors.is_empty() {
-                return format!("Semantic errors: {:?}", real_errors);
-            }
-
-            // Compile first top-level process
+            // compile_single_checked enforces the error gate;
+            // Compiler::new filters recoverable errors (NameInProcPosition)
+            // automatically, so no manual filtering is needed.
             let compiler = Compiler::new(&db);
-            let process = match compiler.compile_single(first) {
+            let process = match compiler.compile_single_checked(first) {
                 Ok(p) => p,
                 Err(e) => {
-                    return format!("Compilation error: {}", e);
+                    let reporter = ErrorReporter::default();
+                    return reporter.format_error(&e, code, None);
                 }
             };
 

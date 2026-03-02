@@ -501,6 +501,12 @@ impl ErrorKind {
             ErrorKind::NameInProcPosition(binder, sym)
         }
     }
+
+    /// Returns true if this error can be recovered from during compilation
+    /// the compiler can emit workaround bytecode
+    pub fn is_recoverable(&self) -> bool {
+        matches!(self, ErrorKind::NameInProcPosition(_, _))
+    }
 }
 
 const SEED0: u64 = 0x0FED_CBA9_8765_4321;
