@@ -85,6 +85,72 @@ pub fn try_eval_numeric(root: &AnnProc<'_>) -> Result<Option<NumericValue>, Runt
     eval_numeric(root)
 }
 
+pub fn validate_runtime_numeric_support<'a>(root: &'a AnnProc<'a>) -> Result<(), RuntimeEvalError> {
+    for proc in root.iter_preorder_dfs() {
+        if let ast::Proc::FloatLiteral { bits, .. } = proc.proc {
+            if !is_supported_runtime_float_width(*bits) {
+                return Err(RuntimeEvalError::at(
+                    proc.span.start,
+                    format!(
+                        "float literal f{bits} is not supported by this runtime (supported: f32, f64)"
+                    ),
+                ));
+            }
+        }
+
+        if let ast::Proc::Method {
+            receiver,
+            name,
+            args,
+        } = proc.proc
+        {
+            if name.name == "float" && args.len() == 1 {
+                if let Some(width_arg) = eval_numeric(&args[0])? {
+                    let width_args = [width_arg];
+                    let bits = parse_width_arg(&width_args, "float", proc.span.start)?;
+                    cast_float(
+                        NumericValue::SignedInt {
+                            value: BigInt::zero(),
+                            bits: 64,
+                            explicit: false,
+                        },
+                        bits,
+                        proc.span.start,
+                    )?;
+                }
+            }
+
+            if is_cast_builtin(name.name) {
+                let Some(receiver_value) = eval_numeric(receiver)? else {
+                    continue;
+                };
+
+                let mut evaluated_args = Vec::with_capacity(args.len());
+                let mut all_args_evaluable = true;
+                for arg in args {
+                    match eval_numeric(arg)? {
+                        Some(value) => evaluated_args.push(value),
+                        None => {
+                            all_args_evaluable = false;
+                            break;
+                        }
+                    }
+                }
+
+                if all_args_evaluable {
+                    apply_cast_builtin(
+                        name.name,
+                        receiver_value,
+                        &evaluated_args,
+                        proc.span.start,
+                    )?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Rewrites cast builtins from function-call form to method-call form:
 /// `int(x, 8)` -> `(x).int(8)`
 ///
@@ -130,6 +196,14 @@ fn eval_numeric(proc: &AnnProc<'_>) -> Result<Option<NumericValue>, RuntimeEvalE
             Ok(Some(NumericValue::BigRat(BigRational::from_integer(n))))
         }
         ast::Proc::FloatLiteral { value, bits } => {
+            if !is_supported_runtime_float_width(*bits) {
+                return Err(RuntimeEvalError::at(
+                    pos,
+                    format!(
+                        "float literal f{bits} is not supported by this runtime (supported: f32, f64)"
+                    ),
+                ));
+            }
             let parsed = value.parse::<f64>().map_err(|_| {
                 RuntimeEvalError::at(pos, format!("invalid float literal '{value}f{bits}'"))
             })?;
@@ -229,7 +303,11 @@ fn rewrite_segment(input: &str) -> String {
                 j += 1;
             }
 
-            if is_cast_builtin(ident) && j < bytes.len() && bytes[j] == b'(' {
+            if is_cast_builtin(ident)
+                && !is_method_invocation(input, start)
+                && j < bytes.len()
+                && bytes[j] == b'('
+            {
                 if let Some((close_idx, inner)) = extract_parenthesized(input, j) {
                     let args = split_top_level_args(inner);
                     if !args.is_empty() {
@@ -371,6 +449,26 @@ fn is_ident_start(ch: char) -> bool {
 
 fn is_ident_continue(ch: char) -> bool {
     ch.is_ascii_alphanumeric() || ch == '_'
+}
+
+fn is_method_invocation(input: &str, ident_start: usize) -> bool {
+    let bytes = input.as_bytes();
+    let mut i = ident_start;
+
+    while i > 0 {
+        i -= 1;
+        let ch = bytes[i];
+        if ch.is_ascii_whitespace() {
+            continue;
+        }
+        return ch == b'.';
+    }
+
+    false
+}
+
+fn is_supported_runtime_float_width(bits: u16) -> bool {
+    matches!(bits, 32 | 64)
 }
 
 fn parse_bigint(value: &str, pos: SourcePos) -> Result<BigInt, RuntimeEvalError> {
@@ -852,6 +950,12 @@ fn cast_float(
             "float(width): width must be one of 32, 64, 80, 128, 256",
         ));
     }
+    if !is_supported_runtime_float_width(bits as u16) {
+        return Err(RuntimeEvalError::at(
+            pos,
+            format!("float(width): f{bits} is not supported by this runtime (supported: f32, f64)"),
+        ));
+    }
 
     let mut rendered = to_f64_with_infinity(&value);
     if bits == 32 {
@@ -1106,5 +1210,16 @@ mod tests {
     #[test]
     fn does_not_rewrite_when_no_builtin_call() {
         assert!(rewrite_cast_builtin_calls("1 + 2 * 3").is_none());
+    }
+
+    #[test]
+    fn does_not_rewrite_method_style_builtin_call() {
+        assert!(rewrite_cast_builtin_calls("(3.5f32).int(8)").is_none());
+    }
+
+    #[test]
+    fn rewrites_outer_builtin_without_corrupting_nested_method_call() {
+        let rewritten = rewrite_cast_builtin_calls("int((3.5f32).int(8), 16)").expect("rewritten");
+        assert_eq!(rewritten, "((3.5f32).int(8)).int(16)");
     }
 }

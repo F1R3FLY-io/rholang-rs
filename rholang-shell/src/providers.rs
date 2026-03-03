@@ -1,4 +1,6 @@
-use crate::runtime_eval::{rewrite_cast_builtin_calls, try_eval_numeric};
+use crate::runtime_eval::{
+    rewrite_cast_builtin_calls, try_eval_numeric, validate_runtime_numeric_support,
+};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use rholang_parser::RholangParser;
@@ -295,6 +297,18 @@ impl InterpreterProvider for RholangParserInterpreterProvider {
                 let validated = parser.parse(&code_for_task);
                 match validated {
                     Validated::Good(procs) => {
+                        for proc in &procs {
+                            if let Err(err) = validate_runtime_numeric_support(proc) {
+                                return InterpretationResult::Error(
+                                    InterpreterError::parsing_error(
+                                        err.message,
+                                        err.position.map(|pos| pos.to_string()),
+                                        Some(code_for_task.clone()),
+                                    ),
+                                );
+                            }
+                        }
+
                         let top_level_procs = procs.len();
                         if procs.len() == 1 {
                             match try_eval_numeric(&procs[0]) {

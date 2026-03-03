@@ -259,3 +259,119 @@ async fn test_runtime_cast_builtins() -> Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_runtime_nested_cast_builtin_rewrite_is_stable() -> Result<()> {
+    let provider = RholangParserInterpreterProvider::new()?;
+    provider.set_delay(0)?;
+
+    let result = provider.interpret("int((-3.5f32).int(8), 16)").await;
+    match result {
+        InterpretationResult::Success(output) => assert_eq!(output, "Evaluated: -4i16"),
+        InterpretationResult::Error(err) => {
+            panic!("Expected nested cast rewrite success, got error: {err}");
+        }
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_runtime_rejects_unsupported_float_width_cast() -> Result<()> {
+    let provider = RholangParserInterpreterProvider::new()?;
+    provider.set_delay(0)?;
+
+    let result = provider.interpret("float(1u8, 80)").await;
+    match result {
+        InterpretationResult::Error(err) => {
+            assert!(
+                err.message.contains("unsupported") || err.message.contains("width"),
+                "Unexpected error message: {}",
+                err.message
+            );
+        }
+        InterpretationResult::Success(output) => {
+            panic!("Expected unsupported float-width error, got success: {output}");
+        }
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_runtime_rejects_unsupported_float_literals() -> Result<()> {
+    let provider = RholangParserInterpreterProvider::new()?;
+    provider.set_delay(0)?;
+
+    let result = provider
+        .interpret("1.0000000000000000000000000000000001f128 - 1f128")
+        .await;
+    match result {
+        InterpretationResult::Error(err) => {
+            assert!(
+                err.message.contains("unsupported") || err.message.contains("float"),
+                "Unexpected error message: {}",
+                err.message
+            );
+        }
+        InterpretationResult::Success(output) => {
+            panic!("Expected unsupported float-literal error, got success: {output}");
+        }
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_runtime_rejects_unsupported_float_literals_in_non_expression_code() -> Result<()> {
+    let provider = RholangParserInterpreterProvider::new()?;
+    provider.set_delay(0)?;
+
+    let cases = [
+        "@\"x\"!(1f128)",
+        "for (@x <- c) { @\"y\"!(x + 1f128) }",
+        "@\"x\"!((1u8).float(80))",
+        "for (@x <- c) { @\"y\"!(x.float(80)) }",
+    ];
+
+    for input in cases {
+        let result = provider.interpret(input).await;
+        match result {
+            InterpretationResult::Error(err) => {
+                assert!(
+                    err.message.contains("unsupported") || err.message.contains("float"),
+                    "Unexpected error message for '{input}': {}",
+                    err.message
+                );
+            }
+            InterpretationResult::Success(output) => {
+                panic!(
+                    "Expected unsupported float-literal error for '{input}', got success: {output}"
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_runtime_allows_supported_float_cast_in_non_expression_code() -> Result<()> {
+    let provider = RholangParserInterpreterProvider::new()?;
+    provider.set_delay(0)?;
+
+    let result = provider.interpret("@\"x\"!((1u8).float(32))").await;
+    match result {
+        InterpretationResult::Success(output) => {
+            assert!(
+                output.contains("Parsed successfully"),
+                "Unexpected success output: {output}"
+            );
+        }
+        InterpretationResult::Error(err) => {
+            panic!("Expected parse success for supported cast, got error: {err}");
+        }
+    }
+
+    Ok(())
+}
