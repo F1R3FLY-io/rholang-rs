@@ -185,6 +185,22 @@ async fn test_runtime_arithmetic_execution() -> Result<()> {
         }
     }
 
+    let result = provider.interpret("10p1 / 3p1").await;
+    match result {
+        InterpretationResult::Success(output) => assert_eq!(output, "Evaluated: 3.3p1"),
+        InterpretationResult::Error(err) => {
+            panic!("Expected fixed-point division success, got error: {err}");
+        }
+    }
+
+    let result = provider.interpret("10p1 % 3p1").await;
+    match result {
+        InterpretationResult::Success(output) => assert_eq!(output, "Evaluated: 0.1p1"),
+        InterpretationResult::Error(err) => {
+            panic!("Expected fixed-point modulo success, got error: {err}");
+        }
+    }
+
     Ok(())
 }
 
@@ -217,6 +233,11 @@ async fn test_runtime_cast_builtins() -> Result<()> {
 
     let cases = [
         ("int(-3.5f32, 8)", "Evaluated: -4i8"),
+        ("uint(-3.5f32, 8)", "Evaluated: 0u8"),
+        ("bigint(3.5f32)", "Evaluated: 3n"),
+        ("bigrat(3.5f32)", "Evaluated: 7r/2r"),
+        ("float(1000u16, 32)", "Evaluated: 1000f32"),
+        ("fixed(3.49p2, 1)", "Evaluated: 3.4p1"),
         ("(-3.5f32).int(8)", "Evaluated: -4i8"),
         ("(-3.5f32).uint(8)", "Evaluated: 0u8"),
         ("257u16.uint(8)", "Evaluated: 1u8"),

@@ -604,8 +604,9 @@ fn apply_binary(
                 BinaryExpOp::Mult => (l * r) / ten_pow.clone(),
                 BinaryExpOp::Div => (l * ten_pow.clone()) / r,
                 BinaryExpOp::Mod => {
-                    let q = (l.clone() * ten_pow) / r.clone();
-                    l - q * r
+                    let q = (l.clone() * ten_pow.clone()) / r.clone();
+                    let product = (q * r) / ten_pow;
+                    l - product
                 }
                 _ => unreachable!("non-arithmetic operator"),
             };
