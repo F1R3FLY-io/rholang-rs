@@ -163,3 +163,78 @@ async fn test_rholang_parser_interpreter_provider_kill_nonexistent_process() -> 
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_runtime_arithmetic_execution() -> Result<()> {
+    let provider = RholangParserInterpreterProvider::new()?;
+    provider.set_delay(0)?;
+
+    let result = provider.interpret("1 + 2 * 3").await;
+    match result {
+        InterpretationResult::Success(output) => assert_eq!(output, "Evaluated: 7"),
+        InterpretationResult::Error(err) => {
+            panic!("Expected numeric evaluation success, got error: {err}");
+        }
+    }
+
+    let result = provider.interpret("10u8 + 250u8").await;
+    match result {
+        InterpretationResult::Success(output) => assert_eq!(output, "Evaluated: 4u8"),
+        InterpretationResult::Error(err) => {
+            panic!("Expected unsigned wrapping arithmetic success, got error: {err}");
+        }
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_runtime_rejects_mixed_numeric_types() -> Result<()> {
+    let provider = RholangParserInterpreterProvider::new()?;
+    provider.set_delay(0)?;
+
+    let result = provider.interpret("1 + 2u8").await;
+    match result {
+        InterpretationResult::Error(err) => {
+            assert!(
+                err.message.contains("numeric type mismatch"),
+                "Unexpected error message: {}",
+                err.message
+            );
+        }
+        InterpretationResult::Success(output) => {
+            panic!("Expected mixed-type arithmetic error, got success: {output}");
+        }
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_runtime_cast_builtins() -> Result<()> {
+    let provider = RholangParserInterpreterProvider::new()?;
+    provider.set_delay(0)?;
+
+    let cases = [
+        ("int(-3.5f32, 8)", "Evaluated: -4i8"),
+        ("(-3.5f32).int(8)", "Evaluated: -4i8"),
+        ("(-3.5f32).uint(8)", "Evaluated: 0u8"),
+        ("257u16.uint(8)", "Evaluated: 1u8"),
+        ("(3.5f32).bigint()", "Evaluated: 3n"),
+        ("(3.5f32).bigrat()", "Evaluated: 7r/2r"),
+        ("1000u16.float(32)", "Evaluated: 1000f32"),
+        ("(3.49p2).fixed(1)", "Evaluated: 3.4p1"),
+    ];
+
+    for (input, expected) in cases {
+        let result = provider.interpret(input).await;
+        match result {
+            InterpretationResult::Success(output) => assert_eq!(output, expected),
+            InterpretationResult::Error(err) => {
+                panic!("Expected cast builtin success for '{input}', got error: {err}");
+            }
+        }
+    }
+
+    Ok(())
+}
