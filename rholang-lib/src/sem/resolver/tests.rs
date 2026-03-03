@@ -3,15 +3,15 @@ use test_macros::test_rholang_code;
 use crate::{
     match_proc,
     sem::{
-        diagnostics::DisjunctionConsistencyCheck,
+        diagnostics::{DisjunctionConsistencyCheck, NumericTypeConsistencyCheck},
         pipeline::Pipeline,
         tests::expect::{self, matches},
     },
 };
 
 use super::{
-    BinderId, BinderKind, ErrorKind, PID, ProcRef, ResolverPass, SemanticDb, VarBinding,
-    WarningKind, diagnostics::UnusedVarsPass,
+    BinderId, BinderKind, ErrorKind, NumericType, PID, ProcRef, ResolverPass, SemanticDb,
+    VarBinding, WarningKind, diagnostics::UnusedVarsPass,
 };
 
 use rholang_parser::ast;
@@ -25,7 +25,8 @@ where
             pipeline.add_fact(ResolverPass::new(root))
         })
         .add_diagnostic(UnusedVarsPass)
-        .add_diagnostic(DisjunctionConsistencyCheck);
+        .add_diagnostic(DisjunctionConsistencyCheck)
+        .add_diagnostic(NumericTypeConsistencyCheck);
     pipeline
 }
 
@@ -1189,4 +1190,56 @@ fn test_disjunctions<'test>(_tree: ProcRef<'test>, db: &'test SemanticDb<'test>)
     expect::error(db, ErrorKind::UnmatchedVarInDisjunction(x), second_for);
     expect::error(db, ErrorKind::UnmatchedVarInDisjunction(y), second_for);
     expect::errors(db, 3);
+}
+
+#[test_rholang_code("1 + 2u8", pipeline = pipeline)]
+fn test_numeric_mixed_types_at_root<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
+    let root = db[tree];
+    expect::error(
+        db,
+        ErrorKind::MixedNumericTypes {
+            op: ast::BinaryExpOp::Add,
+            left: NumericType::Int64,
+            right: NumericType::UnsignedInt { bits: 8 },
+        },
+        root,
+    );
+    expect::errors(db, 1);
+}
+
+#[test_rholang_code("(1u8 + 2u8) * 3u16", pipeline = pipeline)]
+fn test_numeric_mixed_types_nested<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
+    let root = db[tree];
+    expect::error(
+        db,
+        ErrorKind::MixedNumericTypes {
+            op: ast::BinaryExpOp::Mult,
+            left: NumericType::UnsignedInt { bits: 8 },
+            right: NumericType::UnsignedInt { bits: 16 },
+        },
+        root,
+    );
+    expect::errors(db, 1);
+}
+
+#[test_rholang_code("1.0f64 % 3.0f64", pipeline = pipeline)]
+fn test_numeric_float_mod_rejected<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
+    let root = db[tree];
+    expect::error(
+        db,
+        ErrorKind::UnsupportedNumericOperator {
+            op: ast::BinaryExpOp::Mod,
+            arg: NumericType::Float { bits: 64 },
+        },
+        root,
+    );
+    expect::errors(db, 1);
+}
+
+#[test_rholang_code("(1u8 + 2u8) * 3u8", pipeline = pipeline)]
+fn test_numeric_homogeneous_expression_is_valid<'test>(
+    _tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    expect::no_warnings_or_errors(db);
 }

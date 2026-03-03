@@ -477,14 +477,36 @@ pub enum WarningKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NumericType {
+    Int64,
+    SignedInt { bits: u32 },
+    UnsignedInt { bits: u32 },
+    BigInt,
+    BigRat,
+    Float { bits: u16 },
+    FixedPoint { scale: u32 },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorKind {
     UnboundVariable,
-    DuplicateVarDef { original: SymbolOccurrence },
+    DuplicateVarDef {
+        original: SymbolOccurrence,
+    },
     NameInProcPosition(BinderId, Symbol),
     ProcInNamePosition(BinderId, Symbol),
     ConnectiveOutsidePattern,
     BundleInsidePattern,
     UnmatchedVarInDisjunction(Symbol),
+    MixedNumericTypes {
+        op: ast::BinaryExpOp,
+        left: NumericType,
+        right: NumericType,
+    },
+    UnsupportedNumericOperator {
+        op: ast::BinaryExpOp,
+        arg: NumericType,
+    },
 }
 
 impl ErrorKind {
