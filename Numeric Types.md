@@ -19,6 +19,21 @@ We propose following this pattern to extend the set of numeric types in Rholang 
 
 Platforms may not support certain numeric types defined below and should throw an error as early as possible (e.g. before deploying the contract in blockchain applications).  Dynamic casting may throw an error at runtime (causing a deployment to abort in blockchain applications).
 
+# Implementation Notes (Current Workspace State)
+
+This document is the design target. The current implementation in this repository includes a substantial subset:
+
+- **Parser/grammar**: typed numeric literals are implemented for `i*`, `u*`, `n`, `r`, `f*`, and `p*`.
+- **Semantic diagnostics**: arithmetic expressions report mixed-type errors, and `%` on float types is rejected.
+- **Shell runtime evaluator**:
+  - evaluates arithmetic (`+ - * / %`) for numeric expressions when type-homogeneous
+  - supports explicit cast builtins: `int`, `uint`, `bigint`, `bigrat`, `float`, `fixed`
+  - supports both method form (`x.int(8)`) and function-call form (`int(x, 8)`)
+- **Runtime float support**:
+  - execution support is currently **`f32` and `f64` only**
+  - wider float widths can be parsed by grammar (`f128`, `f256`) but are rejected by shell runtime
+  - `float(arg, m)` validates declared widths (`32`, `64`, `80`, `128`, `256`), but runtime accepts only `32` and `64`
+
 ## Default: signed 64-bit integers
 
 So as not to change the semantics of existing code, unqualified numeric literals refer to signed 64-bit integers.
