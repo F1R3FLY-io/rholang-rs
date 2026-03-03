@@ -1904,6 +1904,30 @@
         },
         {
           "type": "SYMBOL",
+          "name": "signed_int_literal"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "unsigned_int_literal"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "bigint_literal"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "bigrat_literal"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "float_literal"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "fixed_point_literal"
+        },
+        {
+          "type": "SYMBOL",
           "name": "long_literal"
         },
         {
@@ -1928,6 +1952,48 @@
           "value": "false"
         }
       ]
+    },
+    "signed_int_literal": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "-?\\d+i[1-9]\\d*"
+      }
+    },
+    "unsigned_int_literal": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "\\d+u[1-9]\\d*"
+      }
+    },
+    "bigint_literal": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "-?\\d+n"
+      }
+    },
+    "bigrat_literal": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "-?\\d+r"
+      }
+    },
+    "float_literal": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "-?(?:\\d+\\.\\d*|\\.\\d+|\\d+)(?:[eE][+-]?\\d+)?f(?:32|64|128|256)"
+      }
+    },
+    "fixed_point_literal": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "-?(?:\\d+\\.\\d*|\\.\\d+|\\d+)p\\d+"
+      }
     },
     "long_literal": {
       "type": "TOKEN",

@@ -137,6 +137,12 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
             | Proc::Unit
             | Proc::BoolLiteral(_)
             | Proc::LongLiteral(_)
+            | Proc::SignedIntLiteral { .. }
+            | Proc::UnsignedIntLiteral { .. }
+            | Proc::BigIntLiteral(_)
+            | Proc::BigRatLiteral(_)
+            | Proc::FloatLiteral { .. }
+            | Proc::FixedPointLiteral { .. }
             | Proc::StringLiteral(_)
             | Proc::UriLiteral(_)
             | Proc::SimpleType(_)
@@ -368,6 +374,12 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
             | Proc::Unit
             | Proc::BoolLiteral(_)
             | Proc::LongLiteral(_)
+            | Proc::SignedIntLiteral { .. }
+            | Proc::UnsignedIntLiteral { .. }
+            | Proc::BigIntLiteral(_)
+            | Proc::BigRatLiteral(_)
+            | Proc::FloatLiteral { .. }
+            | Proc::FixedPointLiteral { .. }
             | Proc::StringLiteral(_)
             | Proc::UriLiteral(_)
             | Proc::SimpleType(_)

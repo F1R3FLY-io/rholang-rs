@@ -126,6 +126,60 @@ pub(super) fn node_to_ast<'ast>(
                         }
                     }
                 }
+                kind!("signed_int_literal") => {
+                    let lit_value = get_node_value(&node, source);
+                    if let Some((value, bits)) = parse_sized_int_literal(lit_value, 'i') {
+                        proc_stack.push(ast_builder.alloc_signed_int_literal(value, bits), span);
+                    } else {
+                        errors.push(AnnParsingError::new(ParsingError::NumberOutOfRange, &node));
+                        bad = true;
+                    }
+                }
+                kind!("unsigned_int_literal") => {
+                    let lit_value = get_node_value(&node, source);
+                    if let Some((value, bits)) = parse_sized_int_literal(lit_value, 'u') {
+                        proc_stack.push(ast_builder.alloc_unsigned_int_literal(value, bits), span);
+                    } else {
+                        errors.push(AnnParsingError::new(ParsingError::NumberOutOfRange, &node));
+                        bad = true;
+                    }
+                }
+                kind!("bigint_literal") => {
+                    let lit_value = get_node_value(&node, source);
+                    if let Some(value) = lit_value.strip_suffix('n') {
+                        proc_stack.push(ast_builder.alloc_bigint_literal(value), span);
+                    } else {
+                        errors.push(AnnParsingError::new(ParsingError::NumberOutOfRange, &node));
+                        bad = true;
+                    }
+                }
+                kind!("bigrat_literal") => {
+                    let lit_value = get_node_value(&node, source);
+                    if let Some(value) = lit_value.strip_suffix('r') {
+                        proc_stack.push(ast_builder.alloc_bigrat_literal(value), span);
+                    } else {
+                        errors.push(AnnParsingError::new(ParsingError::NumberOutOfRange, &node));
+                        bad = true;
+                    }
+                }
+                kind!("float_literal") => {
+                    let lit_value = get_node_value(&node, source);
+                    if let Some((value, bits)) = parse_float_literal(lit_value) {
+                        proc_stack.push(ast_builder.alloc_float_literal(value, bits), span);
+                    } else {
+                        errors.push(AnnParsingError::new(ParsingError::NumberOutOfRange, &node));
+                        bad = true;
+                    }
+                }
+                kind!("fixed_point_literal") => {
+                    let lit_value = get_node_value(&node, source);
+                    if let Some((value, scale)) = parse_fixed_point_literal(lit_value) {
+                        proc_stack.push(ast_builder.alloc_fixed_point_literal(value, scale), span);
+                    } else {
+                        errors.push(AnnParsingError::new(ParsingError::NumberOutOfRange, &node));
+                        bad = true;
+                    }
+                }
                 kind!("string_literal") => {
                     let lit_value = get_node_value(&node, source);
                     proc_stack.push(ast_builder.alloc_string_literal(lit_value), span);
@@ -720,6 +774,30 @@ fn parse_decls<'a>(from: &tree_sitter::Node, source: &'a str) -> Vec<NameDecl<'a
     }
 
     result
+}
+
+fn parse_sized_int_literal(literal: &str, suffix: char) -> Option<(&str, u32)> {
+    let (value, width) = literal.rsplit_once(suffix)?;
+    let bits: u32 = width.parse().ok()?;
+    if bits < 8 || !bits.is_power_of_two() {
+        return None;
+    }
+    Some((value, bits))
+}
+
+fn parse_float_literal(literal: &str) -> Option<(&str, u16)> {
+    let (value, width) = literal.rsplit_once('f')?;
+    let bits: u16 = width.parse().ok()?;
+    match bits {
+        32 | 64 | 128 | 256 => Some((value, bits)),
+        _ => None,
+    }
+}
+
+fn parse_fixed_point_literal(literal: &str) -> Option<(&str, u32)> {
+    let (value, scale) = literal.rsplit_once('p')?;
+    let scale: u32 = scale.parse().ok()?;
+    Some((value, scale))
 }
 
 fn apply_cont<'tree, 'ast>(

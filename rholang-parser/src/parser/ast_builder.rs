@@ -93,6 +93,30 @@ impl<'ast> ASTBuilder<'ast> {
         }
     }
 
+    pub(crate) fn alloc_signed_int_literal(&self, value: &'ast str, bits: u32) -> &Proc<'ast> {
+        self.arena.alloc(Proc::SignedIntLiteral { value, bits })
+    }
+
+    pub(crate) fn alloc_unsigned_int_literal(&self, value: &'ast str, bits: u32) -> &Proc<'ast> {
+        self.arena.alloc(Proc::UnsignedIntLiteral { value, bits })
+    }
+
+    pub(crate) fn alloc_bigint_literal(&self, value: &'ast str) -> &Proc<'ast> {
+        self.arena.alloc(Proc::BigIntLiteral(value))
+    }
+
+    pub(crate) fn alloc_bigrat_literal(&self, value: &'ast str) -> &Proc<'ast> {
+        self.arena.alloc(Proc::BigRatLiteral(value))
+    }
+
+    pub(crate) fn alloc_float_literal(&self, value: &'ast str, bits: u16) -> &Proc<'ast> {
+        self.arena.alloc(Proc::FloatLiteral { value, bits })
+    }
+
+    pub(crate) fn alloc_fixed_point_literal(&self, value: &'ast str, scale: u32) -> &Proc<'ast> {
+        self.arena.alloc(Proc::FixedPointLiteral { value, scale })
+    }
+
     pub(crate) fn alloc_uri_literal(&self, value: &'ast str) -> &Proc<'ast> {
         self.arena.alloc(Proc::UriLiteral(value.into()))
     }

@@ -125,6 +125,12 @@ fn resolve_proc_pattern_rec<'a>(
         | Unit
         | BoolLiteral(_)
         | LongLiteral(_)
+        | SignedIntLiteral { .. }
+        | UnsignedIntLiteral { .. }
+        | BigIntLiteral(_)
+        | BigRatLiteral(_)
+        | FloatLiteral { .. }
+        | FixedPointLiteral { .. }
         | StringLiteral(_)
         | UriLiteral(_)
         | SimpleType(_)
