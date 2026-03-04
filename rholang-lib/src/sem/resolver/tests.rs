@@ -1236,6 +1236,23 @@ fn test_numeric_float_mod_rejected<'test>(tree: ProcRef<'test>, db: &'test Seman
     expect::errors(db, 1);
 }
 
+#[test_rholang_code("-(1u8)", pipeline = pipeline)]
+fn test_numeric_unsigned_unary_neg_rejected<'test>(
+    tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    let root = db[tree];
+    expect::error(
+        db,
+        ErrorKind::UnsupportedUnaryNumericOperator {
+            op: ast::UnaryExpOp::Neg,
+            arg: NumericType::UnsignedInt { bits: 8 },
+        },
+        root,
+    );
+    expect::errors(db, 1);
+}
+
 #[test_rholang_code("(1u8 + 2u8) * 3u8", pipeline = pipeline)]
 fn test_numeric_homogeneous_expression_is_valid<'test>(
     _tree: ProcRef<'test>,

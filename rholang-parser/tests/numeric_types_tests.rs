@@ -4,7 +4,7 @@ use validated::Validated;
 #[test]
 fn parses_typed_numeric_literals() {
     let parser = RholangParser::new();
-    let input = "-52i64\n65535u16\n10n\n3r\n-1.234e5f32\n3.3p1";
+    let input = include_str!("corpus/numeric_types.rho");
     let parsed = parser.parse(input);
 
     let procs = match parsed {
@@ -12,36 +12,57 @@ fn parses_typed_numeric_literals() {
         Validated::Fail(err) => panic!("expected successful parse, got errors: {err:?}"),
     };
 
-    assert!(matches!(
-        procs[0].proc,
-        Proc::SignedIntLiteral {
-            value: "-52",
-            bits: 64
-        }
-    ));
-    assert!(matches!(
-        procs[1].proc,
-        Proc::UnsignedIntLiteral {
-            value: "65535",
-            bits: 16
-        }
-    ));
-    assert!(matches!(procs[2].proc, Proc::BigIntLiteral("10")));
-    assert!(matches!(procs[3].proc, Proc::BigRatLiteral("3")));
-    assert!(matches!(
-        procs[4].proc,
-        Proc::FloatLiteral {
-            value: "-1.234e5",
-            bits: 32
-        }
-    ));
-    assert!(matches!(
-        procs[5].proc,
-        Proc::FixedPointLiteral {
-            value: "3.3",
-            scale: 1
-        }
-    ));
+    assert_eq!(
+        procs.len(),
+        10,
+        "numeric_types.rho should parse to 10 top-level terms"
+    );
+    assert!(procs.iter().any(|p| {
+        matches!(
+            p.proc,
+            Proc::SignedIntLiteral {
+                value: "-52",
+                bits: 64
+            }
+        )
+    }));
+    assert!(procs.iter().any(|p| {
+        matches!(
+            p.proc,
+            Proc::UnsignedIntLiteral {
+                value: "65535",
+                bits: 16
+            }
+        )
+    }));
+    assert!(
+        procs
+            .iter()
+            .any(|p| matches!(p.proc, Proc::BigIntLiteral("10")))
+    );
+    assert!(
+        procs
+            .iter()
+            .any(|p| matches!(p.proc, Proc::BigRatLiteral("3")))
+    );
+    assert!(procs.iter().any(|p| {
+        matches!(
+            p.proc,
+            Proc::FloatLiteral {
+                value: "-1.234e5",
+                bits: 32
+            }
+        )
+    }));
+    assert!(procs.iter().any(|p| {
+        matches!(
+            p.proc,
+            Proc::FixedPointLiteral {
+                value: "3.3",
+                scale: 1
+            }
+        )
+    }));
 }
 
 #[test]

@@ -205,6 +205,50 @@ async fn test_runtime_arithmetic_execution() -> Result<()> {
 }
 
 #[tokio::test]
+async fn test_runtime_rejects_unsigned_unary_negation() -> Result<()> {
+    let provider = RholangParserInterpreterProvider::new()?;
+    provider.set_delay(0)?;
+
+    let result = provider.interpret("-(1u8)").await;
+    match result {
+        InterpretationResult::Error(err) => {
+            assert!(
+                err.message.contains("unsigned"),
+                "Unexpected error message: {}",
+                err.message
+            );
+        }
+        InterpretationResult::Success(output) => {
+            panic!("Expected unsigned unary-negation error, got success: {output}");
+        }
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_runtime_rejects_unsigned_subtraction_underflow() -> Result<()> {
+    let provider = RholangParserInterpreterProvider::new()?;
+    provider.set_delay(0)?;
+
+    let result = provider.interpret("1u8 - 2u8").await;
+    match result {
+        InterpretationResult::Error(err) => {
+            assert!(
+                err.message.contains("underflow"),
+                "Unexpected error message: {}",
+                err.message
+            );
+        }
+        InterpretationResult::Success(output) => {
+            panic!("Expected unsigned subtraction underflow error, got success: {output}");
+        }
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_runtime_rejects_mixed_numeric_types() -> Result<()> {
     let provider = RholangParserInterpreterProvider::new()?;
     provider.set_delay(0)?;

@@ -507,6 +507,10 @@ pub enum ErrorKind {
         op: ast::BinaryExpOp,
         arg: NumericType,
     },
+    UnsupportedUnaryNumericOperator {
+        op: ast::UnaryExpOp,
+        arg: NumericType,
+    },
 }
 
 impl ErrorKind {

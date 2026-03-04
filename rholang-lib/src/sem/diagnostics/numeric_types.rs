@@ -17,41 +17,58 @@ impl DiagnosticPass for NumericTypeConsistencyCheck {
         let mut result = Vec::new();
 
         for (pid, proc) in db {
-            let ast::Proc::BinaryExp { op, left, right } = proc.proc else {
-                continue;
-            };
-            if !is_arithmetic_operator(*op) {
-                continue;
-            }
+            match proc.proc {
+                ast::Proc::UnaryExp {
+                    op: UnaryExpOp::Neg,
+                    arg,
+                } => {
+                    let Some(arg_type) = infer_numeric_type(arg) else {
+                        continue;
+                    };
 
-            let left_type = infer_numeric_type(left);
-            let right_type = infer_numeric_type(right);
-            let (Some(left_type), Some(right_type)) = (left_type, right_type) else {
-                continue;
-            };
+                    if matches!(arg_type, NumericType::UnsignedInt { .. }) {
+                        result.push(Diagnostic::error(
+                            pid,
+                            ErrorKind::UnsupportedUnaryNumericOperator {
+                                op: UnaryExpOp::Neg,
+                                arg: arg_type,
+                            },
+                            Some(proc.span.start),
+                        ));
+                    }
+                }
+                ast::Proc::BinaryExp { op, left, right } if is_arithmetic_operator(*op) => {
+                    let left_type = infer_numeric_type(left);
+                    let right_type = infer_numeric_type(right);
+                    let (Some(left_type), Some(right_type)) = (left_type, right_type) else {
+                        continue;
+                    };
 
-            if left_type != right_type {
-                result.push(Diagnostic::error(
-                    pid,
-                    ErrorKind::MixedNumericTypes {
-                        op: *op,
-                        left: left_type,
-                        right: right_type,
-                    },
-                    Some(proc.span.start),
-                ));
-                continue;
-            }
+                    if left_type != right_type {
+                        result.push(Diagnostic::error(
+                            pid,
+                            ErrorKind::MixedNumericTypes {
+                                op: *op,
+                                left: left_type,
+                                right: right_type,
+                            },
+                            Some(proc.span.start),
+                        ));
+                        continue;
+                    }
 
-            if *op == BinaryExpOp::Mod && is_float_type(left_type) {
-                result.push(Diagnostic::error(
-                    pid,
-                    ErrorKind::UnsupportedNumericOperator {
-                        op: *op,
-                        arg: left_type,
-                    },
-                    Some(proc.span.start),
-                ));
+                    if *op == BinaryExpOp::Mod && is_float_type(left_type) {
+                        result.push(Diagnostic::error(
+                            pid,
+                            ErrorKind::UnsupportedNumericOperator {
+                                op: *op,
+                                arg: left_type,
+                            },
+                            Some(proc.span.start),
+                        ));
+                    }
+                }
+                _ => {}
             }
         }
 

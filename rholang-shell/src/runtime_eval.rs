@@ -226,7 +226,7 @@ fn eval_numeric(proc: &AnnProc<'_>) -> Result<Option<NumericValue>, RuntimeEvalE
             let Some(arg) = eval_numeric(arg)? else {
                 return Ok(None);
             };
-            Ok(Some(negate(arg)))
+            Ok(Some(negate(arg, pos)?))
         }
         ast::Proc::BinaryExp { op, left, right } if is_arithmetic(*op) => {
             let Some(left) = eval_numeric(left)? else {
@@ -628,6 +628,12 @@ fn apply_binary(
             if (op == BinaryExpOp::Div || op == BinaryExpOp::Mod) && r.is_zero() {
                 return Err(RuntimeEvalError::at(pos, "division by zero"));
             }
+            if op == BinaryExpOp::Sub && l < r {
+                return Err(RuntimeEvalError::at(
+                    pos,
+                    format!("unsigned subtraction underflow for u{bits}: {l} - {r}"),
+                ));
+            }
             let value = match op {
                 BinaryExpOp::Add => normalize_unsigned(l + r, bits),
                 BinaryExpOp::Sub => normalize_unsigned(l - r, bits),
@@ -718,31 +724,31 @@ fn apply_binary(
     }
 }
 
-fn negate(value: NumericValue) -> NumericValue {
+fn negate(value: NumericValue, pos: SourcePos) -> Result<NumericValue, RuntimeEvalError> {
     match value {
         NumericValue::SignedInt {
             value,
             bits,
             explicit,
-        } => NumericValue::SignedInt {
+        } => Ok(NumericValue::SignedInt {
             value: normalize_signed(-value, bits),
             bits,
             explicit,
-        },
-        NumericValue::UnsignedInt { value, bits } => NumericValue::UnsignedInt {
-            value: normalize_unsigned(-value, bits),
-            bits,
-        },
-        NumericValue::BigInt(value) => NumericValue::BigInt(-value),
-        NumericValue::BigRat(value) => NumericValue::BigRat(-value),
-        NumericValue::Float { value, bits } => NumericValue::Float {
+        }),
+        NumericValue::UnsignedInt { bits, .. } => Err(RuntimeEvalError::at(
+            pos,
+            format!("operator unary '-' is not defined for unsigned integers (u{bits})"),
+        )),
+        NumericValue::BigInt(value) => Ok(NumericValue::BigInt(-value)),
+        NumericValue::BigRat(value) => Ok(NumericValue::BigRat(-value)),
+        NumericValue::Float { value, bits } => Ok(NumericValue::Float {
             value: -value,
             bits,
-        },
-        NumericValue::FixedPoint { unscaled, scale } => NumericValue::FixedPoint {
+        }),
+        NumericValue::FixedPoint { unscaled, scale } => Ok(NumericValue::FixedPoint {
             unscaled: -unscaled,
             scale,
-        },
+        }),
     }
 }
 
