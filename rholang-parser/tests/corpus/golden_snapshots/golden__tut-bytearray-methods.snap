@@ -9,20 +9,6 @@ Good(
                 decls: [
                     NameDecl {
                         id: Id {
-                            name: "stdout",
-                            pos: SourcePos {
-                                line: 1,
-                                col: 11,
-                            },
-                        },
-                        uri: Some(
-                            Uri(
-                                "rho:io:stdout",
-                            ),
-                        ),
-                    },
-                    NameDecl {
-                        id: Id {
                             name: "x",
                             pos: SourcePos {
                                 line: 1,
@@ -40,6 +26,20 @@ Good(
                             },
                         },
                         uri: None,
+                    },
+                    NameDecl {
+                        id: Id {
+                            name: "stdout",
+                            pos: SourcePos {
+                                line: 1,
+                                col: 11,
+                            },
+                        },
+                        uri: Some(
+                            Uri(
+                                "rho:io:stdout",
+                            ),
+                        ),
                     },
                 ],
                 proc: AnnProc {

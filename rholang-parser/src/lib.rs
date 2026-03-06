@@ -9,7 +9,7 @@ pub mod ast;
 pub mod parser;
 mod traverse;
 
-pub use parser::RholangParser;
+pub use parser::{RholangParser, ASTBuilder};
 pub use traverse::{DfsEvent, DfsEventExt};
 
 /// a position in the source code. 1-based
