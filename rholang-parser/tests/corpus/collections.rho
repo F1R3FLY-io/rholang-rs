@@ -1,0 +1,7 @@
+new sendPathMap, stdout(`rho:io:stdout`) in {
+    sendPathMap!({| "a:b:c:1", "a:b:c:d:2" |}) | 
+
+    for (@value <- sendPathMap) {
+      stdout!(value)
+    }
+}

@@ -9,30 +9,6 @@ Good(
                 decls: [
                     NameDecl {
                         id: Id {
-                            name: "ack",
-                            pos: SourcePos {
-                                line: 4,
-                                col: 37,
-                            },
-                        },
-                        uri: None,
-                    },
-                    NameDecl {
-                        id: Id {
-                            name: "ri",
-                            pos: SourcePos {
-                                line: 2,
-                                col: 6,
-                            },
-                        },
-                        uri: Some(
-                            Uri(
-                                "rho:registry:insertArbitrary",
-                            ),
-                        ),
-                    },
-                    NameDecl {
-                        id: Id {
                             name: "simpleInsertTest",
                             pos: SourcePos {
                                 line: 1,
@@ -50,6 +26,20 @@ Good(
                             },
                         },
                         uri: None,
+                    },
+                    NameDecl {
+                        id: Id {
+                            name: "ri",
+                            pos: SourcePos {
+                                line: 2,
+                                col: 6,
+                            },
+                        },
+                        uri: Some(
+                            Uri(
+                                "rho:registry:insertArbitrary",
+                            ),
+                        ),
                     },
                     NameDecl {
                         id: Id {
@@ -78,6 +68,16 @@ Good(
                                 "rho:io:stdoutAck",
                             ),
                         ),
+                    },
+                    NameDecl {
+                        id: Id {
+                            name: "ack",
+                            pos: SourcePos {
+                                line: 4,
+                                col: 37,
+                            },
+                        },
+                        uri: None,
                     },
                 ],
                 proc: AnnProc {
