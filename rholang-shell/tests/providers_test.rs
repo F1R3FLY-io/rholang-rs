@@ -201,6 +201,14 @@ async fn test_runtime_arithmetic_execution() -> Result<()> {
         }
     }
 
+    let result = provider.interpret("3r % 2r").await;
+    match result {
+        InterpretationResult::Success(output) => assert_eq!(output, "Evaluated: 1r"),
+        InterpretationResult::Error(err) => {
+            panic!("Expected BigRat modulo success, got error: {err}");
+        }
+    }
+
     Ok(())
 }
 

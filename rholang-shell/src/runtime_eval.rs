@@ -660,7 +660,7 @@ fn apply_binary(
             Ok(NumericValue::BigInt(value))
         }
         (NumericValue::BigRat(l), NumericValue::BigRat(r)) => {
-            if op == BinaryExpOp::Div && r.is_zero() {
+            if (op == BinaryExpOp::Div || op == BinaryExpOp::Mod) && r.is_zero() {
                 return Err(RuntimeEvalError::at(pos, "division by zero"));
             }
 
@@ -669,7 +669,7 @@ fn apply_binary(
                 BinaryExpOp::Sub => l - r,
                 BinaryExpOp::Mult => l * r,
                 BinaryExpOp::Div => l / r,
-                BinaryExpOp::Mod => BigRational::zero(),
+                BinaryExpOp::Mod => l % r,
                 _ => unreachable!("non-arithmetic operator"),
             };
             Ok(NumericValue::BigRat(value))
