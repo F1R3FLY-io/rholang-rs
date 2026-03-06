@@ -14,7 +14,7 @@ pub mod parser_wasm;
 pub use parser_wasm as parser;
 mod traverse;
 
-pub use parser::RholangParser;
+pub use parser::{RholangParser, ASTBuilder};
 
 // Unified parse failure type alias for consumers
 #[cfg(not(target_arch = "wasm32"))]

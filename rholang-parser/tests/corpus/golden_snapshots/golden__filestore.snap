@@ -31,6 +31,16 @@ Fail(
                             },
                             NameDecl {
                                 id: Id {
+                                    name: "store",
+                                    pos: SourcePos {
+                                        line: 1,
+                                        col: 23,
+                                    },
+                                },
+                                uri: None,
+                            },
+                            NameDecl {
+                                id: Id {
                                     name: "stdout",
                                     pos: SourcePos {
                                         line: 1,
@@ -42,16 +52,6 @@ Fail(
                                         "rho:io:stdout",
                                     ),
                                 ),
-                            },
-                            NameDecl {
-                                id: Id {
-                                    name: "store",
-                                    pos: SourcePos {
-                                        line: 1,
-                                        col: 23,
-                                    },
-                                },
-                                uri: None,
                             },
                         ],
                         proc: AnnProc {
@@ -685,20 +685,6 @@ Fail(
                                         decls: [
                                             NameDecl {
                                                 id: Id {
-                                                    name: "register",
-                                                    pos: SourcePos {
-                                                        line: 13,
-                                                        col: 32,
-                                                    },
-                                                },
-                                                uri: Some(
-                                                    Uri(
-                                                        "rho:registry:insertArbitrary",
-                                                    ),
-                                                ),
-                                            },
-                                            NameDecl {
-                                                id: Id {
                                                     name: "uriAddData",
                                                     pos: SourcePos {
                                                         line: 13,
@@ -716,6 +702,20 @@ Fail(
                                                     },
                                                 },
                                                 uri: None,
+                                            },
+                                            NameDecl {
+                                                id: Id {
+                                                    name: "register",
+                                                    pos: SourcePos {
+                                                        line: 13,
+                                                        col: 32,
+                                                    },
+                                                },
+                                                uri: Some(
+                                                    Uri(
+                                                        "rho:registry:insertArbitrary",
+                                                    ),
+                                                ),
                                             },
                                         ],
                                         proc: AnnProc {

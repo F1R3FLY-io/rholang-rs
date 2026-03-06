@@ -297,6 +297,14 @@ pub(super) fn node_to_ast<'ast>(
                                 }
                             }
                         }
+                        kind!("pathmap") => {
+                            cont_stack.push(K::ConsumePathMap {
+                                arity: collection_node.named_child_count(),
+                                has_remainder,
+                                span,
+                            });
+                            cont_stack.push(K::EvalList(collection_node.walk()));
+                        }
                         _ => unreachable!("Rholang collections are: list, set, tuple and map"),
                     }
                 }
@@ -328,25 +336,26 @@ pub(super) fn node_to_ast<'ast>(
                     fn check_for_duplicate_decls(
                         decls: &[NameDecl],
                     ) -> Option<(SourcePos, SourcePos)> {
-                        decls.windows(2).find_map(|w| {
-                            if w[0] == w[1] {
-                                let mut first = w[0].id.pos;
-                                let mut second = w[1].id.pos;
-                                if second < first {
-                                    std::mem::swap(&mut first, &mut second);
+                        // Check for duplicates without requiring sorted input
+                        // Use O(n^2) comparison since n is typically small
+                        for i in 0..decls.len() {
+                            for j in (i + 1)..decls.len() {
+                                if decls[i].id.name == decls[j].id.name {
+                                    let first = decls[i].id.pos;
+                                    let second = decls[j].id.pos;
+                                    return Some((first, second));
                                 }
-                                Some((first, second))
-                            } else {
-                                None
                             }
-                        })
+                        }
+                        None
                     }
 
                     let decls_node = get_field(&node, field!("decls"));
                     let proc_node = get_field(&node, field!("proc"));
 
-                    let mut decls = parse_decls(&decls_node, source);
-                    decls.sort_unstable();
+                    let decls = parse_decls(&decls_node, source);
+                    // IMPORTANT: Do NOT sort decls - preserve source order for correct variable indexing
+                    // The old parser (rust/dev) and Scala implementation expect source order
                     if let Some((first, second)) = check_for_duplicate_decls(&decls) {
                         errors.push(AnnParsingError::new(
                             ParsingError::DuplicateNameDecl { first, second },
@@ -875,6 +884,22 @@ fn apply_cont<'tree, 'ast>(
                                 map.ann(span)
                             })
                         }
+                        K::ConsumePathMap {
+                            arity,
+                            has_remainder,
+                            span,
+                        } => proc_stack.replace_top_slice(arity, |elems| {
+                            let path_map = if has_remainder {
+                                assert!(!elems.is_empty());
+                                // SAFETY: We have checked above that there is at least one element
+                                let (last, init) = elems.split_last().unwrap_unchecked();
+                                ast_builder
+                                    .alloc_pathmap_with_remainder(init, into_remainder(*last))
+                            } else {
+                                ast_builder.alloc_pathmap(elems)
+                            };
+                            path_map.ann(span)
+                        }),
                         K::ConsumeMatch { span, arity } => {
                             proc_stack.replace_top_slice(arity * 2 + 1, |expr_cases| {
                                 let expr = expr_cases[0];
@@ -1017,6 +1042,11 @@ enum K<'tree, 'ast> {
         has_remainder: bool,
         span: SourceSpan,
     },
+    ConsumePathMap {
+        arity: usize,
+        has_remainder: bool,
+        span: SourceSpan,
+    },
     ConsumeMatch {
         span: SourceSpan,
         arity: usize,
@@ -1121,6 +1151,11 @@ impl Debug for K<'_, '_> {
                 .finish(),
             Self::ConsumeMap { arity, span, .. } => f
                 .debug_struct("ConsumeMap")
+                .field("arity", arity)
+                .field("span", span)
+                .finish(),
+            Self::ConsumePathMap { arity, span, .. } => f
+                .debug_struct("ConsumePathMap")
                 .field("arity", arity)
                 .field("span", span)
                 .finish(),

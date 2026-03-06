@@ -9,13 +9,17 @@ Good(
                 decls: [
                     NameDecl {
                         id: Id {
-                            name: "approveProposal",
+                            name: "stdout",
                             pos: SourcePos {
-                                line: 6,
+                                line: 1,
                                 col: 5,
                             },
                         },
-                        uri: None,
+                        uri: Some(
+                            Uri(
+                                "rho:io:stdout",
+                            ),
+                        ),
                     },
                     NameDecl {
                         id: Id {
@@ -29,9 +33,39 @@ Good(
                     },
                     NameDecl {
                         id: Id {
+                            name: "proposals",
+                            pos: SourcePos {
+                                line: 3,
+                                col: 5,
+                            },
+                        },
+                        uri: None,
+                    },
+                    NameDecl {
+                        id: Id {
+                            name: "treasuryBalance",
+                            pos: SourcePos {
+                                line: 4,
+                                col: 5,
+                            },
+                        },
+                        uri: None,
+                    },
+                    NameDecl {
+                        id: Id {
                             name: "createProposal",
                             pos: SourcePos {
                                 line: 5,
+                                col: 5,
+                            },
+                        },
+                        uri: None,
+                    },
+                    NameDecl {
+                        id: Id {
+                            name: "approveProposal",
+                            pos: SourcePos {
+                                line: 6,
                                 col: 5,
                             },
                         },
@@ -52,40 +86,6 @@ Good(
                             name: "getBalance",
                             pos: SourcePos {
                                 line: 8,
-                                col: 5,
-                            },
-                        },
-                        uri: None,
-                    },
-                    NameDecl {
-                        id: Id {
-                            name: "proposals",
-                            pos: SourcePos {
-                                line: 3,
-                                col: 5,
-                            },
-                        },
-                        uri: None,
-                    },
-                    NameDecl {
-                        id: Id {
-                            name: "stdout",
-                            pos: SourcePos {
-                                line: 1,
-                                col: 5,
-                            },
-                        },
-                        uri: Some(
-                            Uri(
-                                "rho:io:stdout",
-                            ),
-                        ),
-                    },
-                    NameDecl {
-                        id: Id {
-                            name: "treasuryBalance",
-                            pos: SourcePos {
-                                line: 4,
                                 col: 5,
                             },
                         },
