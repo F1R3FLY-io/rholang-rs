@@ -420,6 +420,10 @@ impl<'a> CodegenContext<'a> {
             Collection::Map { .. } => {
                 bail!("Maps not supported in MVP");
             }
+
+            Collection::PathMap { .. } => {
+                bail!("PathMaps not supported in MVP");
+            }
         }
 
         Ok(())

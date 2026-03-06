@@ -1,5 +1,6 @@
 ---
 source: rholang-parser/tests/golden.rs
+assertion_line: 23
 expression: result
 ---
 Good(
@@ -38,16 +39,6 @@ Good(
                         decls: [
                             NameDecl {
                                 id: Id {
-                                    name: "committedRewardsCh",
-                                    pos: SourcePos {
-                                        line: 2,
-                                        col: 68,
-                                    },
-                                },
-                                uri: None,
-                            },
-                            NameDecl {
-                                id: Id {
                                     name: "posBalanceCh",
                                     pos: SourcePos {
                                         line: 2,
@@ -82,6 +73,16 @@ Good(
                                     pos: SourcePos {
                                         line: 2,
                                         col: 51,
+                                    },
+                                },
+                                uri: None,
+                            },
+                            NameDecl {
+                                id: Id {
+                                    name: "committedRewardsCh",
+                                    pos: SourcePos {
+                                        line: 2,
+                                        col: 68,
                                     },
                                 },
                                 uri: None,

@@ -44,6 +44,9 @@ pub enum MessageType {
     Map {
         expected_pairs: Option<usize>,
     },
+    PathMap {
+        expected_len: Option<usize>,
+    },
     Multiple,
     /// Unknown or complex type
     Unknown,
@@ -228,6 +231,16 @@ impl<'a, 'ast> TypeValidator<'a, 'ast> {
                         Some(elements.len())
                     },
                 }),
+                ast::Collection::PathMap {
+                    elements,
+                    remainder,
+                } => Ok(MessageType::PathMap {
+                    expected_len: if remainder.is_some() {
+                        None
+                    } else {
+                        Some(elements.len())
+                    },
+                }),
             },
 
             // Process patterns
@@ -314,7 +327,8 @@ impl<'a, 'ast> TypeValidator<'a, 'ast> {
             (ChannelType::QuotedProcess, MessageType::List { .. })
             | (ChannelType::QuotedProcess, MessageType::Tuple { .. })
             | (ChannelType::QuotedProcess, MessageType::Set { .. })
-            | (ChannelType::QuotedProcess, MessageType::Map { .. }) => {
+            | (ChannelType::QuotedProcess, MessageType::Map { .. })
+            | (ChannelType::QuotedProcess, MessageType::PathMap { .. }) => {
                 // Quoted processes as channels with collection patterns is unusual
                 // but valid in Rholang - the pattern would need to match a collection structure
                 self.warn_unusual_pattern_channel_combo(for_comp_pid, pattern)?;
@@ -538,6 +552,15 @@ impl<'a, 'ast> PatternQueryValidator<'a, 'ast> {
                     }
                     Ok(())
                 }
+                ast::Collection::PathMap {
+                    elements,
+                    remainder: _,
+                } => {
+                    for elem in elements.iter() {
+                        Self::analyze_pattern_structure(elem)?;
+                    }
+                    Ok(())
+                }
             },
 
             // Binary expressions with connectives
@@ -626,6 +649,15 @@ impl<'a, 'ast> PatternQueryValidator<'a, 'ast> {
                         for (key, value) in elements.iter() {
                             Self::validate_pattern_projections(key)?;
                             Self::validate_pattern_projections(value)?;
+                        }
+                        Ok(())
+                    }
+                    ast::Collection::PathMap {
+                        elements,
+                        remainder: _,
+                    } => {
+                        for elem in elements.iter() {
+                            Self::validate_pattern_projections(elem)?;
                         }
                         Ok(())
                     }
@@ -759,6 +791,15 @@ impl<'a, 'ast> PatternQueryValidator<'a, 'ast> {
                             }
                         }
                     }
+                    ast::Collection::PathMap { elements, .. } => {
+                        for elem in elements.iter() {
+                            if let Some(impossible) =
+                                self.find_impossible_collection_constraint(elem)
+                            {
+                                return Some(impossible);
+                            }
+                        }
+                    }
                 }
                 None
             }
@@ -774,6 +815,7 @@ impl<'a, 'ast> PatternQueryValidator<'a, 'ast> {
                 ast::Collection::Tuple(_) => Some("Tuple"),
                 ast::Collection::Set { .. } => Some("Set"),
                 ast::Collection::Map { .. } => Some("Map"),
+                ast::Collection::PathMap { .. } => Some("PathMap"),
             },
             _ => None,
         }
@@ -825,6 +867,16 @@ impl<'a, 'ast> PatternQueryValidator<'a, 'ast> {
                     }
                 }
                 ast::Collection::Map {
+                    elements,
+                    remainder,
+                } => {
+                    if remainder.is_none() {
+                        Some(elements.len())
+                    } else {
+                        None
+                    }
+                }
+                ast::Collection::PathMap {
                     elements,
                     remainder,
                 } => {
