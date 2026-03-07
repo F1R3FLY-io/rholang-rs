@@ -22,6 +22,13 @@ This Rust implementation aims to provide:
 - Trustworthy, scalable, and concurrent execution environment
 - REPL for interactive development and testing
 
+## Numeric Types Status
+
+- Parser and grammar support typed numeric literals: `i*`, `u*`, `n`, `r`, `f*`, `p*`.
+- The shell runtime evaluates numeric expressions and explicit cast builtins.
+- Runtime float execution is currently limited to `f32` and `f64`; wider float widths are parsed but rejected at runtime.
+- See [Numeric Types.md](Numeric%20Types.md) for the design and implementation notes.
+
 ## Getting Started
 
 ### Prerequisites
@@ -49,7 +56,7 @@ cargo --version
 # rustup default nightly
 ```
 
-**Note**: Edition 2024 requires Cargo 1.85+ with the feature stabilized. Currently using Edition 2021 and resolver v2 for stable compatibility.
+**Note**: Edition 2024 requires Cargo 1.85+ with the feature stabilized. This workspace currently uses Edition 2021 and resolver v3 for stable compatibility.
 
 ### Building the Project
 
@@ -65,7 +72,7 @@ cargo build
 cargo build --release
 
 # Build specific workspace member
-cargo build -p rholang-shell
+cargo build -p shell
 ```
 
 ### Running Tests
@@ -78,7 +85,7 @@ cargo test
 cargo test -- --nocapture
 
 # Run tests for specific workspace member
-cargo test -p rholang-shell
+cargo test -p shell
 
 # Run specific test module
 cargo test <module_name>
@@ -126,7 +133,7 @@ cargo clippy
 cargo clippy --all-features --all-targets -- -D warnings
 
 # Fix code style issues automatically
-cargo fix --bin "rhosh"
+cargo fix -p shell --bin rhosh
 
 # Check for security vulnerabilities (requires cargo-audit)
 cargo install cargo-audit
@@ -136,11 +143,11 @@ cargo audit
 ### Running the Interpreter
 
 ```bash
-# Run the Rholang rholang-shell (rhosh)
-cargo run -p rholang-shell
+# Run the Rholang shell (rhosh)
+cargo run -p shell --bin rhosh
 
 # Run with specific arguments
-cargo run -p rholang-shell -- --help
+cargo run -p shell --bin rhosh -- --help
 
 # Run the interpreter binary directly after building
 ./target/debug/rhosh
@@ -156,17 +163,14 @@ cargo run -p rholang-shell -- --help
 ```
 rholang-rs/
 ├── Cargo.toml           # Workspace configuration
-├── shell/               # Rholang interpreter shell (rhosh)
-│   ├── Cargo.toml       # Shell package configuration
-│   ├── src/
-│   │   ├── main.rs      # Shell entry point
-│   │   ├── lib.rs       # Library modules
-│   │   ├── interpreter.rs    # Core interpreter logic
-│   │   ├── rh_interpreter.rs # Rholang-specific interpreter
-│   │   └── main_sync.rs # Synchronous main alternative
-│   └── tests/           # Shell integration tests
+├── rholang-tree-sitter/            # Tree-sitter grammar
+├── rholang-parser/                 # AST parser based on grammar
+├── rholang-lib/                    # Semantic analysis pipeline
+├── rholang-shell/                  # REPL + runtime numeric evaluation (package: shell)
+├── rholang-tree-sitter-proc-macro/ # Procedural macros for grammar IDs
+├── test-macros/                    # Test helpers
 ├── README.md
-└── CLAUDE.md           # Project instructions for Claude
+└── CLAUDE.md                      # Project instructions for Claude
 ```
 
 ### Code Style Guidelines
@@ -191,8 +195,8 @@ cargo test --lib
 # Run integration tests only
 cargo test --test '*'
 
-# Run tests for rholang-shell package
-cargo test -p rholang-shell
+# Run tests for shell package
+cargo test -p shell
 
 # Run benchmarks
 cargo bench

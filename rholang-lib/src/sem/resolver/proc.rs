@@ -61,7 +61,19 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
         }
 
         // -- ground expressions that do not contain names --
-        Nil | Unit | BoolLiteral(_) | LongLiteral(_) | StringLiteral(_) | UriLiteral(_) | Bad => {}
+        Nil
+        | Unit
+        | BoolLiteral(_)
+        | LongLiteral(_)
+        | SignedIntLiteral { .. }
+        | UnsignedIntLiteral { .. }
+        | BigIntLiteral(_)
+        | BigRatLiteral(_)
+        | FloatLiteral { .. }
+        | FixedPointLiteral { .. }
+        | StringLiteral(_)
+        | UriLiteral(_)
+        | Bad => {}
 
         // -- variables --
         ProcVar(Id(id)) => {

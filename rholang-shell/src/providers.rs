@@ -1,7 +1,9 @@
+use crate::runtime_eval::{
+    rewrite_cast_builtin_calls, try_eval_numeric, validate_runtime_numeric_support,
+};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use rholang_parser::RholangParser;
-use validated::Validated;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
@@ -9,6 +11,7 @@ use std::time::Duration;
 use tokio::sync::oneshot;
 use tokio::task;
 use tokio::time::timeout;
+use validated::Validated;
 
 /// Represents an error that occurred during interpretation
 #[derive(Debug, Clone)]
@@ -294,14 +297,101 @@ impl InterpreterProvider for RholangParserInterpreterProvider {
                 let validated = parser.parse(&code_for_task);
                 match validated {
                     Validated::Good(procs) => {
-                        // Ensure output contains the word "source" to satisfy tests
+                        for proc in &procs {
+                            if let Err(err) = validate_runtime_numeric_support(proc) {
+                                return InterpretationResult::Error(
+                                    InterpreterError::parsing_error(
+                                        err.message,
+                                        err.position.map(|pos| pos.to_string()),
+                                        Some(code_for_task.clone()),
+                                    ),
+                                );
+                            }
+                        }
+
+                        let top_level_procs = procs.len();
+                        if procs.len() == 1 {
+                            match try_eval_numeric(&procs[0]) {
+                                Ok(Some(value)) => {
+                                    return InterpretationResult::Success(format!(
+                                        "Evaluated: {value}"
+                                    ))
+                                }
+                                Ok(None) => {}
+                                Err(err) => {
+                                    return InterpretationResult::Error(
+                                        InterpreterError::parsing_error(
+                                            err.message,
+                                            err.position.map(|pos| pos.to_string()),
+                                            Some(code_for_task.clone()),
+                                        ),
+                                    );
+                                }
+                            }
+                        }
+
+                        if let Some(rewritten) = rewrite_cast_builtin_calls(&code_for_task) {
+                            let rewritten_eval = {
+                                let reparsed = parser.parse(&rewritten);
+                                if let Validated::Good(rewritten_procs) = reparsed {
+                                    if rewritten_procs.len() == 1 {
+                                        match try_eval_numeric(&rewritten_procs[0]) {
+                                            Ok(Some(value)) => Some(InterpretationResult::Success(
+                                                format!("Evaluated: {value}"),
+                                            )),
+                                            Ok(None) => None,
+                                            Err(err) => Some(InterpretationResult::Error(
+                                                InterpreterError::parsing_error(
+                                                    err.message,
+                                                    err.position.map(|pos| pos.to_string()),
+                                                    Some(code_for_task.clone()),
+                                                ),
+                                            )),
+                                        }
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    None
+                                }
+                            };
+                            if let Some(result) = rewritten_eval {
+                                return result;
+                            }
+                        }
+
+                        // Keep parse-success behavior for non-expression code paths.
                         InterpretationResult::Success(format!(
                             "Parsed successfully: source ({} top-level procs)",
-                            procs.len()
+                            top_level_procs
                         ))
                     }
                     Validated::Fail(_failure) => {
-                        // Return a parsing error without exposing internal details
+                        if let Some(rewritten) = rewrite_cast_builtin_calls(&code_for_task) {
+                            let reparsed = parser.parse(&rewritten);
+                            if let Validated::Good(procs) = reparsed {
+                                if procs.len() == 1 {
+                                    match try_eval_numeric(&procs[0]) {
+                                        Ok(Some(value)) => {
+                                            return InterpretationResult::Success(format!(
+                                                "Evaluated: {value}"
+                                            ))
+                                        }
+                                        Ok(None) => {}
+                                        Err(err) => {
+                                            return InterpretationResult::Error(
+                                                InterpreterError::parsing_error(
+                                                    err.message,
+                                                    err.position.map(|pos| pos.to_string()),
+                                                    Some(code_for_task.clone()),
+                                                ),
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         InterpretationResult::Error(InterpreterError::parsing_error(
                             "Parsing failed",
                             None,
