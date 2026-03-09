@@ -194,6 +194,12 @@ impl<'a, 'ast> TypeValidator<'a, 'ast> {
             | Proc::LongLiteral(_)
             | Proc::StringLiteral(_)
             | Proc::UriLiteral(_)
+            | Proc::SignedIntLiteral { .. }
+            | Proc::UnsignedIntLiteral { .. }
+            | Proc::BigIntLiteral(_)
+            | Proc::BigRatLiteral(_)
+            | Proc::FloatLiteral { .. }
+            | Proc::FixedPointLiteral { .. }
             | Proc::SimpleType(_) => Ok(MessageType::Ground),
 
             // Collections

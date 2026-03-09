@@ -1,6 +1,3 @@
-use crate::runtime_eval::{
-    rewrite_cast_builtin_calls, try_eval_numeric, validate_runtime_numeric_support,
-};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use rholang_parser::RholangParser;
@@ -18,7 +15,6 @@ use librho::sem::{
 };
 use rholang_compiler::Compiler;
 use rholang_vm::api::Value as VmValue;
-use validated::Validated;
 
 /// Remove source position/span information from a pretty-printed AST/debug output
 fn strip_sourcepos(input: &str) -> String {

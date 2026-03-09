@@ -26,8 +26,7 @@ where
         })
         .add_diagnostic(UnusedVarsPass)
         .add_diagnostic(DisjunctionConsistencyCheck)
-        .add_diagnostic(NumericTypeConsistencyCheck);
-    pipeline
+        .add_diagnostic(NumericTypeConsistencyCheck)
 }
 
 #[test_rholang_code(
