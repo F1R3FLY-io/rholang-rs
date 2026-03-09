@@ -1,0 +1,165 @@
+---
+source: rholang-parser/tests/golden.rs
+expression: result
+---
+Good(
+    [
+        AnnProc {
+            proc: LongLiteral(
+                42,
+            ),
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 1,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 1,
+                    col: 3,
+                },
+            },
+        },
+        AnnProc {
+            proc: SignedIntLiteral {
+                value: "-52",
+                bits: 64,
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 2,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 2,
+                    col: 7,
+                },
+            },
+        },
+        AnnProc {
+            proc: UnsignedIntLiteral {
+                value: "65535",
+                bits: 16,
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 3,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 3,
+                    col: 9,
+                },
+            },
+        },
+        AnnProc {
+            proc: BigIntLiteral(
+                "10",
+            ),
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 4,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 4,
+                    col: 4,
+                },
+            },
+        },
+        AnnProc {
+            proc: BigRatLiteral(
+                "3",
+            ),
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 5,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 5,
+                    col: 3,
+                },
+            },
+        },
+        AnnProc {
+            proc: FloatLiteral {
+                value: "-1.234e5",
+                bits: 32,
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 6,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 6,
+                    col: 12,
+                },
+            },
+        },
+        AnnProc {
+            proc: FloatLiteral {
+                value: "123400",
+                bits: 64,
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 7,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 7,
+                    col: 10,
+                },
+            },
+        },
+        AnnProc {
+            proc: FixedPointLiteral {
+                value: "10",
+                scale: 1,
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 8,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 8,
+                    col: 5,
+                },
+            },
+        },
+        AnnProc {
+            proc: FixedPointLiteral {
+                value: "3.3",
+                scale: 1,
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 9,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 9,
+                    col: 6,
+                },
+            },
+        },
+        AnnProc {
+            proc: FixedPointLiteral {
+                value: ".25",
+                scale: 2,
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 10,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 10,
+                    col: 6,
+                },
+            },
+        },
+    ],
+)

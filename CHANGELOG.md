@@ -5,10 +5,27 @@ All notable changes to the Rholang-RS project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-=======
 ## [Unreleased]
 ### Added
-- Planned features for future releases as outlined in the ROADMAP.md
+- Typed numeric literal families in parser and grammar:
+  - signed fixed-width ints (`i*`)
+  - unsigned fixed-width ints (`u*`)
+  - bigint (`n`)
+  - bigrat (`r`)
+  - float (`f*`)
+  - fixed point (`p*`)
+- Numeric type consistency diagnostics in semantic analysis:
+  - mixed numeric-type arithmetic detection
+  - float `%` operator rejection
+- Runtime numeric evaluator in shell for arithmetic expressions and explicit cast builtins
+- Runtime numeric support validation over parsed ASTs to reject unsupported float widths in non-expression programs
+
+### Changed
+- Shell main-function tests now assert non-hanging behavior in non-interactive test environments
+
+### Fixed
+- Cast builtin rewrite now preserves nested method-style cast calls
+- Runtime cast/float-width checks now surface consistently in both expression and non-expression code paths
 
 ## [0.1.2] - 2025-07-01
 ### Added

@@ -15,6 +15,24 @@ pub enum Proc<'ast> {
     Unit,
     BoolLiteral(bool),
     LongLiteral(i64),
+    SignedIntLiteral {
+        value: &'ast str,
+        bits: u32,
+    },
+    UnsignedIntLiteral {
+        value: &'ast str,
+        bits: u32,
+    },
+    BigIntLiteral(&'ast str),
+    BigRatLiteral(&'ast str),
+    FloatLiteral {
+        value: &'ast str,
+        bits: u16,
+    },
+    FixedPointLiteral {
+        value: &'ast str,
+        scale: u32,
+    },
     StringLiteral(&'ast str),
     UriLiteral(Uri<'ast>),
 
@@ -122,6 +140,12 @@ impl<'a> Proc<'a> {
             | Proc::Unit
             | Proc::BoolLiteral(_)
             | Proc::LongLiteral(_)
+            | Proc::SignedIntLiteral { .. }
+            | Proc::UnsignedIntLiteral { .. }
+            | Proc::BigIntLiteral(_)
+            | Proc::BigRatLiteral(_)
+            | Proc::FloatLiteral { .. }
+            | Proc::FixedPointLiteral { .. }
             | Proc::StringLiteral(_)
             | Proc::UriLiteral(_)
             | Proc::SimpleType(_)
