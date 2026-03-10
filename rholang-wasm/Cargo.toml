@@ -1,0 +1,45 @@
+[package]
+name = "rholang-wasm"
+version = "0.1.0"
+authors = ["Rholang Team"]
+edition = "2021"
+license = "Apache-2.0"
+description = "WASM interface for Rholang interpreter"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+# Ensure WebAssembly randomness backend available for transitive deps
+getrandom = { version = "0.3", features = ["wasm_js"] }
+
+# Core dependencies to compile and execute Rholang in WASM.
+# These are heavy and currently not wasm32-friendly; make them optional and
+# enable them behind the `vm-eval` feature.
+rholang-vm = { path = "../rholang-vm", optional = true }
+rholang-parser = { path = "../rholang-parser", optional = true }
+rholang-compiler = { path = "../rholang-compiler", optional = true }
+rholang-lib = { path = "../rholang-lib", optional = true }
+# Shared interpreter facade (no tokio on wasm)
+rholang-interpreter = { path = "../rholang-interpreter", default-features = false, optional = true }
+validated = { workspace = true }
+anyhow = { workspace = true }
+futures = "0.3"
+
+[features]
+default = ["vm-eval"]
+# Enable full VM-based parse/compile/execute in WASM. Without this feature,
+# the crate exposes a lightweight stub API that echoes inputs.
+vm-eval = [
+    "rholang-vm",
+    "rholang-compiler",
+    "rholang-lib",
+    "rholang-interpreter",
+]
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+pretty_assertions = { workspace = true }

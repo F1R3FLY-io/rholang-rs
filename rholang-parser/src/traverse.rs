@@ -639,10 +639,10 @@ mod tests {
         E1: IntoIterator<Item = DfsEvent<'test>>,
         E2: IntoIterator<Item = DfsEventExt<'test>>,
     {
-        let mut evs = e1.into_iter();
+        let evs = e1.into_iter();
         let mut exts = e2.into_iter();
 
-        while let Some(ev) = evs.next() {
+        for ev in evs {
             let actual: DfsEventExt = ev.into();
             let expected = exts.next().expect("expected same number of events");
             assert_eq!(actual, expected);
@@ -653,7 +653,7 @@ mod tests {
     #[test]
     fn single_leaf() {
         let root = Proc::Nil.ann(SourcePos::default().span_of(3));
-        let nodes: Vec<_> = (&root).iter_preorder_dfs().collect();
+        let nodes: Vec<_> = root.iter_preorder_dfs().collect();
 
         assert_eq!(nodes.len(), 1);
         assert_matches!(nodes[0].proc, Proc::Nil);
@@ -669,7 +669,7 @@ mod tests {
             end: right.span.end,
         });
 
-        let nodes: Vec<_> = (&root).iter_preorder_dfs().collect();
+        let nodes: Vec<_> = root.iter_preorder_dfs().collect();
 
         assert_eq!(nodes.len(), 3);
         // preorder: root → left → right
@@ -678,7 +678,7 @@ mod tests {
         assert_matches!(nodes[2].proc, Proc::BoolLiteral(false));
 
         // events
-        let events: Vec<_> = (&root).iter_dfs_event().collect();
+        let events: Vec<_> = root.iter_dfs_event().collect();
         assert_matches!(
             events.as_slice(),
             [
@@ -709,7 +709,7 @@ mod tests {
             ]
         );
 
-        assert_same_events(events, (&root).iter_dfs_event_with_names());
+        assert_same_events(events, root.iter_dfs_event_with_names());
     }
 
     #[test]
@@ -732,7 +732,7 @@ mod tests {
             end: body.span.end,
         });
 
-        let nodes: Vec<_> = (&root).iter_preorder_dfs().collect();
+        let nodes: Vec<_> = root.iter_preorder_dfs().collect();
 
         assert_eq!(nodes.len(), 3);
         // preorder: root → body → binding.rhs
@@ -741,7 +741,7 @@ mod tests {
         assert_matches!(nodes[2].proc, Proc::LongLiteral(42));
 
         // events
-        let events: Vec<_> = (&root).iter_dfs_event().collect();
+        let events: Vec<_> = root.iter_dfs_event().collect();
         assert_matches!(
             events.as_slice(),
             [
@@ -773,7 +773,7 @@ mod tests {
         );
 
         // events and names
-        let events_and_names: Vec<_> = (&root).iter_dfs_event_with_names().collect();
+        let events_and_names: Vec<_> = root.iter_dfs_event_with_names().collect();
         assert_matches!(
             events_and_names.as_slice(),
             [
@@ -820,7 +820,7 @@ mod tests {
             end: if_false.span.end,
         });
 
-        let nodes: Vec<_> = (&root).iter_preorder_dfs().collect();
+        let nodes: Vec<_> = root.iter_preorder_dfs().collect();
 
         assert_eq!(nodes.len(), 4);
         // preorder: root → cond → if_true → if_false
@@ -829,7 +829,7 @@ mod tests {
         assert_matches!(nodes[2].proc, Proc::StringLiteral("yes"));
         assert_matches!(nodes[3].proc, Proc::StringLiteral("no"));
 
-        let events: Vec<_> = (&root).iter_dfs_event().collect();
+        let events: Vec<_> = root.iter_dfs_event().collect();
         assert_matches!(
             events.as_slice(),
             [
@@ -868,7 +868,7 @@ mod tests {
             ]
         );
 
-        assert_same_events(events, (&root).iter_dfs_event_with_names());
+        assert_same_events(events, root.iter_dfs_event_with_names());
     }
 
     #[test]
@@ -884,7 +884,7 @@ mod tests {
         });
         let root = map.ann(SourcePos::default().span_of(20));
 
-        let nodes: Vec<_> = (&root).iter_preorder_dfs().collect();
+        let nodes: Vec<_> = root.iter_preorder_dfs().collect();
 
         assert_eq!(nodes.len(), 5);
         // preorder: root → k1 → v1 → k2 → v2
@@ -894,7 +894,7 @@ mod tests {
         assert_matches!(nodes[3].proc, Proc::StringLiteral("k2"));
         assert_matches!(nodes[4].proc, Proc::LongLiteral(2));
 
-        let events: Vec<_> = (&root).iter_dfs_event().collect();
+        let events: Vec<_> = root.iter_dfs_event().collect();
         assert_matches!(
             events.as_slice(),
             [
@@ -941,7 +941,7 @@ mod tests {
             ]
         );
 
-        assert_same_events(events, (&root).iter_dfs_event_with_names());
+        assert_same_events(events, root.iter_dfs_event_with_names());
     }
 
     #[test]
@@ -969,7 +969,7 @@ mod tests {
         };
         let root = par_proc.ann(SourcePos::default().span_of(27));
 
-        let nodes: Vec<_> = (&root).iter_preorder_dfs().collect();
+        let nodes: Vec<_> = root.iter_preorder_dfs().collect();
 
         assert_eq!(nodes.len(), 5);
         // preorder: par → left → right → let body → leaf2
@@ -979,7 +979,7 @@ mod tests {
         assert_matches!(nodes[3].proc, Proc::Unit);
         assert_matches!(nodes[4].proc, Proc::LongLiteral(7));
 
-        let events: Vec<_> = (&root).iter_dfs_event().collect();
+        let events: Vec<_> = root.iter_dfs_event().collect();
         assert_matches!(
             events.as_slice(),
             [
@@ -1026,7 +1026,7 @@ mod tests {
             ]
         );
 
-        let events_and_names: Vec<_> = (&root).iter_dfs_event_with_names().collect();
+        let events_and_names: Vec<_> = root.iter_dfs_event_with_names().collect();
         assert_matches!(
             events_and_names.as_slice(),
             [
@@ -1127,7 +1127,7 @@ mod tests {
 
         let root = outer_proc.ann(SourcePos::default().span_of(59));
 
-        let nodes: Vec<_> = (&root).iter_preorder_dfs().collect();
+        let nodes: Vec<_> = root.iter_preorder_dfs().collect();
 
         assert_eq!(nodes.len(), 6);
         // ensure the outermost node is root
@@ -1142,7 +1142,7 @@ mod tests {
         assert_matches!(nodes[4].proc, Proc::LongLiteral(42));
         assert_matches!(nodes[5].proc, Proc::LongLiteral(42));
 
-        let events: Vec<_> = (&root).iter_dfs_event().collect();
+        let events: Vec<_> = root.iter_dfs_event().collect();
         assert_matches!(
             events.as_slice(),
             [
@@ -1197,7 +1197,7 @@ mod tests {
             ]
         );
 
-        let events_and_names: Vec<_> = (&root).iter_dfs_event_with_names().collect();
+        let events_and_names: Vec<_> = root.iter_dfs_event_with_names().collect();
         assert_matches!(
             events_and_names.as_slice(),
             [
@@ -1277,7 +1277,7 @@ mod tests {
             .unwrap();
 
         let root = node.ann(SourceSpan::default());
-        let nodes: Vec<_> = (&root).iter_preorder_dfs().collect();
+        let nodes: Vec<_> = root.iter_preorder_dfs().collect();
 
         assert_eq!(nodes.len(), 1001);
         // first node is the outermost UnaryExp
@@ -1372,7 +1372,7 @@ mod tests {
             end: SourcePos { line: 4, col: 1 },
         });
 
-        let nodes: Vec<_> = (&root).iter_preorder_dfs().collect();
+        let nodes: Vec<_> = root.iter_preorder_dfs().collect();
 
         assert_eq!(nodes.len(), 12);
         // preorder: for →
@@ -1397,7 +1397,7 @@ mod tests {
         );
         assert_matches!(nodes[11].proc, Proc::Eval { .. });
 
-        let events: Vec<_> = (&root).iter_dfs_event().collect();
+        let events: Vec<_> = root.iter_dfs_event().collect();
         assert_matches!(
             events.as_slice(),
             [
@@ -1454,7 +1454,7 @@ mod tests {
             ]
         );
 
-        let events_and_names: Vec<_> = (&root).iter_dfs_event_with_names().collect();
+        let events_and_names: Vec<_> = root.iter_dfs_event_with_names().collect();
         assert_matches!(
             events_and_names.as_slice(),
             [
@@ -1558,7 +1558,7 @@ mod tests {
             end: SourcePos { line: 1, col: 31 },
         });
 
-        let nodes: Vec<_> = (&root).iter_preorder_dfs().collect();
+        let nodes: Vec<_> = root.iter_preorder_dfs().collect();
         assert_eq!(nodes.len(), 6);
         assert_matches!(nodes[0].proc, Proc::Match { .. });
         // expression
@@ -1569,7 +1569,7 @@ mod tests {
         assert_matches!(nodes[4].proc, Proc::ProcVar(Var::Id(Id { name: "p2", .. })));
         assert_matches!(nodes[5].proc, Proc::ProcVar(Var::Id(Id { name: "y2", .. })));
 
-        let events: Vec<_> = (&root).iter_dfs_event().collect();
+        let events: Vec<_> = root.iter_dfs_event().collect();
         assert_matches!(
             events.as_slice(),
             [
@@ -1624,6 +1624,6 @@ mod tests {
             ]
         );
 
-        assert_same_events(events, (&root).iter_dfs_event_with_names());
+        assert_same_events(events, root.iter_dfs_event_with_names());
     }
 }

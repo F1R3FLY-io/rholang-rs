@@ -16,7 +16,7 @@ fn pipeline<I>(roots: I) -> Pipeline
 where
     I: Iterator<Item = PID>,
 {
-    let pipeline = roots
+    roots
         .fold(Pipeline::new(), |pipeline, root| {
             pipeline
                 .add_fact(ResolverPass::new(root))
@@ -24,8 +24,7 @@ where
         })
         .add_diagnostic(UnusedVarsPass)
         .add_diagnostic(DisjunctionConsistencyCheck)
-        .add_diagnostic(NumericTypeConsistencyCheck);
-    pipeline
+        .add_diagnostic(NumericTypeConsistencyCheck)
 }
 
 #[test_rholang_code(

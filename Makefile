@@ -56,6 +56,26 @@ test-all:
 test-shell:
 	cargo test -p shell
 
+# Run tests for the VM crate
+.PHONY: test-vm
+test-vm:
+	cargo test -p rholang-vm
+
+# Run all VM tests including ignored ones
+.PHONY: test-vm-all
+test-vm-all:
+	cargo test -p rholang-vm -- --include-ignored
+
+# Run a specific VM integration test binary (e.g., BIN=bytecode_examples_tests)
+.PHONY: test-vm-bin
+test-vm-bin:
+	@if [ -z "$(BIN)" ]; then \
+		echo "Usage: make test-vm-bin BIN=<integration_test_name> [ARGS='-- --nocapture']"; \
+		echo "Example: make test-vm-bin BIN=bytecode_examples_tests ARGS='-- --nocapture'"; \
+		exit 1; \
+	fi; \
+	cargo test -p rholang-vm --test $(BIN) $(ARGS)
+
 # Check code quality
 .PHONY: check
 check:
@@ -92,8 +112,7 @@ coverage-html:
 .PHONY: clean
 clean:
 	cargo clean
-	cd rholang-jetbrains-plugin && ./gradlew clean
-	rm -rf rholang-jetbrains-plugin/.gradle
+
 
 # Build the JetBrains plugin
 .PHONY: build-plugin
@@ -165,6 +184,9 @@ help:
 	@echo "  test            Run all tests"
 	@echo "  test-all        Run all tests including ignored tests"
 	@echo "  test-shell      Run tests for the shell crate"
+	@echo "  test-vm         Run tests for the rholang-vm crate"
+	@echo "  test-vm-all     Run VM tests including ignored tests"
+	@echo "  test-vm-bin     Run a specific VM integration test binary (BIN=...)"
 	@echo "  check           Check code quality"
 	@echo "  fix             Fix code quality issues"
 	@echo "  coverage        Run source-only test coverage (excluding tests)"
@@ -173,6 +195,8 @@ help:
 	@echo "  build-plugin    Build the JetBrains plugin (includes building rholang-jni-bridge)"
 	@echo "  build-rholang-parser Build the rholang-parser library (required for the JetBrains plugin)"
 	@echo "  build-rholang-jni-bridge Build the rholang-jni-bridge library with JNI support (required for the JetBrains plugin)"
+	@echo "  wasm-build      Build the rholang-wasm package (RELEASE=1 TARGET=web OUT_DIR=pkg FEATURES=...)"
+	@echo "  wasm-serve      Build and serve rholang-wasm demo (PORT=8000 RELEASE=1 OPEN=1)"
 	@echo "  setup           Install development dependencies"
 	@echo "  help            Show this help message"
 	@echo ""
@@ -184,3 +208,13 @@ help:
 	@echo "  container-check  Check code quality in a container"
 	@echo "  container-fix    Fix code quality issues in a container"
 	@echo "  container-shell  Start an interactive shell in the container"
+
+
+# WASM build and serve targets
+.PHONY: wasm-build
+wasm-build:
+	@bash scripts/wasm_build.sh $(if $(DEBUG),--debug,)
+
+.PHONY: wasm-run
+wasm-run:
+	@bash scripts/wasm_run.sh $(if $(RELEASE),--release,)

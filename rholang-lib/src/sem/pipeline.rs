@@ -146,7 +146,8 @@ impl DiagnosticGroup {
         self.passes.push(Box::new(pass));
     }
 
-    /// Run all diagnostics concurrently
+    /// Run all diagnostics concurrently (native) or sequentially (wasm)
+    #[cfg(not(target_arch = "wasm32"))]
     async fn run_async<'d>(&self, db: &SemanticDb<'d>) -> Vec<super::Diagnostic> {
         if self.passes.len() == NonZeroUsize::MIN {
             return self.passes.first().run(db);
@@ -169,6 +170,16 @@ impl DiagnosticGroup {
 
         all
     }
+
+    #[cfg(target_arch = "wasm32")]
+    async fn run_async<'d>(&self, db: &SemanticDb<'d>) -> Vec<super::Diagnostic> {
+        // No multi-threading on wasm; run sequentially
+        let mut all = Vec::new();
+        for pass in &self.passes {
+            all.extend(pass.run(db));
+        }
+        all
+    }
 }
 
 impl Pass for DiagnosticGroup {
@@ -189,9 +200,22 @@ impl Pass for DiagnosticGroup {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl DiagnosticPass for DiagnosticGroup {
     fn run(&self, db: &SemanticDb) -> Vec<super::Diagnostic> {
         tokio::runtime::Handle::current().block_on(self.run_async(db))
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl DiagnosticPass for DiagnosticGroup {
+    fn run(&self, db: &SemanticDb) -> Vec<super::Diagnostic> {
+        // Synchronous sequential execution on wasm
+        let mut all = Vec::new();
+        for pass in &self.passes {
+            all.extend(pass.run(db));
+        }
+        all
     }
 }
 

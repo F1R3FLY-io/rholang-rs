@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Rholang WASM Playground</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, 'Helvetica Neue', Arial, 'Apple Color Emoji', 'Segoe UI Emoji'; margin: 0; padding: 0; background: #0f172a; color: #e2e8f0; }
+    header { padding: 16px 24px; background: #111827; border-bottom: 1px solid #1f2937; }
+    header h1 { margin: 0; font-size: 20px; }
+    main { max-width: 1000px; margin: 0 auto; padding: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .panel { background: #111827; border: 1px solid #1f2937; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
+    .panel h2 { margin: 0; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; color: #9ca3af; padding: 10px 12px; border-bottom: 1px solid #1f2937; background: #0b1220; }
+    textarea { width: 100%; height: 360px; resize: vertical; border: none; outline: none; background: #0b1220; color: #e5e7eb; padding: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size: 14px; line-height: 1.5; }
+    pre { margin: 0; padding: 12px; background: #0b1220; color: #a7f3d0; height: 360px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+    .toolbar { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid #1f2937; background: #0b1220; }
+    button { background: #2563eb; color: white; border: none; border-radius: 6px; padding: 8px 12px; font-weight: 600; cursor: pointer; }
+    button:hover { background: #1d4ed8; }
+    .status { margin-left: auto; color: #93c5fd; font-size: 12px; }
+    footer { text-align: center; color: #6b7280; padding: 16px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Rholang WASM Playground</h1>
+  </header>
+  <main>
+    <section class="panel">
+      <h2>Input (Rholang)</h2>
+      <textarea id="code" spellcheck="false" placeholder="// Type Rholang code here
+new x in { x!(42) }"></textarea>
+      <div class="toolbar">
+        <button id="run">Run ▶</button>
+        <div class="status" id="status">Idle</div>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Output</h2>
+      <pre id="output">// Output will appear here</pre>
+    </section>
+  </main>
+  <footer>
+    Built with wasm-bindgen. This demo uses a WASM parser-based interpreter that validates Rholang and prints the AST.
+  </footer>
+  <script type="module">
+    import init, { WasmInterpreter } from './pkg/rholang_wasm.js';
+
+    const status = document.getElementById('status');
+    const output = document.getElementById('output');
+    const code = document.getElementById('code');
+    const runBtn = document.getElementById('run');
+
+    async function main() {
+      status.textContent = 'Loading WASM…';
+      await init();
+      const interpreter = new WasmInterpreter();
+      status.textContent = 'Ready';
+
+      runBtn.addEventListener('click', async () => {
+        status.textContent = 'Running…';
+        output.textContent = '';
+        try {
+          const res = await interpreter.interpret(code.value);
+          output.textContent = res;
+          status.textContent = 'Done';
+        } catch (e) {
+          output.textContent = String(e);
+          status.textContent = 'Error';
+        }
+      });
+    }
+
+    main();
+  </script>
+</body>
+</html>

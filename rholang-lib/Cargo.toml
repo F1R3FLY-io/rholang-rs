@@ -15,7 +15,6 @@ harness = false
 [dependencies]
 ahash = { workspace = true }
 as-any = { workspace = true }
-async-scoped = { workspace = true }
 bitvec = { workspace = true }
 by_address = "1.2.1"
 fixedbitset = "0.5.7"
@@ -26,8 +25,15 @@ nonempty-collections = "1.2.1"
 parking_lot = { workspace = true }
 rholang-parser = { path = "../rholang-parser" }
 smallvec = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+async-scoped = { workspace = true }
 stacker = "0.1.22"
 tokio = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# On wasm we avoid native stack growth and Tokio runtime entirely
+async-std = { workspace = true }
 
 [dev-dependencies]
 divan = { workspace = true }
