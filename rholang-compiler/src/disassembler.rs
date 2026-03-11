@@ -269,6 +269,7 @@ impl Disassembler {
             Opcode::PUSH_PROC => format!("Push process at index {}", inst.op16()),
             Opcode::PUSH_NAME => format!("Push name at index {}", inst.op16()),
             Opcode::PUSH_NIL => "Push nil".to_string(),
+            Opcode::PUSH_CONST => format!("Push constant at index {}", inst.op16()),
             Opcode::POP => "Pop top of stack".to_string(),
             Opcode::DUP => "Duplicate top of stack".to_string(),
             Opcode::SWAP => "Swap top two stack values".to_string(),

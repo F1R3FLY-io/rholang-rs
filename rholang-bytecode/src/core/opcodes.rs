@@ -24,6 +24,10 @@ pub enum Opcode {
     PUSH_PROC = 0x13,
     PUSH_NAME = 0x14,
     PUSH_NIL = 0x15,
+    /// Push typed constant from constant pool, 1 operand (pool index).
+    /// Used for numeric values that don't fit in instruction immediates:
+    /// Float, BigInt, BigRat, FixedPoint, and integers outside i16 range.
+    PUSH_CONST = 0x19,
     POP = 0x16,
     DUP = 0x17,
     SWAP = 0x18,
@@ -123,6 +127,7 @@ impl Opcode {
         table[0x13] = Some(Opcode::PUSH_PROC);
         table[0x14] = Some(Opcode::PUSH_NAME);
         table[0x15] = Some(Opcode::PUSH_NIL);
+        table[0x19] = Some(Opcode::PUSH_CONST);
         table[0x16] = Some(Opcode::POP);
         table[0x17] = Some(Opcode::DUP);
         table[0x18] = Some(Opcode::SWAP);
@@ -255,6 +260,7 @@ impl Opcode {
         counts[0x12] = 1; // PUSH_BOOL
         counts[0x13] = 1; // PUSH_PROC
         counts[0x14] = 1; // PUSH_NAME
+        counts[0x19] = 1; // PUSH_CONST
         counts[0x20] = 1; // LOAD_VAR
         counts[0x21] = 1; // LOAD_LOCAL
         counts[0x22] = 1; // STORE_LOCAL

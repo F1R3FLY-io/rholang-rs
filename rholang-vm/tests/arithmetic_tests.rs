@@ -49,5 +49,5 @@ fn test_div_mod_by_zero_errors() {
     ];
     let mut process4 = Process::new(prog2, "arithmetic");
     let err2 = process4.execute().expect_err("should error mod by zero");
-    assert!(err2.to_string().to_lowercase().contains("modulo by zero"));
+    assert!(err2.to_string().to_lowercase().contains("division by zero"));
 }

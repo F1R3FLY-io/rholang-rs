@@ -200,5 +200,5 @@ fn test_relational_ops_type_errors_and_underflow() {
         .execute()
         .expect_err("should error for underflow on CMP_GT");
     let msg2 = err2.to_string().to_lowercase();
-    assert!(msg2.contains("cmp_gt") && msg2.contains("int"));
+    assert!(msg2.contains("cmp_gt") && msg2.contains("stack underflow"));
 }

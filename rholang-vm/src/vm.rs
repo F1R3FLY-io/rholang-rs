@@ -126,6 +126,7 @@ impl VM {
     ///
     /// * `locals` - Process local variable slots
     /// * `names` - Process string pool for PUSH_STR
+    /// * `constants` - Typed constant pool for PUSH_CONST (numeric values)
     /// * `inst` - The instruction to execute
     ///
     /// # Returns
@@ -135,9 +136,10 @@ impl VM {
         &mut self,
         locals: &mut Vec<Value>,
         names: &[Value],
+        constants: &[Value],
         inst: CoreInst,
     ) -> Result<StepResult, ExecError> {
-        execute::step(self, locals, names, inst)
+        execute::step(self, locals, names, constants, inst)
     }
 }
 

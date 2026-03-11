@@ -189,30 +189,11 @@ pub fn compile_and_run(source: &str) -> Result<Value> {
 /// Format a Value for display
 pub fn format_value(v: &Value) -> String {
     match v {
-        Value::Nil => "Nil".to_string(),
-        Value::Int(i) => i.to_string(),
-        Value::Bool(b) => b.to_string(),
-        Value::Str(s) => format!("\"{}\"", s),
-        Value::List(items) => {
-            let inner: Vec<String> = items.iter().map(format_value).collect();
-            format!("[{}]", inner.join(", "))
-        }
-        Value::Tuple(items) => {
-            let inner: Vec<String> = items.iter().map(format_value).collect();
-            format!("({})", inner.join(", "))
-        }
-        Value::Name(n) => format!("@\"{}\"", n),
-        Value::Map(m) => {
-            let inner: Vec<String> = m
-                .iter()
-                .map(|(k, v)| format!("{}: {}", format_value(k), format_value(v)))
-                .collect();
-            format!("{{{}}}", inner.join(", "))
-        }
         Value::Par(ps) => {
             let inner: Vec<String> = ps.iter().map(|p| format!("<{}>", p.source_ref())).collect();
             inner.join(" | ")
         }
+        other => other.to_string(),
     }
 }
 
