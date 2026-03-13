@@ -230,7 +230,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 pub use entry::Entry;
 pub use error::ExecError;
 pub use rspace::RSpace;
-pub use value::{ProcessHolder, ProcessState, Value, BIGINT_MAX_BYTES};
+pub use value::{ProcessHolder, ProcessState, Value};
 
 // ============================================================================
 // Public API - Implementations

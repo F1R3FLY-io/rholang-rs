@@ -68,7 +68,7 @@ fn test_float_arithmetic() {
     assert_eq!(binop(Value::Float(5.0), Value::Float(3.0), Opcode::SUB).unwrap(), Value::Float(2.0));
     assert_eq!(binop(Value::Float(2.5), Value::Float(4.0), Opcode::MUL).unwrap(), Value::Float(10.0));
     assert_eq!(binop(Value::Float(10.0), Value::Float(4.0), Opcode::DIV).unwrap(), Value::Float(2.5));
-    assert_eq!(unaryop(Value::Float(3.14), Opcode::NEG).unwrap(), Value::Float(-3.14));
+    assert_eq!(unaryop(Value::Float(3.15), Opcode::NEG).unwrap(), Value::Float(-3.15));
 }
 
 #[test]
@@ -114,10 +114,7 @@ fn test_bigint_arithmetic() {
 fn test_bigint_errors() {
     let bi = |n: i64| Value::BigInt(BigInt::from(n));
     assert!(binop_err(bi(1), bi(0), Opcode::DIV).contains("division by zero"));
-
-    // Overflow: 2^1023 * 2^1023 exceeds 128-byte cap
-    let large: BigInt = BigInt::from(1) << 1023_usize;
-    assert!(binop_err(Value::BigInt(large.clone()), Value::BigInt(large), Opcode::MUL).contains("byte limit"));
+    assert!(binop_err(bi(1), bi(0), Opcode::MOD).contains("division by zero"));
 }
 
 #[test]
@@ -148,6 +145,16 @@ fn test_bigrat_errors() {
     assert!(binop_err(bigrat(1, 2), bigrat(0, 1), Opcode::DIV).contains("division by zero"));
 }
 
+// ==========================================================================
+// Signed integer: division by zero
+// ==========================================================================
+
+#[test]
+fn test_int_division_by_zero() {
+    assert!(binop_err(Value::Int(10), Value::Int(0), Opcode::DIV).contains("division by zero"));
+    assert!(binop_err(Value::Int(10), Value::Int(0), Opcode::MOD).contains("division by zero"));
+}
+
 #[test]
 fn test_bigrat_comparison() {
     assert_eq!(binop(bigrat(1, 3), bigrat(1, 2), Opcode::CMP_LT).unwrap(), Value::Bool(true));
@@ -166,9 +173,13 @@ fn test_fixedpoint_add_sub() {
 }
 
 #[test]
-fn test_fixedpoint_mul_doubles_scale() {
-    // Spec: scale doubles on multiplication. 1.5p1 * 2.0p1 = 3.00p2
-    assert_eq!(binop(fixed(15, 1), fixed(20, 1), Opcode::MUL).unwrap(), fixed(300, 2));
+fn test_fixedpoint_mul_preserves_scale() {
+    // Scale-preserving: 1.5p1 * 2.0p1 = 3.0p1 (unscaled: (15*20)/10 = 30)
+    assert_eq!(binop(fixed(15, 1), fixed(20, 1), Opcode::MUL).unwrap(), fixed(30, 1));
+    // Precision loss: 0.1p1 * 0.1p1 = 0.0p1 (unscaled: (1*1)/10 = 0, floor)
+    assert_eq!(binop(fixed(1, 1), fixed(1, 1), Opcode::MUL).unwrap(), fixed(0, 1));
+    // Scale mismatch is an error
+    assert!(binop_err(fixed(15, 1), fixed(150, 2), Opcode::MUL).contains("type mismatch"));
 }
 
 #[test]

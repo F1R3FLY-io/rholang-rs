@@ -47,7 +47,7 @@ fn test_bigrat_literals_and_arithmetic() {
 
 #[test]
 fn test_float_literals_and_arithmetic() {
-    assert_eq!(compile_and_run("3.14f64").unwrap(), Value::Float(3.14));
+    assert_eq!(compile_and_run("3.15f64").unwrap(), Value::Float(3.15));
     assert_eq!(compile_and_run("2.5f32").unwrap(), Value::Float(2.5_f32 as f64)); // f32 stored as f64
     assert_eq!(compile_and_run("-1.5f64").unwrap(), Value::Float(-1.5));
     assert_eq!(compile_and_run("1.5e2f64").unwrap(), Value::Float(150.0)); // scientific notation
@@ -66,8 +66,8 @@ fn test_fixedpoint_literals_and_arithmetic() {
 
     assert_eq!(compile_and_run("1.50p2 + 2.25p2").unwrap(), fixed(375, 2));
     assert_eq!(compile_and_run("5.00p2 - 3.25p2").unwrap(), fixed(175, 2));
-    // Scale doubles on mul: 1.5p1 * 2.0p1 = 3.00p2
-    assert_eq!(compile_and_run("1.5p1 * 2.0p1").unwrap(), fixed(300, 2));
+    // Scale-preserving mul: 1.5p1 * 2.0p1 = 3.0p1 (unscaled: (15*20)/10 = 30)
+    assert_eq!(compile_and_run("1.5p1 * 2.0p1").unwrap(), fixed(30, 1));
     // Spec: 10p1 / 3p1 == 3.3p1
     assert_eq!(compile_and_run("10.0p1 / 3.0p1").unwrap(), fixed(33, 1));
 }

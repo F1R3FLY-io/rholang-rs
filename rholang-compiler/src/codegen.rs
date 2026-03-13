@@ -298,8 +298,6 @@ impl<'a> CodegenContext<'a> {
             self.emit_int(n as i64)
         } else {
             let big = BigInt::from(n);
-            Value::check_bigint_size(&big)
-                .map_err(|e| anyhow!("Unsigned integer literal {}{}: {}", value, bits, e))?;
             let idx = self.add_constant(Value::BigInt(big));
             self.emit(Instruction::unary(Opcode::PUSH_CONST, idx));
             Ok(())
@@ -311,8 +309,6 @@ impl<'a> CodegenContext<'a> {
         let n: BigInt = s
             .parse()
             .map_err(|e| anyhow!("Invalid bigint literal '{}n': {}", s, e))?;
-        Value::check_bigint_size(&n)
-            .map_err(|e| anyhow!("BigInt literal {}n: {}", s, e))?;
         let idx = self.add_constant(Value::BigInt(n));
         self.emit(Instruction::unary(Opcode::PUSH_CONST, idx));
         Ok(())
@@ -361,9 +357,6 @@ impl<'a> CodegenContext<'a> {
     /// Compile a fixed-point literal (e.g., `3.3p1`, `0.25p2`, `100p0`).
     fn compile_fixed_point(&mut self, value: &str, scale: u32) -> Result<()> {
         let unscaled = parse_fixed_point_unscaled(value, scale)?;
-        Value::check_bigint_size(&unscaled).map_err(|e| {
-            anyhow!("FixedPoint literal '{}p{}': {}", value, scale, e)
-        })?;
         let idx = self.add_constant(Value::FixedPoint { unscaled, scale });
         self.emit(Instruction::unary(Opcode::PUSH_CONST, idx));
         Ok(())

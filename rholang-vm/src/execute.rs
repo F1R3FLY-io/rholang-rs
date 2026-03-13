@@ -1,13 +1,13 @@
 use num_bigint::BigInt;
 use num_rational::BigRational;
-use num_traits::Zero;
+use num_traits::{Signed, Zero};
 use rholang_bytecode::core::instructions::Instruction as CoreInst;
 use rholang_bytecode::core::opcodes::Opcode;
 use std::cmp::Ordering;
 use std::result::Result;
 
 use crate::VM;
-use rholang_rspace::{ExecError, Value, BIGINT_MAX_BYTES};
+use rholang_rspace::{ExecError, Value};
 
 pub enum StepResult {
     Next,
@@ -91,22 +91,16 @@ pub fn step(
                 (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Int(a.wrapping_add(b))),
                 (Some(Value::Float(a)), Some(Value::Float(b))) => vm.stack.push(Value::Float(a + b)),
                 (Some(Value::BigInt(a)), Some(Value::BigInt(b))) => {
-                    let r = a + b;
-                    check_bigint_size("ADD", &r)?;
-                    vm.stack.push(Value::BigInt(r));
+                    vm.stack.push(Value::BigInt(a + b));
                 }
                 (Some(Value::BigRat(a)), Some(Value::BigRat(b))) => {
-                    let r = a + b;
-                    check_bigrat_size("ADD", &r)?;
-                    vm.stack.push(Value::BigRat(r));
+                    vm.stack.push(Value::BigRat(a + b));
                 }
                 (Some(Value::FixedPoint { unscaled: ua, scale: sa }), Some(Value::FixedPoint { unscaled: ub, scale: sb })) => {
                     if sa != sb {
                         return Err(type_mismatch_error("ADD", &format!("FixedPoint(p{})", sa), &format!("FixedPoint(p{})", sb)));
                     }
-                    let r = ua + ub;
-                    check_bigint_size("ADD", &r)?;
-                    vm.stack.push(Value::FixedPoint { unscaled: r, scale: sa });
+                    vm.stack.push(Value::FixedPoint { unscaled: ua + ub, scale: sa });
                 }
                 (Some(Value::Str(a)), Some(Value::Str(b))) => vm.stack.push(Value::Str(a + &b)),
                 (Some(Value::List(mut a)), Some(Value::List(b))) => {
@@ -123,22 +117,16 @@ pub fn step(
                 (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Int(a.wrapping_sub(b))),
                 (Some(Value::Float(a)), Some(Value::Float(b))) => vm.stack.push(Value::Float(a - b)),
                 (Some(Value::BigInt(a)), Some(Value::BigInt(b))) => {
-                    let r = a - b;
-                    check_bigint_size("SUB", &r)?;
-                    vm.stack.push(Value::BigInt(r));
+                    vm.stack.push(Value::BigInt(a - b));
                 }
                 (Some(Value::BigRat(a)), Some(Value::BigRat(b))) => {
-                    let r = a - b;
-                    check_bigrat_size("SUB", &r)?;
-                    vm.stack.push(Value::BigRat(r));
+                    vm.stack.push(Value::BigRat(a - b));
                 }
                 (Some(Value::FixedPoint { unscaled: ua, scale: sa }), Some(Value::FixedPoint { unscaled: ub, scale: sb })) => {
                     if sa != sb {
                         return Err(type_mismatch_error("SUB", &format!("FixedPoint(p{})", sa), &format!("FixedPoint(p{})", sb)));
                     }
-                    let r = ua - ub;
-                    check_bigint_size("SUB", &r)?;
-                    vm.stack.push(Value::FixedPoint { unscaled: r, scale: sa });
+                    vm.stack.push(Value::FixedPoint { unscaled: ua - ub, scale: sa });
                 }
                 (Some(a), Some(b)) => return Err(type_mismatch_error("SUB", a.type_name(), b.type_name())),
                 _ => return Err(stack_underflow("SUB")),
@@ -150,21 +138,27 @@ pub fn step(
                 (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Int(a.wrapping_mul(b))),
                 (Some(Value::Float(a)), Some(Value::Float(b))) => vm.stack.push(Value::Float(a * b)),
                 (Some(Value::BigInt(a)), Some(Value::BigInt(b))) => {
-                    let r = a * b;
-                    check_bigint_size("MUL", &r)?;
-                    vm.stack.push(Value::BigInt(r));
+                    vm.stack.push(Value::BigInt(a * b));
                 }
                 (Some(Value::BigRat(a)), Some(Value::BigRat(b))) => {
-                    let r = a * b;
-                    check_bigrat_size("MUL", &r)?;
-                    vm.stack.push(Value::BigRat(r));
+                    vm.stack.push(Value::BigRat(a * b));
                 }
                 (Some(Value::FixedPoint { unscaled: ua, scale: sa }), Some(Value::FixedPoint { unscaled: ub, scale: sb })) => {
-                    // Scale doubles: p1 * p1 → p2
-                    let r = ua * ub;
-                    let new_scale = sa + sb;
-                    check_bigint_size("MUL", &r)?;
-                    vm.stack.push(Value::FixedPoint { unscaled: r, scale: new_scale });
+                    if sa != sb {
+                        return Err(type_mismatch_error("MUL", &format!("FixedPoint(p{})", sa), &format!("FixedPoint(p{})", sb)));
+                    }
+                    // Scale-preserving: (ua * ub) / 10^scale, using floor division
+                    let raw = &ua * &ub;
+                    let scale_factor = num_traits::pow::pow(BigInt::from(10), sa as usize);
+                    let one = BigInt::from(1);
+                    let unscaled: BigInt = if raw.is_negative() {
+                        // Floor division for negative: -((-raw - 1) / sf + 1)
+                        let abs_raw = -&raw;
+                        -((&abs_raw - &one) / &scale_factor + &one)
+                    } else {
+                        &raw / &scale_factor
+                    };
+                    vm.stack.push(Value::FixedPoint { unscaled, scale: sa });
                 }
                 (Some(a), Some(b)) => return Err(type_mismatch_error("MUL", a.type_name(), b.type_name())),
                 _ => return Err(stack_underflow("MUL")),
@@ -194,9 +188,7 @@ pub fn step(
                     if b.is_zero() {
                         return Err(div_by_zero("DIV"));
                     }
-                    let r = a / b;
-                    check_bigrat_size("DIV", &r)?;
-                    vm.stack.push(Value::BigRat(r));
+                    vm.stack.push(Value::BigRat(a / b));
                 }
                 (Some(Value::FixedPoint { unscaled: ua, scale: sa }), Some(Value::FixedPoint { unscaled: ub, scale: sb })) => {
                     if sa != sb {
@@ -207,9 +199,7 @@ pub fn step(
                     }
                     // Shifted division: (ua * 10^scale) / ub
                     let shifted = ua * num_traits::pow::pow(BigInt::from(10), sa as usize);
-                    let r = shifted / ub;
-                    check_bigint_size("DIV", &r)?;
-                    vm.stack.push(Value::FixedPoint { unscaled: r, scale: sa });
+                    vm.stack.push(Value::FixedPoint { unscaled: shifted / ub, scale: sa });
                 }
                 (Some(a), Some(b)) => return Err(type_mismatch_error("DIV", a.type_name(), b.type_name())),
                 _ => return Err(stack_underflow("DIV")),
@@ -698,34 +688,6 @@ pub fn step(
 // ---------------------------------------------------------------------------
 // Helper functions for arithmetic/comparison opcodes
 // ---------------------------------------------------------------------------
-
-fn check_bigint_size(opcode: &'static str, n: &BigInt) -> Result<(), ExecError> {
-    if n.to_signed_bytes_be().len() > BIGINT_MAX_BYTES {
-        return Err(ExecError::OpcodeParamError {
-            opcode,
-            message: format!(
-                "BigInt result exceeds {} byte limit",
-                BIGINT_MAX_BYTES
-            ),
-        });
-    }
-    Ok(())
-}
-
-fn check_bigrat_size(opcode: &'static str, r: &BigRational) -> Result<(), ExecError> {
-    let numer_bytes = r.numer().to_signed_bytes_be().len();
-    let denom_bytes = r.denom().to_signed_bytes_be().len();
-    if numer_bytes > BIGINT_MAX_BYTES || denom_bytes > BIGINT_MAX_BYTES {
-        return Err(ExecError::OpcodeParamError {
-            opcode,
-            message: format!(
-                "BigRat component exceeds {} byte limit (numer: {} bytes, denom: {} bytes)",
-                BIGINT_MAX_BYTES, numer_bytes, denom_bytes
-            ),
-        });
-    }
-    Ok(())
-}
 
 fn type_mismatch_error(opcode: &'static str, type_a: &str, type_b: &str) -> ExecError {
     ExecError::OpcodeParamError {

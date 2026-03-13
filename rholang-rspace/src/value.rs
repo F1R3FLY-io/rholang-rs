@@ -69,8 +69,6 @@ impl PartialEq for Box<dyn ProcessHolder> {
     }
 }
 
-/// Maximum byte length for BigInt values (1024 bits = 128 bytes).
-pub const BIGINT_MAX_BYTES: usize = 128;
 
 /// Runtime value in RSpace.
 ///
@@ -261,19 +259,6 @@ impl Value {
             Value::Map(_) => "Map",
             Value::Par(_) => "Par",
             Value::Nil => "Nil",
-        }
-    }
-
-    /// Check if a BigInt value exceeds the maximum allowed size.
-    pub fn check_bigint_size(n: &BigInt) -> Result<(), String> {
-        let byte_len = n.to_signed_bytes_be().len();
-        if byte_len > BIGINT_MAX_BYTES {
-            Err(format!(
-                "BigInt exceeds 1024-bit maximum ({} bytes, max {})",
-                byte_len, BIGINT_MAX_BYTES
-            ))
-        } else {
-            Ok(())
         }
     }
 
@@ -528,25 +513,6 @@ mod tests {
             Value::Int(1).partial_cmp(&Value::BigInt(BigInt::from(1))),
             None
         );
-    }
-
-    #[test]
-    fn test_bigint_size_check() {
-        // Small value: ok
-        assert!(Value::check_bigint_size(&BigInt::from(42)).is_ok());
-
-        // Value that fits in 128 bytes: ok
-        // Max positive value in 128 bytes signed = 2^1023 - 1
-        let max_val = (BigInt::from(1) << 1023) - 1;
-        assert!(Value::check_bigint_size(&max_val).is_ok());
-
-        // 1 << 1023 requires 129 bytes in signed two's complement (leading 0x00 byte)
-        let over_val = BigInt::from(1) << 1023;
-        assert!(Value::check_bigint_size(&over_val).is_err());
-
-        // ETH uint256 max (2^256 - 1): fits easily within 128 bytes
-        let eth_max = (BigInt::from(1) << 256) - 1;
-        assert!(Value::check_bigint_size(&eth_max).is_ok());
     }
 
     #[test]
