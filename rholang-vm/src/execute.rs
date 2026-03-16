@@ -1,5 +1,9 @@
+use num_bigint::BigInt;
+use num_rational::BigRational;
+use num_traits::{Signed, Zero};
 use rholang_bytecode::core::instructions::Instruction as CoreInst;
 use rholang_bytecode::core::opcodes::Opcode;
+use std::cmp::Ordering;
 use std::result::Result;
 
 use crate::VM;
@@ -19,11 +23,13 @@ pub enum StepResult {
 /// * `vm` - The VM state (stack, rspace, continuations, name counter)
 /// * `locals` - The process's local variable slots
 /// * `names` - The process's string pool for PUSH_STR
+/// * `constants` - The process's typed constant pool for PUSH_CONST
 /// * `inst` - The instruction to execute
 pub fn step(
     vm: &mut VM,
     locals: &mut Vec<Value>,
     names: &[Value],
+    constants: &[Value],
     inst: CoreInst,
 ) -> Result<StepResult, ExecError> {
     let opcode = inst.opcode().map_err(|e| ExecError::OpcodeParamError {
@@ -62,6 +68,18 @@ pub fn step(
             }
         }
         Opcode::PUSH_NIL => vm.stack.push(Value::Nil),
+        Opcode::PUSH_CONST => {
+            let idx = inst.op16() as usize;
+            match constants.get(idx) {
+                Some(val) => vm.stack.push(val.clone()),
+                None => {
+                    return Err(ExecError::OpcodeParamError {
+                        opcode: "PUSH_CONST",
+                        message: format!("constants index out of bounds: {}", idx),
+                    });
+                }
+            }
+        }
         Opcode::POP => {
             let _ = vm.stack.pop();
         }
@@ -70,42 +88,80 @@ pub fn step(
         Opcode::ADD => {
             let (b, a) = (vm.stack.pop(), vm.stack.pop());
             match (a, b) {
-                (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Int(a + b)),
+                (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Int(a.wrapping_add(b))),
+                (Some(Value::Float(a)), Some(Value::Float(b))) => vm.stack.push(Value::Float(a + b)),
+                (Some(Value::BigInt(a)), Some(Value::BigInt(b))) => {
+                    vm.stack.push(Value::BigInt(a + b));
+                }
+                (Some(Value::BigRat(a)), Some(Value::BigRat(b))) => {
+                    vm.stack.push(Value::BigRat(a + b));
+                }
+                (Some(Value::FixedPoint { unscaled: ua, scale: sa }), Some(Value::FixedPoint { unscaled: ub, scale: sb })) => {
+                    if sa != sb {
+                        return Err(type_mismatch_error("ADD", &format!("FixedPoint(p{})", sa), &format!("FixedPoint(p{})", sb)));
+                    }
+                    vm.stack.push(Value::FixedPoint { unscaled: ua + ub, scale: sa });
+                }
                 (Some(Value::Str(a)), Some(Value::Str(b))) => vm.stack.push(Value::Str(a + &b)),
                 (Some(Value::List(mut a)), Some(Value::List(b))) => {
                     a.extend(b);
                     vm.stack.push(Value::List(a));
                 }
-                _ => {
-                    return Err(ExecError::OpcodeParamError {
-                        opcode: "ADD",
-                        message: "type mismatch".to_string(),
-                    })
-                }
+                (Some(a), Some(b)) => return Err(type_mismatch_error("ADD", a.type_name(), b.type_name())),
+                _ => return Err(stack_underflow("ADD")),
             }
         }
         Opcode::SUB => {
             let (b, a) = (vm.stack.pop(), vm.stack.pop());
             match (a, b) {
-                (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Int(a - b)),
-                _ => {
-                    return Err(ExecError::OpcodeParamError {
-                        opcode: "SUB",
-                        message: "requires Ints".to_string(),
-                    })
+                (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Int(a.wrapping_sub(b))),
+                (Some(Value::Float(a)), Some(Value::Float(b))) => vm.stack.push(Value::Float(a - b)),
+                (Some(Value::BigInt(a)), Some(Value::BigInt(b))) => {
+                    vm.stack.push(Value::BigInt(a - b));
                 }
+                (Some(Value::BigRat(a)), Some(Value::BigRat(b))) => {
+                    vm.stack.push(Value::BigRat(a - b));
+                }
+                (Some(Value::FixedPoint { unscaled: ua, scale: sa }), Some(Value::FixedPoint { unscaled: ub, scale: sb })) => {
+                    if sa != sb {
+                        return Err(type_mismatch_error("SUB", &format!("FixedPoint(p{})", sa), &format!("FixedPoint(p{})", sb)));
+                    }
+                    vm.stack.push(Value::FixedPoint { unscaled: ua - ub, scale: sa });
+                }
+                (Some(a), Some(b)) => return Err(type_mismatch_error("SUB", a.type_name(), b.type_name())),
+                _ => return Err(stack_underflow("SUB")),
             }
         }
         Opcode::MUL => {
             let (b, a) = (vm.stack.pop(), vm.stack.pop());
             match (a, b) {
-                (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Int(a * b)),
-                _ => {
-                    return Err(ExecError::OpcodeParamError {
-                        opcode: "MUL",
-                        message: "requires Ints".to_string(),
-                    })
+                (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Int(a.wrapping_mul(b))),
+                (Some(Value::Float(a)), Some(Value::Float(b))) => vm.stack.push(Value::Float(a * b)),
+                (Some(Value::BigInt(a)), Some(Value::BigInt(b))) => {
+                    vm.stack.push(Value::BigInt(a * b));
                 }
+                (Some(Value::BigRat(a)), Some(Value::BigRat(b))) => {
+                    vm.stack.push(Value::BigRat(a * b));
+                }
+                (Some(Value::FixedPoint { unscaled: ua, scale: sa }), Some(Value::FixedPoint { unscaled: ub, scale: sb })) => {
+                    if sa != sb {
+                        return Err(type_mismatch_error("MUL", &format!("FixedPoint(p{})", sa), &format!("FixedPoint(p{})", sb)));
+                    }
+                    // Scale-preserving: (ua * ub) / 10^scale, using floor division
+                    let raw = &ua * &ub;
+                    let scale_factor = num_traits::pow::pow(BigInt::from(10), sa as usize);
+                    let one = BigInt::from(1);
+                    let unscaled: BigInt = if raw.is_negative() {
+                        // Floor division for negative: -((-raw - 1) / sf + 1)
+                        let abs_raw = -&raw;
+                        -((&abs_raw - &one) / &scale_factor + &one)
+                    } else {
+                        &raw / &scale_factor
+                    };
+                    vm.stack.push(Value::FixedPoint { unscaled, scale: sa });
+                }
+                (Some(a), Some(b)) => return Err(type_mismatch_error("MUL", a.type_name(), b.type_name())),
+                _ => return Err(stack_underflow("MUL")),
             }
         }
         Opcode::DIV => {
@@ -113,19 +169,40 @@ pub fn step(
             match (a, b) {
                 (Some(Value::Int(a)), Some(Value::Int(b))) => {
                     if b == 0 {
-                        return Err(ExecError::OpcodeParamError {
-                            opcode: "DIV",
-                            message: "division by zero".to_string(),
-                        });
+                        return Err(div_by_zero("DIV"));
                     }
-                    vm.stack.push(Value::Int(a / b))
+                    vm.stack.push(Value::Int(a.wrapping_div(b)));
                 }
-                _ => {
-                    return Err(ExecError::OpcodeParamError {
-                        opcode: "DIV",
-                        message: "requires Ints".to_string(),
-                    })
+                (Some(Value::Float(a)), Some(Value::Float(b))) => {
+                    // IEEE 754: div by zero produces Inf/-Inf/NaN
+                    vm.stack.push(Value::Float(a / b));
                 }
+                (Some(Value::BigInt(a)), Some(Value::BigInt(b))) => {
+                    if b.is_zero() {
+                        return Err(div_by_zero("DIV"));
+                    }
+                    let r = a / b;
+                    vm.stack.push(Value::BigInt(r));
+                }
+                (Some(Value::BigRat(a)), Some(Value::BigRat(b))) => {
+                    if b.is_zero() {
+                        return Err(div_by_zero("DIV"));
+                    }
+                    vm.stack.push(Value::BigRat(a / b));
+                }
+                (Some(Value::FixedPoint { unscaled: ua, scale: sa }), Some(Value::FixedPoint { unscaled: ub, scale: sb })) => {
+                    if sa != sb {
+                        return Err(type_mismatch_error("DIV", &format!("FixedPoint(p{})", sa), &format!("FixedPoint(p{})", sb)));
+                    }
+                    if ub.is_zero() {
+                        return Err(div_by_zero("DIV"));
+                    }
+                    // Shifted division: (ua * 10^scale) / ub
+                    let shifted = ua * num_traits::pow::pow(BigInt::from(10), sa as usize);
+                    vm.stack.push(Value::FixedPoint { unscaled: shifted / ub, scale: sa });
+                }
+                (Some(a), Some(b)) => return Err(type_mismatch_error("DIV", a.type_name(), b.type_name())),
+                _ => return Err(stack_underflow("DIV")),
             }
         }
         Opcode::MOD => {
@@ -133,29 +210,61 @@ pub fn step(
             match (a, b) {
                 (Some(Value::Int(a)), Some(Value::Int(b))) => {
                     if b == 0 {
-                        return Err(ExecError::OpcodeParamError {
-                            opcode: "MOD",
-                            message: "modulo by zero".to_string(),
-                        });
+                        return Err(div_by_zero("MOD"));
                     }
-                    vm.stack.push(Value::Int(a % b))
+                    vm.stack.push(Value::Int(a % b));
                 }
-                _ => {
+                (Some(Value::Float(_)), Some(Value::Float(_))) => {
                     return Err(ExecError::OpcodeParamError {
                         opcode: "MOD",
-                        message: "requires Ints".to_string(),
-                    })
+                        message: "modulus not defined on floating point".to_string(),
+                    });
                 }
+                (Some(Value::BigInt(a)), Some(Value::BigInt(b))) => {
+                    if b.is_zero() {
+                        return Err(div_by_zero("MOD"));
+                    }
+                    let r = a % b;
+                    vm.stack.push(Value::BigInt(r));
+                }
+                (Some(Value::BigRat(_)), Some(Value::BigRat(_))) => {
+                    // Per spec: (a/b)*b == a exactly, so mod always returns 0
+                    vm.stack.push(Value::BigRat(BigRational::zero()));
+                }
+                (Some(Value::FixedPoint { unscaled: ua, scale: sa }), Some(Value::FixedPoint { unscaled: ub, scale: sb })) => {
+                    if sa != sb {
+                        return Err(type_mismatch_error("MOD", &format!("FixedPoint(p{})", sa), &format!("FixedPoint(p{})", sb)));
+                    }
+                    if ub.is_zero() {
+                        return Err(div_by_zero("MOD"));
+                    }
+                    // C99 identity: (a/b)*b + a%b == a
+                    // quotient = (ua * 10^scale) / ub (same as DIV)
+                    // remainder = ua - quotient * ub
+                    let scale_factor = num_traits::pow::pow(BigInt::from(10), sa as usize);
+                    let quotient = (&ua * &scale_factor) / &ub;
+                    let r = ua - (&quotient * &ub) / scale_factor;
+                    vm.stack.push(Value::FixedPoint { unscaled: r, scale: sa });
+                }
+                (Some(a), Some(b)) => return Err(type_mismatch_error("MOD", a.type_name(), b.type_name())),
+                _ => return Err(stack_underflow("MOD")),
             }
         }
         Opcode::NEG => match vm.stack.pop() {
-            Some(Value::Int(a)) => vm.stack.push(Value::Int(-a)),
-            _ => {
+            Some(Value::Int(a)) => vm.stack.push(Value::Int(a.wrapping_neg())),
+            Some(Value::Float(a)) => vm.stack.push(Value::Float(-a)),
+            Some(Value::BigInt(a)) => vm.stack.push(Value::BigInt(-a)),
+            Some(Value::BigRat(a)) => vm.stack.push(Value::BigRat(-a)),
+            Some(Value::FixedPoint { unscaled, scale }) => {
+                vm.stack.push(Value::FixedPoint { unscaled: -unscaled, scale });
+            }
+            Some(other) => {
                 return Err(ExecError::OpcodeParamError {
                     opcode: "NEG",
-                    message: "requires Int".to_string(),
-                })
+                    message: format!("cannot negate {}", other.type_name()),
+                });
             }
+            None => return Err(stack_underflow("NEG")),
         },
 
         // Comparison
@@ -163,73 +272,31 @@ pub fn step(
             let (b, a) = (vm.stack.pop(), vm.stack.pop());
             match (a, b) {
                 (Some(a), Some(b)) => vm.stack.push(Value::Bool(a == b)),
-                _ => {
-                    return Err(ExecError::OpcodeParamError {
-                        opcode: "CMP_EQ",
-                        message: "requires two values".to_string(),
-                    })
-                }
+                _ => return Err(stack_underflow("CMP_EQ")),
             }
         }
         Opcode::CMP_NEQ => {
             let (b, a) = (vm.stack.pop(), vm.stack.pop());
             match (a, b) {
                 (Some(a), Some(b)) => vm.stack.push(Value::Bool(a != b)),
-                _ => {
-                    return Err(ExecError::OpcodeParamError {
-                        opcode: "CMP_NEQ",
-                        message: "requires two values".to_string(),
-                    })
-                }
+                _ => return Err(stack_underflow("CMP_NEQ")),
             }
         }
         Opcode::CMP_LT => {
             let (b, a) = (vm.stack.pop(), vm.stack.pop());
-            match (a, b) {
-                (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Bool(a < b)),
-                _ => {
-                    return Err(ExecError::OpcodeParamError {
-                        opcode: "CMP_LT",
-                        message: "requires Ints".to_string(),
-                    })
-                }
-            }
+            vm.stack.push(Value::Bool(compare_values("CMP_LT", &a, &b)? == Ordering::Less));
         }
         Opcode::CMP_LTE => {
             let (b, a) = (vm.stack.pop(), vm.stack.pop());
-            match (a, b) {
-                (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Bool(a <= b)),
-                _ => {
-                    return Err(ExecError::OpcodeParamError {
-                        opcode: "CMP_LTE",
-                        message: "requires Ints".to_string(),
-                    })
-                }
-            }
+            vm.stack.push(Value::Bool(matches!(compare_values("CMP_LTE", &a, &b)?, Ordering::Less | Ordering::Equal)));
         }
         Opcode::CMP_GT => {
             let (b, a) = (vm.stack.pop(), vm.stack.pop());
-            match (a, b) {
-                (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Bool(a > b)),
-                _ => {
-                    return Err(ExecError::OpcodeParamError {
-                        opcode: "CMP_GT",
-                        message: "requires Ints".to_string(),
-                    })
-                }
-            }
+            vm.stack.push(Value::Bool(compare_values("CMP_GT", &a, &b)? == Ordering::Greater));
         }
         Opcode::CMP_GTE => {
             let (b, a) = (vm.stack.pop(), vm.stack.pop());
-            match (a, b) {
-                (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Bool(a >= b)),
-                _ => {
-                    return Err(ExecError::OpcodeParamError {
-                        opcode: "CMP_GTE",
-                        message: "requires Ints".to_string(),
-                    })
-                }
-            }
+            vm.stack.push(Value::Bool(matches!(compare_values("CMP_GTE", &a, &b)?, Ordering::Greater | Ordering::Equal)));
         }
 
         // Logical operators
@@ -616,4 +683,49 @@ pub fn step(
     }
 
     Ok(StepResult::Next)
+}
+
+// ---------------------------------------------------------------------------
+// Helper functions for arithmetic/comparison opcodes
+// ---------------------------------------------------------------------------
+
+fn type_mismatch_error(opcode: &'static str, type_a: &str, type_b: &str) -> ExecError {
+    ExecError::OpcodeParamError {
+        opcode,
+        message: format!("type mismatch: {} vs {}", type_a, type_b),
+    }
+}
+
+fn stack_underflow(opcode: &'static str) -> ExecError {
+    ExecError::OpcodeParamError {
+        opcode,
+        message: "stack underflow".to_string(),
+    }
+}
+
+fn div_by_zero(opcode: &'static str) -> ExecError {
+    ExecError::OpcodeParamError {
+        opcode,
+        message: "division by zero".to_string(),
+    }
+}
+
+fn compare_values(
+    opcode: &'static str,
+    a: &Option<Value>,
+    b: &Option<Value>,
+) -> Result<Ordering, ExecError> {
+    match (a, b) {
+        (Some(a_val), Some(b_val)) => a_val
+            .partial_cmp(b_val)
+            .ok_or_else(|| ExecError::OpcodeParamError {
+                opcode,
+                message: format!(
+                    "values not comparable: {} vs {}",
+                    a_val.type_name(),
+                    b_val.type_name()
+                ),
+            }),
+        _ => Err(stack_underflow(opcode)),
+    }
 }

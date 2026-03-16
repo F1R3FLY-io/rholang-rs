@@ -12,6 +12,9 @@ pub struct Process {
     pub source_ref: String,
     pub locals: Vec<Value>,
     pub names: Vec<Value>,
+    /// Typed constant pool for numeric values (Float, BigInt, BigRat, FixedPoint,
+    /// and integers outside i16 range). Indexed by PUSH_CONST operand.
+    pub constants: Vec<Value>,
     pub vm: VM,
     pub state: ProcessState,
     /// Named parameter bindings that must be solved before execution
@@ -33,6 +36,7 @@ impl Process {
             source_ref: source_ref.into(),
             locals: Vec::new(),
             names: Vec::new(),
+            constants: Vec::new(),
             vm: VM::new(),
             state: ProcessState::Ready,
             parameters: Vec::new(),
@@ -46,6 +50,7 @@ impl Process {
             source_ref: source_ref.into(),
             locals: Vec::new(),
             names: Vec::new(),
+            constants: Vec::new(),
             vm,
             state: ProcessState::Ready,
             parameters: Vec::new(),
@@ -158,7 +163,7 @@ impl Process {
             }
 
             let inst = code[pc];
-            match self.vm.execute(&mut self.locals, &self.names, inst) {
+            match self.vm.execute(&mut self.locals, &self.names, &self.constants, inst) {
                 Ok(StepResult::Next) => {
                     pc += 1;
                 }
@@ -249,6 +254,14 @@ impl fmt::Display for Process {
             writeln!(f, "\n[Parameters] ({} entries)", self.parameters.len())?;
             for (idx, param) in self.parameters.iter().enumerate() {
                 writeln!(f, "  [{}]: {}", idx, param.name())?;
+            }
+        }
+
+        // Constants pool section
+        if !self.constants.is_empty() {
+            writeln!(f, "\n[Constants Pool] ({} entries)", self.constants.len())?;
+            for (idx, val) in self.constants.iter().enumerate() {
+                writeln!(f, "  [{}]: {:?}", idx, val)?;
             }
         }
 

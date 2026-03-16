@@ -489,25 +489,6 @@ impl RholangCompilerInterpreterProvider {
 
     fn render_value(v: &VmValue) -> String {
         match v {
-            VmValue::Int(n) => n.to_string(),
-            VmValue::Bool(b) => b.to_string(),
-            VmValue::Str(s) => format!("\"{}\"", s),
-            VmValue::Name(n) => format!("@{}", n),
-            VmValue::List(items) => {
-                let inner: Vec<String> = items.iter().map(Self::render_value).collect();
-                format!("[{}]", inner.join(", "))
-            }
-            VmValue::Tuple(items) => {
-                let inner: Vec<String> = items.iter().map(Self::render_value).collect();
-                format!("({})", inner.join(", "))
-            }
-            VmValue::Map(entries) => {
-                let inner: Vec<String> = entries
-                    .iter()
-                    .map(|(k, v)| format!("{}: {}", Self::render_value(k), Self::render_value(v)))
-                    .collect();
-                format!("{{{}}}", inner.join(", "))
-            }
             VmValue::Par(procs) => {
                 let inner: Vec<String> = procs
                     .iter()
@@ -515,7 +496,7 @@ impl RholangCompilerInterpreterProvider {
                     .collect();
                 inner.join(" | ")
             }
-            VmValue::Nil => "Nil".to_string(),
+            other => other.to_string(),
         }
     }
 }

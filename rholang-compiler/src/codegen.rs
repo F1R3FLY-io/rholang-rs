@@ -5,6 +5,8 @@
 
 use anyhow::{anyhow, bail, Result};
 use librho::sem::{BinderId, SemanticDb, SymbolOccurrence, PID};
+use num_bigint::BigInt;
+use num_rational::BigRational;
 use rholang_bytecode::core::{instructions::Instruction, opcodes::Opcode};
 use rholang_parser::ast::{
     AnnProc, BinaryExpOp, Bind, Collection, Name, Proc, Receipts, Source, Var,
@@ -21,6 +23,10 @@ pub struct CodegenContext<'a> {
 
     /// String pool for string literals (index -> string)
     strings: Vec<String>,
+
+    /// Typed constant pool for numeric values (Float, BigInt, BigRat, FixedPoint,
+    /// and integers outside i16 range). Indexed by PUSH_CONST operand.
+    constants: Vec<Value>,
 
     /// Map from variable binder IDs to local slot indices
     locals: HashMap<BinderId, u16>,
@@ -52,6 +58,7 @@ impl<'a> CodegenContext<'a> {
             db,
             instructions: Vec::new(),
             strings: Vec::new(),
+            constants: Vec::new(),
             locals: HashMap::new(),
             next_local: 0,
             labels: HashMap::new(),
@@ -86,6 +93,30 @@ impl<'a> CodegenContext<'a> {
 
             Proc::LongLiteral(n) => {
                 self.emit_int(*n)?;
+            }
+
+            Proc::SignedIntLiteral { value, bits } => {
+                self.compile_signed_int(value, *bits)?;
+            }
+
+            Proc::UnsignedIntLiteral { value, bits } => {
+                self.compile_unsigned_int(value, *bits)?;
+            }
+
+            Proc::BigIntLiteral(s) => {
+                self.compile_bigint(s)?;
+            }
+
+            Proc::BigRatLiteral(s) => {
+                self.compile_bigrat(s)?;
+            }
+
+            Proc::FloatLiteral { value, bits } => {
+                self.compile_float(value, *bits)?;
+            }
+
+            Proc::FixedPointLiteral { value, scale } => {
+                self.compile_fixed_point(value, *scale)?;
             }
 
             Proc::StringLiteral(s) => {
@@ -182,30 +213,152 @@ impl<'a> CodegenContext<'a> {
         self.instructions.push(inst);
     }
 
-    /// Emit an integer literal instruction
+    /// Emit an integer literal instruction.
     ///
-    /// In MVP, we only support integers that fit in i16 range for simplicity
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the integer is outside the i16 range.
+    /// Values in i16 range use PUSH_INT (inline immediate).
+    /// Values outside i16 range use PUSH_CONST (constant pool).
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn emit_int(&mut self, n: i64) -> Result<()> {
-        if n < i16::MIN as i64 || n > i16::MAX as i64 {
+        if n >= i16::MIN as i64 && n <= i16::MAX as i64 {
+            let bits = (n as i16) as u16;
+            self.emit(Instruction::unary(Opcode::PUSH_INT, bits));
+        } else {
+            let idx = self.add_constant(Value::Int(n));
+            self.emit(Instruction::unary(Opcode::PUSH_CONST, idx));
+        }
+        Ok(())
+    }
+
+    /// Add a typed constant to the constant pool and return its index.
+    #[allow(clippy::cast_possible_truncation)]
+    fn add_constant(&mut self, val: Value) -> u16 {
+        // Deduplicate: reuse existing index if an equal constant already exists
+        if let Some(idx) = self.constants.iter().position(|c| c == &val) {
+            return idx as u16;
+        }
+        let idx = self.constants.len();
+        assert!(
+            idx <= u16::MAX as usize,
+            "Constant pool overflow (max {} constants)",
+            u16::MAX
+        );
+        self.constants.push(val);
+        idx as u16
+    }
+
+    /// Compile a signed integer literal (e.g., `-52i64`, `127i8`).
+    fn compile_signed_int(&mut self, value: &str, bits: u32) -> Result<()> {
+        let n: i128 = value
+            .parse()
+            .map_err(|e| anyhow!("Invalid signed integer literal '{}': {}", value, e))?;
+
+        let max = 1i128 << (bits - 1);
+        let min = -max;
+        if n < min || n >= max {
             bail!(
-                "Integer literal {n} out of range for MVP (must fit in i16: {} to {})",
-                i16::MIN,
-                i16::MAX
+                "Signed integer literal {} out of range for i{} ({} to {})",
+                value,
+                bits,
+                min,
+                max - 1
             );
         }
 
-        // Cast is safe because we checked the range above
-        let value = n as i16;
+        if bits <= 64 {
+            self.emit_int(n as i64)
+        } else {
+            let big = BigInt::from(n);
+            let idx = self.add_constant(Value::BigInt(big));
+            self.emit(Instruction::unary(Opcode::PUSH_CONST, idx));
+            Ok(())
+        }
+    }
 
-        // Reinterpret bits to store as u16
-        let bits = value as u16;
+    /// Compile an unsigned integer literal (e.g., `65535u16`, `255u8`).
+    fn compile_unsigned_int(&mut self, value: &str, bits: u32) -> Result<()> {
+        let n: u128 = value
+            .parse()
+            .map_err(|e| anyhow!("Invalid unsigned integer literal '{}': {}", value, e))?;
 
-        self.emit(Instruction::unary(Opcode::PUSH_INT, bits));
+        let max = if bits >= 128 {
+            u128::MAX
+        } else {
+            (1u128 << bits) - 1
+        };
+        if n > max {
+            bail!(
+                "Unsigned integer literal {} out of range for u{} (0 to {})",
+                value,
+                bits,
+                max
+            );
+        }
+
+        if n <= i64::MAX as u128 {
+            self.emit_int(n as i64)
+        } else {
+            let big = BigInt::from(n);
+            let idx = self.add_constant(Value::BigInt(big));
+            self.emit(Instruction::unary(Opcode::PUSH_CONST, idx));
+            Ok(())
+        }
+    }
+
+    /// Compile a BigInt literal (e.g., `10n`, `-1n`).
+    fn compile_bigint(&mut self, s: &str) -> Result<()> {
+        let n: BigInt = s
+            .parse()
+            .map_err(|e| anyhow!("Invalid bigint literal '{}n': {}", s, e))?;
+        let idx = self.add_constant(Value::BigInt(n));
+        self.emit(Instruction::unary(Opcode::PUSH_CONST, idx));
+        Ok(())
+    }
+
+    /// Compile a BigRat literal (e.g., `3r`, `-1r`).
+    fn compile_bigrat(&mut self, s: &str) -> Result<()> {
+        let n: BigInt = s
+            .parse()
+            .map_err(|e| anyhow!("Invalid bigrat literal '{}r': {}", s, e))?;
+        let r = BigRational::from(n);
+        let idx = self.add_constant(Value::BigRat(r));
+        self.emit(Instruction::unary(Opcode::PUSH_CONST, idx));
+        Ok(())
+    }
+
+    /// Compile a float literal (e.g., `-1.234e5f32`, `3.14f64`).
+    fn compile_float(&mut self, value: &str, bits: u16) -> Result<()> {
+        match bits {
+            32 | 64 => {}
+            other => bail!(
+                "Float width f{} not supported at runtime (only f32 and f64)",
+                other
+            ),
+        }
+
+        let f: f64 = value
+            .parse()
+            .map_err(|e| anyhow!("Invalid float literal '{}f{}': {}", value, bits, e))?;
+
+        if bits == 32 {
+            let f32_val = f as f32;
+            if f32_val.is_infinite() && !f.is_infinite() {
+                bail!(
+                    "Float literal '{}' overflows f32 (would become Inf)",
+                    value
+                );
+            }
+        }
+
+        let idx = self.add_constant(Value::Float(f));
+        self.emit(Instruction::unary(Opcode::PUSH_CONST, idx));
+        Ok(())
+    }
+
+    /// Compile a fixed-point literal (e.g., `3.3p1`, `0.25p2`, `100p0`).
+    fn compile_fixed_point(&mut self, value: &str, scale: u32) -> Result<()> {
+        let unscaled = parse_fixed_point_unscaled(value, scale)?;
+        let idx = self.add_constant(Value::FixedPoint { unscaled, scale });
+        self.emit(Instruction::unary(Opcode::PUSH_CONST, idx));
         Ok(())
     }
 
@@ -246,6 +399,7 @@ impl<'a> CodegenContext<'a> {
             BinaryExpOp::Sub => Opcode::SUB,
             BinaryExpOp::Mult => Opcode::MUL,
             BinaryExpOp::Div => Opcode::DIV,
+            BinaryExpOp::Mod => Opcode::MOD,
 
             // Comparison operators
             BinaryExpOp::Eq => Opcode::CMP_EQ,
@@ -721,7 +875,48 @@ impl<'a> CodegenContext<'a> {
         // Convert string pool to Value::Str
         process.names = self.strings.into_iter().map(Value::Str).collect();
 
+        // Set the constant pool
+        process.constants = self.constants;
+
         Ok(process)
+    }
+}
+
+/// Parse a fixed-point literal value string into an unscaled BigInt.
+///
+/// For example, `"3.3"` with scale=1 → unscaled=33.
+/// `"100"` with scale=0 → unscaled=100.
+/// `"0.25"` with scale=2 → unscaled=25.
+fn parse_fixed_point_unscaled(value: &str, scale: u32) -> Result<BigInt> {
+    let scale = scale as usize;
+
+    if let Some(dot_pos) = value.find('.') {
+        let integer_part = &value[..dot_pos];
+        let frac_part = &value[dot_pos + 1..];
+
+        if frac_part.len() > scale {
+            bail!(
+                "Fixed-point literal '{}p{}' has {} fractional digits but scale is {}",
+                value,
+                scale,
+                frac_part.len(),
+                scale
+            );
+        }
+
+        // Pad fractional part to match scale
+        let padded_frac = format!("{:0<width$}", frac_part, width = scale);
+        let combined = format!("{}{}", integer_part, padded_frac);
+        combined
+            .parse::<BigInt>()
+            .map_err(|e| anyhow!("Invalid fixed-point literal '{}p{}': {}", value, scale, e))
+    } else {
+        // No decimal point — multiply by 10^scale
+        let base: BigInt = value
+            .parse()
+            .map_err(|e| anyhow!("Invalid fixed-point literal '{}p{}': {}", value, scale, e))?;
+        let multiplier = num_traits::pow::pow(BigInt::from(10), scale);
+        Ok(base * multiplier)
     }
 }
 
@@ -797,14 +992,21 @@ mod tests {
     }
 
     #[test]
-    fn test_compile_int_out_of_range() {
+    fn test_compile_int_large_uses_constant_pool() {
         let db = SemanticDb::new();
         let proc = Proc::LongLiteral(100_000);
         let mut ctx = CodegenContext::new(&db, 0);
 
         let result = ctx.compile_proc(&ann_proc(&proc));
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("out of range"));
+        assert!(result.is_ok(), "large int should compile via constant pool");
+        // Verify a PUSH_CONST instruction was emitted
+        assert!(
+            ctx.instructions
+                .iter()
+                .any(|i| i.opcode().map(|o| o == Opcode::PUSH_CONST).unwrap_or(false)),
+            "should emit PUSH_CONST for out-of-i16-range integer"
+        );
+        assert_eq!(ctx.constants.len(), 1);
     }
 
     #[test]

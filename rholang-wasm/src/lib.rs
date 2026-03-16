@@ -35,6 +35,12 @@ fn pretty_value(v: &Value) -> String {
             let elems: Vec<String> = ps.iter().map(|p| format!("<{}>", p.source_ref())).collect();
             format!("Par({})", elems.join(" | "))
         }
+        Value::Float(f) => format!("Float({})", f),
+        Value::BigInt(n) => format!("BigInt({}n)", n),
+        Value::BigRat(r) => format!("BigRat({}r/{}r)", r.numer(), r.denom()),
+        Value::FixedPoint { unscaled, scale } => {
+            format!("FixedPoint({}p{})", unscaled, scale)
+        }
         Value::Nil => "Nil".to_string(),
     }
 }

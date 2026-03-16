@@ -73,17 +73,17 @@ fn test_int_large_negative() {
 }
 
 #[test]
-#[should_panic(expected = "out of range")]
-fn test_int_out_of_range_positive() {
-    let source = "100000"; // Beyond i16::MAX
-    compile_and_run(source).unwrap();
+fn test_int_out_of_range_positive_uses_constant_pool() {
+    let source = "100000"; // Beyond i16::MAX, uses PUSH_CONST
+    let result = compile_and_run(source).unwrap();
+    assert_eq!(result, Value::Int(100_000));
 }
 
 #[test]
-#[should_panic(expected = "out of range")]
-fn test_int_out_of_range_negative() {
-    let source = "-100000"; // Beyond i16::MIN
-    compile_and_run(source).unwrap();
+fn test_int_out_of_range_negative_uses_constant_pool() {
+    let source = "-100000"; // Beyond i16::MIN, uses PUSH_CONST
+    let result = compile_and_run(source).unwrap();
+    assert_eq!(result, Value::Int(-100_000));
 }
 
 // === String Tests ===
