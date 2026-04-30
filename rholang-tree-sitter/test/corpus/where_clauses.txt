@@ -1,0 +1,155 @@
+================================
+Receive with where guard (single bind)
+================================
+
+for (@x <- a where x > 5) { P }
+
+---
+
+(source_file
+  (input
+    receipts: (receipts
+      (receipt
+        (linear_bind
+          names: (names
+            (quote
+              (var)))
+          input: (simple_source
+            (var)))
+        guard: (gt
+          (var)
+          (long_literal))))
+    proc: (block
+      (var))))
+
+================================
+Receive with where guard (join)
+================================
+
+for (@x <- a & @y <- b where x < y) { P }
+
+---
+
+(source_file
+  (input
+    receipts: (receipts
+      (receipt
+        (linear_bind
+          names: (names
+            (quote
+              (var)))
+          input: (simple_source
+            (var)))
+        (linear_bind
+          names: (names
+            (quote
+              (var)))
+          input: (simple_source
+            (var)))
+        guard: (lt
+          (var)
+          (var))))
+    proc: (block
+      (var))))
+
+================================
+Receive with per-receipt where guards (sequential)
+================================
+
+for (@x <- a where x > 0; @y <- b where y < x) { P }
+
+---
+
+(source_file
+  (input
+    receipts: (receipts
+      (receipt
+        (linear_bind
+          names: (names
+            (quote
+              (var)))
+          input: (simple_source
+            (var)))
+        guard: (gt
+          (var)
+          (long_literal)))
+      (receipt
+        (linear_bind
+          names: (names
+            (quote
+              (var)))
+          input: (simple_source
+            (var)))
+        guard: (lt
+          (var)
+          (var))))
+    proc: (block
+      (var))))
+
+================================
+Receive without where (regression)
+================================
+
+for (@x <- a) { P }
+
+---
+
+(source_file
+  (input
+    receipts: (receipts
+      (receipt
+        (linear_bind
+          names: (names
+            (quote
+              (var)))
+          input: (simple_source
+            (var)))))
+    proc: (block
+      (var))))
+
+================================
+Match case with where guard
+================================
+
+match x {
+  n where n > 0 => big
+  _             => small
+}
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (var)
+        guard: (gt
+          (var)
+          (long_literal))
+        proc: (var))
+      (case
+        pattern: (wildcard)
+        proc: (var)))))
+
+================================
+Match without where (regression)
+================================
+
+match x {
+  1 => one
+  _ => other
+}
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (var))
+      (case
+        pattern: (wildcard)
+        proc: (var)))))

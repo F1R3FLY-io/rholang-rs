@@ -134,6 +134,7 @@ Good(
                                                                 },
                                                             },
                                                         },
+                                                        guard: None,
                                                         proc: AnnProc {
                                                             proc: Nil,
                                                             span: SourceSpan {
@@ -201,6 +202,7 @@ Good(
                                                                 },
                                                             },
                                                         },
+                                                        guard: None,
                                                         proc: AnnProc {
                                                             proc: New {
                                                                 decls: [
@@ -220,31 +222,34 @@ Good(
                                                                         left: AnnProc {
                                                                             proc: ForComprehension {
                                                                                 receipts: [
-                                                                                    [
-                                                                                        Linear {
-                                                                                            lhs: Names {
-                                                                                                names: [
-                                                                                                    NameVar(
-                                                                                                        Wildcard,
-                                                                                                    ),
-                                                                                                ],
-                                                                                                remainder: None,
-                                                                                            },
-                                                                                            rhs: Simple {
-                                                                                                name: NameVar(
-                                                                                                    Id(
-                                                                                                        Id {
-                                                                                                            name: "ret",
-                                                                                                            pos: SourcePos {
-                                                                                                                line: 7,
-                                                                                                                col: 21,
+                                                                                    Receipt {
+                                                                                        binds: [
+                                                                                            Linear {
+                                                                                                lhs: Names {
+                                                                                                    names: [
+                                                                                                        NameVar(
+                                                                                                            Wildcard,
+                                                                                                        ),
+                                                                                                    ],
+                                                                                                    remainder: None,
+                                                                                                },
+                                                                                                rhs: Simple {
+                                                                                                    name: NameVar(
+                                                                                                        Id(
+                                                                                                            Id {
+                                                                                                                name: "ret",
+                                                                                                                pos: SourcePos {
+                                                                                                                    line: 7,
+                                                                                                                    col: 21,
+                                                                                                                },
                                                                                                             },
-                                                                                                        },
+                                                                                                        ),
                                                                                                     ),
-                                                                                                ),
+                                                                                                },
                                                                                             },
-                                                                                        },
-                                                                                    ],
+                                                                                        ],
+                                                                                        guard: None,
+                                                                                    },
                                                                                 ],
                                                                                 proc: AnnProc {
                                                                                     proc: Send {
@@ -529,6 +534,7 @@ Good(
                                                                 },
                                                             },
                                                         },
+                                                        guard: None,
                                                         proc: AnnProc {
                                                             proc: Send {
                                                                 channel: NameVar(
@@ -684,6 +690,7 @@ Good(
                                                                 },
                                                             },
                                                         },
+                                                        guard: None,
                                                         proc: AnnProc {
                                                             proc: Send {
                                                                 channel: NameVar(
@@ -769,6 +776,7 @@ Good(
                                                                 },
                                                             },
                                                         },
+                                                        guard: None,
                                                         proc: AnnProc {
                                                             proc: Send {
                                                                 channel: NameVar(

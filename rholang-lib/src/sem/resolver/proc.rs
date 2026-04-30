@@ -162,7 +162,12 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
             }
 
             resolve_unguarded(db, stack, expression);
-            for Case { pattern, proc } in cases {
+            for Case {
+                pattern,
+                guard: _,
+                proc,
+            } in cases
+            {
                 resolve_case(pattern, proc, db, stack);
             }
         }

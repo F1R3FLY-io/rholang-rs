@@ -269,7 +269,9 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
             }
 
             Proc::ForComprehension { receipts, proc } => {
-                self.push_children(iter::once(proc).chain(receipts.iter().flat_map(|r| inputs(r))));
+                self.push_children(
+                    iter::once(proc).chain(receipts.iter().flat_map(|r| inputs(&r.binds))),
+                );
             }
 
             Proc::Let { bindings, body, .. } => {
@@ -299,6 +301,7 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
                 for case in cases.iter().rev() {
                     let Case {
                         pattern,
+                        guard: _,
                         proc: body,
                     } = case;
 
@@ -571,27 +574,33 @@ fn let_lhss<'a>(bindings: &'a [LetBinding<'a>]) -> impl DoubleEndedIterator<Item
 fn for_comprehension_inputs<'a>(
     receipts: &'a [Receipt<'a>],
 ) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
-    receipts.iter().flatten().flat_map(|binding| {
-        let name_proc = if let Name::Quote(quoted) = binding.source_name() {
-            Some(quoted)
-        } else {
-            None
-        };
-        let quoted_iter = name_proc.into_iter();
-        let input_iter = binding.input().into_iter().flatten();
-        quoted_iter.chain(input_iter)
-    })
+    receipts
+        .iter()
+        .flat_map(|receipt| receipt.binds.iter())
+        .flat_map(|binding| {
+            let name_proc = if let Name::Quote(quoted) = binding.source_name() {
+                Some(quoted)
+            } else {
+                None
+            };
+            let quoted_iter = name_proc.into_iter();
+            let input_iter = binding.input().into_iter().flatten();
+            quoted_iter.chain(input_iter)
+        })
 }
 
 /// Helper: extract sources + their outputs from `ForComprehension` receipts.
 fn for_comprehension_outputs<'a>(
     receipts: &'a [Receipt<'a>],
 ) -> impl DoubleEndedIterator<Item = &'a Name<'a>> {
-    receipts.iter().flatten().flat_map(|binding| {
-        binding
-            .names_iter()
-            .chain(iter::once(binding.source_name()))
-    })
+    receipts
+        .iter()
+        .flat_map(|receipt| receipt.binds.iter())
+        .flat_map(|binding| {
+            binding
+                .names_iter()
+                .chain(iter::once(binding.source_name()))
+        })
 }
 
 /// Helper: extract expression + cases from `Match`.
@@ -1096,7 +1105,10 @@ mod tests {
         };
 
         let inner_proc = Proc::ForComprehension {
-            receipts: smallvec![smallvec![inner_bind]],
+            receipts: smallvec![Receipt {
+                binds: smallvec![inner_bind],
+                guard: None,
+            }],
             proc: inner_rhs.ann(SourcePos::at_col(44).span_of(2)),
         };
 
@@ -1121,7 +1133,10 @@ mod tests {
         };
 
         let outer_proc = Proc::ForComprehension {
-            receipts: smallvec![smallvec![outer_bind]],
+            receipts: smallvec![Receipt {
+                binds: smallvec![outer_bind],
+                guard: None,
+            }],
             proc: outer_rhs.ann(SourcePos::at_col(56).span_of(2)),
         };
 
@@ -1360,7 +1375,10 @@ mod tests {
         };
 
         let for_comprehension = Proc::ForComprehension {
-            receipts: smallvec![smallvec![bind]],
+            receipts: smallvec![Receipt {
+                binds: smallvec![bind],
+                guard: None,
+            }],
             proc: for_body.ann(SourceSpan {
                 start: SourcePos { line: 1, col: 29 },
                 end: SourcePos { line: 4, col: 2 },
@@ -1545,10 +1563,12 @@ mod tests {
             cases: vec![
                 Case {
                     pattern: p1.ann(SourcePos::at_col(11).span_of(2)),
+                    guard: None,
                     proc: y1.ann(SourcePos::at_col(17).span_of(2)),
                 },
                 Case {
                     pattern: p2.ann(SourcePos::at_col(21).span_of(2)),
+                    guard: None,
                     proc: y2.ann(SourcePos::at_col(27).span_of(2)),
                 },
             ],

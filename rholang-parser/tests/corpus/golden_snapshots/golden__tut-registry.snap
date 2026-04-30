@@ -196,53 +196,56 @@ Good(
                                         right: AnnProc {
                                             proc: ForComprehension {
                                                 receipts: [
-                                                    [
-                                                        Linear {
-                                                            lhs: Names {
-                                                                names: [
-                                                                    Quote(
-                                                                        AnnProc {
-                                                                            proc: ProcVar(
-                                                                                Id(
-                                                                                    Id {
-                                                                                        name: "idFromTest1",
-                                                                                        pos: SourcePos {
-                                                                                            line: 19,
-                                                                                            col: 14,
+                                                    Receipt {
+                                                        binds: [
+                                                            Linear {
+                                                                lhs: Names {
+                                                                    names: [
+                                                                        Quote(
+                                                                            AnnProc {
+                                                                                proc: ProcVar(
+                                                                                    Id(
+                                                                                        Id {
+                                                                                            name: "idFromTest1",
+                                                                                            pos: SourcePos {
+                                                                                                line: 19,
+                                                                                                col: 14,
+                                                                                            },
                                                                                         },
-                                                                                    },
+                                                                                    ),
                                                                                 ),
-                                                                            ),
-                                                                            span: SourceSpan {
-                                                                                start: SourcePos {
-                                                                                    line: 19,
-                                                                                    col: 14,
-                                                                                },
-                                                                                end: SourcePos {
-                                                                                    line: 19,
-                                                                                    col: 25,
+                                                                                span: SourceSpan {
+                                                                                    start: SourcePos {
+                                                                                        line: 19,
+                                                                                        col: 14,
+                                                                                    },
+                                                                                    end: SourcePos {
+                                                                                        line: 19,
+                                                                                        col: 25,
+                                                                                    },
                                                                                 },
                                                                             },
-                                                                        },
-                                                                    ),
-                                                                ],
-                                                                remainder: None,
-                                                            },
-                                                            rhs: Simple {
-                                                                name: NameVar(
-                                                                    Id(
-                                                                        Id {
-                                                                            name: "simpleInsertTestReturnID",
-                                                                            pos: SourcePos {
-                                                                                line: 19,
-                                                                                col: 29,
+                                                                        ),
+                                                                    ],
+                                                                    remainder: None,
+                                                                },
+                                                                rhs: Simple {
+                                                                    name: NameVar(
+                                                                        Id(
+                                                                            Id {
+                                                                                name: "simpleInsertTestReturnID",
+                                                                                pos: SourcePos {
+                                                                                    line: 19,
+                                                                                    col: 29,
+                                                                                },
                                                                             },
-                                                                        },
+                                                                        ),
                                                                     ),
-                                                                ),
+                                                                },
                                                             },
-                                                        },
-                                                    ],
+                                                        ],
+                                                        guard: None,
+                                                    },
                                                 ],
                                                 proc: AnnProc {
                                                     proc: Send {
@@ -535,31 +538,34 @@ Good(
                                                                 right: AnnProc {
                                                                     proc: ForComprehension {
                                                                         receipts: [
-                                                                            [
-                                                                                Linear {
-                                                                                    lhs: Names {
-                                                                                        names: [
-                                                                                            NameVar(
-                                                                                                Wildcard,
-                                                                                            ),
-                                                                                        ],
-                                                                                        remainder: None,
-                                                                                    },
-                                                                                    rhs: Simple {
-                                                                                        name: NameVar(
-                                                                                            Id(
-                                                                                                Id {
-                                                                                                    name: "innerAck",
-                                                                                                    pos: SourcePos {
-                                                                                                        line: 27,
-                                                                                                        col: 26,
+                                                                            Receipt {
+                                                                                binds: [
+                                                                                    Linear {
+                                                                                        lhs: Names {
+                                                                                            names: [
+                                                                                                NameVar(
+                                                                                                    Wildcard,
+                                                                                                ),
+                                                                                            ],
+                                                                                            remainder: None,
+                                                                                        },
+                                                                                        rhs: Simple {
+                                                                                            name: NameVar(
+                                                                                                Id(
+                                                                                                    Id {
+                                                                                                        name: "innerAck",
+                                                                                                        pos: SourcePos {
+                                                                                                            line: 27,
+                                                                                                            col: 26,
+                                                                                                        },
                                                                                                     },
-                                                                                                },
+                                                                                                ),
                                                                                             ),
-                                                                                        ),
+                                                                                        },
                                                                                     },
-                                                                                },
-                                                                            ],
+                                                                                ],
+                                                                                guard: None,
+                                                                            },
                                                                         ],
                                                                         proc: AnnProc {
                                                                             proc: Par {
@@ -701,53 +707,56 @@ Good(
                                                                                 right: AnnProc {
                                                                                     proc: ForComprehension {
                                                                                         receipts: [
-                                                                                            [
-                                                                                                Linear {
-                                                                                                    lhs: Names {
-                                                                                                        names: [
-                                                                                                            Quote(
-                                                                                                                AnnProc {
-                                                                                                                    proc: ProcVar(
-                                                                                                                        Id(
-                                                                                                                            Id {
-                                                                                                                                name: "uri",
-                                                                                                                                pos: SourcePos {
-                                                                                                                                    line: 30,
-                                                                                                                                    col: 26,
+                                                                                            Receipt {
+                                                                                                binds: [
+                                                                                                    Linear {
+                                                                                                        lhs: Names {
+                                                                                                            names: [
+                                                                                                                Quote(
+                                                                                                                    AnnProc {
+                                                                                                                        proc: ProcVar(
+                                                                                                                            Id(
+                                                                                                                                Id {
+                                                                                                                                    name: "uri",
+                                                                                                                                    pos: SourcePos {
+                                                                                                                                        line: 30,
+                                                                                                                                        col: 26,
+                                                                                                                                    },
                                                                                                                                 },
-                                                                                                                            },
+                                                                                                                            ),
                                                                                                                         ),
-                                                                                                                    ),
-                                                                                                                    span: SourceSpan {
-                                                                                                                        start: SourcePos {
-                                                                                                                            line: 30,
-                                                                                                                            col: 26,
-                                                                                                                        },
-                                                                                                                        end: SourcePos {
-                                                                                                                            line: 30,
-                                                                                                                            col: 29,
+                                                                                                                        span: SourceSpan {
+                                                                                                                            start: SourcePos {
+                                                                                                                                line: 30,
+                                                                                                                                col: 26,
+                                                                                                                            },
+                                                                                                                            end: SourcePos {
+                                                                                                                                line: 30,
+                                                                                                                                col: 29,
+                                                                                                                            },
                                                                                                                         },
                                                                                                                     },
-                                                                                                                },
-                                                                                                            ),
-                                                                                                        ],
-                                                                                                        remainder: None,
-                                                                                                    },
-                                                                                                    rhs: Simple {
-                                                                                                        name: NameVar(
-                                                                                                            Id(
-                                                                                                                Id {
-                                                                                                                    name: "Y",
-                                                                                                                    pos: SourcePos {
-                                                                                                                        line: 30,
-                                                                                                                        col: 33,
+                                                                                                                ),
+                                                                                                            ],
+                                                                                                            remainder: None,
+                                                                                                        },
+                                                                                                        rhs: Simple {
+                                                                                                            name: NameVar(
+                                                                                                                Id(
+                                                                                                                    Id {
+                                                                                                                        name: "Y",
+                                                                                                                        pos: SourcePos {
+                                                                                                                            line: 30,
+                                                                                                                            col: 33,
+                                                                                                                        },
                                                                                                                     },
-                                                                                                                },
+                                                                                                                ),
                                                                                                             ),
-                                                                                                        ),
+                                                                                                        },
                                                                                                     },
-                                                                                                },
-                                                                                            ],
+                                                                                                ],
+                                                                                                guard: None,
+                                                                                            },
                                                                                         ],
                                                                                         proc: AnnProc {
                                                                                             proc: Par {
@@ -1364,53 +1373,56 @@ Good(
                                                         right: AnnProc {
                                                             proc: ForComprehension {
                                                                 receipts: [
-                                                                    [
-                                                                        Linear {
-                                                                            lhs: Names {
-                                                                                names: [
-                                                                                    Quote(
-                                                                                        AnnProc {
-                                                                                            proc: ProcVar(
-                                                                                                Id(
-                                                                                                    Id {
-                                                                                                        name: "val",
-                                                                                                        pos: SourcePos {
-                                                                                                            line: 45,
-                                                                                                            col: 22,
+                                                                    Receipt {
+                                                                        binds: [
+                                                                            Linear {
+                                                                                lhs: Names {
+                                                                                    names: [
+                                                                                        Quote(
+                                                                                            AnnProc {
+                                                                                                proc: ProcVar(
+                                                                                                    Id(
+                                                                                                        Id {
+                                                                                                            name: "val",
+                                                                                                            pos: SourcePos {
+                                                                                                                line: 45,
+                                                                                                                col: 22,
+                                                                                                            },
                                                                                                         },
-                                                                                                    },
+                                                                                                    ),
                                                                                                 ),
-                                                                                            ),
-                                                                                            span: SourceSpan {
-                                                                                                start: SourcePos {
-                                                                                                    line: 45,
-                                                                                                    col: 22,
-                                                                                                },
-                                                                                                end: SourcePos {
-                                                                                                    line: 45,
-                                                                                                    col: 25,
+                                                                                                span: SourceSpan {
+                                                                                                    start: SourcePos {
+                                                                                                        line: 45,
+                                                                                                        col: 22,
+                                                                                                    },
+                                                                                                    end: SourcePos {
+                                                                                                        line: 45,
+                                                                                                        col: 25,
+                                                                                                    },
                                                                                                 },
                                                                                             },
-                                                                                        },
-                                                                                    ),
-                                                                                ],
-                                                                                remainder: None,
-                                                                            },
-                                                                            rhs: Simple {
-                                                                                name: NameVar(
-                                                                                    Id(
-                                                                                        Id {
-                                                                                            name: "lookupResponse",
-                                                                                            pos: SourcePos {
-                                                                                                line: 45,
-                                                                                                col: 29,
+                                                                                        ),
+                                                                                    ],
+                                                                                    remainder: None,
+                                                                                },
+                                                                                rhs: Simple {
+                                                                                    name: NameVar(
+                                                                                        Id(
+                                                                                            Id {
+                                                                                                name: "lookupResponse",
+                                                                                                pos: SourcePos {
+                                                                                                    line: 45,
+                                                                                                    col: 29,
+                                                                                                },
                                                                                             },
-                                                                                        },
+                                                                                        ),
                                                                                     ),
-                                                                                ),
+                                                                                },
                                                                             },
-                                                                        },
-                                                                    ],
+                                                                        ],
+                                                                        guard: None,
+                                                                    },
                                                                 ],
                                                                 proc: AnnProc {
                                                                     proc: Par {

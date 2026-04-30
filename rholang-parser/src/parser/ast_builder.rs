@@ -3,7 +3,8 @@ use typed_arena::Arena;
 
 use crate::ast::{
     AnnProc, BinaryExpOp, Bind, BundleType, Case, Collection, Id, KeyValuePair, LetBinding, Name,
-    NameDecl, Names, Proc, SendType, SimpleType, SyncSendCont, UnaryExpOp, Var, VarRefKind,
+    NameDecl, Names, Proc, Receipt, SendType, SimpleType, SyncSendCont, UnaryExpOp, Var,
+    VarRefKind,
 };
 
 pub struct ASTBuilder<'ast> {
@@ -269,6 +270,9 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
+    /// Allocates a `for`-comprehension with no guards. Each yielded receipt
+    /// becomes a `Receipt { binds, guard: None }`. Use
+    /// [`Self::alloc_for_with_guards`] when guards are present.
     pub fn alloc_for<Rs, Bs>(&self, receipts: Rs, proc: AnnProc<'ast>) -> &Proc<'ast>
     where
         Rs: IntoIterator<Item = Bs>,
@@ -277,7 +281,29 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::ForComprehension {
             receipts: receipts
                 .into_iter()
-                .map(|bs| bs.into_iter().collect())
+                .map(|bs| Receipt {
+                    binds: bs.into_iter().collect(),
+                    guard: None,
+                })
+                .collect(),
+            proc,
+        })
+    }
+
+    /// Allocates a `for`-comprehension where each receipt may carry an
+    /// optional `where` guard. Yields `(binds, optional_guard)` pairs.
+    pub fn alloc_for_with_guards<Rs, Bs>(&self, receipts: Rs, proc: AnnProc<'ast>) -> &Proc<'ast>
+    where
+        Rs: IntoIterator<Item = (Bs, Option<AnnProc<'ast>>)>,
+        Bs: IntoIterator<Item = Bind<'ast>>,
+    {
+        self.arena.alloc(Proc::ForComprehension {
+            receipts: receipts
+                .into_iter()
+                .map(|(bs, guard)| Receipt {
+                    binds: bs.into_iter().collect(),
+                    guard,
+                })
                 .collect(),
             proc,
         })
@@ -287,6 +313,9 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::ProcVar(var))
     }
 
+    /// Allocates a `match` expression with no per-case guards. Cases are
+    /// consumed in pattern/proc pairs. Use [`Self::alloc_match_with_guards`]
+    /// when per-case `where` guards are present.
     pub fn alloc_match(&self, expression: AnnProc<'ast>, cases: &[AnnProc<'ast>]) -> &Proc<'ast> {
         self.arena.alloc(Proc::Match {
             expression,
@@ -294,7 +323,27 @@ impl<'ast> ASTBuilder<'ast> {
                 .chunks_exact(2)
                 .map(|pair| Case {
                     pattern: pair[0],
+                    guard: None,
                     proc: pair[1],
+                })
+                .collect(),
+        })
+    }
+
+    /// Allocates a `match` expression where each case may carry an optional
+    /// `where` guard. Cases are yielded as `(pattern, optional_guard, proc)`.
+    pub fn alloc_match_with_guards<I>(&self, expression: AnnProc<'ast>, cases: I) -> &Proc<'ast>
+    where
+        I: IntoIterator<Item = (AnnProc<'ast>, Option<AnnProc<'ast>>, AnnProc<'ast>)>,
+    {
+        self.arena.alloc(Proc::Match {
+            expression,
+            cases: cases
+                .into_iter()
+                .map(|(pattern, guard, proc)| Case {
+                    pattern,
+                    guard,
+                    proc,
                 })
                 .collect(),
         })

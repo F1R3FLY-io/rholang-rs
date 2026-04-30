@@ -242,7 +242,12 @@ fn resolve_proc_pattern_rec<'a>(
         }
         Match { expression, cases } => {
             resolve_proc_pattern_rec(db, env, res, expression);
-            for ast::Case { pattern, proc } in cases {
+            for ast::Case {
+                pattern,
+                guard: _,
+                proc,
+            } in cases
+            {
                 res.with_subpattern(SubPattern::Proc(pattern), db, env, |db, env, res| {
                     resolve_proc_pattern_rec(db, env, res, proc);
                 });
