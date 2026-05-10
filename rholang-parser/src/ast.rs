@@ -557,7 +557,44 @@ impl BinaryExpOp {
 // for-comprehensions
 
 pub type Receipts<'a> = SmallVec<[Receipt<'a>; 1]>;
-pub type Receipt<'a> = SmallVec<[Bind<'a>; 1]>;
+pub type ReceiptBinds<'a> = SmallVec<[Bind<'a>; 1]>;
+
+/// A single receipt in a `for`-comprehension: an `&`-joined group of binds
+/// with an optional `where` guard. `;`-separated receipts in `for(...)` are
+/// each represented as one `Receipt`; the comprehension as a whole carries
+/// a `Receipts` (= SmallVec of these) which the normalizer desugars into
+/// nested `for`s.
+///
+/// Derefs to `[Bind]` so existing call sites can iterate the binds directly
+/// (e.g. `receipt.iter()`, `&receipt[..]`).
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Receipt<'ast> {
+    pub binds: ReceiptBinds<'ast>,
+    pub guard: Option<AnnProc<'ast>>,
+}
+
+impl<'ast> std::ops::Deref for Receipt<'ast> {
+    type Target = [Bind<'ast>];
+
+    fn deref(&self) -> &Self::Target {
+        &self.binds
+    }
+}
+
+impl<'ast> std::ops::DerefMut for Receipt<'ast> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.binds
+    }
+}
+
+impl<'a, 'ast> IntoIterator for &'a Receipt<'ast> {
+    type Item = &'a Bind<'ast>;
+    type IntoIter = std::slice::Iter<'a, Bind<'ast>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.binds.iter()
+    }
+}
 
 pub fn source_names<'a>(
     receipt: &'a [Bind<'a>],
@@ -629,9 +666,13 @@ pub enum Source<'ast> {
 
 // case in match expression
 
+/// One arm of a `match` expression. The optional `guard` is a process that
+/// must evaluate to `true` for the arm to fire; if it evaluates to anything
+/// else (including non-bool), the matcher falls through to the next case.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Case<'ast> {
     pub pattern: AnnProc<'ast>,
+    pub guard: Option<AnnProc<'ast>>,
     pub proc: AnnProc<'ast>,
 }
 
@@ -646,6 +687,7 @@ pub struct SelectPattern<'ast> {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Branch<'ast> {
     pub patterns: Vec<SelectPattern<'ast>>,
+    pub guard: Option<AnnProc<'ast>>,
     pub proc: AnnProc<'ast>,
 }
 

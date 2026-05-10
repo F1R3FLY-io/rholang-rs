@@ -475,7 +475,24 @@ pub(super) fn node_to_ast<'ast>(
                         let mut bs = SmallVec::with_capacity(receipt_node.named_child_count());
                         let mut receipt_len = 0;
 
+                        // The optional `where`-clause guard. The guard's _proc
+                        // node is also a named child of the receipt, so we
+                        // look it up by field name and skip it when iterating
+                        // bind children below.
+                        let guard_node = receipt_node.child_by_field_id(field!("guard"));
+                        let has_guard = guard_node.is_some();
+
                         for bind_node in receipt_node.named_children(&mut receipt_node.walk()) {
+                            let bind_kind = bind_node.kind_id();
+                            if bind_kind != kind!("linear_bind")
+                                && bind_kind != kind!("repeated_bind")
+                                && bind_kind != kind!("peek_bind")
+                            {
+                                // Anything else here is the guard's _proc;
+                                // it's processed via guard_node above.
+                                continue;
+                            }
+
                             let (names_node, source_node) = if bind_node.named_child_count() > 1 {
                                 let (ns, s) = get_left_and_right(&bind_node);
                                 (Some(ns), s)
@@ -490,7 +507,7 @@ pub(super) fn node_to_ast<'ast>(
                                 None => (0, false),
                             };
 
-                            let bind_desc = match bind_node.kind_id() {
+                            let bind_desc = match bind_kind {
                                 kind!("linear_bind") => {
                                     let source_desc = match source_node.kind_id() {
                                         kind!("simple_source") => SourceDesc::Simple,
@@ -522,7 +539,7 @@ pub(super) fn node_to_ast<'ast>(
                                     cont_present,
                                 },
                                 _ => unreachable!(
-                                    "There are only three types of binds in for-comprehensions: linear, repeated and peek"
+                                    "Filtered above"
                                 ),
                             };
 
@@ -552,9 +569,19 @@ pub(super) fn node_to_ast<'ast>(
                             bs.push(bind_desc);
                             receipt_len += bind_desc.len();
                         }
+
+                        // Push the guard's eval LAST so that its resulting
+                        // AnnProc lands at the end of this receipt's slice in
+                        // proc_stack — matching what ReceiptIter expects.
+                        if let Some(guard_node) = guard_node {
+                            temp_cont_stack.push(K::EvalDelayed(guard_node));
+                            receipt_len += 1;
+                        }
+
                         rs.push(ReceiptDesc {
                             parts: bs,
                             len: receipt_len,
+                            has_guard,
                         });
                         total_len += receipt_len;
                     }
@@ -574,16 +601,40 @@ pub(super) fn node_to_ast<'ast>(
                     let expression_node = get_field(&node, field!("expression"));
                     let cases_node = get_field(&node, field!("cases"));
 
-                    temp_cont_stack.reserve(2 * cases_node.named_child_count());
-                    let arity = eval_named_pairs(
+                    // Per-case guard mask: tells ConsumeMatch which cases
+                    // pushed a `guard` AnnProc onto proc_stack between their
+                    // `pattern` and `proc` AnnProcs.
+                    let mut guards_present: SmallVec<[bool; 4]> = SmallVec::new();
+                    temp_cont_stack.reserve(3 * cases_node.named_child_count());
+
+                    for case in named_children_of_kind(
                         &cases_node,
                         kind!("case"),
-                        field!("pattern"),
-                        field!("proc"),
-                        &mut temp_cont_stack,
-                    );
+                        &mut cases_node.walk(),
+                    ) {
+                        let pattern_node = get_field(&case, field!("pattern"));
+                        let guard_node = case.child_by_field_id(field!("guard"));
+                        let proc_node = get_field(&case, field!("proc"));
 
-                    cont_stack.push(K::ConsumeMatch { span, arity });
+                        // Push pattern, optional guard, proc — order on
+                        // proc_stack after evaluation (since temp_cont_stack
+                        // gets reversed below) will be pattern, [guard,]
+                        // proc per case.
+                        temp_cont_stack.push(K::EvalDelayed(pattern_node));
+                        if let Some(g) = guard_node {
+                            temp_cont_stack.push(K::EvalDelayed(g));
+                            guards_present.push(true);
+                        } else {
+                            guards_present.push(false);
+                        }
+                        temp_cont_stack.push(K::EvalDelayed(proc_node));
+                    }
+                    temp_cont_stack.reverse();
+
+                    cont_stack.push(K::ConsumeMatch {
+                        span,
+                        guards_present,
+                    });
                     cont_stack.append(&mut temp_cont_stack);
 
                     node = expression_node;
@@ -897,7 +948,10 @@ fn apply_cont<'tree, 'ast>(
                                 let body = body_procs[0];
                                 let procs = &body_procs[1..];
                                 ast_builder
-                                    .alloc_for(ReceiptIter::new(&desc, procs, &mask[1..]), body)
+                                    .alloc_for_with_guards(
+                                        ReceiptIter::new(&desc, procs, &mask[1..]),
+                                        body,
+                                    )
                                     .ann(span)
                             },
                         ),
@@ -978,11 +1032,38 @@ fn apply_cont<'tree, 'ast>(
                             };
                             path_map.ann(span)
                         }),
-                        K::ConsumeMatch { span, arity } => {
-                            proc_stack.replace_top_slice(arity * 2 + 1, |expr_cases| {
-                                let expr = expr_cases[0];
-                                let cases = &expr_cases[1..];
-                                ast_builder.alloc_match(expr, cases).ann(span)
+                        K::ConsumeMatch {
+                            span,
+                            guards_present,
+                        } => {
+                            // Total slice = expression + sum_per_case(2 if no
+                            // guard, 3 if guard).
+                            let total: usize = 1
+                                + guards_present
+                                    .iter()
+                                    .map(|&g| if g { 3 } else { 2 })
+                                    .sum::<usize>();
+                            proc_stack.replace_top_slice(total, |slice| {
+                                let expr = slice[0];
+                                let mut idx = 1usize;
+                                let cases = guards_present
+                                    .iter()
+                                    .map(|&has_guard| {
+                                        let pattern = slice[idx];
+                                        idx += 1;
+                                        let guard = if has_guard {
+                                            let g = slice[idx];
+                                            idx += 1;
+                                            Some(g)
+                                        } else {
+                                            None
+                                        };
+                                        let proc = slice[idx];
+                                        idx += 1;
+                                        (pattern, guard, proc)
+                                    })
+                                    .collect::<Vec<_>>();
+                                ast_builder.alloc_match_with_guards(expr, cases).ann(span)
                             })
                         }
                         K::ConsumeMethod { span, id, arity } => {
@@ -1127,7 +1208,10 @@ enum K<'tree, 'ast> {
     },
     ConsumeMatch {
         span: SourceSpan,
-        arity: usize,
+        // One bool per case in source order: true if that case has a
+        // `where` guard sitting between its pattern and proc on
+        // proc_stack. Length is the number of cases.
+        guards_present: SmallVec<[bool; 4]>,
     },
     ConsumeMethod {
         span: SourceSpan,
@@ -1237,9 +1321,12 @@ impl Debug for K<'_, '_> {
                 .field("arity", arity)
                 .field("span", span)
                 .finish(),
-            Self::ConsumeMatch { span, arity } => f
+            Self::ConsumeMatch {
+                span,
+                guards_present,
+            } => f
                 .debug_struct("ConsumeMatch")
-                .field("arity", arity)
+                .field("guards_present", guards_present)
                 .field("span", span)
                 .finish(),
             Self::ConsumeMethod { span, id, arity } => f
@@ -1672,6 +1759,7 @@ impl BindDesc {
 struct ReceiptDesc {
     parts: BindDescripts,
     len: usize,
+    has_guard: bool,
 }
 
 struct BindIter<'slice, 'a, O>
@@ -1754,7 +1842,10 @@ impl<'slice, 'a, O> Iterator for ReceiptIter<'slice, 'a, O>
 where
     O: Iterator<Item = &'slice ReceiptDesc> + ExactSizeIterator,
 {
-    type Item = BindIter<'slice, 'a, SliceIter<'slice, BindDesc>>;
+    type Item = (
+        BindIter<'slice, 'a, SliceIter<'slice, BindDesc>>,
+        Option<AnnProc<'a>>,
+    );
 
     #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
@@ -1765,11 +1856,24 @@ where
             self.procs = rest_procs;
             self.mask = rest_mask;
 
-            BindIter {
-                iter: next.parts.iter(),
-                procs: this_procs,
-                mask: this_mask,
-            }
+            // The guard proc — if any — sits at the end of this receipt's
+            // slice (it was pushed last to temp_cont_stack so it ends up
+            // last on proc_stack within this receipt's range).
+            let (bind_procs, bind_mask, guard) = if next.has_guard {
+                let last = this_procs.len() - 1;
+                (&this_procs[..last], &this_mask[..last], Some(this_procs[last]))
+            } else {
+                (this_procs, this_mask, None)
+            };
+
+            (
+                BindIter {
+                    iter: next.parts.iter(),
+                    procs: bind_procs,
+                    mask: bind_mask,
+                },
+                guard,
+            )
         })
     }
 

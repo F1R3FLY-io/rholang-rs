@@ -1,6 +1,5 @@
 ---
 source: rholang-parser/tests/golden.rs
-assertion_line: 23
 expression: result
 ---
 Good(
@@ -563,286 +562,304 @@ Good(
                                 right: AnnProc {
                                     proc: ForComprehension {
                                         receipts: [
-                                            [
-                                                Linear {
-                                                    lhs: Names {
-                                                        names: [
-                                                            Quote(
-                                                                AnnProc {
-                                                                    proc: ProcVar(
-                                                                        Id(
-                                                                            Id {
-                                                                                name: "posBalance",
-                                                                                pos: SourcePos {
-                                                                                    line: 8,
-                                                                                    col: 11,
+                                            Receipt {
+                                                binds: [
+                                                    Linear {
+                                                        lhs: Names {
+                                                            names: [
+                                                                Quote(
+                                                                    AnnProc {
+                                                                        proc: ProcVar(
+                                                                            Id(
+                                                                                Id {
+                                                                                    name: "posBalance",
+                                                                                    pos: SourcePos {
+                                                                                        line: 8,
+                                                                                        col: 11,
+                                                                                    },
                                                                                 },
-                                                                            },
+                                                                            ),
                                                                         ),
-                                                                    ),
-                                                                    span: SourceSpan {
-                                                                        start: SourcePos {
+                                                                        span: SourceSpan {
+                                                                            start: SourcePos {
+                                                                                line: 8,
+                                                                                col: 11,
+                                                                            },
+                                                                            end: SourcePos {
+                                                                                line: 8,
+                                                                                col: 21,
+                                                                            },
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            ],
+                                                            remainder: None,
+                                                        },
+                                                        rhs: Simple {
+                                                            name: NameVar(
+                                                                Id(
+                                                                    Id {
+                                                                        name: "posBalanceCh",
+                                                                        pos: SourcePos {
                                                                             line: 8,
-                                                                            col: 11,
-                                                                        },
-                                                                        end: SourcePos {
-                                                                            line: 8,
-                                                                            col: 21,
+                                                                            col: 25,
                                                                         },
                                                                     },
-                                                                },
+                                                                ),
                                                             ),
-                                                        ],
-                                                        remainder: None,
+                                                        },
                                                     },
-                                                    rhs: Simple {
-                                                        name: NameVar(
-                                                            Id(
-                                                                Id {
-                                                                    name: "posBalanceCh",
-                                                                    pos: SourcePos {
-                                                                        line: 8,
-                                                                        col: 25,
-                                                                    },
-                                                                },
-                                                            ),
-                                                        ),
-                                                    },
-                                                },
-                                            ],
-                                            [
-                                                Linear {
-                                                    lhs: Names {
-                                                        names: [
-                                                            Quote(
-                                                                AnnProc {
-                                                                    proc: ProcVar(
-                                                                        Id(
-                                                                            Id {
-                                                                                name: "totalBond",
-                                                                                pos: SourcePos {
-                                                                                    line: 9,
-                                                                                    col: 11,
+                                                ],
+                                                guard: None,
+                                            },
+                                            Receipt {
+                                                binds: [
+                                                    Linear {
+                                                        lhs: Names {
+                                                            names: [
+                                                                Quote(
+                                                                    AnnProc {
+                                                                        proc: ProcVar(
+                                                                            Id(
+                                                                                Id {
+                                                                                    name: "totalBond",
+                                                                                    pos: SourcePos {
+                                                                                        line: 9,
+                                                                                        col: 11,
+                                                                                    },
                                                                                 },
-                                                                            },
+                                                                            ),
                                                                         ),
-                                                                    ),
-                                                                    span: SourceSpan {
-                                                                        start: SourcePos {
+                                                                        span: SourceSpan {
+                                                                            start: SourcePos {
+                                                                                line: 9,
+                                                                                col: 11,
+                                                                            },
+                                                                            end: SourcePos {
+                                                                                line: 9,
+                                                                                col: 20,
+                                                                            },
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            ],
+                                                            remainder: None,
+                                                        },
+                                                        rhs: Simple {
+                                                            name: NameVar(
+                                                                Id(
+                                                                    Id {
+                                                                        name: "totalBondCh",
+                                                                        pos: SourcePos {
                                                                             line: 9,
-                                                                            col: 11,
-                                                                        },
-                                                                        end: SourcePos {
-                                                                            line: 9,
-                                                                            col: 20,
-                                                                        },
-                                                                    },
-                                                                },
-                                                            ),
-                                                        ],
-                                                        remainder: None,
-                                                    },
-                                                    rhs: Simple {
-                                                        name: NameVar(
-                                                            Id(
-                                                                Id {
-                                                                    name: "totalBondCh",
-                                                                    pos: SourcePos {
-                                                                        line: 9,
-                                                                        col: 24,
-                                                                    },
-                                                                },
-                                                            ),
-                                                        ),
-                                                    },
-                                                },
-                                            ],
-                                            [
-                                                Linear {
-                                                    lhs: Names {
-                                                        names: [
-                                                            Quote(
-                                                                AnnProc {
-                                                                    proc: ProcVar(
-                                                                        Id(
-                                                                            Id {
-                                                                                name: "activeBonds",
-                                                                                pos: SourcePos {
-                                                                                    line: 10,
-                                                                                    col: 11,
-                                                                                },
-                                                                            },
-                                                                        ),
-                                                                    ),
-                                                                    span: SourceSpan {
-                                                                        start: SourcePos {
-                                                                            line: 10,
-                                                                            col: 11,
-                                                                        },
-                                                                        end: SourcePos {
-                                                                            line: 10,
-                                                                            col: 22,
-                                                                        },
-                                                                    },
-                                                                },
-                                                            ),
-                                                        ],
-                                                        remainder: None,
-                                                    },
-                                                    rhs: Simple {
-                                                        name: NameVar(
-                                                            Id(
-                                                                Id {
-                                                                    name: "totalActiveBondCh",
-                                                                    pos: SourcePos {
-                                                                        line: 10,
-                                                                        col: 26,
-                                                                    },
-                                                                },
-                                                            ),
-                                                        ),
-                                                    },
-                                                },
-                                            ],
-                                            [
-                                                Linear {
-                                                    lhs: Names {
-                                                        names: [
-                                                            Quote(
-                                                                AnnProc {
-                                                                    proc: ProcVar(
-                                                                        Id(
-                                                                            Id {
-                                                                                name: "totalWithdraw",
-                                                                                pos: SourcePos {
-                                                                                    line: 11,
-                                                                                    col: 11,
-                                                                                },
-                                                                            },
-                                                                        ),
-                                                                    ),
-                                                                    span: SourceSpan {
-                                                                        start: SourcePos {
-                                                                            line: 11,
-                                                                            col: 11,
-                                                                        },
-                                                                        end: SourcePos {
-                                                                            line: 11,
                                                                             col: 24,
                                                                         },
                                                                     },
-                                                                },
+                                                                ),
                                                             ),
-                                                        ],
-                                                        remainder: None,
+                                                        },
                                                     },
-                                                    rhs: Simple {
-                                                        name: NameVar(
+                                                ],
+                                                guard: None,
+                                            },
+                                            Receipt {
+                                                binds: [
+                                                    Linear {
+                                                        lhs: Names {
+                                                            names: [
+                                                                Quote(
+                                                                    AnnProc {
+                                                                        proc: ProcVar(
+                                                                            Id(
+                                                                                Id {
+                                                                                    name: "activeBonds",
+                                                                                    pos: SourcePos {
+                                                                                        line: 10,
+                                                                                        col: 11,
+                                                                                    },
+                                                                                },
+                                                                            ),
+                                                                        ),
+                                                                        span: SourceSpan {
+                                                                            start: SourcePos {
+                                                                                line: 10,
+                                                                                col: 11,
+                                                                            },
+                                                                            end: SourcePos {
+                                                                                line: 10,
+                                                                                col: 22,
+                                                                            },
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            ],
+                                                            remainder: None,
+                                                        },
+                                                        rhs: Simple {
+                                                            name: NameVar(
+                                                                Id(
+                                                                    Id {
+                                                                        name: "totalActiveBondCh",
+                                                                        pos: SourcePos {
+                                                                            line: 10,
+                                                                            col: 26,
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            ),
+                                                        },
+                                                    },
+                                                ],
+                                                guard: None,
+                                            },
+                                            Receipt {
+                                                binds: [
+                                                    Linear {
+                                                        lhs: Names {
+                                                            names: [
+                                                                Quote(
+                                                                    AnnProc {
+                                                                        proc: ProcVar(
+                                                                            Id(
+                                                                                Id {
+                                                                                    name: "totalWithdraw",
+                                                                                    pos: SourcePos {
+                                                                                        line: 11,
+                                                                                        col: 11,
+                                                                                    },
+                                                                                },
+                                                                            ),
+                                                                        ),
+                                                                        span: SourceSpan {
+                                                                            start: SourcePos {
+                                                                                line: 11,
+                                                                                col: 11,
+                                                                            },
+                                                                            end: SourcePos {
+                                                                                line: 11,
+                                                                                col: 24,
+                                                                            },
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            ],
+                                                            remainder: None,
+                                                        },
+                                                        rhs: Simple {
+                                                            name: NameVar(
+                                                                Id(
+                                                                    Id {
+                                                                        name: "totalWithdrawCh",
+                                                                        pos: SourcePos {
+                                                                            line: 11,
+                                                                            col: 28,
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            ),
+                                                        },
+                                                    },
+                                                ],
+                                                guard: None,
+                                            },
+                                            Receipt {
+                                                binds: [
+                                                    Linear {
+                                                        lhs: Names {
+                                                            names: [
+                                                                Quote(
+                                                                    AnnProc {
+                                                                        proc: ProcVar(
+                                                                            Id(
+                                                                                Id {
+                                                                                    name: "totalCommittedRewards",
+                                                                                    pos: SourcePos {
+                                                                                        line: 12,
+                                                                                        col: 11,
+                                                                                    },
+                                                                                },
+                                                                            ),
+                                                                        ),
+                                                                        span: SourceSpan {
+                                                                            start: SourcePos {
+                                                                                line: 12,
+                                                                                col: 11,
+                                                                            },
+                                                                            end: SourcePos {
+                                                                                line: 12,
+                                                                                col: 32,
+                                                                            },
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            ],
+                                                            remainder: None,
+                                                        },
+                                                        rhs: Simple {
+                                                            name: NameVar(
+                                                                Id(
+                                                                    Id {
+                                                                        name: "committedRewardsCh",
+                                                                        pos: SourcePos {
+                                                                            line: 12,
+                                                                            col: 36,
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            ),
+                                                        },
+                                                    },
+                                                ],
+                                                guard: None,
+                                            },
+                                            Receipt {
+                                                binds: [
+                                                    Peek {
+                                                        lhs: Names {
+                                                            names: [
+                                                                Quote(
+                                                                    AnnProc {
+                                                                        proc: ProcVar(
+                                                                            Id(
+                                                                                Id {
+                                                                                    name: "state",
+                                                                                    pos: SourcePos {
+                                                                                        line: 13,
+                                                                                        col: 11,
+                                                                                    },
+                                                                                },
+                                                                            ),
+                                                                        ),
+                                                                        span: SourceSpan {
+                                                                            start: SourcePos {
+                                                                                line: 13,
+                                                                                col: 11,
+                                                                            },
+                                                                            end: SourcePos {
+                                                                                line: 13,
+                                                                                col: 16,
+                                                                            },
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            ],
+                                                            remainder: None,
+                                                        },
+                                                        rhs: NameVar(
                                                             Id(
                                                                 Id {
-                                                                    name: "totalWithdrawCh",
+                                                                    name: "stateCh",
                                                                     pos: SourcePos {
-                                                                        line: 11,
-                                                                        col: 28,
+                                                                        line: 13,
+                                                                        col: 21,
                                                                     },
                                                                 },
                                                             ),
                                                         ),
                                                     },
-                                                },
-                                            ],
-                                            [
-                                                Linear {
-                                                    lhs: Names {
-                                                        names: [
-                                                            Quote(
-                                                                AnnProc {
-                                                                    proc: ProcVar(
-                                                                        Id(
-                                                                            Id {
-                                                                                name: "totalCommittedRewards",
-                                                                                pos: SourcePos {
-                                                                                    line: 12,
-                                                                                    col: 11,
-                                                                                },
-                                                                            },
-                                                                        ),
-                                                                    ),
-                                                                    span: SourceSpan {
-                                                                        start: SourcePos {
-                                                                            line: 12,
-                                                                            col: 11,
-                                                                        },
-                                                                        end: SourcePos {
-                                                                            line: 12,
-                                                                            col: 32,
-                                                                        },
-                                                                    },
-                                                                },
-                                                            ),
-                                                        ],
-                                                        remainder: None,
-                                                    },
-                                                    rhs: Simple {
-                                                        name: NameVar(
-                                                            Id(
-                                                                Id {
-                                                                    name: "committedRewardsCh",
-                                                                    pos: SourcePos {
-                                                                        line: 12,
-                                                                        col: 36,
-                                                                    },
-                                                                },
-                                                            ),
-                                                        ),
-                                                    },
-                                                },
-                                            ],
-                                            [
-                                                Peek {
-                                                    lhs: Names {
-                                                        names: [
-                                                            Quote(
-                                                                AnnProc {
-                                                                    proc: ProcVar(
-                                                                        Id(
-                                                                            Id {
-                                                                                name: "state",
-                                                                                pos: SourcePos {
-                                                                                    line: 13,
-                                                                                    col: 11,
-                                                                                },
-                                                                            },
-                                                                        ),
-                                                                    ),
-                                                                    span: SourceSpan {
-                                                                        start: SourcePos {
-                                                                            line: 13,
-                                                                            col: 11,
-                                                                        },
-                                                                        end: SourcePos {
-                                                                            line: 13,
-                                                                            col: 16,
-                                                                        },
-                                                                    },
-                                                                },
-                                                            ),
-                                                        ],
-                                                        remainder: None,
-                                                    },
-                                                    rhs: NameVar(
-                                                        Id(
-                                                            Id {
-                                                                name: "stateCh",
-                                                                pos: SourcePos {
-                                                                    line: 13,
-                                                                    col: 21,
-                                                                },
-                                                            },
-                                                        ),
-                                                    ),
-                                                },
-                                            ],
+                                                ],
+                                                guard: None,
+                                            },
                                         ],
                                         proc: AnnProc {
                                             proc: Send {

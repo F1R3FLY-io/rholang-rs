@@ -1529,6 +1529,31 @@
           }
         },
         {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "STRING",
+                  "value": "where"
+                },
+                {
+                  "type": "FIELD",
+                  "name": "guard",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "_proc"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
           "type": "STRING",
           "value": "=>"
         },
@@ -1573,6 +1598,31 @@
               }
             ]
           }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "STRING",
+                  "value": "where"
+                },
+                {
+                  "type": "FIELD",
+                  "name": "guard",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "_proc"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         },
         {
           "type": "STRING",
@@ -1626,50 +1676,80 @@
       "type": "SEQ",
       "members": [
         {
-          "type": "CHOICE",
+          "type": "SEQ",
           "members": [
             {
-              "type": "SYMBOL",
-              "name": "linear_bind"
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "linear_bind"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "repeated_bind"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "peek_bind"
+                }
+              ]
             },
             {
-              "type": "SYMBOL",
-              "name": "repeated_bind"
-            },
-            {
-              "type": "SYMBOL",
-              "name": "peek_bind"
+              "type": "REPEAT",
+              "content": {
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "STRING",
+                    "value": "&"
+                  },
+                  {
+                    "type": "CHOICE",
+                    "members": [
+                      {
+                        "type": "SYMBOL",
+                        "name": "linear_bind"
+                      },
+                      {
+                        "type": "SYMBOL",
+                        "name": "repeated_bind"
+                      },
+                      {
+                        "type": "SYMBOL",
+                        "name": "peek_bind"
+                      }
+                    ]
+                  }
+                ]
+              }
             }
           ]
         },
         {
-          "type": "REPEAT",
-          "content": {
-            "type": "SEQ",
-            "members": [
-              {
-                "type": "STRING",
-                "value": "&"
-              },
-              {
-                "type": "CHOICE",
-                "members": [
-                  {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "STRING",
+                  "value": "where"
+                },
+                {
+                  "type": "FIELD",
+                  "name": "guard",
+                  "content": {
                     "type": "SYMBOL",
-                    "name": "linear_bind"
-                  },
-                  {
-                    "type": "SYMBOL",
-                    "name": "repeated_bind"
-                  },
-                  {
-                    "type": "SYMBOL",
-                    "name": "peek_bind"
+                    "name": "_proc"
                   }
-                ]
-              }
-            ]
-          }
+                }
+              ]
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         }
       ]
     },
@@ -2778,6 +2858,10 @@
       {
         "type": "STRING",
         "value": "false"
+      },
+      {
+        "type": "STRING",
+        "value": "where"
       }
     ]
   }

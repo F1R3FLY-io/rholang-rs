@@ -34,7 +34,8 @@ module.exports = grammar({
             "not",
             "bundle",
             "true",
-            "false"
+            "false",
+            "where"
         ],
     },
 
@@ -224,14 +225,36 @@ module.exports = grammar({
         bundle_read_write: $ => 'bundle',
 
         // case in match expression
-        case: $ => seq(field('pattern', $._proc), '=>', field('proc', $._proc)),
+        // Optional `where` guard: `pattern where guard => proc`. If the guard
+        // evaluates to true, the case fires; if false, fall through to the
+        // next case. Non-bool guard also falls through.
+        case: $ => seq(
+            field('pattern', $._proc),
+            optional(seq('where', field('guard', $._proc))),
+            '=>',
+            field('proc', $._proc)
+        ),
 
         // branch in select expression
-        branch: $ => seq(field('pattern', semiSep1($.linear_bind)), '=>', field('proc', choice($.send, $._proc_expression))),
+        // Optional `where` guard: only commit (consume messages) if every
+        // spatial pattern matches AND the guard evaluates to true.
+        // Guard-false is indistinguishable from a spatial mismatch.
+        branch: $ => seq(
+            field('pattern', semiSep1($.linear_bind)),
+            optional(seq('where', field('guard', $._proc))),
+            '=>',
+            field('proc', choice($.send, $._proc_expression))
+        ),
 
         // for comprehensions
+        // Optional `where` guard on a receipt: only commit (consume messages)
+        // if every spatial pattern matches AND the guard evaluates to true.
+        // Guard-false is indistinguishable from a spatial mismatch.
         receipts: $ => semiSep1($.receipt),
-        receipt: $ => conc1(choice($.linear_bind, $.repeated_bind, $.peek_bind)),
+        receipt: $ => seq(
+            conc1(choice($.linear_bind, $.repeated_bind, $.peek_bind)),
+            optional(seq('where', field('guard', $._proc)))
+        ),
 
         linear_bind: $ => seq(
             optional(field('names', $.names)),

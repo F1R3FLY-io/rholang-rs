@@ -31,39 +31,42 @@ Good(
                 proc: AnnProc {
                     proc: ForComprehension {
                         receipts: [
-                            [
-                                Linear {
-                                    lhs: Names {
-                                        names: [
-                                            NameVar(
+                            Receipt {
+                                binds: [
+                                    Linear {
+                                        lhs: Names {
+                                            names: [
+                                                NameVar(
+                                                    Id(
+                                                        Id {
+                                                            name: "auction_contract",
+                                                            pos: SourcePos {
+                                                                line: 12,
+                                                                col: 10,
+                                                            },
+                                                        },
+                                                    ),
+                                                ),
+                                            ],
+                                            remainder: None,
+                                        },
+                                        rhs: Simple {
+                                            name: NameVar(
                                                 Id(
                                                     Id {
-                                                        name: "auction_contract",
+                                                        name: "rtn",
                                                         pos: SourcePos {
                                                             line: 12,
-                                                            col: 10,
+                                                            col: 30,
                                                         },
                                                     },
                                                 ),
                                             ),
-                                        ],
-                                        remainder: None,
+                                        },
                                     },
-                                    rhs: Simple {
-                                        name: NameVar(
-                                            Id(
-                                                Id {
-                                                    name: "rtn",
-                                                    pos: SourcePos {
-                                                        line: 12,
-                                                        col: 30,
-                                                    },
-                                                },
-                                            ),
-                                        ),
-                                    },
-                                },
-                            ],
+                                ],
+                                guard: None,
+                            },
                         ],
                         proc: AnnProc {
                             proc: Send {
