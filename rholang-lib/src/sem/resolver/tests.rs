@@ -1259,3 +1259,221 @@ fn test_numeric_homogeneous_expression_is_valid<'test>(
 ) {
     expect::no_warnings_or_errors(db);
 }
+
+#[test_rholang_code(
+    r#"
+match 1 {
+    x where missing => Nil
+    _ => Nil
+}"#, pipeline = pipeline
+)]
+fn test_match_guard_unbound_var<'test>(
+    _tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    expect::error(db, ErrorKind::UnboundVariable, matches::proc_var("missing"));
+}
+
+#[test_rholang_code(
+    r#"
+match 1 {
+    x where x => Nil
+    _ => Nil
+}"#, pipeline = pipeline
+)]
+fn test_match_guard_bound_var<'test>(
+    _tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    expect::no_warnings_or_errors(db);
+}
+
+#[test_rholang_code(
+    r#"
+new chan in {
+    for (@x <- chan where missing) { Nil }
+}"#, pipeline = pipeline
+)]
+fn test_for_receipt_guard_unbound_var<'test>(
+    _tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    expect::error(db, ErrorKind::UnboundVariable, matches::proc_var("missing"));
+}
+
+#[test_rholang_code(
+    r#"
+new chan in {
+    for (@x <- chan where x) { Nil }
+}"#, pipeline = pipeline
+)]
+fn test_for_receipt_guard_bound_var<'test>(
+    _tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    expect::no_warnings_or_errors(db);
+}
+
+// ---------------------------------------------------------------------------
+// R5.1 / scoping edge cases for `where`-clause guards
+// ---------------------------------------------------------------------------
+
+// Genuinely-nested for-comprehensions: the inner guard must see variables
+// bound by the outer for-comp's pattern.
+#[test_rholang_code(
+    r#"
+new a, b in {
+    for (@x <- a) {
+        for (@y <- b where y > x) { Nil }
+    }
+}"#, pipeline = pipeline
+)]
+fn test_nested_for_inner_guard_refs_outer_binder<'test>(
+    _tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    expect::no_warnings_or_errors(db);
+}
+
+// Three-bind atomic join: guard sees every binder introduced by the &-group.
+#[test_rholang_code(
+    r#"
+new a, b, c in {
+    for (@x <- a & @y <- b & @z <- c where x + y > z) { Nil }
+}"#, pipeline = pipeline
+)]
+fn test_three_bind_join_guard_sees_all_binders<'test>(
+    _tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    expect::no_warnings_or_errors(db);
+}
+
+// Sequential receipts: the second receipt's guard references a binder
+// introduced by the *first* receipt. That works because guards are resolved
+// after the entire `resolve_sequence` has merged every receipt's binders
+// into the for's scope.
+#[test_rholang_code(
+    r#"
+new a, b in {
+    for (@x <- a where x > 0; @y <- b where y < x) { Nil }
+}"#, pipeline = pipeline
+)]
+fn test_sequential_receipts_second_guard_refs_first_binder<'test>(
+    _tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    expect::no_warnings_or_errors(db);
+}
+
+// Match-case guard nested inside a for-comp: the guard references both the
+// case's pattern binder *and* the enclosing for-comp's binder.
+#[test_rholang_code(
+    r#"
+new chan in {
+    for (@v <- chan) {
+        match v {
+            n where n > v => Nil
+            _ => Nil
+        }
+    }
+}"#, pipeline = pipeline
+)]
+fn test_match_guard_inside_for_refs_pattern_and_outer_binder<'test>(
+    _tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    expect::no_warnings_or_errors(db);
+}
+
+// Each match case has its own pattern scope: a guard may not reference a
+// binder from a *sibling* case's pattern.
+#[test_rholang_code(
+    r#"
+match 1 {
+    n => n
+    m where n > 0 => m
+}"#, pipeline = pipeline
+)]
+fn test_match_guard_cannot_see_sibling_case_binder<'test>(
+    _tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    expect::error(db, ErrorKind::UnboundVariable, matches::proc_var("n"));
+}
+
+// Guard payload that is itself a `match` expression — its inner pattern
+// binder must be in scope inside the inner case body, but should *not* leak
+// out to the rest of the outer case body.
+#[test_rholang_code(
+    r#"
+new chan in {
+    for (@x <- chan where match x { 1 => true _ => false }) { Nil }
+}"#, pipeline = pipeline
+)]
+fn test_for_receipt_guard_with_match_expression_resolves<'test>(
+    _tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    expect::no_warnings_or_errors(db);
+}
+
+// Guard with method-call shape over a bound variable.
+#[test_rholang_code(
+    r#"
+new chan in {
+    for (@xs <- chan where xs.length() > 0) { Nil }
+}"#, pipeline = pipeline
+)]
+fn test_for_receipt_guard_with_method_call_resolves<'test>(
+    _tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    expect::no_warnings_or_errors(db);
+}
+
+// Mixed cases: only some have guards. The guarded case's pattern binder is
+// referenced by the guard; the unguarded cases must still resolve cleanly.
+#[test_rholang_code(
+    r#"
+match 1 {
+    0 => Nil
+    n where n > 0 => Nil
+    _ => Nil
+}"#, pipeline = pipeline
+)]
+fn test_match_mixed_guards_all_resolve<'test>(
+    _tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    expect::no_warnings_or_errors(db);
+}
+
+// A guard that closes over a variable from the outer `new` decl.
+#[test_rholang_code(
+    r#"
+new threshold, chan in {
+    for (@x <- chan where x > *threshold) { Nil }
+}"#, pipeline = pipeline
+)]
+fn test_for_receipt_guard_refs_outer_new_binder<'test>(
+    _tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    expect::no_warnings_or_errors(db);
+}
+
+// Concurrent (&) join with one guard referencing a binder from a different
+// bind group within the same receipt. (& binds are introduced together.)
+#[test_rholang_code(
+    r#"
+new a, b in {
+    for (@x <- a & @y <- b where x > y) { Nil }
+}"#, pipeline = pipeline
+)]
+fn test_concurrent_join_guard_refs_other_group<'test>(
+    _tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    expect::no_warnings_or_errors(db);
+}

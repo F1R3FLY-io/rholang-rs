@@ -687,6 +687,7 @@ pub struct SelectPattern<'ast> {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Branch<'ast> {
     pub patterns: Vec<SelectPattern<'ast>>,
+    pub guard: Option<AnnProc<'ast>>,
     pub proc: AnnProc<'ast>,
 }
 

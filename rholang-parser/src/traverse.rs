@@ -269,9 +269,14 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
             }
 
             Proc::ForComprehension { receipts, proc } => {
-                self.push_children(
-                    iter::once(proc).chain(receipts.iter().flat_map(|r| inputs(&r.binds))),
-                );
+                // Per receipt: visit any in-source-position procs (e.g.
+                // send-receive inputs `@x!?(P)` whose `P` is a process)
+                // followed by the optional `where` guard.
+                self.push_children(iter::once(proc).chain(
+                    receipts
+                        .iter()
+                        .flat_map(|r| inputs(&r.binds).chain(r.guard.as_ref())),
+                ));
             }
 
             Proc::Let { bindings, body, .. } => {
@@ -301,7 +306,7 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
                 for case in cases.iter().rev() {
                     let Case {
                         pattern,
-                        guard: _,
+                        guard,
                         proc: body,
                     } = case;
 
@@ -309,6 +314,10 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
                     self.stack.push(Frame::Event(DfsEvent::Exit(pattern)));
                     // now push body expansion (normal node)
                     self.expand_node(body);
+                    // optional `where` guard sits between pattern and body
+                    if let Some(g) = guard {
+                        self.expand_node(g);
+                    }
                     // expand pattern children inline
                     self.expand_node_naked(pattern);
                     // pattern enter
@@ -570,23 +579,28 @@ fn let_lhss<'a>(bindings: &'a [LetBinding<'a>]) -> impl DoubleEndedIterator<Item
     bindings.iter().flat_map(|binding| &binding.lhs.names)
 }
 
-/// Helper: extract sources + their inputs from `ForComprehension` receipts.
+/// Helper: extract sources + their inputs + optional `where` guards from
+/// `ForComprehension` receipts. Per receipt, yields each bind's quoted-source
+/// process and send-receive inputs, then the receipt's guard if present.
 fn for_comprehension_inputs<'a>(
     receipts: &'a [Receipt<'a>],
 ) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
-    receipts
-        .iter()
-        .flat_map(|receipt| receipt.binds.iter())
-        .flat_map(|binding| {
-            let name_proc = if let Name::Quote(quoted) = binding.source_name() {
-                Some(quoted)
-            } else {
-                None
-            };
-            let quoted_iter = name_proc.into_iter();
-            let input_iter = binding.input().into_iter().flatten();
-            quoted_iter.chain(input_iter)
-        })
+    receipts.iter().flat_map(|receipt| {
+        receipt
+            .binds
+            .iter()
+            .flat_map(|binding| {
+                let name_proc = if let Name::Quote(quoted) = binding.source_name() {
+                    Some(quoted)
+                } else {
+                    None
+                };
+                let quoted_iter = name_proc.into_iter();
+                let input_iter = binding.input().into_iter().flatten();
+                quoted_iter.chain(input_iter)
+            })
+            .chain(receipt.guard.as_ref())
+    })
 }
 
 /// Helper: extract sources + their outputs from `ForComprehension` receipts.
@@ -603,11 +617,14 @@ fn for_comprehension_outputs<'a>(
         })
 }
 
-/// Helper: extract expression + cases from `Match`.
+/// Helper: extract pattern + optional `where` guard + body for each
+/// `Match` case, in source order.
 fn match_cases<'a>(cases: &'a [Case<'a>]) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
-    cases
-        .iter()
-        .flat_map(|case| iter::once(&case.pattern).chain(iter::once(&case.proc)))
+    cases.iter().flat_map(|case| {
+        iter::once(&case.pattern)
+            .chain(case.guard.as_ref())
+            .chain(iter::once(&case.proc))
+    })
 }
 
 // /// Helper: extract inputs + branch body from `Select`.
@@ -1645,5 +1662,188 @@ mod tests {
         );
 
         assert_same_events(events, root.iter_dfs_event_with_names());
+    }
+
+    #[test]
+    fn match_case_with_guard_visits_guard_between_pattern_and_body() {
+        /* match x { p where g => y; q => z } */
+        let x = Proc::ProcVar(Var::Id(Id {
+            name: "x",
+            pos: SourcePos::at_col(7),
+        }));
+        let p = Proc::ProcVar(Var::Id(Id {
+            name: "p",
+            pos: SourcePos::at_col(11),
+        }));
+        let g = Proc::ProcVar(Var::Id(Id {
+            name: "g",
+            pos: SourcePos::at_col(19),
+        }));
+        let y = Proc::ProcVar(Var::Id(Id {
+            name: "y",
+            pos: SourcePos::at_col(24),
+        }));
+        let q = Proc::ProcVar(Var::Id(Id {
+            name: "q",
+            pos: SourcePos::at_col(28),
+        }));
+        let z = Proc::ProcVar(Var::Id(Id {
+            name: "z",
+            pos: SourcePos::at_col(33),
+        }));
+
+        let match_exp = Proc::Match {
+            expression: x.ann(SourcePos::at_col(7).span_of(1)),
+            cases: vec![
+                Case {
+                    pattern: p.ann(SourcePos::at_col(11).span_of(1)),
+                    guard: Some(g.ann(SourcePos::at_col(19).span_of(1))),
+                    proc: y.ann(SourcePos::at_col(24).span_of(1)),
+                },
+                Case {
+                    pattern: q.ann(SourcePos::at_col(28).span_of(1)),
+                    guard: None,
+                    proc: z.ann(SourcePos::at_col(33).span_of(1)),
+                },
+            ],
+        };
+        let root = match_exp.ann(SourceSpan {
+            start: SourcePos::default(),
+            end: SourcePos { line: 1, col: 35 },
+        });
+
+        let events: Vec<_> = root.iter_dfs_event().collect();
+        assert_matches!(
+            events.as_slice(),
+            [
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::Match { .. },
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "x", .. })),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "x", .. })),
+                    ..
+                }),
+                // case 1: pattern → guard → body, all wrapped by pattern enter/exit
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "p", .. })),
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "g", .. })),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "g", .. })),
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "y", .. })),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "y", .. })),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "p", .. })),
+                    ..
+                }),
+                // case 2: no guard
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "q", .. })),
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "z", .. })),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "z", .. })),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "q", .. })),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::Match { .. },
+                    ..
+                })
+            ]
+        );
+
+        assert_same_events(events, root.iter_dfs_event_with_names());
+    }
+
+    #[test]
+    fn for_comprehension_with_receipt_guard_visits_guard_after_inputs() {
+        /* for (_ <- ch where g) { body } */
+        let bind = Bind::Linear {
+            lhs: Names::single(Name::NameVar(Var::Wildcard)),
+            rhs: Source::Simple {
+                name: Name::NameVar(Var::Id(Id {
+                    name: "ch",
+                    pos: SourcePos::at_col(11),
+                })),
+            },
+        };
+        let g = Proc::ProcVar(Var::Id(Id {
+            name: "g",
+            pos: SourcePos::at_col(20),
+        }));
+        let body = Proc::ProcVar(Var::Id(Id {
+            name: "body",
+            pos: SourcePos::at_col(25),
+        }));
+
+        let for_comp = Proc::ForComprehension {
+            receipts: smallvec![Receipt {
+                binds: smallvec![bind],
+                guard: Some(g.ann(SourcePos::at_col(20).span_of(1))),
+            }],
+            proc: body.ann(SourcePos::at_col(25).span_of(4)),
+        };
+        let root = for_comp.ann(SourceSpan {
+            start: SourcePos::default(),
+            end: SourcePos { line: 1, col: 30 },
+        });
+
+        let events: Vec<_> = root.iter_dfs_event().collect();
+        // No quoted-name source, no send-receive inputs, so the only proc-position
+        // children are the for body and the receipt guard.
+        assert_matches!(
+            events.as_slice(),
+            [
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::ForComprehension { .. },
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "body", .. })),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "body", .. })),
+                    ..
+                }),
+                DfsEvent::Enter(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "g", .. })),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::ProcVar(Var::Id(Id { name: "g", .. })),
+                    ..
+                }),
+                DfsEvent::Exit(AnnProc {
+                    proc: Proc::ForComprehension { .. },
+                    ..
+                })
+            ]
+        );
     }
 }

@@ -142,6 +142,7 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
         Match { expression, cases } => {
             fn resolve_case<'a>(
                 pattern: ProcRef<'a>,
+                guard: Option<ProcRef<'a>>,
                 proc: ProcRef<'a>,
                 db: &mut SemanticDb<'a>,
                 stack: &mut BindingStack,
@@ -158,17 +159,24 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
                 );
 
                 let mut body = LexicallyScoped::free(db, stack, pat_id, pattern_scope);
-                body.with(|db, scoped_stack| resolve_rec(db, scoped_stack, proc))
+                body.with(|db, scoped_stack| {
+                    // Guard sees the same bindings as the body — pattern binders
+                    // plus the enclosing environment.
+                    if let Some(g) = guard {
+                        resolve_unguarded(db, scoped_stack, g);
+                    }
+                    resolve_rec(db, scoped_stack, proc)
+                })
             }
 
             resolve_unguarded(db, stack, expression);
             for Case {
                 pattern,
-                guard: _,
+                guard,
                 proc,
             } in cases
             {
-                resolve_case(pattern, proc, db, stack);
+                resolve_case(pattern, guard.as_ref(), proc, db, stack);
             }
         }
 
@@ -254,6 +262,17 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
                         concurrent.iter().map(|bind| bind.names())
                     },
                 );
+
+                // After every receipt's binders are merged into the scope,
+                // resolve any per-receipt `where` guards. The for-comprehension
+                // commits atomically, so each guard is allowed to reference any
+                // binder introduced by the for; we resolve all guards in the
+                // single merged scope.
+                for receipt in sequential {
+                    if let Some(guard) = &receipt.guard {
+                        resolve_unguarded(db, scoped_stack, guard);
+                    }
+                }
 
                 resolve_rec(db, scoped_stack, proc);
             });

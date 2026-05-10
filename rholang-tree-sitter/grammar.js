@@ -236,7 +236,15 @@ module.exports = grammar({
         ),
 
         // branch in select expression
-        branch: $ => seq(field('pattern', semiSep1($.linear_bind)), '=>', field('proc', choice($.send, $._proc_expression))),
+        // Optional `where` guard: only commit (consume messages) if every
+        // spatial pattern matches AND the guard evaluates to true.
+        // Guard-false is indistinguishable from a spatial mismatch.
+        branch: $ => seq(
+            field('pattern', semiSep1($.linear_bind)),
+            optional(seq('where', field('guard', $._proc))),
+            '=>',
+            field('proc', choice($.send, $._proc_expression))
+        ),
 
         // for comprehensions
         // Optional `where` guard on a receipt: only commit (consume messages)

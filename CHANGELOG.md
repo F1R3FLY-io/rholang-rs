@@ -19,16 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - float `%` operator rejection
 - Runtime numeric evaluator in shell for arithmetic expressions and explicit cast builtins
 - Runtime numeric support validation over parsed ASTs to reject unsupported float widths in non-expression programs
-- `where`-clause guards on receipts and match cases:
+- `where`-clause guards on receipts, match cases, and select branches:
   - `for(p <- chan where cond) { P }` — atomic guard on a receive (must
     satisfy spatial match AND guard for the for to commit; guard-failure is
     indistinguishable from a spatial mismatch)
   - `match e { p where cond => Q ... }` — guard on a match case (a non-true
     guard falls through to the next case)
+  - `select { p <- chan where cond => Q ... }` — guard on a select branch
+    (parallel semantics to receipt guards)
 - `where` is now a globally reserved keyword
 - New `Receipt` AST node with `binds` and an optional `guard: AnnProc`;
-  `Case.guard: Option<AnnProc>` for match-case guards
+  `Case.guard: Option<AnnProc>` for match-case guards;
+  `Branch.guard: Option<AnnProc>` for select-branch guards
 - CPS parser populates the new `guard` fields on AST construction
+  (Select itself remains unimplemented in the parser)
 
 ### Changed
 - Shell main-function tests now assert non-hanging behavior in non-interactive test environments
