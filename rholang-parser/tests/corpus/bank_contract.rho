@@ -1,85 +1,80 @@
 new
   stdout(`rho:io:stdout`),
   registry(`rho:registry:lookup`),
-  registryInsert(`rho:registry:insert`),
-  makeBank,
-  return in {
+  registryInsert(`rho:registry:insert`) in {
 
-  contract makeBank(@initialBalances, ret) = {
+  agent Bank {
+    constructor(@initialBalances) {
+      new loop in {
+        // Initialize account balances
+        for (@() <- loop) {
+          for (@(name, balance) <- initialBalances) {
+            Bank!(name, balance)
+          }
+        } |
+        loop!(*nil)
+      }
+    } |
 
-    new balances, loop in {
-
-      // Initialize account balances
-      for (@() <- loop) {
-        for (@(name, balance) <- initialBalances) {
-          balances!(name, balance)
-        }
-      } |
-
-      loop!(*nil) |
-
-      // Define the bank contract
-      contract bank(@"deposit", name, amount, ack) = {
-        for (name2, old <- balances) {
-          match name == name2 {
-            true => {
-              let newBalance = old + amount in {
-                balances!(name, newBalance) |
-                ack!("Deposited " ++ amount.toString() ++ " into " ++ name)
-              }
-            }
-            false => {
-              ack!("Account not found")
+    method deposit(name, amount, ack) {
+      for (name2, old <- Bank) {
+        match name == name2 {
+          true => {
+            let newBalance = old + amount in {
+              Bank!(name, newBalance) |
+              ack!("Deposited " ++ amount.toString() ++ " into " ++ name)
             }
           }
+          false => {
+            ack!("Account not found")
+          }
         }
-      } |
+      }
+    } |
 
-      contract bank(@"withdraw", name, amount, ack) = {
-        for (name2, old <- balances) {
-          match name == name2 {
-            true => {
-              match old >= amount {
-                true => {
-                  let newBalance = old - amount in {
-                    balances!(name, newBalance) |
-                    ack!("Withdrew " ++ amount.toString() ++ " from " ++ name)
-                  }
-                }
-                false => {
-                  ack!("Insufficient funds")
+    method withdraw(name, amount, ack) {
+      for (name2, old <- Bank) {
+        match name == name2 {
+          true => {
+            match old >= amount {
+              true => {
+                let newBalance = old - amount in {
+                  Bank!(name, newBalance) |
+                  ack!("Withdrew " ++ amount.toString() ++ " from " ++ name)
                 }
               }
-            }
-            false => {
-              ack!("Account not found")
+              false => {
+                ack!("Insufficient funds")
+              }
             }
           }
-        }
-      } |
-
-      contract bank(@"getBalance", name, ack) = {
-        for (name2, balance <- balances) {
-          match name == name2 {
-            true => ack!(balance)
-            false => ack!("Account not found")
+          false => {
+            ack!("Account not found")
           }
         }
-      } |
+      }
+    } |
 
-      ret!(bank)
+    method getBalance(name, ack) {
+      for (name2, balance <- Bank) {
+        match name == name2 {
+          true => ack!(balance)
+          false => ack!("Account not found")
+        }
+      }
     }
   } |
 
   // Example usage:
-  makeBank!([["Alice", 100], ["Bob", 50]], *return) |
-
-  for (bank <- return) {
+  // Bank is already available in the scope!
+  new ack0 in {
+    Bank!$constructor([["Alice", 100], ["Bob", 50]]) | // initialize the bank
+    // wait for init? Actually constructor has no ack here.
     new ack1, ack2, ack3, ack4 in {
-      bank!("deposit", "Alice", 25, *ack1) |
-      bank!("withdraw", "Bob", 20, *ack2) |
-      bank!("getBalance", "Alice", *ack3) |
-      bank!("getBalance", "Charlie", *ack4) |
+      Bank!deposit("Alice", 25, *ack1) |
+      Bank!withdraw("Bob", 20, *ack2) |
+      Bank!getBalance("Alice", *ack3) |
+      Bank!getBalance("Charlie", *ack4) |
 
       for (msg <- ack1) { stdout!(msg) } |
       for (msg <- ack2) { stdout!(msg) } |

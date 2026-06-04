@@ -1,0 +1,33 @@
+agent Cell {
+    constructor() {
+        new state in {
+            state!(0)
+        }
+    } |
+
+    method get(ret) {
+        for (@val <<- state) {
+            ret!(val)
+        }
+    } |
+
+    method set(val, ret) {
+        for (_ <- state) {
+            state!(val) | ret!(true)
+        }
+    } |
+
+    default(msg, ret) {
+        ret!(false)
+    }
+}
+|
+new ret in {
+    Cell!get(*ret) |
+    for (@val <- ret) {
+        Cell!set(val + 1, *ret) |
+        for (@success <- ret) {
+            Cell!?get().
+        }
+    }
+}

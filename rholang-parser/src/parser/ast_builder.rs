@@ -2,9 +2,9 @@ use smallvec::ToSmallVec;
 use typed_arena::Arena;
 
 use crate::ast::{
-    AnnProc, BinaryExpOp, Bind, BundleType, Case, Collection, Id, KeyValuePair, LetBinding, Name,
-    NameDecl, Names, Proc, Receipt, SendType, SimpleType, SyncSendCont, UnaryExpOp, Var,
-    VarRefKind,
+    AgentDefault, AgentMethod, AnnProc, BinaryExpOp, Bind, BundleType, Case, Collection, Id,
+    KeyValuePair, LetBinding, Name, NameDecl, Names, Proc, Receipt, SendType, SimpleType,
+    SyncSendCont, UnaryExpOp, Var, VarRefKind,
 };
 
 pub struct ASTBuilder<'ast> {
@@ -378,6 +378,73 @@ impl<'ast> ASTBuilder<'ast> {
             name,
             formals,
             body,
+        })
+    }
+
+    /// Allocates a `Proc::Agent` node (agent syntactic sugar).
+    pub fn alloc_agent(
+        &self,
+        name: Id<'ast>,
+        constructor_formals: Names<'ast>,
+        constructor_body: AnnProc<'ast>,
+        methods: Vec<AgentMethod<'ast>>,
+        default: Option<AgentDefault<'ast>>,
+    ) -> &Proc<'ast> {
+        self.arena.alloc(Proc::Agent {
+            name,
+            constructor_formals,
+            constructor_body,
+            methods,
+            default,
+        })
+    }
+
+    /// Allocates a `Proc::MethodSend` node.
+    /// Represents: `channel!method_name(...inputs)`.
+    pub fn alloc_method_send(
+        &self,
+        send_type: SendType,
+        channel: Name<'ast>,
+        method_name: Id<'ast>,
+        inputs: &[AnnProc<'ast>],
+    ) -> &Proc<'ast> {
+        self.arena.alloc(Proc::MethodSend {
+            channel,
+            send_type,
+            method_name,
+            inputs: inputs.to_smallvec(),
+        })
+    }
+
+    /// Allocates a `Proc::MethodSendSync` node.
+    /// Represents: `channel!?method_name(...inputs)...`.
+    pub fn alloc_method_send_sync(
+        &self,
+        channel: Name<'ast>,
+        method_name: Id<'ast>,
+        inputs: &[AnnProc<'ast>],
+    ) -> &Proc<'ast> {
+        self.arena.alloc(Proc::MethodSendSync {
+            channel,
+            method_name,
+            inputs: inputs.to_smallvec(),
+            cont: SyncSendCont::Empty,
+        })
+    }
+
+    /// Allocates a `Proc::MethodSendSync` node with a non-empty continuation.
+    pub fn alloc_method_send_sync_with_cont(
+        &self,
+        channel: Name<'ast>,
+        method_name: Id<'ast>,
+        inputs: &[AnnProc<'ast>],
+        cont: AnnProc<'ast>,
+    ) -> &Proc<'ast> {
+        self.arena.alloc(Proc::MethodSendSync {
+            channel,
+            method_name,
+            inputs: inputs.to_smallvec(),
+            cont: SyncSendCont::NonEmpty(cont),
         })
     }
 

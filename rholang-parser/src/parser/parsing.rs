@@ -9,7 +9,7 @@ use std::slice::Iter as SliceIter;
 use validated::Validated;
 
 use crate::SourcePos;
-use crate::ast::{Name, Var};
+use crate::ast::{AgentDefault, AgentMethod, Name, Var};
 use crate::parser::errors::{self, ParsingFailure};
 use crate::{
     SourceSpan,
@@ -419,6 +419,224 @@ pub(super) fn node_to_ast<'ast>(
 
                     cont_stack.push(K::ConsumeNew { decls, span });
                     node = proc_node;
+                    continue 'parse;
+                }
+
+                kind!("agent") => {
+                    // Grammar: agent <var> { <agent_body> }
+                    // where agent_body is a sep1(agent_member, '|')
+                    // agent_member = agent_constructor | agent_method | agent_default
+                    let name_node = get_field(&node, field!("name"));
+                    let body_node = get_field(&node, field!("body")); // alias agent_body
+
+                    let name_id = Id {
+                        name: get_node_value(&name_node, source),
+                        pos: name_node.start_position().into(),
+                    };
+
+                    // Walk agent members and collect constructor / methods / default.
+                    // We parse formals eagerly since they're name lists; bodies are
+                    // deferred as proc nodes.
+                    let mut constructor_formals = Names {
+                        names: SmallVec::new(),
+                        remainder: None,
+                    };
+                    let mut default_formals: Option<Names<'_>> = None;
+                    let mut constructor_body_node: Option<tree_sitter::Node<'_>> = None;
+                    let mut method_body_nodes: Vec<(Id<'_>, Names<'_>, tree_sitter::Node<'_>)> =
+                        Vec::new();
+                    let mut default_body_node: Option<tree_sitter::Node<'_>> = None;
+
+                    for member_node in body_node.named_children(&mut body_node.walk()) {
+                        match member_node.kind_id() {
+                            kind!("agent_constructor") => {
+                                let proc_node = get_field(&member_node, field!("proc"));
+                                if let Some(formals_node) =
+                                    member_node.child_by_field_id(field!("formals"))
+                                {
+                                    let arity = formals_node.named_child_count();
+                                    let has_cont =
+                                        formals_node.child_by_field_id(field!("cont")).is_some();
+                                    // Parse names inline (they are just name nodes)
+                                    let procs_mock: Vec<AnnProc<'_>> = Vec::new();
+                                    // We need to parse names; use the existing NamesIter approach.
+                                    // However since we're in a sync context we collect them manually.
+                                    constructor_formals = parse_names_node(
+                                        &formals_node,
+                                        arity,
+                                        has_cont,
+                                        source,
+                                        &procs_mock,
+                                    );
+                                }
+                                constructor_body_node = Some(proc_node);
+                            }
+                            kind!("agent_method") => {
+                                let method_name_node = get_field(&member_node, field!("name"));
+                                let proc_node = get_field(&member_node, field!("proc"));
+                                let method_name_id = Id {
+                                    name: get_node_value(&method_name_node, source),
+                                    pos: method_name_node.start_position().into(),
+                                };
+                                let formals = if let Some(formals_node) =
+                                    member_node.child_by_field_id(field!("formals"))
+                                {
+                                    let arity = formals_node.named_child_count();
+                                    let has_cont =
+                                        formals_node.child_by_field_id(field!("cont")).is_some();
+                                    let procs_mock: Vec<AnnProc<'_>> = Vec::new();
+                                    parse_names_node(
+                                        &formals_node,
+                                        arity,
+                                        has_cont,
+                                        source,
+                                        &procs_mock,
+                                    )
+                                } else {
+                                    Names {
+                                        names: SmallVec::new(),
+                                        remainder: None,
+                                    }
+                                };
+                                method_body_nodes.push((method_name_id, formals, proc_node));
+                            }
+                            kind!("agent_default") => {
+                                let formals_node = get_field(&member_node, field!("formals"));
+                                let proc_node = get_field(&member_node, field!("proc"));
+                                let arity = formals_node.named_child_count();
+                                let has_cont =
+                                    formals_node.child_by_field_id(field!("cont")).is_some();
+                                let procs_mock: Vec<AnnProc<'_>> = Vec::new();
+                                default_formals = Some(parse_names_node(
+                                    &formals_node,
+                                    arity,
+                                    has_cont,
+                                    source,
+                                    &procs_mock,
+                                ));
+                                default_body_node = Some(proc_node);
+                            }
+                            _ => {
+                                // skip separators and unknown nodes
+                            }
+                        }
+                    }
+
+                    // Count how many proc bodies we will push and consume
+                    let method_count = method_body_nodes.len();
+                    let has_default = default_body_node.is_some();
+
+                    cont_stack.push(K::ConsumeAgent {
+                        span,
+                        name: name_id,
+                        constructor_formals,
+                        method_infos: method_body_nodes
+                            .iter()
+                            .map(|(id, formals, _)| (*id, formals.clone()))
+                            .collect(),
+                        has_default,
+                        default_formals: default_formals.unwrap_or(Names {
+                            names: SmallVec::new(),
+                            remainder: None,
+                        }),
+                        method_count,
+                    });
+
+                    // Push body proc evals: constructor body first, then methods, then default.
+                    // Since cont_stack is LIFO, push in reverse so constructor body is evaluated
+                    // first.
+                    if let Some(db) = default_body_node {
+                        cont_stack.push(K::EvalDelayed(db));
+                    }
+                    for (_, _, body) in method_body_nodes.iter().rev() {
+                        cont_stack.push(K::EvalDelayed(*body));
+                    }
+
+                    if let Some(cb) = constructor_body_node {
+                        node = cb;
+                        continue 'parse;
+                    } else {
+                        // No constructor body — push Nil as stand-in
+                        proc_stack.push(ast_builder.const_nil(), span);
+                        // apply cont immediately
+                        let step = apply_cont(&mut cont_stack, &mut proc_stack, ast_builder);
+                        match step {
+                            Step::Done => {
+                                if start_node.has_error() {
+                                    errors::query_errors(start_node, source, &mut errors);
+                                }
+                                if let Some(some_errors) = NEVec::try_from_vec(errors) {
+                                    return Validated::fail(ParsingFailure {
+                                        partial_tree: proc_stack.to_proc_partial(),
+                                        errors: some_errors,
+                                    });
+                                }
+                                let last = proc_stack.into_proc();
+                                return Validated::Good(last);
+                            }
+                            Step::Continue(n) => {
+                                node = n;
+                                continue 'parse;
+                            }
+                        }
+                    }
+                }
+
+                kind!("method_send") => {
+                    let name_node = get_field(&node, field!("channel"));
+                    let send_type_node = get_field(&node, field!("send_type"));
+                    let method_name_node = get_field(&node, field!("method_name"));
+                    let inputs_node = get_field(&node, field!("inputs"));
+
+                    let send_type = match send_type_node.kind_id() {
+                        kind!("send_single") => SendType::Single,
+                        kind!("send_multiple") => SendType::Multiple,
+                        _ => unreachable!("Send type can only be: single or multiple"),
+                    };
+                    let method_name_id = Id {
+                        name: get_node_value(&method_name_node, source),
+                        pos: method_name_node.start_position().into(),
+                    };
+                    let arity = inputs_node.named_child_count();
+                    cont_stack.push(K::ConsumeMethodSend {
+                        send_type,
+                        method_name: method_name_id,
+                        arity,
+                        span,
+                    });
+                    if arity > 0 {
+                        cont_stack.push(K::EvalList(inputs_node.walk()));
+                    }
+                    node = name_node;
+                    continue 'parse;
+                }
+
+                kind!("method_send_sync") => {
+                    let name_node = get_field(&node, field!("channel"));
+                    let method_name_node = get_field(&node, field!("method_name"));
+                    let messages_node = get_field(&node, field!("inputs"));
+                    let arity = messages_node.named_child_count();
+                    let sync_send_cont_node = get_field(&node, field!("cont"));
+                    let choice_node = get_first_child(&sync_send_cont_node);
+                    let method_name_id = Id {
+                        name: get_node_value(&method_name_node, source),
+                        pos: method_name_node.start_position().into(),
+                    };
+                    match choice_node.kind_id() {
+                        kind!("empty_cont") => {
+                            cont_stack.push(K::ConsumeMethodSendSync { span, method_name: method_name_id, arity });
+                        }
+                        kind!("non_empty_cont") => {
+                            let cont_node = get_first_child(&choice_node);
+                            cont_stack.push(K::ConsumeMethodSendSyncWithCont { span, method_name: method_name_id, arity });
+                            cont_stack.push(K::EvalDelayed(cont_node));
+                        }
+                        _ => {
+                            unreachable!("Continuations of method_send_sync are either empty or non-empty")
+                        }
+                    };
+                    cont_stack.push(K::EvalList(messages_node.walk()));
+                    node = name_node;
                     continue 'parse;
                 }
 
@@ -836,6 +1054,75 @@ fn parse_decls<'a>(from: &tree_sitter::Node, source: &'a str) -> Vec<NameDecl<'a
     result
 }
 
+/// Parse a `names` tree-sitter node into a [`Names`] struct without going through the
+/// continuation stack. Used in the `agent` parser for constructor and method formals.
+///
+/// The `_procs_mock` parameter is unused; it exists only to prevent a compiler warning about
+/// dead code for the parameter names — the actual formals are parsed directly from the syntax
+/// tree nodes.
+#[allow(unused_variables)]
+fn parse_names_node<'a>(
+    names_node: &tree_sitter::Node,
+    _arity: usize,
+    has_cont: bool,
+    source: &'a str,
+    _procs_mock: &[AnnProc<'a>],
+) -> Names<'a> {
+    let mut collected: SmallVec<[Name<'a>; 1]> = SmallVec::new();
+
+    for child in names_node.named_children(&mut names_node.walk()) {
+        // The grammar has: names = commaSep1(name), optional(_name_remainder)
+        // _name_remainder = seq('...', '@', proc_var)
+        // name = choice(proc_var, quote)
+        // quote = '@' proc
+        // proc_var = choice(wildcard, var)
+        // We handle the simple cases: var, wildcard, @var (quote of proc var), and the
+        // `...@var` remainder (which shows up as a standalone _name_remainder child).
+        let kind = child.kind_id();
+        if kind == kind!("var") {
+            let name_str = get_node_value(&child, source);
+            let id = Id {
+                name: name_str,
+                pos: child.start_position().into(),
+            };
+            collected.push(Name::NameVar(Var::Id(id)));
+        } else if kind == kind!("wildcard") {
+            collected.push(Name::NameVar(Var::Wildcard));
+        } else if kind == kind!("quote") {
+            // @proc — the child is a proc node; we only support @var here for formals
+            if let Some(inner) = child.named_child(0) {
+                if inner.kind_id() == kind!("var") {
+                    let name_str = get_node_value(&inner, source);
+                    let id = Id {
+                        name: name_str,
+                        pos: inner.start_position().into(),
+                    };
+                    // This is a quoted proc-var; store it as Name::Quote over a ProcVar.
+                    // (Actual macro-expansion handles the semantics; we just capture the syntax.)
+                    // For quoted patterns in formals we encode as Quote(ProcVar).
+                    // We need an arena for this but we don't have one here; so we record as
+                    // NameVar with the identifier, which is the common case for formals.
+                    collected.push(Name::NameVar(Var::Id(id)));
+                }
+            }
+        }
+        // _name_remainder ('...' '@' proc_var) is handled via has_cont below — it's the
+        // last child for patterns like `x, y, ...@rest`
+    }
+
+    // If has_cont is true, the last element of collected is the remainder variable.
+    let remainder = if has_cont {
+        collected.pop().and_then(|n| n.as_var())
+    } else {
+        None
+    };
+
+    Names {
+        names: collected,
+        remainder,
+    }
+}
+
 fn parse_sized_int_literal(literal: &str, suffix: char) -> Option<(&str, u32)> {
     let (value, width) = literal.rsplit_once(suffix)?;
     let bits: u32 = width.parse().ok()?;
@@ -917,8 +1204,97 @@ fn apply_cont<'tree, 'ast>(
                                 ast_builder.alloc_binary_exp(op, left, right).ann(span)
                             })
                         }
+                        K::ConsumeAgent {
+                            span,
+                            name,
+                            constructor_formals,
+                            method_infos,
+                            has_default,
+                            default_formals,
+                            method_count,
+                        } => {
+                            // On proc_stack (from bottom to top after evaluation):
+                            // [constructor_body, method_body_0, ..., method_body_n, default_body?]
+                            let total = 1 + method_count + if has_default { 1 } else { 0 };
+                            proc_stack.replace_top_slice(total, |bodies| {
+                                let constructor_body = bodies[0];
+                                let method_bodies = &bodies[1..1 + method_count];
+                                let default_body =
+                                    if has_default { Some(bodies[1 + method_count]) } else { None };
+
+                                let methods: Vec<AgentMethod<'_>> = method_infos
+                                    .into_iter()
+                                    .zip(method_bodies)
+                                    .map(|((method_name, formals), &body)| AgentMethod {
+                                        name: method_name,
+                                        formals,
+                                        body,
+                                    })
+                                    .collect();
+
+                                let default = default_body.map(|body| AgentDefault {
+                                    formals: default_formals,
+                                    body,
+                                });
+
+                                ast_builder
+                                    .alloc_agent(
+                                        name,
+                                        constructor_formals,
+                                        constructor_body,
+                                        methods,
+                                        default,
+                                    )
+                                    .ann(span)
+                            })
+                        }
                         K::ConsumeBundle { span, typ } => proc_stack
                             .replace_top(|proc| ast_builder.alloc_bundle(typ, proc).ann(span)),
+                        K::ConsumeMethodSend {
+                            send_type,
+                            method_name,
+                            arity,
+                            span,
+                        } => proc_stack.replace_top_slice_with_mask(arity + 1, |name_args, mask| {
+                            let channel = into_name(name_args[0], mask[0]);
+                            let inputs = &name_args[1..];
+                            ast_builder
+                                .alloc_method_send(send_type, channel, method_name, inputs)
+                                .ann(span)
+                        }),
+                        K::ConsumeMethodSendSync {
+                            span,
+                            method_name,
+                            arity,
+                        } => proc_stack.replace_top_slice_with_mask(arity + 1, |name_inputs, mask| {
+                            let channel = into_name(name_inputs[0], mask[0]);
+                            ast_builder
+                                .alloc_method_send_sync(channel, method_name, &name_inputs[1..])
+                                .ann(span)
+                        }),
+                        K::ConsumeMethodSendSyncWithCont {
+                            span,
+                            method_name,
+                            arity,
+                        } => proc_stack.replace_top_slice_with_mask(
+                            arity + 2,
+                            |name_inputs_cont, mask| {
+                                let channel = into_name(name_inputs_cont[0], mask[0]);
+                                // SAFETY: Because we successfully consumed |arity + 2|
+                                // elements, then the slice.len() is greater or equal 2
+                                let (last, messages) =
+                                    name_inputs_cont[1..].split_last().unwrap();
+                                let cont = *last;
+                                ast_builder
+                                    .alloc_method_send_sync_with_cont(
+                                        channel,
+                                        method_name,
+                                        messages,
+                                        cont,
+                                    )
+                                    .ann(span)
+                            },
+                        ),
                         K::ConsumeContract {
                             arity,
                             has_cont,
@@ -1162,9 +1538,34 @@ enum K<'tree, 'ast> {
         op: BinaryExpOp,
         span: SourceSpan,
     },
+    ConsumeAgent {
+        span: SourceSpan,
+        name: Id<'ast>,
+        constructor_formals: Names<'ast>,
+        method_infos: Vec<(Id<'ast>, Names<'ast>)>,
+        has_default: bool,
+        default_formals: Names<'ast>,
+        method_count: usize,
+    },
     ConsumeBundle {
         span: SourceSpan,
         typ: BundleType,
+    },
+    ConsumeMethodSend {
+        span: SourceSpan,
+        send_type: SendType,
+        method_name: Id<'ast>,
+        arity: usize,
+    },
+    ConsumeMethodSendSync {
+        span: SourceSpan,
+        method_name: Id<'ast>,
+        arity: usize,
+    },
+    ConsumeMethodSendSyncWithCont {
+        span: SourceSpan,
+        method_name: Id<'ast>,
+        arity: usize,
     },
     ConsumeContract {
         arity: usize,
@@ -1264,9 +1665,33 @@ impl Debug for K<'_, '_> {
                 .field("op", op)
                 .field("span", span)
                 .finish(),
+            Self::ConsumeAgent { span, name, method_count, .. } => f
+                .debug_struct("ConsumeAgent")
+                .field("name", &name.name)
+                .field("method_count", method_count)
+                .field("span", span)
+                .finish(),
             Self::ConsumeBundle { span, typ } => f
                 .debug_struct("ConsumeBundle")
                 .field("typ", typ)
+                .field("span", span)
+                .finish(),
+            Self::ConsumeMethodSend { span, method_name, arity, .. } => f
+                .debug_struct("ConsumeMethodSend")
+                .field("method_name", &method_name.name)
+                .field("arity", arity)
+                .field("span", span)
+                .finish(),
+            Self::ConsumeMethodSendSync { span, method_name, arity } => f
+                .debug_struct("ConsumeMethodSendSync")
+                .field("method_name", &method_name.name)
+                .field("arity", arity)
+                .field("span", span)
+                .finish(),
+            Self::ConsumeMethodSendSyncWithCont { span, method_name, arity } => f
+                .debug_struct("ConsumeMethodSendSyncWithCont")
+                .field("method_name", &method_name.name)
+                .field("arity", arity)
                 .field("span", span)
                 .finish(),
             Self::ConsumeContract { arity, span, .. } => f

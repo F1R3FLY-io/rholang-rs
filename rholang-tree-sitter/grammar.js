@@ -27,6 +27,10 @@ module.exports = grammar({
             "match",
             "select",
             "contract",
+            "agent",
+            "constructor",
+            "method",
+            "default",
             "for",
             "or",
             "and",
@@ -45,6 +49,8 @@ module.exports = grammar({
 
         _proc: $ => choice(
             $.par,
+            $.agent,
+            $.method_send_sync,
             $.send_sync,
             $.new,
             $.ifElse,
@@ -54,6 +60,7 @@ module.exports = grammar({
             $.choice,
             $.contract,
             $.input,
+            $.method_send,
             $.send,
             $._proc_expression
         ),
@@ -115,9 +122,60 @@ module.exports = grammar({
             field('proc', $.block)
         )),
 
+        // Agent syntactic sugar: OOP-style concurrent agent definitions
+        agent: $ => prec(2, seq(
+            'agent',
+            field('name', $.var),
+            '{',
+            field('body', alias(sep1($.agent_member, '|'), $.agent_body)),
+            '}'
+        )),
+
+        agent_member: $ => choice(
+            $.agent_constructor,
+            $.agent_method,
+            $.agent_default,
+        ),
+
+        agent_constructor: $ => seq(
+            'constructor',
+            '(', optional(field('formals', $.names)), ')',
+            field('proc', $.block)
+        ),
+
+        agent_method: $ => seq(
+            'method',
+            field('name', $.var),
+            '(', optional(field('formals', $.names)), ')',
+            field('proc', $.block)
+        ),
+
+        agent_default: $ => seq(
+            'default',
+            '(', field('formals', $.names), ')',
+            field('proc', $.block)
+        ),
+
         input: $ => prec(2, seq(
             'for', '(', field('receipts', $.receipts), ')',
             field('proc', $.block)
+        )),
+
+        // Method-call send: x!method(...args) desugars to x!(@"method", ...args)
+        method_send: $ => prec(4, seq(
+            field('channel', $.name),
+            field('send_type', $._send_type),
+            field('method_name', $.var),
+            field('inputs', alias($._proc_list, $.inputs))
+        )),
+
+        // Method-call send-sync: x!?method(...args)... desugars to x!?(@"method", ...args)...
+        method_send_sync: $ => prec(4, seq(
+            field('channel', $.name),
+            '!?',
+            field('method_name', $.var),
+            field('inputs', alias($._proc_list, $.messages)),
+            field('cont', $.sync_send_cont)
         )),
 
         send: $ => prec(3, seq(
@@ -364,6 +422,10 @@ module.exports = grammar({
         // http://stackoverflow.com/questions/13014947/regex-to-match-a-c-style-multiline-comment/36328890#36328890
     }
 });
+
+function sep1(rule, separator) {
+    return seq(rule, repeat(seq(separator, rule)));
+}
 
 function commaSep(rule) {
     return optional(commaSep1(rule))

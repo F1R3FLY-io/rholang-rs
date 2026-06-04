@@ -1,105 +1,102 @@
 new stdout(`rho:io:stdout`), 
-    boardMembers, 
-    proposals, 
-    treasuryBalance, 
-    createProposal, 
-    approveProposal, 
-    executeProposal, 
-    getBalance 
+    registry(`rho:registry:lookup`),
+    registryInsert(`rho:registry:insert`)
 in {
-  
-  // Treasury balance initialization (example: 1000 tokens)
-  treasuryBalance!(1000) |
+  agent Treasury {
+    constructor() {
+      new boardMembers, proposals, treasuryBalance in {
+        // Treasury balance initialization (example: 1000 tokens)
+        treasuryBalance!(1000) |
+        // List of authorized board members
+        boardMembers!(Set("Alice", "Bob", "Charlie")) |
+        // Proposals data structure
+        proposals!([])
+      }
+    } |
 
-  // List of authorized board members
-  boardMembers!(Set("Alice", "Bob", "Charlie")) |
-
-  // Proposals data structure
-  proposals!([]) |
-
-  // Function to create a proposal (only board members can create proposals)
-  contract createProposal(@creator, @amount, @recipient, ret) = {
-    for (@currentBoardMembers <- boardMembers) {
-      if (currentBoardMembers.contains(creator)) {
-        for (@currentProposals <- proposals) {
+    // Function to create a proposal (only board members can create proposals)
+    method createProposal(creator, amount, recipient, ret) {
+      for (@(boardMembers, proposals, balance) <- Treasury) {
+        if (boardMembers.contains(creator)) {
           let newProposal = { 
             "creator": creator, 
             "amount": amount, 
             "recipient": recipient, 
             "approvals": Set(creator)  // Initial approval from the creator
           } in {
-            proposals!(currentProposals ++ [newProposal]) |
+            Treasury!(boardMembers, proposals ++ [newProposal], balance) |
             ret!("Proposal created.")
           }
+        } else {
+          Treasury!(boardMembers, proposals, balance) |
+          ret!("Only board members can create proposals.")
         }
-      } else {
-        ret!("Only board members can create proposals.")
       }
-    }
-  } |
+    } |
 
-  // Function to approve a proposal (only board members can approve)
-  contract approveProposal(@member, @proposalIndex, ret) = {
-    for (@currentBoardMembers <- boardMembers) {
-      if (currentBoardMembers.contains(member)) {
-        for (@currentProposals <- proposals) {
-          let proposal = currentProposals.get(proposalIndex);
+    // Function to approve a proposal (only board members can approve)
+    method approveProposal(member, proposalIndex, ret) {
+      for (@(boardMembers, proposals, balance) <- Treasury) {
+        if (boardMembers.contains(member)) {
+          let proposal = proposals.get(proposalIndex);
               updatedProposal = proposal.set("approvals", proposal.get("approvals").add(member));
-              updatedProposals = currentProposals.set(proposalIndex, updatedProposal) in {
-            proposals!(updatedProposals) |
+              updatedProposals = proposals.set(proposalIndex, updatedProposal) in {
+            Treasury!(boardMembers, updatedProposals, balance) |
             ret!("Proposal approved by " ++ member)
           }
+        } else {
+          Treasury!(boardMembers, proposals, balance) |
+          ret!("Only board members can approve proposals.")
         }
-      } else {
-        ret!("Only board members can approve proposals.")
       }
-    }
-  } |
+    } |
 
-  // Function to execute a proposal (requires majority approvals)
-  contract executeProposal(@proposalIndex, ret) = {
-    for (@currentBoardMembers <- boardMembers) {
-      for (@currentProposals <- proposals) {
-        let proposal = currentProposals.get(proposalIndex);
+    // Function to execute a proposal (requires majority approvals)
+    method executeProposal(proposalIndex, ret) {
+      for (@(boardMembers, proposals, balance) <- Treasury) {
+        let proposal = proposals.get(proposalIndex);
             amount = proposal.get("amount");
             approvalCount = proposal.get("approvals").size() in {
-          if (approvalCount > currentBoardMembers.size() / 2) {
-            for (@balance <- treasuryBalance) {
-              if (balance >= amount) {
-                let updatedBalance = balance - amount in {
-                  treasuryBalance!(updatedBalance) |
-                  stdout!("Executed proposal: Transferred " ++ amount.toString() ++ " to " ++ proposal.get("recipient")) |
-                  ret!("Proposal executed successfully.")
-                }
-              } else {
-                ret!("Insufficient funds in the treasury.")
+          if (approvalCount > boardMembers.size() / 2) {
+            if (balance >= amount) {
+              let updatedBalance = balance - amount in {
+                Treasury!(boardMembers, proposals, updatedBalance) |
+                stdout!("Executed proposal: Transferred " ++ amount.toString() ++ " to " ++ proposal.get("recipient")) |
+                ret!("Proposal executed successfully.")
               }
+            } else {
+              Treasury!(boardMembers, proposals, balance) |
+              ret!("Insufficient funds in the treasury.")
             }
           } else {
+            Treasury!(boardMembers, proposals, balance) |
             ret!("Not enough approvals to execute the proposal.")
           }
         }
       }
+    } |
+
+    // Function to check the treasury balance
+    method getBalance(ret) {
+      for (@(boardMembers, proposals, balance) <<- Treasury) {
+        ret!("Treasury balance: " ++ balance.toString())
+      }
     }
   } |
 
-  // Function to check the treasury balance
-  contract getBalance(ret) = {
-    for (@balance <<- treasuryBalance) {
-      ret!("Treasury balance: " ++ balance.toString())
-    }
-  } |
+  Treasury!$constructor() | // Init state:
+  Treasury!(Set("Alice", "Bob", "Charlie"), [], 1000) |
 
   // Example usage
   // Board member "Alice" creates a proposal to transfer 100 tokens to "Dave"
-  createProposal!("Alice", 100, "Dave", *stdout) |
+  Treasury!createProposal("Alice", 100, "Dave", *stdout) |
   
   // Board member "Bob" approves the proposal
-  approveProposal!("Bob", 0, *stdout) |
+  Treasury!approveProposal("Bob", 0, *stdout) |
 
   // Execute the proposal after approvals
-  executeProposal!(0, *stdout) |
+  Treasury!executeProposal(0, *stdout) |
 
   // Check treasury balance
-  getBalance!(*stdout)
+  Treasury!getBalance(*stdout)
 }

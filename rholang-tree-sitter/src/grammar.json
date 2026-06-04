@@ -19,6 +19,14 @@
         },
         {
           "type": "SYMBOL",
+          "name": "agent"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "method_send_sync"
+        },
+        {
+          "type": "SYMBOL",
           "name": "send_sync"
         },
         {
@@ -52,6 +60,10 @@
         {
           "type": "SYMBOL",
           "name": "input"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "method_send"
         },
         {
           "type": "SYMBOL",
@@ -418,6 +430,209 @@
         ]
       }
     },
+    "agent": {
+      "type": "PREC",
+      "value": 2,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "STRING",
+            "value": "agent"
+          },
+          {
+            "type": "FIELD",
+            "name": "name",
+            "content": {
+              "type": "SYMBOL",
+              "name": "var"
+            }
+          },
+          {
+            "type": "STRING",
+            "value": "{"
+          },
+          {
+            "type": "FIELD",
+            "name": "body",
+            "content": {
+              "type": "ALIAS",
+              "content": {
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "SYMBOL",
+                    "name": "agent_member"
+                  },
+                  {
+                    "type": "REPEAT",
+                    "content": {
+                      "type": "SEQ",
+                      "members": [
+                        {
+                          "type": "STRING",
+                          "value": "|"
+                        },
+                        {
+                          "type": "SYMBOL",
+                          "name": "agent_member"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "named": true,
+              "value": "agent_body"
+            }
+          },
+          {
+            "type": "STRING",
+            "value": "}"
+          }
+        ]
+      }
+    },
+    "agent_member": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "agent_constructor"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "agent_method"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "agent_default"
+        }
+      ]
+    },
+    "agent_constructor": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "constructor"
+        },
+        {
+          "type": "STRING",
+          "value": "("
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "formals",
+              "content": {
+                "type": "SYMBOL",
+                "name": "names"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "STRING",
+          "value": ")"
+        },
+        {
+          "type": "FIELD",
+          "name": "proc",
+          "content": {
+            "type": "SYMBOL",
+            "name": "block"
+          }
+        }
+      ]
+    },
+    "agent_method": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "method"
+        },
+        {
+          "type": "FIELD",
+          "name": "name",
+          "content": {
+            "type": "SYMBOL",
+            "name": "var"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "("
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "formals",
+              "content": {
+                "type": "SYMBOL",
+                "name": "names"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "STRING",
+          "value": ")"
+        },
+        {
+          "type": "FIELD",
+          "name": "proc",
+          "content": {
+            "type": "SYMBOL",
+            "name": "block"
+          }
+        }
+      ]
+    },
+    "agent_default": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "default"
+        },
+        {
+          "type": "STRING",
+          "value": "("
+        },
+        {
+          "type": "FIELD",
+          "name": "formals",
+          "content": {
+            "type": "SYMBOL",
+            "name": "names"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": ")"
+        },
+        {
+          "type": "FIELD",
+          "name": "proc",
+          "content": {
+            "type": "SYMBOL",
+            "name": "block"
+          }
+        }
+      ]
+    },
     "input": {
       "type": "PREC",
       "value": 2,
@@ -450,6 +665,102 @@
             "content": {
               "type": "SYMBOL",
               "name": "block"
+            }
+          }
+        ]
+      }
+    },
+    "method_send": {
+      "type": "PREC",
+      "value": 4,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "FIELD",
+            "name": "channel",
+            "content": {
+              "type": "SYMBOL",
+              "name": "name"
+            }
+          },
+          {
+            "type": "FIELD",
+            "name": "send_type",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_send_type"
+            }
+          },
+          {
+            "type": "FIELD",
+            "name": "method_name",
+            "content": {
+              "type": "SYMBOL",
+              "name": "var"
+            }
+          },
+          {
+            "type": "FIELD",
+            "name": "inputs",
+            "content": {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_proc_list"
+              },
+              "named": true,
+              "value": "inputs"
+            }
+          }
+        ]
+      }
+    },
+    "method_send_sync": {
+      "type": "PREC",
+      "value": 4,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "FIELD",
+            "name": "channel",
+            "content": {
+              "type": "SYMBOL",
+              "name": "name"
+            }
+          },
+          {
+            "type": "STRING",
+            "value": "!?"
+          },
+          {
+            "type": "FIELD",
+            "name": "method_name",
+            "content": {
+              "type": "SYMBOL",
+              "name": "var"
+            }
+          },
+          {
+            "type": "FIELD",
+            "name": "inputs",
+            "content": {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_proc_list"
+              },
+              "named": true,
+              "value": "messages"
+            }
+          },
+          {
+            "type": "FIELD",
+            "name": "cont",
+            "content": {
+              "type": "SYMBOL",
+              "name": "sync_send_cont"
             }
           }
         ]
@@ -2826,6 +3137,22 @@
       {
         "type": "STRING",
         "value": "contract"
+      },
+      {
+        "type": "STRING",
+        "value": "agent"
+      },
+      {
+        "type": "STRING",
+        "value": "constructor"
+      },
+      {
+        "type": "STRING",
+        "value": "method"
+      },
+      {
+        "type": "STRING",
+        "value": "default"
       },
       {
         "type": "STRING",

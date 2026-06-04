@@ -151,6 +151,34 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
             | Proc::VarRef { .. }
             | Proc::Bad => {}
 
+            Proc::Agent {
+                constructor_body,
+                methods,
+                default,
+                ..
+            } => {
+                if let Some(d) = default {
+                    self.stack.push(&d.body);
+                }
+                for m in methods.iter().rev() {
+                    self.stack.push(&m.body);
+                }
+                self.stack.push(constructor_body);
+            }
+
+            Proc::MethodSend { inputs, channel, .. } => {
+                self.remember(inputs);
+                self.push_name(channel);
+            }
+
+            Proc::MethodSendSync { inputs, cont, channel, .. } => {
+                if let SyncSendCont::NonEmpty(proc) = cont {
+                    self.stack.push(proc);
+                }
+                self.remember(inputs);
+                self.push_name(channel);
+            }
+
             Proc::Select { .. } => {
                 unimplemented!("Select is not implemented in this version of Rholang")
             }
@@ -402,6 +430,32 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
             | Proc::VarRef { .. }
             | Proc::Bad => {}
 
+            Proc::Agent {
+                constructor_body,
+                methods,
+                default,
+                ..
+            } => {
+                let default_iter = default.iter().map(|d| &d.body);
+                self.push_children(
+                    iter::once(constructor_body)
+                        .chain(methods.iter().map(|m| &m.body))
+                        .chain(default_iter),
+                );
+            }
+
+            Proc::MethodSend { inputs, .. } => {
+                self.push_children(inputs);
+            }
+
+            Proc::MethodSendSync { inputs, cont, .. } => {
+                let cont_iter = match cont {
+                    SyncSendCont::NonEmpty(p) => Some(p),
+                    _ => None,
+                };
+                self.push_children(inputs.iter().chain(cont_iter));
+            }
+
             Proc::Select { .. } => {
                 unimplemented!("Select is not implemented in this version of Rholang")
             }
@@ -500,6 +554,9 @@ impl<'a, const S: usize> NameAwareDfsEventIter<'a, S> {
             Proc::ForComprehension { receipts, .. } => {
                 self.pending
                     .extend(for_comprehension_outputs(receipts).rev());
+            }
+            Proc::MethodSend { channel, .. } | Proc::MethodSendSync { channel, .. } => {
+                self.pending.push(channel);
             }
             /* no names */
             _ => {}

@@ -100,6 +100,49 @@ pub enum Proc<'ast> {
         cont: SyncSendCont<'ast>,
     },
 
+    /// Agent syntactic sugar: OOP-style concurrent process definitions.
+    ///
+    /// Represents:
+    /// ```rho
+    /// agent Foo {
+    ///   constructor(<formals>) { Pc } |
+    ///   method bar(<ptrns>) { P } |
+    ///   ...
+    ///   default(...@args) { Q }
+    /// }
+    /// ```
+    ///
+    /// This is lowered to a `for`/`new`/`match` combination by a later
+    /// desugaring pass.
+    Agent {
+        /// The name of the agent's constructor channel (the `var` after `agent`).
+        name: Id<'ast>,
+        /// Formal parameters for the constructor.
+        constructor_formals: Names<'ast>,
+        /// Body of the constructor (sets up initial state and returns `this`).
+        constructor_body: AnnProc<'ast>,
+        /// Named methods: (method_name, formals, body).
+        methods: Vec<AgentMethod<'ast>>,
+        /// Optional default handler: (formals including rest param, body).
+        default: Option<AgentDefault<'ast>>,
+    },
+
+    /// Method-call send sugar: `x!method(...args)` desugars to `x!(method, ...args)`.
+    MethodSend {
+        channel: Name<'ast>,
+        send_type: SendType,
+        method_name: Id<'ast>,
+        inputs: ProcList<'ast>,
+    },
+
+    /// Method-call send-sync sugar: `x!?method(...args)...` desugars to `x!?(method, ...args)...`.
+    MethodSendSync {
+        channel: Name<'ast>,
+        method_name: Id<'ast>,
+        inputs: ProcList<'ast>,
+        cont: SyncSendCont<'ast>,
+    },
+
     // expressions
     Eval {
         name: Name<'ast>,
@@ -689,6 +732,23 @@ pub struct Branch<'ast> {
     pub patterns: Vec<SelectPattern<'ast>>,
     pub guard: Option<AnnProc<'ast>>,
     pub proc: AnnProc<'ast>,
+}
+
+// agent members
+
+/// A named method inside an `agent` block.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct AgentMethod<'ast> {
+    pub name: Id<'ast>,
+    pub formals: Names<'ast>,
+    pub body: AnnProc<'ast>,
+}
+
+/// A default (catch-all) handler inside an `agent` block.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct AgentDefault<'ast> {
+    pub formals: Names<'ast>,
+    pub body: AnnProc<'ast>,
 }
 
 // ground terms and expressions

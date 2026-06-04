@@ -389,6 +389,36 @@ fn resolve_proc_pattern_rec<'a>(
                 Some(pattern.span.start),
             );
         }
+        // Agent is sugar that must be desugared before pattern matching; reject it here.
+        Agent { .. } => {
+            db.error(
+                res.id,
+                ErrorKind::ConnectiveOutsidePattern,
+                Some(pattern.span.start),
+            );
+        }
+        // Method-call send patterns – treat like Send patterns
+        MethodSend {
+            channel, inputs, ..
+        } => {
+            resolve_send_pattern(channel, inputs, None, db, env, res);
+        }
+        MethodSendSync {
+            channel,
+            inputs,
+            cont: SyncSendCont::Empty,
+            ..
+        } => {
+            resolve_send_pattern(channel, inputs, None, db, env, res);
+        }
+        MethodSendSync {
+            channel,
+            inputs,
+            cont: SyncSendCont::NonEmpty(cont),
+            ..
+        } => {
+            resolve_send_pattern(channel, inputs, Some(cont), db, env, res);
+        }
         Select { branches: _ } => {
             unimplemented!("Select is not implemented in this version of Rholang")
         }

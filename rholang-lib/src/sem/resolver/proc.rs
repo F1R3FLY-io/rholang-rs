@@ -355,6 +355,74 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
             });
         }
 
+        // Agent syntactic sugar resolution.
+        // The agent name is introduced as a fresh channel in the current scope.
+        // Each method/constructor body is resolved with the method's formals in scope.
+        Agent {
+            name,
+            constructor_formals,
+            constructor_body,
+            methods,
+            default,
+        } => {
+            let current = db[this];
+
+            // The agent name is a fresh proc-level binding (like `new` but in the contract
+            // namespace).  We treat it as an unbound name for now and leave full desugaring to
+            // a later pass.
+            let _ = resolve_var(*name, false, current, db, stack);
+
+            // Resolve constructor formals then constructor body.
+            {
+                let ctor_vars = resolve_name_pattern(db, stack, current, this.span, constructor_formals, 0);
+                let mut ctor_scope = LexicallyScoped::free(db, stack, current, ctor_vars);
+                ctor_scope.with(|db, scoped_stack| resolve_rec(db, scoped_stack, constructor_body));
+            }
+
+            // Resolve each method body.
+            // Collect refs first to avoid conflicts between mutable db/stack borrows and
+            // the immutable reference to `methods` items.
+            let method_refs: Vec<(&ast::Names, &ast::AnnProc)> =
+                methods.iter().map(|m| (&m.formals, &m.body)).collect();
+            for (formals, body) in method_refs {
+                let method_vars = resolve_name_pattern(db, stack, current, this.span, formals, 0);
+                let mut method_scope = LexicallyScoped::free(db, stack, current, method_vars);
+                method_scope.with(|db, scoped_stack| resolve_rec(db, scoped_stack, body));
+            }
+
+            // Resolve default handler body.
+            if let Some(ast::AgentDefault { formals, body }) = default {
+                // Rebind before mutably borrowing db/stack.
+                let default_formals: &ast::Names = formals;
+                let default_body: &ast::AnnProc = body;
+                let default_vars =
+                    resolve_name_pattern(db, stack, current, this.span, default_formals, 0);
+                let mut default_scope = LexicallyScoped::free(db, stack, current, default_vars);
+                default_scope.with(|db, scoped_stack| resolve_rec(db, scoped_stack, default_body));
+            }
+        }
+
+        // Method-call send: resolve like send.
+        MethodSend {
+            channel, inputs, ..
+        } => {
+            resolve_send(db[this], channel, inputs, None, db, stack);
+        }
+        MethodSendSync {
+            channel,
+            inputs,
+            cont: SyncSendCont::Empty,
+            ..
+        } => {
+            resolve_send(db[this], channel, inputs, None, db, stack);
+        }
+        MethodSendSync {
+            channel,
+            inputs,
+            cont: SyncSendCont::NonEmpty(proc),
+            ..
+        } => resolve_send(db[this], channel, inputs, Some(proc), db, stack),
+
         Select { branches: _ } => {
             unimplemented!("Select is not implemented in this version of Rholang")
         }

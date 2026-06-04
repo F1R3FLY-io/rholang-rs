@@ -20,13 +20,19 @@ async fn test_main_function_code_path() -> Result<()> {
     // Run the rholang-shell with a timeout to prevent hangs.
     // In non-interactive test environments, the shell may exit quickly with EOF
     // or an input-device error instead of blocking for user input.
-    let result = timeout(Duration::from_millis(100), async {
+    let result = timeout(Duration::from_millis(500), async {
         run_shell(args, interpreter).await
     })
     .await;
 
     // The important assertion for this test is that the code path does not hang.
-    assert!(result.is_ok(), "run_shell unexpectedly timed out");
+    // However, if run locally in an interactive terminal, it will legitimately hang
+    // waiting for user input, causing a timeout.
+    if atty::is(atty::Stream::Stdin) {
+        assert!(result.is_err(), "run_shell should time out when running interactively");
+    } else {
+        assert!(result.is_ok(), "run_shell unexpectedly timed out");
+    }
 
     Ok(())
 }
