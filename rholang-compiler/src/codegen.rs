@@ -200,10 +200,50 @@ impl<'a> CodegenContext<'a> {
                 self.compile_par(left, right)?;
             }
 
-            _ => bail!(
-                "Unsupported process variant in MVP: {:?}",
-                std::mem::discriminant(proc.proc)
-            ),
+            Proc::Contract { .. } => {
+                bail!("Contract declarations are not supported in MVP");
+            }
+
+            Proc::Agent { name, constructor_formals, constructor_body, methods, default } => {
+                let pid = match self.db.lookup(unsafe { &*(proc as *const AnnProc<'a>) }) {
+                    Some(pid) => pid,
+                    None => bail!("Agent at {} not indexed", proc.span.start),
+                };
+                self.compile_agent(pid, name, constructor_formals, constructor_body, methods, default)?;
+            }
+
+            Proc::MethodSend { channel, send_type: _, method_name, inputs } => {
+                let pid = match self.db.lookup(unsafe { &*(proc as *const AnnProc<'a>) }) {
+                    Some(pid) => pid,
+                    None => bail!("MethodSend at {} not indexed", proc.span.start),
+                };
+                self.compile_method_send(pid, channel, method_name, inputs)?;
+            }
+
+            Proc::MethodSendSync { channel, method_name, inputs, cont } => {
+                let pid = match self.db.lookup(unsafe { &*(proc as *const AnnProc<'a>) }) {
+                    Some(pid) => pid,
+                    None => bail!("MethodSendSync at {} not indexed", proc.span.start),
+                };
+                self.compile_method_send_sync(pid, channel, method_name, inputs, cont)?;
+            }
+
+            Proc::Eval { name } => {
+                let pid = match self.db.lookup(unsafe { &*(proc as *const AnnProc<'a>) }) {
+                    Some(pid) => pid,
+                    None => bail!("Eval at {} not indexed", proc.span.start),
+                };
+                self.compile_name(name, pid)?;
+                self.emit(Instruction::nullary(Opcode::EVAL));
+            }
+
+            _ => {
+                println!("UNSUPPORTED PROC: {:#?}", proc.proc);
+                bail!(
+                    "Unsupported process variant in MVP: {:?}",
+                    std::mem::discriminant(proc.proc)
+                )
+            }
         }
 
         Ok(())
@@ -729,8 +769,34 @@ impl<'a> CodegenContext<'a> {
                                     // Wildcard binding - pop the value
                                     self.emit(Instruction::nullary(Opcode::POP));
                                 }
-                                Name::Quote(_) => {
-                                    bail!("Quote patterns not supported in MVP");
+                                Name::Quote(ann_proc) => {
+                                    if let Proc::ProcVar(Var::Id(id)) = ann_proc.proc {
+                                        let symbol = self.db.intern(id.name);
+                                        let occ = SymbolOccurrence {
+                                            symbol,
+                                            position: id.pos,
+                                        };
+
+                                        match self.db.binder_of(occ) {
+                                            Some(binding) => {
+                                                let binder_id =
+                                                    self.db.resolve_var_binding(pid, binding);
+
+                                                self.emit(Instruction::nullary(Opcode::ALLOC_LOCAL));
+
+                                                let slot = self.alloc_local(binder_id)?;
+                                                self.emit(Instruction::unary(
+                                                    Opcode::STORE_LOCAL,
+                                                    slot,
+                                                ));
+                                            }
+                                            None => {
+                                                bail!("Unbound variable '{}' at {}", id.name, id.pos);
+                                            }
+                                        }
+                                    } else {
+                                        bail!("Quote patterns with non-variables not supported in MVP");
+                                    }
                                 }
                             }
                         }
@@ -780,7 +846,13 @@ impl<'a> CodegenContext<'a> {
     fn compile_name(&mut self, name: &Name<'a>, pid: PID) -> Result<()> {
         match name {
             Name::NameVar(var) => self.compile_var(var, pid, false),
-            Name::Quote(_) => bail!("Quote not supported in MVP"),
+            Name::Quote(ann_proc) => {
+                if let Proc::ProcVar(var) = ann_proc.proc {
+                    self.compile_var(var, pid, false)
+                } else {
+                    bail!("Quote of non-variable not supported in MVP")
+                }
+            }
         }
     }
 
@@ -879,6 +951,246 @@ impl<'a> CodegenContext<'a> {
         process.constants = self.constants;
 
         Ok(process)
+    }
+
+    pub(crate) fn compile_method_send(
+        &mut self,
+        pid: PID,
+        channel: &Name<'a>,
+        method_name: &rholang_parser::ast::Id<'a>,
+        inputs: &[AnnProc<'a>],
+    ) -> Result<()> {
+        self.compile_name(channel, pid)?;
+        let idx = self.add_string(method_name.name);
+        self.emit(Instruction::unary(Opcode::PUSH_STR, idx));
+        for input in inputs {
+            self.compile_proc(input)?;
+        }
+        let count = inputs.len() + 1;
+        if count > u16::MAX as usize {
+            bail!("Too many method arguments (max {})", u16::MAX);
+        }
+        self.emit(Instruction::unary(Opcode::CREATE_LIST, count as u16));
+        self.emit(Instruction::nullary(Opcode::TELL));
+        Ok(())
+    }
+
+    pub(crate) fn compile_method_send_sync(
+        &mut self,
+        pid: PID,
+        channel: &Name<'a>,
+        method_name: &rholang_parser::ast::Id<'a>,
+        inputs: &[AnnProc<'a>],
+        cont: &rholang_parser::ast::SyncSendCont<'a>,
+    ) -> Result<()> {
+        self.emit(Instruction::unary(Opcode::NAME_CREATE, 3));
+        self.emit(Instruction::nullary(Opcode::ALLOC_LOCAL));
+        let ret_slot = self.next_local;
+        self.next_local += 1;
+        self.emit(Instruction::unary(Opcode::STORE_LOCAL, ret_slot));
+
+        self.compile_name(channel, pid)?;
+
+        let idx = self.add_string(method_name.name);
+        self.emit(Instruction::unary(Opcode::PUSH_STR, idx));
+
+        self.emit(Instruction::unary(Opcode::LOAD_LOCAL, ret_slot));
+
+        for input in inputs {
+            self.compile_proc(input)?;
+        }
+        let count = inputs.len() + 2;
+        if count > u16::MAX as usize {
+            bail!("Too many method arguments (max {})", u16::MAX);
+        }
+        self.emit(Instruction::unary(Opcode::CREATE_LIST, count as u16));
+        self.emit(Instruction::nullary(Opcode::TELL));
+
+        self.emit(Instruction::unary(Opcode::LOAD_LOCAL, ret_slot));
+        self.emit(Instruction::binary(Opcode::ASK, 3, 0));
+        self.emit(Instruction::nullary(Opcode::POP)); // Drop the result list wrapper
+
+        match cont {
+            rholang_parser::ast::SyncSendCont::Empty => {}
+            rholang_parser::ast::SyncSendCont::NonEmpty(proc) => {
+                self.compile_proc(proc)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn compile_agent(
+        &mut self,
+        pid: PID,
+        name: &rholang_parser::ast::Id<'a>,
+        constructor_formals: &rholang_parser::ast::Names<'a>,
+        constructor_body: &AnnProc<'a>,
+        methods: &[rholang_parser::ast::AgentMethod<'a>],
+        default: &Option<rholang_parser::ast::AgentDefault<'a>>,
+    ) -> Result<()> {
+        let loop_start = self.new_label();
+        self.define_label(loop_start);
+
+        let symbol = self.db.intern(name.name);
+        let occ = librho::sem::SymbolOccurrence { symbol, position: name.pos };
+        if let Some(binding) = self.db.binder_of(occ) {
+            let binder_id = self.db.resolve_var_binding(pid, binding);
+            if let Some(slot) = self.locals.get(&binder_id) {
+                self.emit(Instruction::unary(Opcode::LOAD_LOCAL, *slot));
+            } else {
+                bail!("Agent name {} not found in locals", name.name);
+            }
+        } else {
+            bail!("Agent name {} not bound", name.name);
+        }
+
+        // Receive constructor arguments: `for (r, ...formals <= agent_name) { ... }`
+        const DEFAULT_RECEIVE_KIND: u8 = 3;
+        self.emit(Instruction::binary(Opcode::ASK, DEFAULT_RECEIVE_KIND, 0));
+
+        let end_loop = self.new_label();
+        self.emit(Instruction::nullary(Opcode::DUP));
+        self.emit(Instruction::nullary(Opcode::PUSH_NIL));
+        self.emit(Instruction::nullary(Opcode::CMP_EQ));
+        let exit_branch1 = self.instructions.len();
+        self.emit(Instruction::nullary(Opcode::NOP));
+        self.forward_refs.push((exit_branch1, end_loop, Opcode::BRANCH_TRUE));
+
+        self.emit(Instruction::nullary(Opcode::DUP)); // DUP args
+        self.emit(Instruction::unary(Opcode::PUSH_INT, 0));
+        self.emit(Instruction::nullary(Opcode::NTH)); // Get r
+        self.emit(Instruction::nullary(Opcode::ALLOC_LOCAL));
+        let r_slot = self.next_local;
+        self.next_local += 1;
+        self.emit(Instruction::unary(Opcode::STORE_LOCAL, r_slot));
+
+        // Extract constructor formals
+        for (i, param) in constructor_formals.names.iter().enumerate() {
+            if let rholang_parser::ast::Name::NameVar(Var::Id(id)) = param {
+                let symbol = self.db.intern(id.name);
+                let occ = librho::sem::SymbolOccurrence { symbol, position: id.pos };
+                if let Some(binding) = self.db.binder_of(occ) {
+                    let binder_id = self.db.resolve_var_binding(pid, binding);
+                    let slot = self.alloc_local(binder_id)?;
+                    self.emit(Instruction::nullary(Opcode::DUP)); // DUP args
+                    self.emit(Instruction::unary(Opcode::PUSH_INT, (i + 1) as u16));
+                    self.emit(Instruction::nullary(Opcode::NTH));
+                    self.emit(Instruction::unary(Opcode::STORE_LOCAL, slot));
+                }
+            }
+        }
+
+        self.emit(Instruction::nullary(Opcode::POP)); // Drop args
+
+        // Create `this` channel
+        self.emit(Instruction::unary(Opcode::NAME_CREATE, 3));
+        self.emit(Instruction::nullary(Opcode::ALLOC_LOCAL));
+        let this_slot = self.next_local;
+        self.next_local += 1;
+        self.emit(Instruction::unary(Opcode::STORE_LOCAL, this_slot));
+
+        // Compile constructor body
+        self.compile_proc(constructor_body)?;
+
+        // Send `this` to `r` (r!(bundle+{this}))
+        self.emit(Instruction::unary(Opcode::LOAD_LOCAL, this_slot));
+        self.emit(Instruction::unary(Opcode::CREATE_LIST, 1)); // We send it as a single-element list? Wait, yes, Rholang arguments are lists!
+        self.emit(Instruction::unary(Opcode::LOAD_LOCAL, r_slot));
+        self.emit(Instruction::nullary(Opcode::TELL));
+
+        // Method loop on `this`
+        let method_loop = self.new_label();
+        self.define_label(method_loop);
+
+        self.emit(Instruction::unary(Opcode::LOAD_LOCAL, this_slot));
+        self.emit(Instruction::binary(Opcode::ASK, 3, 0));
+
+        // If args is Nil (queue empty), exit the method loop
+        self.emit(Instruction::nullary(Opcode::DUP));
+        self.emit(Instruction::nullary(Opcode::PUSH_NIL));
+        self.emit(Instruction::nullary(Opcode::CMP_EQ));
+        let exit_branch2 = self.instructions.len();
+        self.emit(Instruction::nullary(Opcode::NOP));
+        self.forward_refs.push((exit_branch2, end_loop, Opcode::BRANCH_TRUE));
+
+        // The stack now has the list of method args `args`.
+        // The method name is at `args[0]`.
+
+        for method in methods {
+            let next_method = self.new_label();
+
+            self.emit(Instruction::nullary(Opcode::DUP)); // DUP args
+            self.emit(Instruction::unary(Opcode::PUSH_INT, 0));
+            self.emit(Instruction::nullary(Opcode::NTH)); // Get args[0]
+
+            let idx = self.add_string(method.name.name);
+            self.emit(Instruction::unary(Opcode::PUSH_STR, idx));
+            self.emit(Instruction::nullary(Opcode::CMP_EQ)); // Check args[0] == method_name
+
+            let branch_idx = self.instructions.len();
+            self.emit(Instruction::nullary(Opcode::NOP));
+            self.forward_refs.push((branch_idx, next_method, Opcode::BRANCH_FALSE));
+
+            // It's a match! 
+            // Extract method parameters
+            for (i, param) in method.formals.names.iter().enumerate() {
+                if let rholang_parser::ast::Name::NameVar(Var::Id(id)) = param {
+                    let symbol = self.db.intern(id.name);
+                    let occ = librho::sem::SymbolOccurrence { symbol, position: id.pos };
+                    if let Some(binding) = self.db.binder_of(occ) {
+                        let binder_id = self.db.resolve_var_binding(pid, binding);
+                        let slot = self.alloc_local(binder_id)?;
+                        self.emit(Instruction::nullary(Opcode::DUP)); // DUP args
+                        self.emit(Instruction::unary(Opcode::PUSH_INT, (i + 1) as u16));
+                        self.emit(Instruction::nullary(Opcode::NTH));
+                        self.emit(Instruction::unary(Opcode::STORE_LOCAL, slot));
+                    }
+                }
+            }
+
+            self.emit(Instruction::nullary(Opcode::POP)); // Drop args
+
+            self.compile_proc(&method.body)?;
+
+            let jmp_idx = self.instructions.len();
+            self.emit(Instruction::nullary(Opcode::NOP));
+            self.forward_refs.push((jmp_idx, method_loop, Opcode::JUMP));
+
+            self.define_label(next_method);
+        }
+
+        if let Some(def) = default {
+            if let Some(param) = &def.formals.remainder {
+                if let Var::Id(id) = param {
+                    let symbol = self.db.intern(id.name);
+                    let occ = librho::sem::SymbolOccurrence { symbol, position: id.pos };
+                    if let Some(binding) = self.db.binder_of(occ) {
+                        let binder_id = self.db.resolve_var_binding(pid, binding);
+                        let slot = self.alloc_local(binder_id)?;
+                        // The default method gets the whole list of arguments (including the method name)
+                        self.emit(Instruction::unary(Opcode::STORE_LOCAL, slot));
+                    } else {
+                        self.emit(Instruction::nullary(Opcode::POP));
+                    }
+                } else {
+                    self.emit(Instruction::nullary(Opcode::POP));
+                }
+            } else {
+                self.emit(Instruction::nullary(Opcode::POP));
+            }
+            self.compile_proc(&def.body)?;
+            let jmp_idx = self.instructions.len();
+            self.emit(Instruction::nullary(Opcode::NOP));
+            self.forward_refs.push((jmp_idx, method_loop, Opcode::JUMP));
+        } else {
+            self.emit(Instruction::nullary(Opcode::POP));
+            let jmp_idx = self.instructions.len();
+            self.emit(Instruction::nullary(Opcode::NOP));
+            self.forward_refs.push((jmp_idx, method_loop, Opcode::JUMP));
+        }
+
+        self.define_label(end_loop);
+        Ok(())
     }
 }
 

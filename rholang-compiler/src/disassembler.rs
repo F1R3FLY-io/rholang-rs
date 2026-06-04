@@ -316,9 +316,10 @@ impl Disassembler {
             Opcode::CREATE_LIST => format!("Create list with {} elements", inst.op16()),
             Opcode::CREATE_TUPLE => format!("Create tuple with {} elements", inst.op16()),
             Opcode::CREATE_MAP => format!("Create map with {} pairs", inst.op16()),
-            Opcode::CONCAT => "Concatenate collections".to_string(),
-            Opcode::DIFF => "Set difference".to_string(),
-            Opcode::INTERPOLATE => "String interpolation".to_string(),
+            Opcode::CONCAT => "Concat".to_string(),
+            Opcode::DIFF => "Diff".to_string(),
+            Opcode::INTERPOLATE => "Interpolate".to_string(),
+            Opcode::NTH => "Nth element".to_string(),
 
             // Process operations
             Opcode::SPAWN_ASYNC => "Spawn asynchronous process".to_string(),

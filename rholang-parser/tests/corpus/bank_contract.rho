@@ -1,7 +1,9 @@
 new
   stdout(`rho:io:stdout`),
   registry(`rho:registry:lookup`),
-  registryInsert(`rho:registry:insert`) in {
+  registryInsert(`rho:registry:insert`),
+  Bank
+in {
 
   agent Bank {
     constructor(@initialBalances) {

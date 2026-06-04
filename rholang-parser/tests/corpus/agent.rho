@@ -1,33 +1,33 @@
-agent Cell {
-    constructor() {
-        new state in {
-            state!(0)
-        }
-    } |
+new Cell in {
+    agent Cell {
+        constructor() {
+            Cell!(0)
+        } |
 
-    method get(ret) {
-        for (@val <<- state) {
-            ret!(val)
-        }
-    } |
+        method get(ret) {
+            for (@val <<- Cell) {
+                ret!(val)
+            }
+        } |
 
-    method set(val, ret) {
-        for (_ <- state) {
-            state!(val) | ret!(true)
-        }
-    } |
+        method set(val, ret) {
+            for (_ <- Cell) {
+                Cell!(val) | ret!(true)
+            }
+        } |
 
-    default(msg, ret) {
-        ret!(false)
+        default(msg, ret) {
+            ret!(false)
+        }
     }
-}
-|
-new ret in {
-    Cell!get(*ret) |
-    for (@val <- ret) {
-        Cell!set(val + 1, *ret) |
-        for (@success <- ret) {
-            Cell!?get().
+    |
+    new ret in {
+        Cell!get(*ret) |
+        for (@val <- ret) {
+            Cell!set(val + 1, *ret) |
+            for (@success <- ret) {
+                Cell!?get().
+            }
         }
     }
 }

@@ -68,6 +68,7 @@ pub enum Opcode {
     CONCAT = 0x63,
     DIFF = 0x64,
     INTERPOLATE = 0x65,
+    NTH = 0x66,
 
     // Process operations (0x70 - 0x7F)
     SPAWN_ASYNC = 0x70,
@@ -168,6 +169,7 @@ impl Opcode {
         table[0x63] = Some(Opcode::CONCAT);
         table[0x64] = Some(Opcode::DIFF);
         table[0x65] = Some(Opcode::INTERPOLATE);
+        table[0x66] = Some(Opcode::NTH);
 
         // Process operations (0x70 - 0x7F)
         table[0x70] = Some(Opcode::SPAWN_ASYNC);
@@ -246,6 +248,7 @@ impl Opcode {
         counts[0x63] = 0; // CONCAT
         counts[0x64] = 0; // DIFF
         counts[0x65] = 0; // INTERPOLATE
+        counts[0x66] = 0; // NTH
         counts[0x89] = 0; // BUNDLE_BEGIN
         counts[0x8A] = 0; // BUNDLE_END
         counts[0x15] = 0; // PUSH_NIL

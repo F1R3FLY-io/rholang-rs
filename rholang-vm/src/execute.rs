@@ -107,6 +107,9 @@ pub fn step(
                     a.extend(b);
                     vm.stack.push(Value::List(a));
                 }
+                (Some(Value::Nil), _) | (_, Some(Value::Nil)) => {
+                    vm.stack.push(Value::Nil);
+                }
                 (Some(a), Some(b)) => return Err(type_mismatch_error("ADD", a.type_name(), b.type_name())),
                 _ => return Err(stack_underflow("ADD")),
             }
@@ -127,6 +130,9 @@ pub fn step(
                         return Err(type_mismatch_error("SUB", &format!("FixedPoint(p{})", sa), &format!("FixedPoint(p{})", sb)));
                     }
                     vm.stack.push(Value::FixedPoint { unscaled: ua - ub, scale: sa });
+                }
+                (Some(Value::Nil), _) | (_, Some(Value::Nil)) => {
+                    vm.stack.push(Value::Nil);
                 }
                 (Some(a), Some(b)) => return Err(type_mismatch_error("SUB", a.type_name(), b.type_name())),
                 _ => return Err(stack_underflow("SUB")),
@@ -481,6 +487,47 @@ pub fn step(
             }
             vm.stack.push(Value::Map(map));
         }
+        Opcode::NTH => {
+            let index_val = vm.stack.pop().ok_or_else(|| ExecError::OpcodeParamError {
+                opcode: "NTH",
+                message: "stack underflow (expected index)".to_string(),
+            })?;
+            let coll_val = vm.stack.pop().ok_or_else(|| ExecError::OpcodeParamError {
+                opcode: "NTH",
+                message: "stack underflow (expected collection)".to_string(),
+            })?;
+            
+            let index = match index_val {
+                Value::Int(i) => {
+                    if i < 0 {
+                        return Err(ExecError::OpcodeParamError {
+                            opcode: "NTH",
+                            message: "index cannot be negative".to_string(),
+                        });
+                    }
+                    i as usize
+                }
+                _ => {
+                    return Err(ExecError::OpcodeParamError {
+                        opcode: "NTH",
+                        message: "index must be an integer".to_string(),
+                    });
+                }
+            };
+            
+            match coll_val {
+                Value::List(ref list) | Value::Tuple(ref list) => {
+                    if index >= list.len() {
+                        vm.stack.push(Value::Nil);
+                    } else {
+                        vm.stack.push(list[index].clone());
+                    }
+                }
+                _ => {
+                    vm.stack.push(Value::Nil);
+                }
+            }
+        }
         Opcode::CONCAT => {
             let (b, a) = (vm.stack.pop(), vm.stack.pop());
             match (a, b) {
@@ -576,7 +623,7 @@ pub fn step(
                 _ => {
                     return Err(ExecError::OpcodeParamError {
                         opcode: "TELL",
-                        message: "requires Name channel".to_string(),
+                        message: format!("requires Name channel, got {:?}", chan),
                     })
                 }
             }
@@ -600,7 +647,7 @@ pub fn step(
                 _ => {
                     return Err(ExecError::OpcodeParamError {
                         opcode: "ASK",
-                        message: "requires Name channel".to_string(),
+                        message: format!("requires Name channel, got {:?}", chan),
                     })
                 }
             }
@@ -626,7 +673,7 @@ pub fn step(
                 _ => {
                     return Err(ExecError::OpcodeParamError {
                         opcode: "PEEK",
-                        message: "requires Name channel".to_string(),
+                        message: format!("requires Name channel, got {:?}", chan),
                     })
                 }
             }
