@@ -88,19 +88,39 @@ pub fn step(
         Opcode::ADD => {
             let (b, a) = (vm.stack.pop(), vm.stack.pop());
             match (a, b) {
-                (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Int(a.wrapping_add(b))),
-                (Some(Value::Float(a)), Some(Value::Float(b))) => vm.stack.push(Value::Float(a + b)),
+                (Some(Value::Int(a)), Some(Value::Int(b))) => {
+                    vm.stack.push(Value::Int(a.wrapping_add(b)))
+                }
+                (Some(Value::Float(a)), Some(Value::Float(b))) => {
+                    vm.stack.push(Value::Float(a + b))
+                }
                 (Some(Value::BigInt(a)), Some(Value::BigInt(b))) => {
                     vm.stack.push(Value::BigInt(a + b));
                 }
                 (Some(Value::BigRat(a)), Some(Value::BigRat(b))) => {
                     vm.stack.push(Value::BigRat(a + b));
                 }
-                (Some(Value::FixedPoint { unscaled: ua, scale: sa }), Some(Value::FixedPoint { unscaled: ub, scale: sb })) => {
+                (
+                    Some(Value::FixedPoint {
+                        unscaled: ua,
+                        scale: sa,
+                    }),
+                    Some(Value::FixedPoint {
+                        unscaled: ub,
+                        scale: sb,
+                    }),
+                ) => {
                     if sa != sb {
-                        return Err(type_mismatch_error("ADD", &format!("FixedPoint(p{})", sa), &format!("FixedPoint(p{})", sb)));
+                        return Err(type_mismatch_error(
+                            "ADD",
+                            &format!("FixedPoint(p{})", sa),
+                            &format!("FixedPoint(p{})", sb),
+                        ));
                     }
-                    vm.stack.push(Value::FixedPoint { unscaled: ua + ub, scale: sa });
+                    vm.stack.push(Value::FixedPoint {
+                        unscaled: ua + ub,
+                        scale: sa,
+                    });
                 }
                 (Some(Value::Str(a)), Some(Value::Str(b))) => vm.stack.push(Value::Str(a + &b)),
                 (Some(Value::List(mut a)), Some(Value::List(b))) => {
@@ -110,48 +130,89 @@ pub fn step(
                 (Some(Value::Nil), _) | (_, Some(Value::Nil)) => {
                     vm.stack.push(Value::Nil);
                 }
-                (Some(a), Some(b)) => return Err(type_mismatch_error("ADD", a.type_name(), b.type_name())),
+                (Some(a), Some(b)) => {
+                    return Err(type_mismatch_error("ADD", a.type_name(), b.type_name()))
+                }
                 _ => return Err(stack_underflow("ADD")),
             }
         }
         Opcode::SUB => {
             let (b, a) = (vm.stack.pop(), vm.stack.pop());
             match (a, b) {
-                (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Int(a.wrapping_sub(b))),
-                (Some(Value::Float(a)), Some(Value::Float(b))) => vm.stack.push(Value::Float(a - b)),
+                (Some(Value::Int(a)), Some(Value::Int(b))) => {
+                    vm.stack.push(Value::Int(a.wrapping_sub(b)))
+                }
+                (Some(Value::Float(a)), Some(Value::Float(b))) => {
+                    vm.stack.push(Value::Float(a - b))
+                }
                 (Some(Value::BigInt(a)), Some(Value::BigInt(b))) => {
                     vm.stack.push(Value::BigInt(a - b));
                 }
                 (Some(Value::BigRat(a)), Some(Value::BigRat(b))) => {
                     vm.stack.push(Value::BigRat(a - b));
                 }
-                (Some(Value::FixedPoint { unscaled: ua, scale: sa }), Some(Value::FixedPoint { unscaled: ub, scale: sb })) => {
+                (
+                    Some(Value::FixedPoint {
+                        unscaled: ua,
+                        scale: sa,
+                    }),
+                    Some(Value::FixedPoint {
+                        unscaled: ub,
+                        scale: sb,
+                    }),
+                ) => {
                     if sa != sb {
-                        return Err(type_mismatch_error("SUB", &format!("FixedPoint(p{})", sa), &format!("FixedPoint(p{})", sb)));
+                        return Err(type_mismatch_error(
+                            "SUB",
+                            &format!("FixedPoint(p{})", sa),
+                            &format!("FixedPoint(p{})", sb),
+                        ));
                     }
-                    vm.stack.push(Value::FixedPoint { unscaled: ua - ub, scale: sa });
+                    vm.stack.push(Value::FixedPoint {
+                        unscaled: ua - ub,
+                        scale: sa,
+                    });
                 }
                 (Some(Value::Nil), _) | (_, Some(Value::Nil)) => {
                     vm.stack.push(Value::Nil);
                 }
-                (Some(a), Some(b)) => return Err(type_mismatch_error("SUB", a.type_name(), b.type_name())),
+                (Some(a), Some(b)) => {
+                    return Err(type_mismatch_error("SUB", a.type_name(), b.type_name()))
+                }
                 _ => return Err(stack_underflow("SUB")),
             }
         }
         Opcode::MUL => {
             let (b, a) = (vm.stack.pop(), vm.stack.pop());
             match (a, b) {
-                (Some(Value::Int(a)), Some(Value::Int(b))) => vm.stack.push(Value::Int(a.wrapping_mul(b))),
-                (Some(Value::Float(a)), Some(Value::Float(b))) => vm.stack.push(Value::Float(a * b)),
+                (Some(Value::Int(a)), Some(Value::Int(b))) => {
+                    vm.stack.push(Value::Int(a.wrapping_mul(b)))
+                }
+                (Some(Value::Float(a)), Some(Value::Float(b))) => {
+                    vm.stack.push(Value::Float(a * b))
+                }
                 (Some(Value::BigInt(a)), Some(Value::BigInt(b))) => {
                     vm.stack.push(Value::BigInt(a * b));
                 }
                 (Some(Value::BigRat(a)), Some(Value::BigRat(b))) => {
                     vm.stack.push(Value::BigRat(a * b));
                 }
-                (Some(Value::FixedPoint { unscaled: ua, scale: sa }), Some(Value::FixedPoint { unscaled: ub, scale: sb })) => {
+                (
+                    Some(Value::FixedPoint {
+                        unscaled: ua,
+                        scale: sa,
+                    }),
+                    Some(Value::FixedPoint {
+                        unscaled: ub,
+                        scale: sb,
+                    }),
+                ) => {
                     if sa != sb {
-                        return Err(type_mismatch_error("MUL", &format!("FixedPoint(p{})", sa), &format!("FixedPoint(p{})", sb)));
+                        return Err(type_mismatch_error(
+                            "MUL",
+                            &format!("FixedPoint(p{})", sa),
+                            &format!("FixedPoint(p{})", sb),
+                        ));
                     }
                     // Scale-preserving: (ua * ub) / 10^scale, using floor division
                     let raw = &ua * &ub;
@@ -164,9 +225,14 @@ pub fn step(
                     } else {
                         &raw / &scale_factor
                     };
-                    vm.stack.push(Value::FixedPoint { unscaled, scale: sa });
+                    vm.stack.push(Value::FixedPoint {
+                        unscaled,
+                        scale: sa,
+                    });
                 }
-                (Some(a), Some(b)) => return Err(type_mismatch_error("MUL", a.type_name(), b.type_name())),
+                (Some(a), Some(b)) => {
+                    return Err(type_mismatch_error("MUL", a.type_name(), b.type_name()))
+                }
                 _ => return Err(stack_underflow("MUL")),
             }
         }
@@ -196,18 +262,36 @@ pub fn step(
                     }
                     vm.stack.push(Value::BigRat(a / b));
                 }
-                (Some(Value::FixedPoint { unscaled: ua, scale: sa }), Some(Value::FixedPoint { unscaled: ub, scale: sb })) => {
+                (
+                    Some(Value::FixedPoint {
+                        unscaled: ua,
+                        scale: sa,
+                    }),
+                    Some(Value::FixedPoint {
+                        unscaled: ub,
+                        scale: sb,
+                    }),
+                ) => {
                     if sa != sb {
-                        return Err(type_mismatch_error("DIV", &format!("FixedPoint(p{})", sa), &format!("FixedPoint(p{})", sb)));
+                        return Err(type_mismatch_error(
+                            "DIV",
+                            &format!("FixedPoint(p{})", sa),
+                            &format!("FixedPoint(p{})", sb),
+                        ));
                     }
                     if ub.is_zero() {
                         return Err(div_by_zero("DIV"));
                     }
                     // Shifted division: (ua * 10^scale) / ub
                     let shifted = ua * num_traits::pow::pow(BigInt::from(10), sa as usize);
-                    vm.stack.push(Value::FixedPoint { unscaled: shifted / ub, scale: sa });
+                    vm.stack.push(Value::FixedPoint {
+                        unscaled: shifted / ub,
+                        scale: sa,
+                    });
                 }
-                (Some(a), Some(b)) => return Err(type_mismatch_error("DIV", a.type_name(), b.type_name())),
+                (Some(a), Some(b)) => {
+                    return Err(type_mismatch_error("DIV", a.type_name(), b.type_name()))
+                }
                 _ => return Err(stack_underflow("DIV")),
             }
         }
@@ -237,9 +321,22 @@ pub fn step(
                     // Per spec: (a/b)*b == a exactly, so mod always returns 0
                     vm.stack.push(Value::BigRat(BigRational::zero()));
                 }
-                (Some(Value::FixedPoint { unscaled: ua, scale: sa }), Some(Value::FixedPoint { unscaled: ub, scale: sb })) => {
+                (
+                    Some(Value::FixedPoint {
+                        unscaled: ua,
+                        scale: sa,
+                    }),
+                    Some(Value::FixedPoint {
+                        unscaled: ub,
+                        scale: sb,
+                    }),
+                ) => {
                     if sa != sb {
-                        return Err(type_mismatch_error("MOD", &format!("FixedPoint(p{})", sa), &format!("FixedPoint(p{})", sb)));
+                        return Err(type_mismatch_error(
+                            "MOD",
+                            &format!("FixedPoint(p{})", sa),
+                            &format!("FixedPoint(p{})", sb),
+                        ));
                     }
                     if ub.is_zero() {
                         return Err(div_by_zero("MOD"));
@@ -250,9 +347,14 @@ pub fn step(
                     let scale_factor = num_traits::pow::pow(BigInt::from(10), sa as usize);
                     let quotient = (&ua * &scale_factor) / &ub;
                     let r = ua - (&quotient * &ub) / scale_factor;
-                    vm.stack.push(Value::FixedPoint { unscaled: r, scale: sa });
+                    vm.stack.push(Value::FixedPoint {
+                        unscaled: r,
+                        scale: sa,
+                    });
                 }
-                (Some(a), Some(b)) => return Err(type_mismatch_error("MOD", a.type_name(), b.type_name())),
+                (Some(a), Some(b)) => {
+                    return Err(type_mismatch_error("MOD", a.type_name(), b.type_name()))
+                }
                 _ => return Err(stack_underflow("MOD")),
             }
         }
@@ -262,7 +364,10 @@ pub fn step(
             Some(Value::BigInt(a)) => vm.stack.push(Value::BigInt(-a)),
             Some(Value::BigRat(a)) => vm.stack.push(Value::BigRat(-a)),
             Some(Value::FixedPoint { unscaled, scale }) => {
-                vm.stack.push(Value::FixedPoint { unscaled: -unscaled, scale });
+                vm.stack.push(Value::FixedPoint {
+                    unscaled: -unscaled,
+                    scale,
+                });
             }
             Some(other) => {
                 return Err(ExecError::OpcodeParamError {
@@ -290,19 +395,29 @@ pub fn step(
         }
         Opcode::CMP_LT => {
             let (b, a) = (vm.stack.pop(), vm.stack.pop());
-            vm.stack.push(Value::Bool(compare_values("CMP_LT", &a, &b)? == Ordering::Less));
+            vm.stack.push(Value::Bool(
+                compare_values("CMP_LT", &a, &b)? == Ordering::Less,
+            ));
         }
         Opcode::CMP_LTE => {
             let (b, a) = (vm.stack.pop(), vm.stack.pop());
-            vm.stack.push(Value::Bool(matches!(compare_values("CMP_LTE", &a, &b)?, Ordering::Less | Ordering::Equal)));
+            vm.stack.push(Value::Bool(matches!(
+                compare_values("CMP_LTE", &a, &b)?,
+                Ordering::Less | Ordering::Equal
+            )));
         }
         Opcode::CMP_GT => {
             let (b, a) = (vm.stack.pop(), vm.stack.pop());
-            vm.stack.push(Value::Bool(compare_values("CMP_GT", &a, &b)? == Ordering::Greater));
+            vm.stack.push(Value::Bool(
+                compare_values("CMP_GT", &a, &b)? == Ordering::Greater,
+            ));
         }
         Opcode::CMP_GTE => {
             let (b, a) = (vm.stack.pop(), vm.stack.pop());
-            vm.stack.push(Value::Bool(matches!(compare_values("CMP_GTE", &a, &b)?, Ordering::Greater | Ordering::Equal)));
+            vm.stack.push(Value::Bool(matches!(
+                compare_values("CMP_GTE", &a, &b)?,
+                Ordering::Greater | Ordering::Equal
+            )));
         }
 
         // Logical operators
@@ -496,7 +611,7 @@ pub fn step(
                 opcode: "NTH",
                 message: "stack underflow (expected collection)".to_string(),
             })?;
-            
+
             let index = match index_val {
                 Value::Int(i) => {
                     if i < 0 {
@@ -514,7 +629,7 @@ pub fn step(
                     });
                 }
             };
-            
+
             match coll_val {
                 Value::List(ref list) | Value::Tuple(ref list) => {
                     if index >= list.len() {
@@ -763,16 +878,18 @@ fn compare_values(
     b: &Option<Value>,
 ) -> Result<Ordering, ExecError> {
     match (a, b) {
-        (Some(a_val), Some(b_val)) => a_val
-            .partial_cmp(b_val)
-            .ok_or_else(|| ExecError::OpcodeParamError {
-                opcode,
-                message: format!(
-                    "values not comparable: {} vs {}",
-                    a_val.type_name(),
-                    b_val.type_name()
-                ),
-            }),
+        (Some(a_val), Some(b_val)) => {
+            a_val
+                .partial_cmp(b_val)
+                .ok_or_else(|| ExecError::OpcodeParamError {
+                    opcode,
+                    message: format!(
+                        "values not comparable: {} vs {}",
+                        a_val.type_name(),
+                        b_val.type_name()
+                    ),
+                })
+        }
         _ => Err(stack_underflow(opcode)),
     }
 }

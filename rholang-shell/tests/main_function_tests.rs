@@ -29,7 +29,10 @@ async fn test_main_function_code_path() -> Result<()> {
     // However, if run locally in an interactive terminal, it will legitimately hang
     // waiting for user input, causing a timeout.
     if atty::is(atty::Stream::Stdin) {
-        assert!(result.is_err(), "run_shell should time out when running interactively");
+        assert!(
+            result.is_err(),
+            "run_shell should time out when running interactively"
+        );
     } else {
         assert!(result.is_ok(), "run_shell unexpectedly timed out");
     }

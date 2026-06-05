@@ -458,7 +458,6 @@ pub(super) fn node_to_ast<'ast>(
                                     let has_cont =
                                         formals_node.child_by_field_id(field!("cont")).is_some();
                                     // Parse names inline (they are just name nodes)
-                                    let procs_mock: Vec<AnnProc<'_>> = Vec::new();
                                     // We need to parse names; use the existing NamesIter approach.
                                     // However since we're in a sync context we collect them manually.
                                     constructor_formals = parse_names_node(
@@ -466,7 +465,7 @@ pub(super) fn node_to_ast<'ast>(
                                         arity,
                                         has_cont,
                                         source,
-                                        &procs_mock,
+                                        ast_builder,
                                     );
                                 }
                                 constructor_body_node = Some(proc_node);
@@ -484,13 +483,12 @@ pub(super) fn node_to_ast<'ast>(
                                     let arity = formals_node.named_child_count();
                                     let has_cont =
                                         formals_node.child_by_field_id(field!("cont")).is_some();
-                                    let procs_mock: Vec<AnnProc<'_>> = Vec::new();
                                     parse_names_node(
                                         &formals_node,
                                         arity,
                                         has_cont,
                                         source,
-                                        &procs_mock,
+                                        ast_builder,
                                     )
                                 } else {
                                     Names {
@@ -506,13 +504,12 @@ pub(super) fn node_to_ast<'ast>(
                                 let arity = formals_node.named_child_count();
                                 let has_cont =
                                     formals_node.child_by_field_id(field!("cont")).is_some();
-                                let procs_mock: Vec<AnnProc<'_>> = Vec::new();
                                 default_formals = Some(parse_names_node(
                                     &formals_node,
                                     arity,
                                     has_cont,
                                     source,
-                                    &procs_mock,
+                                    ast_builder,
                                 ));
                                 default_body_node = Some(proc_node);
                             }
@@ -624,15 +621,25 @@ pub(super) fn node_to_ast<'ast>(
                     };
                     match choice_node.kind_id() {
                         kind!("empty_cont") => {
-                            cont_stack.push(K::ConsumeMethodSendSync { span, method_name: method_name_id, arity });
+                            cont_stack.push(K::ConsumeMethodSendSync {
+                                span,
+                                method_name: method_name_id,
+                                arity,
+                            });
                         }
                         kind!("non_empty_cont") => {
                             let cont_node = get_first_child(&choice_node);
-                            cont_stack.push(K::ConsumeMethodSendSyncWithCont { span, method_name: method_name_id, arity });
+                            cont_stack.push(K::ConsumeMethodSendSyncWithCont {
+                                span,
+                                method_name: method_name_id,
+                                arity,
+                            });
                             cont_stack.push(K::EvalDelayed(cont_node));
                         }
                         _ => {
-                            unreachable!("Continuations of method_send_sync are either empty or non-empty")
+                            unreachable!(
+                                "Continuations of method_send_sync are either empty or non-empty"
+                            )
                         }
                     };
                     cont_stack.push(K::EvalList(messages_node.walk()));
@@ -756,9 +763,7 @@ pub(super) fn node_to_ast<'ast>(
                                     name_count,
                                     cont_present,
                                 },
-                                _ => unreachable!(
-                                    "Filtered above"
-                                ),
+                                _ => unreachable!("Filtered above"),
                             };
 
                             match &bind_desc {
@@ -825,11 +830,9 @@ pub(super) fn node_to_ast<'ast>(
                     let mut guards_present: SmallVec<[bool; 4]> = SmallVec::new();
                     temp_cont_stack.reserve(3 * cases_node.named_child_count());
 
-                    for case in named_children_of_kind(
-                        &cases_node,
-                        kind!("case"),
-                        &mut cases_node.walk(),
-                    ) {
+                    for case in
+                        named_children_of_kind(&cases_node, kind!("case"), &mut cases_node.walk())
+                    {
                         let pattern_node = get_field(&case, field!("pattern"));
                         let guard_node = case.child_by_field_id(field!("guard"));
                         let proc_node = get_field(&case, field!("proc"));
@@ -1066,7 +1069,7 @@ fn parse_names_node<'a>(
     _arity: usize,
     has_cont: bool,
     source: &'a str,
-    _procs_mock: &[AnnProc<'a>],
+    ast_builder: &'a ASTBuilder<'a>,
 ) -> Names<'a> {
     let mut collected: SmallVec<[Name<'a>; 1]> = SmallVec::new();
 
@@ -1091,19 +1094,20 @@ fn parse_names_node<'a>(
         } else if kind == kind!("quote") {
             // @proc — the child is a proc node; we only support @var here for formals
             if let Some(inner) = child.named_child(0) {
-                if inner.kind_id() == kind!("var") {
-                    let name_str = get_node_value(&inner, source);
-                    let id = Id {
-                        name: name_str,
+                let proc_var = if inner.kind_id() == kind!("var") {
+                    Var::Id(Id {
+                        name: get_node_value(&inner, source),
                         pos: inner.start_position().into(),
-                    };
-                    // This is a quoted proc-var; store it as Name::Quote over a ProcVar.
-                    // (Actual macro-expansion handles the semantics; we just capture the syntax.)
-                    // For quoted patterns in formals we encode as Quote(ProcVar).
-                    // We need an arena for this but we don't have one here; so we record as
-                    // NameVar with the identifier, which is the common case for formals.
-                    collected.push(Name::NameVar(Var::Id(id)));
-                }
+                    })
+                } else if inner.kind_id() == kind!("wildcard") {
+                    Var::Wildcard
+                } else {
+                    continue;
+                };
+                let quoted_proc = ast_builder
+                    .alloc_proc_var(proc_var)
+                    .ann(inner.range().into());
+                collected.push(Name::Quote(quoted_proc));
             }
         }
         // _name_remainder ('...' '@' proc_var) is handled via has_cont below — it's the
@@ -1219,8 +1223,11 @@ fn apply_cont<'tree, 'ast>(
                             proc_stack.replace_top_slice(total, |bodies| {
                                 let constructor_body = bodies[0];
                                 let method_bodies = &bodies[1..1 + method_count];
-                                let default_body =
-                                    if has_default { Some(bodies[1 + method_count]) } else { None };
+                                let default_body = if has_default {
+                                    Some(bodies[1 + method_count])
+                                } else {
+                                    None
+                                };
 
                                 let methods: Vec<AgentMethod<'_>> = method_infos
                                     .into_iter()
@@ -1255,23 +1262,28 @@ fn apply_cont<'tree, 'ast>(
                             method_name,
                             arity,
                             span,
-                        } => proc_stack.replace_top_slice_with_mask(arity + 1, |name_args, mask| {
-                            let channel = into_name(name_args[0], mask[0]);
-                            let inputs = &name_args[1..];
-                            ast_builder
-                                .alloc_method_send(send_type, channel, method_name, inputs)
-                                .ann(span)
-                        }),
+                        } => {
+                            proc_stack.replace_top_slice_with_mask(arity + 1, |name_args, mask| {
+                                let channel = into_name(name_args[0], mask[0]);
+                                let inputs = &name_args[1..];
+                                ast_builder
+                                    .alloc_method_send(send_type, channel, method_name, inputs)
+                                    .ann(span)
+                            })
+                        }
                         K::ConsumeMethodSendSync {
                             span,
                             method_name,
                             arity,
-                        } => proc_stack.replace_top_slice_with_mask(arity + 1, |name_inputs, mask| {
-                            let channel = into_name(name_inputs[0], mask[0]);
-                            ast_builder
-                                .alloc_method_send_sync(channel, method_name, &name_inputs[1..])
-                                .ann(span)
-                        }),
+                        } => proc_stack.replace_top_slice_with_mask(
+                            arity + 1,
+                            |name_inputs, mask| {
+                                let channel = into_name(name_inputs[0], mask[0]);
+                                ast_builder
+                                    .alloc_method_send_sync(channel, method_name, &name_inputs[1..])
+                                    .ann(span)
+                            },
+                        ),
                         K::ConsumeMethodSendSyncWithCont {
                             span,
                             method_name,
@@ -1282,8 +1294,7 @@ fn apply_cont<'tree, 'ast>(
                                 let channel = into_name(name_inputs_cont[0], mask[0]);
                                 // SAFETY: Because we successfully consumed |arity + 2|
                                 // elements, then the slice.len() is greater or equal 2
-                                let (last, messages) =
-                                    name_inputs_cont[1..].split_last().unwrap();
+                                let (last, messages) = name_inputs_cont[1..].split_last().unwrap();
                                 let cont = *last;
                                 ast_builder
                                     .alloc_method_send_sync_with_cont(
@@ -1414,11 +1425,10 @@ fn apply_cont<'tree, 'ast>(
                         } => {
                             // Total slice = expression + sum_per_case(2 if no
                             // guard, 3 if guard).
-                            let total: usize = 1
-                                + guards_present
-                                    .iter()
-                                    .map(|&g| if g { 3 } else { 2 })
-                                    .sum::<usize>();
+                            let total: usize = 1 + guards_present
+                                .iter()
+                                .map(|&g| if g { 3 } else { 2 })
+                                .sum::<usize>();
                             proc_stack.replace_top_slice(total, |slice| {
                                 let expr = slice[0];
                                 let mut idx = 1usize;
@@ -1665,7 +1675,12 @@ impl Debug for K<'_, '_> {
                 .field("op", op)
                 .field("span", span)
                 .finish(),
-            Self::ConsumeAgent { span, name, method_count, .. } => f
+            Self::ConsumeAgent {
+                span,
+                name,
+                method_count,
+                ..
+            } => f
                 .debug_struct("ConsumeAgent")
                 .field("name", &name.name)
                 .field("method_count", method_count)
@@ -1676,19 +1691,32 @@ impl Debug for K<'_, '_> {
                 .field("typ", typ)
                 .field("span", span)
                 .finish(),
-            Self::ConsumeMethodSend { span, method_name, arity, .. } => f
+            Self::ConsumeMethodSend {
+                span,
+                method_name,
+                arity,
+                ..
+            } => f
                 .debug_struct("ConsumeMethodSend")
                 .field("method_name", &method_name.name)
                 .field("arity", arity)
                 .field("span", span)
                 .finish(),
-            Self::ConsumeMethodSendSync { span, method_name, arity } => f
+            Self::ConsumeMethodSendSync {
+                span,
+                method_name,
+                arity,
+            } => f
                 .debug_struct("ConsumeMethodSendSync")
                 .field("method_name", &method_name.name)
                 .field("arity", arity)
                 .field("span", span)
                 .finish(),
-            Self::ConsumeMethodSendSyncWithCont { span, method_name, arity } => f
+            Self::ConsumeMethodSendSyncWithCont {
+                span,
+                method_name,
+                arity,
+            } => f
                 .debug_struct("ConsumeMethodSendSyncWithCont")
                 .field("method_name", &method_name.name)
                 .field("arity", arity)
@@ -2286,7 +2314,11 @@ where
             // last on proc_stack within this receipt's range).
             let (bind_procs, bind_mask, guard) = if next.has_guard {
                 let last = this_procs.len() - 1;
-                (&this_procs[..last], &this_mask[..last], Some(this_procs[last]))
+                (
+                    &this_procs[..last],
+                    &this_mask[..last],
+                    Some(this_procs[last]),
+                )
             } else {
                 (this_procs, this_mask, None)
             };

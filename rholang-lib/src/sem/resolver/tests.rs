@@ -64,6 +64,60 @@ fn test_scope_nested<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'test>) 
 
 #[test_rholang_code(
     r#"
+    new Cell, cellToken in {
+      agent Cell {
+        constructor(@initialValue) {
+          @[*private, *cellToken]!(initialValue)
+        }
+      }
+    }"#, pipeline = pipeline
+)]
+fn test_agent_private_binding<'test>(_tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
+    for bo in db.bound_positions() {
+        println!(
+            "bound occ {:?} name={} pos={:?} binding={:?}",
+            bo.occurence.symbol,
+            db.resolve_symbol(bo.occurence.symbol)
+                .unwrap_or("<unknown>"),
+            bo.occurence.position,
+            bo.binding,
+        );
+    }
+    for diag in db.diagnostics() {
+        if let crate::sem::DiagnosticKind::Error(kind) = diag.kind {
+            match kind {
+                ErrorKind::NameInProcPosition(binder, sym) => {
+                    println!(
+                        "diag: NameInProcPosition binder={} name={} kind={:?} symbol={} at {:?}",
+                        binder.0,
+                        db.resolve_symbol(db[binder].name).unwrap_or("<unknown>"),
+                        db[binder].kind,
+                        db.resolve_symbol(sym).unwrap_or("<unknown>"),
+                        diag.exact_position,
+                    );
+                }
+                _ => {}
+            }
+        }
+        if let crate::sem::DiagnosticKind::Warning(warn) = diag.kind {
+            if let WarningKind::UnusedVariable(binder, sym) = warn {
+                println!(
+                    "diag: UnusedVariable binder={} name={} kind={:?} symbol={} at {:?}",
+                    binder.0,
+                    db.resolve_symbol(db[binder].name).unwrap_or("<unknown>"),
+                    db[binder].kind,
+                    db.resolve_symbol(sym).unwrap_or("<unknown>"),
+                    diag.exact_position,
+                );
+            }
+        }
+        println!("diag = {:?}", diag);
+    }
+    expect::no_warnings_or_errors(db);
+}
+
+#[test_rholang_code(
+    r#"
 new blockData(`rho:block:data`), retCh, stdout(`rho:io:stdout`) in {
   blockData!(*retCh) |
   for(@blockNumber, @timestamp, @sender <- retCh) {
@@ -1267,10 +1321,7 @@ match 1 {
     _ => Nil
 }"#, pipeline = pipeline
 )]
-fn test_match_guard_unbound_var<'test>(
-    _tree: ProcRef<'test>,
-    db: &'test SemanticDb<'test>,
-) {
+fn test_match_guard_unbound_var<'test>(_tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     expect::error(db, ErrorKind::UnboundVariable, matches::proc_var("missing"));
 }
 
@@ -1281,10 +1332,7 @@ match 1 {
     _ => Nil
 }"#, pipeline = pipeline
 )]
-fn test_match_guard_bound_var<'test>(
-    _tree: ProcRef<'test>,
-    db: &'test SemanticDb<'test>,
-) {
+fn test_match_guard_bound_var<'test>(_tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     expect::no_warnings_or_errors(db);
 }
 
@@ -1294,10 +1342,7 @@ new chan in {
     for (@x <- chan where missing) { Nil }
 }"#, pipeline = pipeline
 )]
-fn test_for_receipt_guard_unbound_var<'test>(
-    _tree: ProcRef<'test>,
-    db: &'test SemanticDb<'test>,
-) {
+fn test_for_receipt_guard_unbound_var<'test>(_tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     expect::error(db, ErrorKind::UnboundVariable, matches::proc_var("missing"));
 }
 
@@ -1307,10 +1352,7 @@ new chan in {
     for (@x <- chan where x) { Nil }
 }"#, pipeline = pipeline
 )]
-fn test_for_receipt_guard_bound_var<'test>(
-    _tree: ProcRef<'test>,
-    db: &'test SemanticDb<'test>,
-) {
+fn test_for_receipt_guard_bound_var<'test>(_tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     expect::no_warnings_or_errors(db);
 }
 
@@ -1442,10 +1484,7 @@ match 1 {
     _ => Nil
 }"#, pipeline = pipeline
 )]
-fn test_match_mixed_guards_all_resolve<'test>(
-    _tree: ProcRef<'test>,
-    db: &'test SemanticDb<'test>,
-) {
+fn test_match_mixed_guards_all_resolve<'test>(_tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     expect::no_warnings_or_errors(db);
 }
 

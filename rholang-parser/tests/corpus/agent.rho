@@ -1,33 +1,42 @@
-new Cell in {
-    agent Cell {
-        constructor() {
-            Cell!(0)
-        } |
+new Cell, cellToken in {
+  agent Cell {
+    constructor(@initialValue) {
+      @[*private, *cellToken]!(initialValue)
+    } |
 
-        method get(ret) {
-            for (@val <<- Cell) {
-                ret!(val)
-            }
-        } |
+    method get() {
+      for (@val <<- @[*private, *cellToken]) {
+        return!(val)
+      }
+    } |
 
-        method set(val, ret) {
-            for (_ <- Cell) {
-                Cell!(val) | ret!(true)
-            }
-        } |
+    method set(val) {
+      for (_ <- @[*private, *cellToken]) {
+        @[*private, *cellToken]!(val) | return!()
+      }
+    } |
 
-        default(msg, ret) {
-            ret!(false)
-        }
+    default(...@args) {
+      match args {
+        [return, ...rest] => @return!()
+        [] => Nil
+      }
     }
-    |
-    new ret in {
-        Cell!get(*ret) |
-        for (@val <- ret) {
-            Cell!set(val + 1, *ret) |
-            for (@success <- ret) {
-                Cell!?get().
-            }
-        }
+  } |
+
+  // Invoke the constructor to get an instance
+  for (myCell <- Cell!?(0)) {
+    // Get the current value from the instance
+    for (@val <- myCell!?("get")) {
+      // Record that value
+      @"should be 0"!(val) |
+      // In parallel, update the value of the cell
+      myCell!?("set", val + 1) ; // Use sequential sugar
+      // Get the new value of the cell
+      for (@val <- myCell!?("get")) {
+        // Record that value
+        @"should be 1"!(val)
+      }
     }
+  }
 }

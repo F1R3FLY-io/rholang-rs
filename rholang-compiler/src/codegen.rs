@@ -204,15 +204,33 @@ impl<'a> CodegenContext<'a> {
                 bail!("Contract declarations are not supported in MVP");
             }
 
-            Proc::Agent { name, constructor_formals, constructor_body, methods, default } => {
+            Proc::Agent {
+                name,
+                constructor_formals,
+                constructor_body,
+                methods,
+                default,
+            } => {
                 let pid = match self.db.lookup(unsafe { &*(proc as *const AnnProc<'a>) }) {
                     Some(pid) => pid,
                     None => bail!("Agent at {} not indexed", proc.span.start),
                 };
-                self.compile_agent(pid, name, constructor_formals, constructor_body, methods, default)?;
+                self.compile_agent(
+                    pid,
+                    name,
+                    constructor_formals,
+                    constructor_body,
+                    methods,
+                    default,
+                )?;
             }
 
-            Proc::MethodSend { channel, send_type: _, method_name, inputs } => {
+            Proc::MethodSend {
+                channel,
+                send_type: _,
+                method_name,
+                inputs,
+            } => {
                 let pid = match self.db.lookup(unsafe { &*(proc as *const AnnProc<'a>) }) {
                     Some(pid) => pid,
                     None => bail!("MethodSend at {} not indexed", proc.span.start),
@@ -220,7 +238,12 @@ impl<'a> CodegenContext<'a> {
                 self.compile_method_send(pid, channel, method_name, inputs)?;
             }
 
-            Proc::MethodSendSync { channel, method_name, inputs, cont } => {
+            Proc::MethodSendSync {
+                channel,
+                method_name,
+                inputs,
+                cont,
+            } => {
                 let pid = match self.db.lookup(unsafe { &*(proc as *const AnnProc<'a>) }) {
                     Some(pid) => pid,
                     None => bail!("MethodSendSync at {} not indexed", proc.span.start),
@@ -382,10 +405,7 @@ impl<'a> CodegenContext<'a> {
         if bits == 32 {
             let f32_val = f as f32;
             if f32_val.is_infinite() && !f.is_infinite() {
-                bail!(
-                    "Float literal '{}' overflows f32 (would become Inf)",
-                    value
-                );
+                bail!("Float literal '{}' overflows f32 (would become Inf)", value);
             }
         }
 
@@ -491,6 +511,13 @@ impl<'a> CodegenContext<'a> {
                         // For free variables (e.g., from for-comprehension patterns),
                         // we may have already allocated a local in an enclosing scope
                         let local_idx = self.locals.get(&binder_id).ok_or_else(|| {
+                            eprintln!(
+                                "DEBUG: missing local for binder_id={:?}, symbol='{}', pos={:?}, locals={:?}",
+                                binder_id,
+                                id.name,
+                                id.pos,
+                                self.locals.keys().collect::<Vec<_>>()
+                            );
                             anyhow!(
                                 "Variable '{}' at {} is not allocated to a local slot",
                                 id.name,
@@ -721,18 +748,62 @@ impl<'a> CodegenContext<'a> {
                             Source::Simple { name } => {
                                 self.compile_name(name, pid)?;
                             }
-                            Source::ReceiveSend { .. } | Source::SendReceive { .. } => {
-                                bail!("Complex sources not supported in MVP");
+                            Source::ReceiveSend { name: _ } => {
+                                bail!("ReceiveSend (?!) not supported in MVP");
+                            }
+                            Source::SendReceive { name, inputs } => {
+                                // For SendReceive, we need to:
+                                // 1. Create a return channel
+                                // 2. Send the inputs plus return channel to the service channel
+                                // 3. Receive from the return channel
+
+                                // Create return channel
+                                self.emit(Instruction::unary(Opcode::NAME_CREATE, 3));
+                                self.emit(Instruction::nullary(Opcode::ALLOC_LOCAL));
+                                let ret_channel_slot = self.next_local;
+                                self.next_local += 1;
+                                self.emit(Instruction::unary(Opcode::STORE_LOCAL, ret_channel_slot));
+
+                                // Compile the service channel name
+                                self.compile_name(name, pid)?;
+
+                                // Compile and send the inputs plus return channel
+                                for input in inputs {
+                                    self.compile_proc(input)?;
+                                }
+                                // Add return channel to the message
+                                self.emit(Instruction::unary(Opcode::LOAD_LOCAL, ret_channel_slot));
+                                let arg_count = inputs.len() + 1;
+                                if arg_count > u16::MAX as usize {
+                                    bail!("Too many method arguments (max {})", u16::MAX);
+                                }
+                                self.emit(Instruction::unary(
+                                    Opcode::CREATE_LIST,
+                                    arg_count as u16,
+                                ));
+                                self.emit(Instruction::nullary(Opcode::TELL));
+
+                                // Receive from the return channel
+                                self.emit(Instruction::unary(Opcode::LOAD_LOCAL, ret_channel_slot));
+                                const DEFAULT_RECEIVE_KIND: u8 = 3;
+                                self.emit(Instruction::binary(
+                                    Opcode::ASK,
+                                    DEFAULT_RECEIVE_KIND,
+                                    0, // reserved
+                                ));
                             }
                         }
 
-                        // Emit ASK to receive from the channel
-                        const DEFAULT_RECEIVE_KIND: u8 = 3;
-                        self.emit(Instruction::binary(
-                            Opcode::ASK,
-                            DEFAULT_RECEIVE_KIND,
-                            0, // reserved
-                        ));
+                        // Emit ASK to receive from the channel (for Simple and ReceiveSend)
+                        // For SendReceive, we've already done this above
+                        if !matches!(rhs, Source::SendReceive { .. }) {
+                            const DEFAULT_RECEIVE_KIND: u8 = 3;
+                            self.emit(Instruction::binary(
+                                Opcode::ASK,
+                                DEFAULT_RECEIVE_KIND,
+                                0, // reserved
+                            ));
+                        }
 
                         // Bind received values to variables
                         // For MVP, we expect the result to be a list that we unpack
@@ -782,7 +853,9 @@ impl<'a> CodegenContext<'a> {
                                                 let binder_id =
                                                     self.db.resolve_var_binding(pid, binding);
 
-                                                self.emit(Instruction::nullary(Opcode::ALLOC_LOCAL));
+                                                self.emit(Instruction::nullary(
+                                                    Opcode::ALLOC_LOCAL,
+                                                ));
 
                                                 let slot = self.alloc_local(binder_id)?;
                                                 self.emit(Instruction::unary(
@@ -791,7 +864,11 @@ impl<'a> CodegenContext<'a> {
                                                 ));
                                             }
                                             None => {
-                                                bail!("Unbound variable '{}' at {}", id.name, id.pos);
+                                                bail!(
+                                                    "Unbound variable '{}' at {}",
+                                                    id.name,
+                                                    id.pos
+                                                );
                                             }
                                         }
                                     } else {
@@ -850,7 +927,9 @@ impl<'a> CodegenContext<'a> {
                 if let Proc::ProcVar(var) = ann_proc.proc {
                     self.compile_var(var, pid, false)
                 } else {
-                    bail!("Quote of non-variable not supported in MVP")
+                    self.compile_proc(ann_proc)?;
+                    self.emit(Instruction::nullary(Opcode::NAME_QUOTE));
+                    Ok(())
                 }
             }
         }
@@ -1032,7 +1111,10 @@ impl<'a> CodegenContext<'a> {
         self.define_label(loop_start);
 
         let symbol = self.db.intern(name.name);
-        let occ = librho::sem::SymbolOccurrence { symbol, position: name.pos };
+        let occ = librho::sem::SymbolOccurrence {
+            symbol,
+            position: name.pos,
+        };
         if let Some(binding) = self.db.binder_of(occ) {
             let binder_id = self.db.resolve_var_binding(pid, binding);
             if let Some(slot) = self.locals.get(&binder_id) {
@@ -1054,7 +1136,8 @@ impl<'a> CodegenContext<'a> {
         self.emit(Instruction::nullary(Opcode::CMP_EQ));
         let exit_branch1 = self.instructions.len();
         self.emit(Instruction::nullary(Opcode::NOP));
-        self.forward_refs.push((exit_branch1, end_loop, Opcode::BRANCH_TRUE));
+        self.forward_refs
+            .push((exit_branch1, end_loop, Opcode::BRANCH_TRUE));
 
         self.emit(Instruction::nullary(Opcode::DUP)); // DUP args
         self.emit(Instruction::unary(Opcode::PUSH_INT, 0));
@@ -1066,11 +1149,20 @@ impl<'a> CodegenContext<'a> {
 
         // Extract constructor formals
         for (i, param) in constructor_formals.names.iter().enumerate() {
-            if let rholang_parser::ast::Name::NameVar(Var::Id(id)) = param {
+            let param_id = match param {
+                rholang_parser::ast::Name::NameVar(Var::Id(id)) => Some(id),
+                rholang_parser::ast::Name::Quote(quoted) => match quoted.proc {
+                    Proc::ProcVar(Var::Id(id)) => Some(id),
+                    _ => None,
+                },
+                _ => None,
+            };
+
+            if let Some(id) = param_id {
                 let symbol = self.db.intern(id.name);
-                let occ = librho::sem::SymbolOccurrence { symbol, position: id.pos };
-                if let Some(binding) = self.db.binder_of(occ) {
-                    let binder_id = self.db.resolve_var_binding(pid, binding);
+                // Use symbol-based lookup in the agent scope to find the correct binder,
+                // not the formal's position (which creates a Free binding with wrong index after scope absorption).
+                if let Some(binder_id) = self.db.lookup_in_scope_chain(symbol, pid) {
                     let slot = self.alloc_local(binder_id)?;
                     self.emit(Instruction::nullary(Opcode::DUP)); // DUP args
                     self.emit(Instruction::unary(Opcode::PUSH_INT, (i + 1) as u16));
@@ -1081,6 +1173,13 @@ impl<'a> CodegenContext<'a> {
         }
 
         self.emit(Instruction::nullary(Opcode::POP)); // Drop args
+
+        // Create the implicit agent-private channel if the agent resolver bound one.
+        let private_slot = self.find_agent_private_slot(pid)?;
+        if let Some(private_slot) = private_slot {
+            self.emit(Instruction::unary(Opcode::NAME_CREATE, 3));
+            self.emit(Instruction::unary(Opcode::STORE_LOCAL, private_slot));
+        }
 
         // Create `this` channel
         self.emit(Instruction::unary(Opcode::NAME_CREATE, 3));
@@ -1111,7 +1210,8 @@ impl<'a> CodegenContext<'a> {
         self.emit(Instruction::nullary(Opcode::CMP_EQ));
         let exit_branch2 = self.instructions.len();
         self.emit(Instruction::nullary(Opcode::NOP));
-        self.forward_refs.push((exit_branch2, end_loop, Opcode::BRANCH_TRUE));
+        self.forward_refs
+            .push((exit_branch2, end_loop, Opcode::BRANCH_TRUE));
 
         // The stack now has the list of method args `args`.
         // The method name is at `args[0]`.
@@ -1129,16 +1229,28 @@ impl<'a> CodegenContext<'a> {
 
             let branch_idx = self.instructions.len();
             self.emit(Instruction::nullary(Opcode::NOP));
-            self.forward_refs.push((branch_idx, next_method, Opcode::BRANCH_FALSE));
+            self.forward_refs
+                .push((branch_idx, next_method, Opcode::BRANCH_FALSE));
 
-            // It's a match! 
+            // It's a match!
             // Extract method parameters
             for (i, param) in method.formals.names.iter().enumerate() {
-                if let rholang_parser::ast::Name::NameVar(Var::Id(id)) = param {
+                let param_id = match param {
+                    rholang_parser::ast::Name::NameVar(Var::Id(id)) => Some(id),
+                    rholang_parser::ast::Name::Quote(quoted) => match quoted.proc {
+                        Proc::ProcVar(Var::Id(id)) => Some(id),
+                        _ => None,
+                    },
+                    _ => None,
+                };
+
+                if let Some(id) = param_id {
                     let symbol = self.db.intern(id.name);
-                    let occ = librho::sem::SymbolOccurrence { symbol, position: id.pos };
-                    if let Some(binding) = self.db.binder_of(occ) {
-                        let binder_id = self.db.resolve_var_binding(pid, binding);
+                    let occ = librho::sem::SymbolOccurrence {
+                        symbol,
+                        position: id.pos,
+                    };
+                    if let Some(binder_id) = self.db.resolve_occurence(occ, pid) {
                         let slot = self.alloc_local(binder_id)?;
                         self.emit(Instruction::nullary(Opcode::DUP)); // DUP args
                         self.emit(Instruction::unary(Opcode::PUSH_INT, (i + 1) as u16));
@@ -1160,24 +1272,23 @@ impl<'a> CodegenContext<'a> {
         }
 
         if let Some(def) = default {
-            if let Some(param) = &def.formals.remainder {
-                if let Var::Id(id) = param {
-                    let symbol = self.db.intern(id.name);
-                    let occ = librho::sem::SymbolOccurrence { symbol, position: id.pos };
-                    if let Some(binding) = self.db.binder_of(occ) {
-                        let binder_id = self.db.resolve_var_binding(pid, binding);
-                        let slot = self.alloc_local(binder_id)?;
-                        // The default method gets the whole list of arguments (including the method name)
-                        self.emit(Instruction::unary(Opcode::STORE_LOCAL, slot));
-                    } else {
-                        self.emit(Instruction::nullary(Opcode::POP));
-                    }
+            if let Some(Var::Id(id)) = def.formals.remainder.as_ref() {
+                let symbol = self.db.intern(id.name);
+                let occ = librho::sem::SymbolOccurrence {
+                    symbol,
+                    position: id.pos,
+                };
+                if let Some(binder_id) = self.db.resolve_occurence(occ, pid) {
+                    let slot = self.alloc_local(binder_id)?;
+                    // The default method gets the whole list of arguments (including the method name)
+                    self.emit(Instruction::unary(Opcode::STORE_LOCAL, slot));
                 } else {
                     self.emit(Instruction::nullary(Opcode::POP));
                 }
             } else {
                 self.emit(Instruction::nullary(Opcode::POP));
             }
+
             self.compile_proc(&def.body)?;
             let jmp_idx = self.instructions.len();
             self.emit(Instruction::nullary(Opcode::NOP));
@@ -1191,6 +1302,19 @@ impl<'a> CodegenContext<'a> {
 
         self.define_label(end_loop);
         Ok(())
+    }
+
+    fn find_agent_private_slot(&mut self, pid: PID) -> Result<Option<u16>> {
+        let private_symbol = self.db.intern("private");
+        if let Some(scope) = self.db.get_scope(pid) {
+            for (binder_id, binder) in self.db.binders_full(scope) {
+                if binder.name == private_symbol {
+                    let slot = self.alloc_local(binder_id)?;
+                    return Ok(Some(slot));
+                }
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -1236,7 +1360,10 @@ fn parse_fixed_point_unscaled(value: &str, scale: u32) -> Result<BigInt> {
 mod tests {
     use super::*;
     use librho::sem::SemanticDb;
-    use rholang_parser::{ast::Proc, SourceSpan};
+    use rholang_parser::{
+        ast::{Collection, Name, Proc},
+        SourceSpan,
+    };
 
     /// Helper to create an annotated proc for testing
     fn ann_proc<'a>(proc: &'a Proc<'a>) -> AnnProc<'a> {
@@ -1333,6 +1460,26 @@ mod tests {
         assert_eq!(ctx.instructions[0].opcode().unwrap(), Opcode::PUSH_STR);
         assert_eq!(ctx.strings.len(), 1);
         assert_eq!(ctx.strings[0], "hello");
+    }
+
+    #[test]
+    fn test_compile_quoted_nonvariable_name() {
+        let mut db = SemanticDb::new();
+        let binding = ann_proc(&Proc::Nil);
+        let pid = db.build_index(&binding);
+        let mut ctx = CodegenContext::new(&db, 0);
+
+        let list_proc = Proc::Collection(Collection::List {
+            elements: vec![ann_proc(&Proc::Nil)],
+            remainder: None,
+        });
+        let quoted_name = Name::Quote(ann_proc(&list_proc));
+
+        assert!(ctx.compile_name(&quoted_name, pid).is_ok());
+        assert_eq!(
+            ctx.instructions.last().unwrap().opcode().unwrap(),
+            Opcode::NAME_QUOTE
+        );
     }
 
     #[test]

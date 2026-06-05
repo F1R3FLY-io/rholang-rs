@@ -367,16 +367,39 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
         } => {
             let current = db[this];
 
-            // The agent name is a fresh proc-level binding (like `new` but in the contract
-            // namespace).  We treat it as an unbound name for now and leave full desugaring to
-            // a later pass.
-            let _ = resolve_var(*name, false, current, db, stack);
+            // Bind the implicit agent-private name so `*private` is resolvable in
+            // constructor/method/default bodies.
+            let private_scope = {
+                let binder_start = db.next_binder();
+                let private_name = db.intern("private");
+                db.fresh_binder(Binder {
+                    name: private_name,
+                    kind: BinderKind::Name(None),
+                    scope: current,
+                    index: 0,
+                    source_position: this.span.start,
+                });
+                ScopeInfo::new(binder_start, 1, this.span)
+            };
+            let mut agent_scope = private_scope.clone();
+
+            let mut private_shadowed = Vec::new();
+            stack.push(private_scope, db, &mut private_shadowed);
+
+            // The agent name is declared as a name in the surrounding `new` scope.
+            // Resolve it as a name so it doesn't trigger a NameInProcPosition error.
+            let _ = resolve_var(*name, true, current, db, stack);
 
             // Resolve constructor formals then constructor body.
             {
-                let ctor_vars = resolve_name_pattern(db, stack, current, this.span, constructor_formals, 0);
-                let mut ctor_scope = LexicallyScoped::free(db, stack, current, ctor_vars);
-                ctor_scope.with(|db, scoped_stack| resolve_rec(db, scoped_stack, constructor_body));
+                let ctor_vars =
+                    resolve_name_pattern(db, stack, current, this.span, constructor_formals, 0);
+                let mut ctor_shadowed = Vec::new();
+                stack.push_free(ctor_vars, db, &mut ctor_shadowed);
+                resolve_rec(db, stack, constructor_body);
+                let popped_ctor = stack.pop_free();
+                agent_scope.absorb(popped_ctor);
+                AllowDups::report_shadowed(db, current, &ctor_shadowed);
             }
 
             // Resolve each method body.
@@ -386,20 +409,35 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
                 methods.iter().map(|m| (&m.formals, &m.body)).collect();
             for (formals, body) in method_refs {
                 let method_vars = resolve_name_pattern(db, stack, current, this.span, formals, 0);
-                let mut method_scope = LexicallyScoped::free(db, stack, current, method_vars);
-                method_scope.with(|db, scoped_stack| resolve_rec(db, scoped_stack, body));
+                let mut method_shadowed = Vec::new();
+                stack.push_free(method_vars, db, &mut method_shadowed);
+                resolve_rec(db, stack, body);
+                let popped_method = stack.pop_free();
+                agent_scope.absorb(popped_method);
+                AllowDups::report_shadowed(db, current, &method_shadowed);
             }
 
             // Resolve default handler body.
             if let Some(ast::AgentDefault { formals, body }) = default {
-                // Rebind before mutably borrowing db/stack.
                 let default_formals: &ast::Names = formals;
                 let default_body: &ast::AnnProc = body;
                 let default_vars =
                     resolve_name_pattern(db, stack, current, this.span, default_formals, 0);
-                let mut default_scope = LexicallyScoped::free(db, stack, current, default_vars);
-                default_scope.with(|db, scoped_stack| resolve_rec(db, scoped_stack, default_body));
+                let mut default_shadowed = Vec::new();
+                stack.push_free(default_vars, db, &mut default_shadowed);
+                resolve_rec(db, stack, default_body);
+                let popped_default = stack.pop_free();
+                agent_scope.absorb(popped_default);
+                AllowDups::report_shadowed(db, current, &default_shadowed);
             }
+
+            let _ = stack.pop();
+            DisallowDups::report_shadowed(db, current, &private_shadowed);
+            assert!(
+                db.add_scope(current, agent_scope),
+                "bug: scope {} already visited!!!",
+                current
+            );
         }
 
         // Method-call send: resolve like send.
@@ -454,7 +492,10 @@ fn resolve_collection<'a>(
     use ast::Collection::*;
 
     match collection {
-        List { elements, .. } | Set { elements, .. } | PathMap { elements, .. } | Tuple(elements) => {
+        List { elements, .. }
+        | Set { elements, .. }
+        | PathMap { elements, .. }
+        | Tuple(elements) => {
             for elt in elements {
                 resolve_unguarded(db, stack, elt);
             }

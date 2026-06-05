@@ -166,12 +166,19 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
                 self.stack.push(constructor_body);
             }
 
-            Proc::MethodSend { inputs, channel, .. } => {
+            Proc::MethodSend {
+                inputs, channel, ..
+            } => {
                 self.remember(inputs);
                 self.push_name(channel);
             }
 
-            Proc::MethodSendSync { inputs, cont, channel, .. } => {
+            Proc::MethodSendSync {
+                inputs,
+                cont,
+                channel,
+                ..
+            } => {
                 if let SyncSendCont::NonEmpty(proc) = cont {
                     self.stack.push(proc);
                 }
@@ -300,11 +307,13 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
                 // Per receipt: visit any in-source-position procs (e.g.
                 // send-receive inputs `@x!?(P)` whose `P` is a process)
                 // followed by the optional `where` guard.
-                self.push_children(iter::once(proc).chain(
-                    receipts
-                        .iter()
-                        .flat_map(|r| inputs(&r.binds).chain(r.guard.as_ref())),
-                ));
+                self.push_children(
+                    iter::once(proc).chain(
+                        receipts
+                            .iter()
+                            .flat_map(|r| inputs(&r.binds).chain(r.guard.as_ref())),
+                    ),
+                );
             }
 
             Proc::Let { bindings, body, .. } => {

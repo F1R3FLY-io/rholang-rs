@@ -19,6 +19,7 @@ fn corpus_files() -> Vec<&'static str> {
         "../rholang-parser/tests/corpus/simpleLookupTest.rho",
         "../rholang-parser/tests/corpus/stderr.rho",
         "../rholang-parser/tests/corpus/stdout.rho",
+        "../rholang-parser/tests/corpus/agent.rho",
     ]
 }
 
