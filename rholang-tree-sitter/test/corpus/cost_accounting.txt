@@ -1,0 +1,243 @@
+==================
+Signed term (atomic ground signature)
+==================
+
+{% Nil %}[ s ]
+
+---
+
+(source_file
+  (signed_term
+    (nil)
+    (signature
+      (ground_sig
+        (var)))))
+
+==================
+Signed term with compound signature
+==================
+
+{% Nil %}[ a (*) b ]
+
+---
+
+(source_file
+  (signed_term
+    (nil)
+    (signature
+      (compound_sig
+        (ground_sig
+          (var))
+        (ground_sig
+          (var))))))
+
+==================
+Signed term with hash signature (no parens, Proc12 principal)
+==================
+
+{% x!(1) %}[ # Nil ]
+
+---
+
+(source_file
+  (signed_term
+    (send
+      (var)
+      (send_single)
+      (inputs
+        (long_literal)))
+    (signature
+      (hash_sig
+        (nil)))))
+
+==================
+Lollipop transfer signature over a signed for-comprehension
+==================
+
+{% for(x <- a){ {% *x %}[s] } %}[ c -o p ]
+
+---
+
+(source_file
+  (signed_term
+    (input
+      (receipts
+        (receipt
+          (linear_bind
+            (names
+              (var))
+            (simple_source
+              (var)))))
+      (block
+        (signed_term
+          (eval
+            (var))
+          (signature
+            (ground_sig
+              (var))))))
+    (signature
+      (transfer_sig
+        (ground_sig
+          (var))
+        (signature
+          (ground_sig
+            (var)))))))
+
+==================
+Bare token stack (multiple atomic layers, no purse wrapper)
+==================
+
+a :: b :: ()
+
+---
+
+(source_file
+  (token_stack
+    (stack_sig
+      (ground_sig
+        (var)))
+    (token_stack
+      (stack_sig
+        (ground_sig
+          (var)))
+      (unit))))
+
+==================
+Ring-fence via a new-bound signature
+==================
+
+new s in { s :: () }
+
+---
+
+(source_file
+  (new
+    (name_decls
+      (name_decl
+        (var)))
+    (block
+      (token_stack
+        (stack_sig
+          (ground_sig
+            (var)))
+        (unit)))))
+
+==================
+Regression: ordinary Rholang join is unchanged
+==================
+
+for(x <- a & y <- b){ *x | *y } | a!(0) | b!(1)
+
+---
+
+(source_file
+  (par
+    (par
+      (input
+        (receipts
+          (receipt
+            (linear_bind
+              (names
+                (var))
+              (simple_source
+                (var)))
+            (linear_bind
+              (names
+                (var))
+              (simple_source
+                (var)))))
+        (block
+          (par
+            (eval
+              (var))
+            (eval
+              (var)))))
+      (send
+        (var)
+        (send_single)
+        (inputs
+          (long_literal))))
+    (send
+      (var)
+      (send_single)
+      (inputs
+        (long_literal)))))
+
+==================
+Signed term with n-ary (left-associative) compound signature
+==================
+
+{% Nil %}[ a (*) b (*) c ]
+
+---
+
+(source_file
+  (signed_term
+    (nil)
+    (signature
+      (compound_sig
+        (compound_sig
+          (ground_sig
+            (var))
+          (ground_sig
+            (var)))
+        (ground_sig
+          (var))))))
+
+==================
+Per-clause signed bind (Axis-C join)
+==================
+
+{% for( {% y <- x %}[ s ] & @z <- w ){ Nil } %}[ c ]
+
+---
+
+(source_file
+  (signed_term
+    (input
+      (receipts
+        (receipt
+          (signed_bind
+            (names
+              (var))
+            (simple_source
+              (var))
+            (signature
+              (ground_sig
+                (var))))
+          (linear_bind
+            (names
+              (quote
+                (var)))
+            (simple_source
+              (var)))))
+      (block
+        (nil)))
+    (signature
+      (ground_sig
+        (var)))))
+
+==================
+Signed for-continuation
+==================
+
+for( x <- a ) {% @"r"!(1) %}
+
+---
+
+(source_file
+  (input
+    (receipts
+      (receipt
+        (linear_bind
+          (names
+            (var))
+          (simple_source
+            (var)))))
+    (signed_cont
+      (send
+        (quote
+          (string_literal))
+        (send_single)
+        (inputs
+          (long_literal))))))

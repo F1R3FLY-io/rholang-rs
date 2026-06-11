@@ -268,7 +268,10 @@ fn resolve_proc_pattern_rec<'a>(
             use ast::Collection::*;
 
             match collection {
-                List { elements, .. } | Set { elements, .. } | PathMap { elements, .. } | Tuple(elements) => {
+                List { elements, .. }
+                | Set { elements, .. }
+                | PathMap { elements, .. }
+                | Tuple(elements) => {
                     for elt in elements {
                         resolve_proc_pattern_rec(db, env, res, elt);
                     }
@@ -386,6 +389,13 @@ fn resolve_proc_pattern_rec<'a>(
             db.error(
                 res.id,
                 ErrorKind::BundleInsidePattern,
+                Some(pattern.span.start),
+            );
+        }
+        SignedTerm { .. } | TokenStack { .. } => {
+            db.error(
+                res.id,
+                ErrorKind::CostSyntaxInsidePattern,
                 Some(pattern.span.start),
             );
         }

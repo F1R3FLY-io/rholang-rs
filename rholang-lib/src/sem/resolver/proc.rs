@@ -355,8 +355,42 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
             });
         }
 
+        // -- cost-accounted Rholang --
+        SignedTerm { proc, sig } => {
+            let this_pid = db[this];
+            resolve_rec(db, stack, proc);
+            resolve_signature(sig, this_pid, db, stack);
+        }
+        TokenStack { stack: token_stack } => {
+            let this_pid = db[this];
+            for layer in &token_stack.layers {
+                resolve_signature(layer, this_pid, db, stack);
+            }
+        }
+
         Select { branches: _ } => {
             unimplemented!("Select is not implemented in this version of Rholang")
+        }
+    }
+}
+
+/// Resolve the names embedded in a cost-accounting signature: ground signatures
+/// are names (a free principal is an unbound-variable error, just like any free
+/// Rholang name — bind principals with `new`); hash signatures `#(P)` resolve
+/// their process body; compound/transfer recurse.
+fn resolve_signature<'a>(
+    sig: &'a ast::Signature<'a>,
+    sig_proc: PID,
+    db: &mut SemanticDb<'a>,
+    stack: &mut BindingStack,
+) {
+    use ast::Signature::*;
+    match sig {
+        Ground(name) => resolve_name(name, sig_proc, db, stack),
+        Hash(p) => resolve_rec(db, stack, p),
+        Compound(l, r) | Transfer(l, r) => {
+            resolve_signature(l, sig_proc, db, stack);
+            resolve_signature(r, sig_proc, db, stack);
         }
     }
 }
@@ -386,7 +420,10 @@ fn resolve_collection<'a>(
     use ast::Collection::*;
 
     match collection {
-        List { elements, .. } | Set { elements, .. } | PathMap { elements, .. } | Tuple(elements) => {
+        List { elements, .. }
+        | Set { elements, .. }
+        | PathMap { elements, .. }
+        | Tuple(elements) => {
             for elt in elements {
                 resolve_unguarded(db, stack, elt);
             }

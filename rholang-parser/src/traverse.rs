@@ -4,6 +4,22 @@ use smallvec::{SmallVec, smallvec};
 
 use crate::ast::*;
 
+/// Collect the *process positions* embedded in a cost-accounting signature, in
+/// source order: hash bodies `#(P)`, and the quoted body of any `@P` ground
+/// name. Bare-var ground names contribute nothing here (their var is surfaced
+/// by the name-aware traversal). Used by the process-only DFS iterators.
+fn signature_proc_children<'a>(sig: &'a Signature<'a>, out: &mut SmallVec<[&'a AnnProc<'a>; 4]>) {
+    match sig {
+        Signature::Ground(Name::Quote(p)) => out.push(p),
+        Signature::Ground(Name::NameVar(_)) => {}
+        Signature::Hash(p) => out.push(p),
+        Signature::Compound(l, r) | Signature::Transfer(l, r) => {
+            signature_proc_children(l, out);
+            signature_proc_children(r, out);
+        }
+    }
+}
+
 /// Preorder DFS traversal over `AnnProc`.
 ///
 /// ### Note:
@@ -133,6 +149,21 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
             Proc::Eval { name } => {
                 self.push_name(name);
             }
+
+            Proc::SignedTerm { proc, sig } => {
+                let mut sig_procs: SmallVec<[&AnnProc; 4]> = SmallVec::new();
+                signature_proc_children(sig, &mut sig_procs);
+                self.remember(sig_procs.iter().copied());
+                self.stack.push(proc);
+            }
+            Proc::TokenStack { stack } => {
+                let mut sig_procs: SmallVec<[&AnnProc; 4]> = SmallVec::new();
+                for layer in &stack.layers {
+                    signature_proc_children(layer, &mut sig_procs);
+                }
+                self.remember(sig_procs.iter().copied());
+            }
+
             // leaves
             Proc::Nil
             | Proc::Unit
@@ -382,6 +413,19 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
                     self.push_children(map_elements(elements));
                 }
             },
+
+            Proc::SignedTerm { proc, sig } => {
+                let mut sig_procs: SmallVec<[&AnnProc; 4]> = SmallVec::new();
+                signature_proc_children(sig, &mut sig_procs);
+                self.push_children(iter::once(proc).chain(sig_procs.iter().copied()));
+            }
+            Proc::TokenStack { stack } => {
+                let mut sig_procs: SmallVec<[&AnnProc; 4]> = SmallVec::new();
+                for layer in &stack.layers {
+                    signature_proc_children(layer, &mut sig_procs);
+                }
+                self.push_children(sig_procs.iter().copied());
+            }
 
             // leaves: no children
             Proc::Nil

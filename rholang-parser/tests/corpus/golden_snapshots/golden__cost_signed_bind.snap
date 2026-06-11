@@ -1,0 +1,158 @@
+---
+source: rholang-parser/tests/golden.rs
+expression: result
+---
+Good(
+    [
+        AnnProc {
+            proc: SignedTerm {
+                proc: AnnProc {
+                    proc: ForComprehension {
+                        receipts: [
+                            Receipt {
+                                binds: [
+                                    Signed {
+                                        lhs: Names {
+                                            names: [
+                                                NameVar(
+                                                    Id(
+                                                        Id {
+                                                            name: "y",
+                                                            pos: SourcePos {
+                                                                line: 1,
+                                                                col: 12,
+                                                            },
+                                                        },
+                                                    ),
+                                                ),
+                                            ],
+                                            remainder: None,
+                                        },
+                                        rhs: Simple {
+                                            name: NameVar(
+                                                Id(
+                                                    Id {
+                                                        name: "x",
+                                                        pos: SourcePos {
+                                                            line: 1,
+                                                            col: 17,
+                                                        },
+                                                    },
+                                                ),
+                                            ),
+                                        },
+                                        sig: Ground(
+                                            NameVar(
+                                                Id(
+                                                    Id {
+                                                        name: "s",
+                                                        pos: SourcePos {
+                                                            line: 1,
+                                                            col: 23,
+                                                        },
+                                                    },
+                                                ),
+                                            ),
+                                        ),
+                                    },
+                                    Linear {
+                                        lhs: Names {
+                                            names: [
+                                                Quote(
+                                                    AnnProc {
+                                                        proc: ProcVar(
+                                                            Id(
+                                                                Id {
+                                                                    name: "z",
+                                                                    pos: SourcePos {
+                                                                        line: 1,
+                                                                        col: 30,
+                                                                    },
+                                                                },
+                                                            ),
+                                                        ),
+                                                        span: SourceSpan {
+                                                            start: SourcePos {
+                                                                line: 1,
+                                                                col: 30,
+                                                            },
+                                                            end: SourcePos {
+                                                                line: 1,
+                                                                col: 31,
+                                                            },
+                                                        },
+                                                    },
+                                                ),
+                                            ],
+                                            remainder: None,
+                                        },
+                                        rhs: Simple {
+                                            name: NameVar(
+                                                Id(
+                                                    Id {
+                                                        name: "w",
+                                                        pos: SourcePos {
+                                                            line: 1,
+                                                            col: 35,
+                                                        },
+                                                    },
+                                                ),
+                                            ),
+                                        },
+                                    },
+                                ],
+                                guard: None,
+                            },
+                        ],
+                        proc: AnnProc {
+                            proc: Nil,
+                            span: SourceSpan {
+                                start: SourcePos {
+                                    line: 1,
+                                    col: 40,
+                                },
+                                end: SourcePos {
+                                    line: 1,
+                                    col: 43,
+                                },
+                            },
+                        },
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 1,
+                            col: 4,
+                        },
+                        end: SourcePos {
+                            line: 1,
+                            col: 45,
+                        },
+                    },
+                },
+                sig: Ground(
+                    NameVar(
+                        Id(
+                            Id {
+                                name: "c",
+                                pos: SourcePos {
+                                    line: 1,
+                                    col: 50,
+                                },
+                            },
+                        ),
+                    ),
+                ),
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 1,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 1,
+                    col: 53,
+                },
+            },
+        },
+    ],
+)

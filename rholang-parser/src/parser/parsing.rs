@@ -15,7 +15,7 @@ use crate::{
     SourceSpan,
     ast::{
         AnnProc, BinaryExpOp, Bind, BundleType, Id, LetBinding, NameDecl, Names, Proc, SendType,
-        SimpleType, Source, UnaryExpOp, VarRefKind,
+        Signature, SimpleType, Source, TokenStack, UnaryExpOp, VarRefKind,
     },
     parser::{
         ast_builder::ASTBuilder,
@@ -386,6 +386,77 @@ pub(super) fn node_to_ast<'ast>(
                     continue 'parse;
                 }
 
+                // Cost-accounted Rholang: signed term {% P %}[ s ].
+                kind!("signed_term") => {
+                    let proc_node = get_field(&node, field!("proc"));
+                    let sig_node = get_field(&node, field!("sig"));
+
+                    let mut ops: SmallVec<[SigOp; 4]> = SmallVec::new();
+                    let mut sig_procs: Vec<tree_sitter::Node> = Vec::new();
+                    flatten_signature(&sig_node, &mut ops, &mut sig_procs);
+                    let sig_arity = sig_procs.len();
+
+                    // Body lands at slice[0] (via `node = proc_node`); signature
+                    // procs at slice[1..] in source order (pushed reversed so
+                    // they pop in source order).
+                    cont_stack.push(K::ConsumeSignedTerm {
+                        ops,
+                        sig_arity,
+                        span,
+                    });
+                    for n in sig_procs.iter().rev() {
+                        cont_stack.push(K::EvalDelayed(*n));
+                    }
+                    node = proc_node;
+                    continue 'parse;
+                }
+
+                // Cost-accounted Rholang: a bare token stack `s :: … :: ()` is a
+                // signed process (Greg `app:concrete` `Stk`; no `purse(...)`
+                // wrapper). Located/parallel stacks are ordinary `Par`; ring-fencing
+                // is via `new`-bound signatures (binding-sensitive Σ in the normalizer).
+                kind!("token_stack") => {
+                    let mut all_ops: SmallVec<[SigOp; 8]> = SmallVec::new();
+                    let mut layer_descs: SmallVec<[(usize, usize, usize); 2]> = SmallVec::new();
+                    let mut layer_procs: Vec<tree_sitter::Node> = Vec::new();
+
+                    // Walk the cons spine `head :: tail`; the terminal `tail` is a
+                    // `unit` (no `head` field). The proc node IS the token_stack.
+                    let mut cur = node;
+                    while let Some(head_node) = cur.child_by_field_id(field!("head")) {
+                        let op_start = all_ops.len();
+                        let proc_before = layer_procs.len();
+                        flatten_signature(&head_node, &mut all_ops, &mut layer_procs);
+                        layer_descs.push((
+                            op_start,
+                            all_ops.len() - op_start,
+                            layer_procs.len() - proc_before,
+                        ));
+                        cur = get_field(&cur, field!("tail"));
+                    }
+
+                    cont_stack.push(K::ConsumeTokenStack {
+                        all_ops,
+                        layer_descs,
+                        total_procs: layer_procs.len(),
+                        span,
+                    });
+                    // Pop order → proc_stack slots: [layer_proc0, layer_proc1, …].
+                    for n in layer_procs.iter().rev() {
+                        cont_stack.push(K::EvalDelayed(*n));
+                    }
+                    // Fall through to apply_cont (no body to descend into).
+                }
+
+                // Greg `app:concrete` PSignedInput: a signed receive continuation
+                // `for(...) {% P %}` — unwrap the `{% %}` to its inner process (the
+                // K=Par polymorphism marker carries no extra lowering; the body P is
+                // normalized as-is, signed terms inside it included).
+                kind!("signed_cont") => {
+                    node = get_field(&node, field!("proc"));
+                    continue 'parse;
+                }
+
                 kind!("new") => {
                     fn check_for_duplicate_decls(
                         decls: &[NameDecl],
@@ -484,6 +555,73 @@ pub(super) fn node_to_ast<'ast>(
 
                         for bind_node in receipt_node.named_children(&mut receipt_node.walk()) {
                             let bind_kind = bind_node.kind_id();
+
+                            // Per-clause signed bind `{% y <- x %}[s]` (Greg
+                            // app:concrete SignedBind; Axis-C join). Extract by
+                            // field (names?, input, sig); the proc slots are
+                            // [source_name, (SR inputs), names…, sig_procs…].
+                            if bind_kind == kind!("signed_bind") {
+                                let names_node = bind_node.child_by_field_id(field!("names"));
+                                let source_node = get_field(&bind_node, field!("input"));
+                                let sig_node = get_field(&bind_node, field!("sig"));
+
+                                let (name_count, cont_present) = match names_node {
+                                    Some(names) => (
+                                        names.named_child_count(),
+                                        names.child_by_field_id(field!("cont")).is_some(),
+                                    ),
+                                    None => (0, false),
+                                };
+
+                                let source_desc = match source_node.kind_id() {
+                                    kind!("simple_source") => SourceDesc::Simple,
+                                    kind!("receive_send_source") => SourceDesc::RS,
+                                    kind!("send_receive_source") => SourceDesc::SR {
+                                        arity: get_field(&source_node, field!("inputs"))
+                                            .named_child_count(),
+                                    },
+                                    _ => unreachable!(
+                                        "Sources in for-comprehensions have three kinds: simple, receive_send and send_receive"
+                                    ),
+                                };
+
+                                let mut sig_ops: SmallVec<[SigOp; 4]> = SmallVec::new();
+                                let mut sig_procs: Vec<tree_sitter::Node> = Vec::new();
+                                flatten_signature(&sig_node, &mut sig_ops, &mut sig_procs);
+
+                                let bind_desc = BindDesc::Signed {
+                                    name_count,
+                                    cont_present,
+                                    source: source_desc,
+                                    sig_ops,
+                                    sig_proc_count: sig_procs.len(),
+                                };
+
+                                // Slot order = push order here.
+                                match source_desc {
+                                    SourceDesc::SR { .. } => {
+                                        let inputs = get_field(&source_node, field!("inputs"));
+                                        temp_cont_stack
+                                            .push(K::EvalDelayed(get_first_child(&source_node)));
+                                        temp_cont_stack.push(K::EvalList(inputs.walk()));
+                                    }
+                                    _ => {
+                                        temp_cont_stack
+                                            .push(K::EvalDelayed(get_first_child(&source_node)));
+                                    }
+                                }
+                                if let Some(names) = names_node {
+                                    temp_cont_stack.push(K::EvalList(names.walk()));
+                                }
+                                for n in &sig_procs {
+                                    temp_cont_stack.push(K::EvalDelayed(*n));
+                                }
+
+                                receipt_len += bind_desc.len();
+                                bs.push(bind_desc);
+                                continue;
+                            }
+
                             if bind_kind != kind!("linear_bind")
                                 && bind_kind != kind!("repeated_bind")
                                 && bind_kind != kind!("peek_bind")
@@ -566,8 +704,8 @@ pub(super) fn node_to_ast<'ast>(
                                 temp_cont_stack.push(K::EvalList(names.walk()));
                             }
 
-                            bs.push(bind_desc);
                             receipt_len += bind_desc.len();
+                            bs.push(bind_desc);
                         }
 
                         // Push the guard's eval LAST so that its resulting
@@ -955,6 +1093,31 @@ fn apply_cont<'tree, 'ast>(
                                     .ann(span)
                             },
                         ),
+                        K::ConsumeSignedTerm {
+                            ops,
+                            sig_arity,
+                            span,
+                        } => proc_stack.replace_top_slice(sig_arity + 1, |slice| {
+                            let body = slice[0];
+                            let sig = rebuild_signature(&ops, &slice[1..]);
+                            ast_builder.alloc_signed_term(body, sig).ann(span)
+                        }),
+                        K::ConsumeTokenStack {
+                            all_ops,
+                            layer_descs,
+                            total_procs,
+                            span,
+                        } => proc_stack.replace_top_slice(total_procs, |slice| {
+                            let mut layers: SmallVec<[Signature; 2]> = SmallVec::new();
+                            let mut off = 0usize;
+                            for (op_start, op_len, proc_count) in &layer_descs {
+                                let ops = &all_ops[*op_start..*op_start + *op_len];
+                                let procs = &slice[off..off + *proc_count];
+                                layers.push(rebuild_signature(ops, procs));
+                                off += *proc_count;
+                            }
+                            ast_builder.alloc_token_stack(TokenStack { layers }).ann(span)
+                        }),
                         K::ConsumeIfThen { span } => proc_stack.replace_top2(|cond, if_true| {
                             ast_builder.alloc_if_then(cond, if_true).ann(span)
                         }),
@@ -1179,6 +1342,21 @@ enum K<'tree, 'ast> {
         total_len: usize,
         span: SourceSpan,
     },
+    // Cost-accounted Rholang. `ops` is the post-order signature spine; the
+    // signature's embedded procs sit at proc_stack slice[1..] (slice[0] = body).
+    ConsumeSignedTerm {
+        ops: SmallVec<[SigOp; 4]>,
+        sig_arity: usize,
+        span: SourceSpan,
+    },
+    // `layer_descs[i] = (op_start, op_len, proc_count)` slices `all_ops` and the
+    // proc slice for layer `i` of a bare token stack `s :: … :: ()`.
+    ConsumeTokenStack {
+        all_ops: SmallVec<[SigOp; 8]>,
+        layer_descs: SmallVec<[(usize, usize, usize); 2]>,
+        total_procs: usize,
+        span: SourceSpan,
+    },
     ConsumeIfThen {
         span: SourceSpan,
     },
@@ -1285,6 +1463,27 @@ impl Debug for K<'_, '_> {
                 .debug_struct("ConsumeForComprehension")
                 .field("desc", desc)
                 .field("total_len", total_len)
+                .field("span", span)
+                .finish(),
+            Self::ConsumeSignedTerm {
+                ops,
+                sig_arity,
+                span,
+            } => f
+                .debug_struct("ConsumeSignedTerm")
+                .field("ops", ops)
+                .field("sig_arity", sig_arity)
+                .field("span", span)
+                .finish(),
+            Self::ConsumeTokenStack {
+                layer_descs,
+                total_procs,
+                span,
+                ..
+            } => f
+                .debug_struct("ConsumeTokenStack")
+                .field("layer_descs", layer_descs)
+                .field("total_procs", total_procs)
                 .field("span", span)
                 .finish(),
             Self::ConsumeIfThen { span } => {
@@ -1678,7 +1877,7 @@ impl SourceDesc {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 enum BindDesc {
     Linear {
         name_count: usize,
@@ -1693,6 +1892,16 @@ enum BindDesc {
         name_count: usize,
         cont_present: bool,
     },
+    // Per-clause signed bind `{% y <- x %}[s]` — a linear bind plus a signature.
+    // Proc-slot layout = [source_name, (SR inputs), names…, sig_procs…]; the sig
+    // is rebuilt from the trailing `sig_proc_count` procs via `sig_ops`.
+    Signed {
+        name_count: usize,
+        cont_present: bool,
+        source: SourceDesc,
+        sig_ops: SmallVec<[SigOp; 4]>,
+        sig_proc_count: usize,
+    },
 }
 
 impl BindDesc {
@@ -1701,6 +1910,12 @@ impl BindDesc {
             BindDesc::Linear {
                 name_count, source, ..
             } => name_count + source.len(),
+            BindDesc::Signed {
+                name_count,
+                source,
+                sig_proc_count,
+                ..
+            } => name_count + source.len() + sig_proc_count,
             BindDesc::Repeated { name_count, .. } | BindDesc::Peek { name_count, .. } => {
                 name_count + 1
             }
@@ -1750,6 +1965,37 @@ impl BindDesc {
                     lhs: into_names(rest, qs, cont_present),
                     rhs: channel_name,
                 },
+
+                BindDesc::Signed {
+                    cont_present,
+                    source,
+                    sig_ops,
+                    sig_proc_count,
+                    ..
+                } => {
+                    let rhs = match source {
+                        SourceDesc::Simple => Source::Simple { name: channel_name },
+                        SourceDesc::RS => Source::ReceiveSend { name: channel_name },
+                        SourceDesc::SR { arity } => {
+                            let inputs = &rest[..arity];
+                            Source::SendReceive {
+                                name: channel_name,
+                                inputs: inputs.to_smallvec(),
+                            }
+                        }
+                    };
+                    // rest = [SR inputs…][names…][sig_procs…]; carve the names out
+                    // between the source inputs and the trailing signature procs.
+                    let lhs_start = source.len() - 1;
+                    let names_end = rest.len() - sig_proc_count;
+                    let lhs = into_names(
+                        &rest[lhs_start..names_end],
+                        &qs[lhs_start..names_end],
+                        cont_present,
+                    );
+                    let sig = rebuild_signature(&sig_ops, &rest[names_end..]);
+                    Bind::Signed { lhs, rhs, sig }
+                }
             }
         }
     }
@@ -1786,7 +2032,7 @@ where
             self.procs = rest_procs;
             self.mask = rest_mask;
 
-            next.to_bind(this_procs, this_mask)
+            next.clone().to_bind(this_procs, this_mask)
         })
     }
 
@@ -1970,6 +2216,97 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.iter.len(), None)
     }
+}
+
+/// Post-order opcode for rebuilding a cost-accounting `Signature` from a flat
+/// proc slice. `Ground`/`Hash` each consume one proc; `Compound`/`Transfer`
+/// fold the two most-recently-built signatures.
+#[derive(Debug, Clone, Copy)]
+enum SigOp {
+    Ground,
+    Hash,
+    Compound,
+    Transfer,
+}
+
+/// Walk a `signature` CST node, appending post-order `SigOp`s and pushing each
+/// embedded proc (ground name `_proc_var`; hash body `#(P)`) into `procs` in
+/// source order. The spine is shallow — only the hash body re-enters `_proc`.
+fn flatten_signature<'a, const N: usize>(
+    sig_node: &tree_sitter::Node<'a>,
+    ops: &mut SmallVec<[SigOp; N]>,
+    procs: &mut Vec<tree_sitter::Node<'a>>,
+) {
+    // `signature`/`stack_sig` are named wrappers; the stratified `_sig1`/`_sig2`
+    // levels are hidden, so a compound/transfer operand is a bare sub-sig node.
+    // Match the node directly, recursing through the wrappers.
+    match sig_node.kind_id() {
+        kind!("signature") | kind!("stack_sig") => {
+            flatten_signature(&get_first_child(sig_node), ops, procs);
+        }
+        kind!("ground_sig") => {
+            procs.push(get_field(sig_node, field!("name")));
+            ops.push(SigOp::Ground);
+        }
+        kind!("hash_sig") => {
+            procs.push(get_field(sig_node, field!("proc")));
+            ops.push(SigOp::Hash);
+        }
+        kind!("compound_sig") => {
+            flatten_signature(&get_field(sig_node, field!("left")), ops, procs);
+            flatten_signature(&get_field(sig_node, field!("right")), ops, procs);
+            ops.push(SigOp::Compound);
+        }
+        kind!("transfer_sig") => {
+            flatten_signature(&get_field(sig_node, field!("left")), ops, procs);
+            flatten_signature(&get_field(sig_node, field!("right")), ops, procs);
+            ops.push(SigOp::Transfer);
+        }
+        _ => unreachable!("signature wraps ground/hash/compound/transfer"),
+    }
+}
+
+/// Fold `ops` (post-order spine) + `procs` (the signature's embedded procs, in
+/// source order) into a `Signature`. Ground sigs are bare names (never quoted).
+fn rebuild_signature<'a>(ops: &[SigOp], procs: &[AnnProc<'a>]) -> Signature<'a> {
+    let mut sig_stack: SmallVec<[Signature<'a>; 4]> = SmallVec::new();
+    let mut p = 0usize;
+    for op in ops {
+        match op {
+            SigOp::Ground => {
+                let proc = procs[p];
+                p += 1;
+                // A well-formed ground sig is a bare name (`_proc_var`). Under
+                // error recovery a missing/error node can land here as a `Bad`
+                // proc; the overall parse already fails (errors are collected
+                // separately), so fall back to a quote instead of panicking.
+                let name = if matches!(proc.proc, Proc::ProcVar(_)) {
+                    into_name(proc, false)
+                } else {
+                    Name::Quote(proc)
+                };
+                sig_stack.push(Signature::Ground(name));
+            }
+            SigOp::Hash => {
+                let body = procs[p];
+                p += 1;
+                sig_stack.push(Signature::Hash(body));
+            }
+            SigOp::Compound => {
+                let right = sig_stack.pop().expect("compound_sig needs a right operand");
+                let left = sig_stack.pop().expect("compound_sig needs a left operand");
+                sig_stack.push(Signature::Compound(Box::new(left), Box::new(right)));
+            }
+            SigOp::Transfer => {
+                let right = sig_stack.pop().expect("transfer_sig needs a right operand");
+                let left = sig_stack.pop().expect("transfer_sig needs a left operand");
+                sig_stack.push(Signature::Transfer(Box::new(left), Box::new(right)));
+            }
+        }
+    }
+    sig_stack
+        .pop()
+        .expect("a signature spine yields exactly one Signature")
 }
 
 // process <-> name conversion

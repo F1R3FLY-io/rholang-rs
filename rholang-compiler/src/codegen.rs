@@ -741,6 +741,9 @@ impl<'a> CodegenContext<'a> {
                     Bind::Peek { .. } => {
                         bail!("Peek receives not supported in MVP");
                     }
+                    Bind::Signed { .. } => {
+                        bail!("Signed binds (cost-accounting) not supported in MVP");
+                    }
                 }
             }
         }

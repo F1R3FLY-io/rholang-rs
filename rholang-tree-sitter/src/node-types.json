@@ -292,11 +292,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -475,11 +483,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -658,11 +674,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -841,11 +865,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -1037,11 +1069,19 @@
             "named": true
           },
           {
+            "type": "signed_term",
+            "named": true
+          },
+          {
             "type": "simple_type",
             "named": true
           },
           {
             "type": "sub",
+            "named": true
+          },
+          {
+            "type": "token_stack",
             "named": true
           },
           {
@@ -1430,11 +1470,19 @@
             "named": true
           },
           {
+            "type": "signed_term",
+            "named": true
+          },
+          {
             "type": "simple_type",
             "named": true
           },
           {
             "type": "sub",
+            "named": true
+          },
+          {
+            "type": "token_stack",
             "named": true
           },
           {
@@ -1616,11 +1664,19 @@
             "named": true
           },
           {
+            "type": "signed_term",
+            "named": true
+          },
+          {
             "type": "simple_type",
             "named": true
           },
           {
             "type": "sub",
+            "named": true
+          },
+          {
+            "type": "token_stack",
             "named": true
           },
           {
@@ -1802,11 +1858,19 @@
             "named": true
           },
           {
+            "type": "signed_term",
+            "named": true
+          },
+          {
             "type": "simple_type",
             "named": true
           },
           {
             "type": "sub",
+            "named": true
+          },
+          {
+            "type": "token_stack",
             "named": true
           },
           {
@@ -1881,6 +1945,44 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "compound_sig",
+    "named": true,
+    "fields": {
+      "left": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "compound_sig",
+            "named": true
+          },
+          {
+            "type": "ground_sig",
+            "named": true
+          },
+          {
+            "type": "hash_sig",
+            "named": true
+          }
+        ]
+      },
+      "right": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "ground_sig",
+            "named": true
+          },
+          {
+            "type": "hash_sig",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -2067,11 +2169,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -2250,11 +2360,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -2499,11 +2617,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -2682,11 +2808,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -2865,11 +2999,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -3053,11 +3195,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -3088,6 +3238,22 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "ground_sig",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "_proc_var",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -3255,11 +3421,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -3438,11 +3612,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -3454,6 +3636,50 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "hash_sig",
+    "named": true,
+    "fields": {
+      "proc": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "_literal",
+            "named": true
+          },
+          {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
+            "type": "block",
+            "named": true
+          },
+          {
+            "type": "collection",
+            "named": true
+          },
+          {
+            "type": "eval",
+            "named": true
+          },
+          {
+            "type": "nil",
+            "named": true
+          },
+          {
+            "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "unit",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -3629,11 +3855,19 @@
             "named": true
           },
           {
+            "type": "signed_term",
+            "named": true
+          },
+          {
             "type": "simple_type",
             "named": true
           },
           {
             "type": "sub",
+            "named": true
+          },
+          {
+            "type": "token_stack",
             "named": true
           },
           {
@@ -3815,11 +4049,19 @@
             "named": true
           },
           {
+            "type": "signed_term",
+            "named": true
+          },
+          {
             "type": "simple_type",
             "named": true
           },
           {
             "type": "sub",
+            "named": true
+          },
+          {
+            "type": "token_stack",
             "named": true
           },
           {
@@ -4001,11 +4243,19 @@
             "named": true
           },
           {
+            "type": "signed_term",
+            "named": true
+          },
+          {
             "type": "simple_type",
             "named": true
           },
           {
             "type": "sub",
+            "named": true
+          },
+          {
+            "type": "token_stack",
             "named": true
           },
           {
@@ -4030,6 +4280,10 @@
         "types": [
           {
             "type": "block",
+            "named": true
+          },
+          {
+            "type": "signed_cont",
             "named": true
           }
         ]
@@ -4211,11 +4465,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -4394,11 +4656,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -4585,11 +4855,19 @@
             "named": true
           },
           {
+            "type": "signed_term",
+            "named": true
+          },
+          {
             "type": "simple_type",
             "named": true
           },
           {
             "type": "sub",
+            "named": true
+          },
+          {
+            "type": "token_stack",
             "named": true
           },
           {
@@ -4771,11 +5049,19 @@
             "named": true
           },
           {
+            "type": "signed_term",
+            "named": true
+          },
+          {
             "type": "simple_type",
             "named": true
           },
           {
             "type": "sub",
+            "named": true
+          },
+          {
+            "type": "token_stack",
             "named": true
           },
           {
@@ -4973,11 +5259,19 @@
             "named": true
           },
           {
+            "type": "signed_term",
+            "named": true
+          },
+          {
             "type": "simple_type",
             "named": true
           },
           {
             "type": "sub",
+            "named": true
+          },
+          {
+            "type": "token_stack",
             "named": true
           },
           {
@@ -5157,11 +5451,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -5396,11 +5698,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -5579,11 +5889,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -5762,11 +6080,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -6129,11 +6455,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -6312,11 +6646,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -6523,11 +6865,19 @@
             "named": true
           },
           {
+            "type": "signed_term",
+            "named": true
+          },
+          {
             "type": "simple_type",
             "named": true
           },
           {
             "type": "sub",
+            "named": true
+          },
+          {
+            "type": "token_stack",
             "named": true
           },
           {
@@ -6707,11 +7057,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -6890,11 +7248,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -7144,11 +7510,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -7327,11 +7701,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -7510,11 +7892,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -7711,11 +8101,19 @@
             "named": true
           },
           {
+            "type": "signed_term",
+            "named": true
+          },
+          {
             "type": "simple_type",
             "named": true
           },
           {
             "type": "sub",
+            "named": true
+          },
+          {
+            "type": "token_stack",
             "named": true
           },
           {
@@ -7895,11 +8293,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -8078,11 +8484,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -8261,11 +8675,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -8444,11 +8866,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -8638,11 +9068,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -8851,11 +9289,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -9034,11 +9480,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -9225,11 +9679,19 @@
             "named": true
           },
           {
+            "type": "signed_term",
+            "named": true
+          },
+          {
             "type": "simple_type",
             "named": true
           },
           {
             "type": "sub",
+            "named": true
+          },
+          {
+            "type": "token_stack",
             "named": true
           },
           {
@@ -9257,6 +9719,10 @@
         },
         {
           "type": "repeated_bind",
+          "named": true
+        },
+        {
+          "type": "signed_bind",
           "named": true
         }
       ]
@@ -9612,11 +10078,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -9628,6 +10102,479 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "signature",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "compound_sig",
+          "named": true
+        },
+        {
+          "type": "ground_sig",
+          "named": true
+        },
+        {
+          "type": "hash_sig",
+          "named": true
+        },
+        {
+          "type": "transfer_sig",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "signed_bind",
+    "named": true,
+    "fields": {
+      "input": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "_source",
+            "named": true
+          }
+        ]
+      },
+      "names": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "names",
+            "named": true
+          }
+        ]
+      },
+      "sig": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "signature",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "signed_cont",
+    "named": true,
+    "fields": {
+      "proc": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "(",
+            "named": false
+          },
+          {
+            "type": ")",
+            "named": false
+          },
+          {
+            "type": "_literal",
+            "named": true
+          },
+          {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
+            "type": "add",
+            "named": true
+          },
+          {
+            "type": "and",
+            "named": true
+          },
+          {
+            "type": "block",
+            "named": true
+          },
+          {
+            "type": "bundle",
+            "named": true
+          },
+          {
+            "type": "choice",
+            "named": true
+          },
+          {
+            "type": "collection",
+            "named": true
+          },
+          {
+            "type": "concat",
+            "named": true
+          },
+          {
+            "type": "conjunction",
+            "named": true
+          },
+          {
+            "type": "contract",
+            "named": true
+          },
+          {
+            "type": "diff",
+            "named": true
+          },
+          {
+            "type": "disjunction",
+            "named": true
+          },
+          {
+            "type": "div",
+            "named": true
+          },
+          {
+            "type": "eq",
+            "named": true
+          },
+          {
+            "type": "eval",
+            "named": true
+          },
+          {
+            "type": "gt",
+            "named": true
+          },
+          {
+            "type": "gte",
+            "named": true
+          },
+          {
+            "type": "ifElse",
+            "named": true
+          },
+          {
+            "type": "input",
+            "named": true
+          },
+          {
+            "type": "interpolation",
+            "named": true
+          },
+          {
+            "type": "let",
+            "named": true
+          },
+          {
+            "type": "lt",
+            "named": true
+          },
+          {
+            "type": "lte",
+            "named": true
+          },
+          {
+            "type": "match",
+            "named": true
+          },
+          {
+            "type": "matches",
+            "named": true
+          },
+          {
+            "type": "method",
+            "named": true
+          },
+          {
+            "type": "mod",
+            "named": true
+          },
+          {
+            "type": "mult",
+            "named": true
+          },
+          {
+            "type": "neg",
+            "named": true
+          },
+          {
+            "type": "negation",
+            "named": true
+          },
+          {
+            "type": "neq",
+            "named": true
+          },
+          {
+            "type": "new",
+            "named": true
+          },
+          {
+            "type": "nil",
+            "named": true
+          },
+          {
+            "type": "not",
+            "named": true
+          },
+          {
+            "type": "or",
+            "named": true
+          },
+          {
+            "type": "par",
+            "named": true
+          },
+          {
+            "type": "send",
+            "named": true
+          },
+          {
+            "type": "send_sync",
+            "named": true
+          },
+          {
+            "type": "signed_term",
+            "named": true
+          },
+          {
+            "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "sub",
+            "named": true
+          },
+          {
+            "type": "token_stack",
+            "named": true
+          },
+          {
+            "type": "unit",
+            "named": true
+          },
+          {
+            "type": "var_ref",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "signed_term",
+    "named": true,
+    "fields": {
+      "proc": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "(",
+            "named": false
+          },
+          {
+            "type": ")",
+            "named": false
+          },
+          {
+            "type": "_literal",
+            "named": true
+          },
+          {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
+            "type": "add",
+            "named": true
+          },
+          {
+            "type": "and",
+            "named": true
+          },
+          {
+            "type": "block",
+            "named": true
+          },
+          {
+            "type": "bundle",
+            "named": true
+          },
+          {
+            "type": "choice",
+            "named": true
+          },
+          {
+            "type": "collection",
+            "named": true
+          },
+          {
+            "type": "concat",
+            "named": true
+          },
+          {
+            "type": "conjunction",
+            "named": true
+          },
+          {
+            "type": "contract",
+            "named": true
+          },
+          {
+            "type": "diff",
+            "named": true
+          },
+          {
+            "type": "disjunction",
+            "named": true
+          },
+          {
+            "type": "div",
+            "named": true
+          },
+          {
+            "type": "eq",
+            "named": true
+          },
+          {
+            "type": "eval",
+            "named": true
+          },
+          {
+            "type": "gt",
+            "named": true
+          },
+          {
+            "type": "gte",
+            "named": true
+          },
+          {
+            "type": "ifElse",
+            "named": true
+          },
+          {
+            "type": "input",
+            "named": true
+          },
+          {
+            "type": "interpolation",
+            "named": true
+          },
+          {
+            "type": "let",
+            "named": true
+          },
+          {
+            "type": "lt",
+            "named": true
+          },
+          {
+            "type": "lte",
+            "named": true
+          },
+          {
+            "type": "match",
+            "named": true
+          },
+          {
+            "type": "matches",
+            "named": true
+          },
+          {
+            "type": "method",
+            "named": true
+          },
+          {
+            "type": "mod",
+            "named": true
+          },
+          {
+            "type": "mult",
+            "named": true
+          },
+          {
+            "type": "neg",
+            "named": true
+          },
+          {
+            "type": "negation",
+            "named": true
+          },
+          {
+            "type": "neq",
+            "named": true
+          },
+          {
+            "type": "new",
+            "named": true
+          },
+          {
+            "type": "nil",
+            "named": true
+          },
+          {
+            "type": "not",
+            "named": true
+          },
+          {
+            "type": "or",
+            "named": true
+          },
+          {
+            "type": "par",
+            "named": true
+          },
+          {
+            "type": "send",
+            "named": true
+          },
+          {
+            "type": "send_sync",
+            "named": true
+          },
+          {
+            "type": "signed_term",
+            "named": true
+          },
+          {
+            "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "sub",
+            "named": true
+          },
+          {
+            "type": "token_stack",
+            "named": true
+          },
+          {
+            "type": "unit",
+            "named": true
+          },
+          {
+            "type": "var_ref",
+            "named": true
+          }
+        ]
+      },
+      "sig": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "signature",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -9820,6 +10767,10 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
@@ -9828,11 +10779,38 @@
           "named": true
         },
         {
+          "type": "token_stack",
+          "named": true
+        },
+        {
           "type": "unit",
           "named": true
         },
         {
           "type": "var_ref",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "stack_sig",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "compound_sig",
+          "named": true
+        },
+        {
+          "type": "ground_sig",
+          "named": true
+        },
+        {
+          "type": "hash_sig",
           "named": true
         }
       ]
@@ -10003,11 +10981,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -10038,6 +11024,70 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "token_stack",
+    "named": true,
+    "fields": {
+      "head": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "stack_sig",
+            "named": true
+          }
+        ]
+      },
+      "tail": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "token_stack",
+            "named": true
+          },
+          {
+            "type": "unit",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "transfer_sig",
+    "named": true,
+    "fields": {
+      "left": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "compound_sig",
+            "named": true
+          },
+          {
+            "type": "ground_sig",
+            "named": true
+          },
+          {
+            "type": "hash_sig",
+            "named": true
+          }
+        ]
+      },
+      "right": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "signature",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -10205,11 +11255,19 @@
           "named": true
         },
         {
+          "type": "signed_term",
+          "named": true
+        },
+        {
           "type": "simple_type",
           "named": true
         },
         {
           "type": "sub",
+          "named": true
+        },
+        {
+          "type": "token_stack",
           "named": true
         },
         {
@@ -10268,6 +11326,10 @@
     "named": false
   },
   {
+    "type": "#",
+    "named": false
+  },
+  {
     "type": "%",
     "named": false
   },
@@ -10276,11 +11338,19 @@
     "named": false
   },
   {
+    "type": "%}",
+    "named": false
+  },
+  {
     "type": "&",
     "named": false
   },
   {
     "type": "(",
+    "named": false
+  },
+  {
+    "type": "(*)",
     "named": false
   },
   {
@@ -10316,6 +11386,10 @@
     "named": false
   },
   {
+    "type": "-o",
+    "named": false
+  },
+  {
     "type": ".",
     "named": false
   },
@@ -10333,6 +11407,10 @@
   },
   {
     "type": ":",
+    "named": false
+  },
+  {
+    "type": "::",
     "named": false
   },
   {
@@ -10561,6 +11639,10 @@
   },
   {
     "type": "{",
+    "named": false
+  },
+  {
+    "type": "{%",
     "named": false
   },
   {

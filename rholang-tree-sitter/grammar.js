@@ -55,6 +55,8 @@ module.exports = grammar({
             $.contract,
             $.input,
             $.send,
+            $.signed_term,
+            $.token_stack,
             $._proc_expression
         ),
 
@@ -117,13 +119,67 @@ module.exports = grammar({
 
         input: $ => prec(2, seq(
             'for', '(', field('receipts', $.receipts), ')',
-            field('proc', $.block)
+            field('proc', choice($.block, $.signed_cont))
         )),
+
+        // Greg app:concrete PSignedInput: a signed receive continuation
+        // `for(...) {% SignedProc %}` (the body is a signed process, no trailing
+        // `[s]` — the wrapper-with-signature `{% P %}[s]` is the OUTER signed_term).
+        signed_cont: $ => prec(2, seq('{%', field('proc', $._proc), '%}')),
 
         send: $ => prec(3, seq(
             field('channel', $.name),
             field('send_type', $._send_type),
             field('inputs', alias($._proc_list, $.inputs))
+        )),
+
+        // ─── Cost-accounted Rholang surface ──────────────────────────────────
+        // Constructs + semantics are authoritative in the mettail
+        // cost-accounting worktree ({p}_s, () | s:S, g | #P | s*s, meter(K)) and
+        // the cost-accounted-rho paper (sugars, joins, located purses). The
+        // concrete ASCII delimiters here are a collision-safe rendering (bare
+        // {P}_s collides with `block`; bare s:S with `map` key:value).
+
+        // Signed term {P}_s (worktree `Wrap`).
+        signed_term: $ => prec(2, seq(
+            '{%', field('proc', $._proc), '%}',
+            '[', field('sig', $.signature), ']'
+        )),
+
+        // Token stack S ::= () | s :: S  (worktree `SNil`/`SCons`; Greg app:concrete
+        // `Stk`). A bare stack is DIRECTLY a signed process (no `purse(...)` wrapper);
+        // located stacks are ordinary parallel composition `S1 | S2`, and ring-fencing
+        // is via `new`-bound signatures (binding-sensitive Σ⟦s⟧ in the normalizer). The
+        // proc-level stack is cons-headed (`s :: …`); a bare empty `()` is plain unit/Nil.
+        token_stack: $ => prec.right(2, seq(
+            field('head', $.stack_sig), '::', field('tail', $._stack_tail)
+        )),
+        _stack_tail: $ => choice($.unit, $.token_stack),
+        // A token-stack layer is a fundable signature — ground / `# P` / compound —
+        // but NOT a lollipop (a transfer capability is not a fundable atom; the
+        // normalizer rejects `Transfer` in a stack). Excluding `-o` here also keeps
+        // `-o` out of the bare-process lexer state, so `x-owed` still lexes as `x - owed`.
+        stack_sig: $ => $._sig1,
+
+        // Signatures s ::= g | # P | s1 (*) s2 | s1 -o s2  (Greg app:concrete:
+        // SigGround/SigHash/SigCompound/SigTransfer). `# P` takes a high-precedence
+        // principal (Proc12 — use `# { P }` to hash a complex process); compound uses
+        // the distinct `(*)` lexeme (bare `*` is dereference/multiply, hence reserved);
+        // `-o` is the lollipop. Precedence: ground/# tightest, (*) tighter, -o loosest.
+        // Stratified per Greg's BNFC: Sig ::= Sig1 -o Sig | Sig1 ; Sig1 ::= Sig1 (*) Sig2
+        // | Sig2 ; Sig2 ::= ground | # P. The lollipop `-o` lives ONLY at the top Sig
+        // (reachable only inside the `[ … ]` of a signed term/bind), so it never
+        // enters the bare-process lexer state — `x-owed` still lexes as `x - owed`.
+        signature: $ => choice($.transfer_sig, $._sig1),
+        _sig1: $ => choice($.compound_sig, $._sig2),
+        _sig2: $ => choice($.ground_sig, $.hash_sig),
+        ground_sig: $ => prec(20, field('name', $._proc_var)),
+        hash_sig: $ => prec.right(19, seq('#', field('proc', choice($._ground_expression, $.eval)))),
+        compound_sig: $ => prec.left(17, seq(
+            field('left', $._sig1), '(*)', field('right', $._sig2)
+        )),
+        transfer_sig: $ => prec.right(16, seq(
+            field('left', $._sig1), '-o', field('right', $.signature)
         )),
 
         _proc_expression: $ => choice(
@@ -252,9 +308,18 @@ module.exports = grammar({
         // Guard-false is indistinguishable from a spatial mismatch.
         receipts: $ => semiSep1($.receipt),
         receipt: $ => seq(
-            conc1(choice($.linear_bind, $.repeated_bind, $.peek_bind)),
+            conc1(choice($.linear_bind, $.repeated_bind, $.peek_bind, $.signed_bind)),
             optional(seq('where', field('guard', $._proc)))
         ),
+
+        // Greg app:concrete SignedBind: a per-clause signed bind `{% y <- x %}[s]`
+        // (Axis-C join — each rendezvous surface is funded independently). Plain
+        // binds (linear_bind, etc.) remain unsigned; signed and plain binds compose
+        // with `&` inside one receipt.
+        signed_bind: $ => prec(2, seq(
+            '{%', optional(field('names', $.names)), '<-', field('input', $._source), '%}',
+            '[', field('sig', $.signature), ']'
+        )),
 
         linear_bind: $ => seq(
             optional(field('names', $.names)),
