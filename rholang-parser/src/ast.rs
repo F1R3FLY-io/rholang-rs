@@ -100,6 +100,13 @@ pub enum Proc<'ast> {
         cont: SyncSendCont<'ast>,
     },
 
+    SendMethod {
+        channel: Name<'ast>,
+        method: Id<'ast>,
+        inputs: ProcList<'ast>,
+        cont: SyncSendCont<'ast>,
+    },
+
     // expressions
     Eval {
         name: Name<'ast>,

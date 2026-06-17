@@ -46,6 +46,7 @@ module.exports = grammar({
         _proc: $ => choice(
             $.par,
             $.send_sync,
+            $.send_method,
             $.new,
             $.ifElse,
             $.let,
@@ -64,6 +65,14 @@ module.exports = grammar({
             field('channel', $.name),
             '!?',
             field('inputs', alias($._proc_list, $.messages)), field('cont', $.sync_send_cont))
+        ),
+
+        send_method: $ => prec(1, seq(
+            field('channel', $.name),
+            '!',
+            field('method', $.var),
+            field('inputs', alias($._proc_list, $.messages)),
+            field('cont', $.sync_send_cont))
         ),
 
         new: $ => prec(1, seq(

@@ -188,6 +188,12 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
             channel,
             inputs,
             cont: SyncSendCont::Empty,
+        }
+        | SendMethod {
+            channel,
+            inputs,
+            cont: SyncSendCont::Empty,
+            ..
         } => {
             resolve_send(db[this], channel, inputs, None, db, stack);
         }
@@ -195,6 +201,12 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
             channel,
             inputs,
             cont: SyncSendCont::NonEmpty(proc),
+        }
+        | SendMethod {
+            channel,
+            inputs,
+            cont: SyncSendCont::NonEmpty(proc),
+            ..
         } => resolve_send(db[this], channel, inputs, Some(proc), db, stack),
 
         // -- new --

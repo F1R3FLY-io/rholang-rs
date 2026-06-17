@@ -96,6 +96,18 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
                 self.remember(inputs);
                 self.push_name(channel);
             }
+            Proc::SendMethod {
+                channel,
+                inputs,
+                cont,
+                ..
+            } => {
+                if let SyncSendCont::NonEmpty(proc) = cont {
+                    self.stack.push(proc);
+                }
+                self.remember(inputs);
+                self.push_name(channel);
+            }
 
             Proc::Match { expression, cases } => {
                 self.remember(match_cases(cases));
@@ -366,6 +378,18 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
                 };
                 self.push_children(inputs.iter().chain(cont_iter));
             }
+            Proc::SendMethod {
+                channel: _,
+                inputs,
+                cont,
+                ..
+            } => {
+                let cont_iter = match cont {
+                    SyncSendCont::NonEmpty(p) => Some(p),
+                    _ => None,
+                };
+                self.push_children(inputs.iter().chain(cont_iter));
+            }
 
             Proc::Method { receiver, args, .. } => {
                 self.push_children(iter::once(receiver).chain(args));
@@ -487,6 +511,7 @@ impl<'a, const S: usize> NameAwareDfsEventIter<'a, S> {
         match node.proc {
             Proc::Send { channel: name, .. }
             | Proc::SendSync { channel: name, .. }
+            | Proc::SendMethod { channel: name, .. }
             | Proc::Eval { name } => {
                 self.pending.push(name);
             }

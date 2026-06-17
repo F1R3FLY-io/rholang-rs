@@ -304,6 +304,12 @@ fn resolve_proc_pattern_rec<'a>(
             channel,
             inputs,
             cont: SyncSendCont::Empty,
+        }
+        | SendMethod {
+            channel,
+            inputs,
+            cont: SyncSendCont::Empty,
+            ..
         } => {
             resolve_send_pattern(channel, inputs, None, db, env, res);
         }
@@ -311,6 +317,12 @@ fn resolve_proc_pattern_rec<'a>(
             channel,
             inputs,
             cont: SyncSendCont::NonEmpty(cont),
+        }
+        | SendMethod {
+            channel,
+            inputs,
+            cont: SyncSendCont::NonEmpty(cont),
+            ..
         } => {
             resolve_send_pattern(channel, inputs, Some(cont), db, env, res);
         }
