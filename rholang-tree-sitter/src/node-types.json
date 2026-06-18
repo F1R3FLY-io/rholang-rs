@@ -118,6 +118,10 @@
         "named": true
       },
       {
+        "type": "send_method_source",
+        "named": true
+      },
+      {
         "type": "send_receive_source",
         "named": true
       },
@@ -9594,6 +9598,46 @@
           }
         ]
       }
+    }
+  },
+  {
+    "type": "send_method_source",
+    "named": true,
+    "fields": {
+      "inputs": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "inputs",
+            "named": true
+          }
+        ]
+      },
+      "method": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "var",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "_proc_var",
+          "named": true
+        },
+        {
+          "type": "quote",
+          "named": true
+        }
+      ]
     }
   },
   {

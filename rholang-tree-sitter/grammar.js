@@ -287,11 +287,27 @@ module.exports = grammar({
         _source: $ => choice(
             $.simple_source,
             $.receive_send_source,
-            $.send_receive_source),
+            $.send_receive_source,
+            $.send_method_source),
 
         simple_source: $ => $.name,
         receive_send_source: $ => seq($.name, '?!'),
         send_receive_source: $ => seq($.name, '!?', field('inputs', alias($._proc_list, $.inputs))),
+
+        // For-source position of the method-call sugar (FIP 2025-08-20
+        // Agents §"Method-call sugar"):
+        //
+        //   for (x <- inst!y(args)) { P }
+        //   =
+        //   for (x <- inst!?("y", args)) { P }
+        //
+        // No AST variant; the visitor rewrites this into a
+        // Source::SendReceive at parse time with "y" prepended.
+        send_method_source: $ => seq(
+            $.name, '!',
+            field('method', $.var),
+            field('inputs', alias($._proc_list, $.inputs))
+        ),
 
         // sends
         _send_type: $ => choice($.send_single, $.send_multiple),

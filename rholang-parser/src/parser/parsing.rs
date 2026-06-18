@@ -519,8 +519,15 @@ pub(super) fn node_to_ast<'ast>(
                                                 arity: inputs_node.named_child_count(),
                                             }
                                         }
+                                        kind!("send_method_source") => {
+                                            let inputs_node =
+                                                get_field(&source_node, field!("inputs"));
+                                            SourceDesc::SM {
+                                                arity: inputs_node.named_child_count(),
+                                            }
+                                        }
                                         _ => unreachable!(
-                                            "Sources in for-comprehensions have three kinds: simple, receive_send and send_receive"
+                                            "Sources in for-comprehensions have four kinds: simple, receive_send, send_receive, and send_method"
                                         ),
                                     };
 
@@ -551,6 +558,26 @@ pub(super) fn node_to_ast<'ast>(
                                     let inputs = get_field(&source_node, field!("inputs"));
                                     temp_cont_stack
                                         .push(K::EvalDelayed(get_first_child(&source_node)));
+                                    temp_cont_stack.push(K::EvalList(inputs.walk()));
+                                }
+                                BindDesc::Linear {
+                                    source: SourceDesc::SM { .. },
+                                    ..
+                                } => {
+                                    // proc_stack target after eval:
+                                    //   [channel, method_lit, input0, input1, ...]
+                                    // Push order (becomes reversed below):
+                                    //   channel last, then method_lit, then inputs.
+                                    let method_node = get_field(&source_node, field!("method"));
+                                    let inputs = get_field(&source_node, field!("inputs"));
+                                    let method_name = get_node_value(&method_node, source);
+                                    let method_lit = AnnProc {
+                                        proc: ast_builder.alloc_string_literal(method_name),
+                                        span: method_node.range().into(),
+                                    };
+                                    temp_cont_stack
+                                        .push(K::EvalDelayed(get_first_child(&source_node)));
+                                    temp_cont_stack.push(K::PushAnnProc(method_lit));
                                     temp_cont_stack.push(K::EvalList(inputs.walk()));
                                 }
                                 BindDesc::Linear { .. } => {
@@ -939,6 +966,11 @@ fn apply_cont<'tree, 'ast>(
                     return Step::Continue(node);
                 }
                 cont_stack.pop();
+            }
+            K::PushAnnProc(ann) => {
+                let ann = *ann;
+                cont_stack.pop();
+                proc_stack.push(ann.proc, ann.span);
             }
             _ => {
                 //consumes
@@ -1331,6 +1363,11 @@ enum K<'tree, 'ast> {
     },
     EvalDelayed(tree_sitter::Node<'tree>),
     EvalList(tree_sitter::TreeCursor<'tree>),
+    // Push an already-constructed AnnProc directly onto proc_stack
+    // without a tree-sitter parse step. Used for parse-time
+    // synthesized literals (e.g., the method-name StringLiteral
+    // injected by send_method_source).
+    PushAnnProc(AnnProc<'ast>),
 }
 
 impl Debug for K<'_, '_> {
@@ -1479,6 +1516,7 @@ impl Debug for K<'_, '_> {
                 .debug_struct("EvalList")
                 .field("at", &arg0.node())
                 .finish(),
+            Self::PushAnnProc(arg0) => f.debug_tuple("PushAnnProc").field(arg0).finish(),
         }
     }
 }
@@ -1764,6 +1802,12 @@ enum SourceDesc {
     Simple,
     RS,
     SR { arity: usize },
+    // send_method_source: `name '!' method '(' inputs ')'`. Rewritten
+    // at to_bind time into Source::SendReceive with a StringLiteral
+    // method-name AnnProc prepended. The proc_stack slice carries the
+    // pre-built StringLiteral AnnProc at index 1 (between the channel
+    // and the actual inputs).
+    SM { arity: usize },
 }
 
 impl SourceDesc {
@@ -1771,6 +1815,8 @@ impl SourceDesc {
         match self {
             SourceDesc::Simple | SourceDesc::RS => 1,
             SourceDesc::SR { arity } => *arity + 1,
+            // 1 (channel) + 1 (method-literal AnnProc) + arity (real inputs)
+            SourceDesc::SM { arity } => *arity + 2,
         }
     }
 }
@@ -1825,6 +1871,16 @@ impl BindDesc {
                         SourceDesc::RS => Source::ReceiveSend { name: channel_name },
                         SourceDesc::SR { arity } => {
                             let inputs = &rest[..arity];
+                            Source::SendReceive {
+                                name: channel_name,
+                                inputs: inputs.to_smallvec(),
+                            }
+                        }
+                        // send_method_source -> Source::SendReceive with
+                        // method-name AnnProc already at rest[0] and
+                        // actual inputs at rest[1..arity+1].
+                        SourceDesc::SM { arity } => {
+                            let inputs = &rest[..arity + 1];
                             Source::SendReceive {
                                 name: channel_name,
                                 inputs: inputs.to_smallvec(),

@@ -1920,6 +1920,10 @@
         {
           "type": "SYMBOL",
           "name": "send_receive_source"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "send_method_source"
         }
       ]
     },
@@ -1950,6 +1954,40 @@
         {
           "type": "STRING",
           "value": "!?"
+        },
+        {
+          "type": "FIELD",
+          "name": "inputs",
+          "content": {
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_proc_list"
+            },
+            "named": true,
+            "value": "inputs"
+          }
+        }
+      ]
+    },
+    "send_method_source": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "name"
+        },
+        {
+          "type": "STRING",
+          "value": "!"
+        },
+        {
+          "type": "FIELD",
+          "name": "method",
+          "content": {
+            "type": "SYMBOL",
+            "name": "var"
+          }
         },
         {
           "type": "FIELD",
