@@ -1,0 +1,100 @@
+---
+source: rholang-parser/tests/golden.rs
+assertion_line: 23
+expression: result
+---
+Good(
+    [
+        AnnProc {
+            proc: New {
+                decls: [
+                    NameDecl {
+                        id: Id {
+                            name: "x",
+                            pos: SourcePos {
+                                line: 1,
+                                col: 5,
+                            },
+                        },
+                        uri: None,
+                    },
+                ],
+                proc: AnnProc {
+                    proc: SendMethod {
+                        channel: NameVar(
+                            Id(
+                                Id {
+                                    name: "x",
+                                    pos: SourcePos {
+                                        line: 2,
+                                        col: 3,
+                                    },
+                                },
+                            ),
+                        ),
+                        method: Id {
+                            name: "y",
+                            pos: SourcePos {
+                                line: 2,
+                                col: 5,
+                            },
+                        },
+                        inputs: [
+                            AnnProc {
+                                proc: LongLiteral(
+                                    1,
+                                ),
+                                span: SourceSpan {
+                                    start: SourcePos {
+                                        line: 2,
+                                        col: 7,
+                                    },
+                                    end: SourcePos {
+                                        line: 2,
+                                        col: 8,
+                                    },
+                                },
+                            },
+                            AnnProc {
+                                proc: LongLiteral(
+                                    2,
+                                ),
+                                span: SourceSpan {
+                                    start: SourcePos {
+                                        line: 2,
+                                        col: 10,
+                                    },
+                                    end: SourcePos {
+                                        line: 2,
+                                        col: 11,
+                                    },
+                                },
+                            },
+                        ],
+                        cont: Empty,
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 2,
+                            col: 3,
+                        },
+                        end: SourcePos {
+                            line: 2,
+                            col: 13,
+                        },
+                    },
+                },
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 1,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 3,
+                    col: 2,
+                },
+            },
+        },
+    ],
+)
