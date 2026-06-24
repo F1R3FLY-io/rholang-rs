@@ -1,0 +1,138 @@
+//! Equivalence tests for the parse-time desugaring landed in this PR.
+//!
+//! The golden snapshots show the shape of `x!y(args)` after parsing
+//! (a `SendSync` with the method-name `StringLiteral` prepended), but
+//! they don't prove that this shape MATCHES the AST produced by the
+//! hand-written `x!?("y", args)` form. These tests close that gap:
+//! each case parses both forms and asserts the resulting ASTs agree
+//! after spans are elided.
+//!
+//! Spans are elided because the synthesized `StringLiteral` inherits
+//! the method `var`'s position (a 1-character span at the bare
+//! identifier), whereas the hand-written form has the 3-character
+//! span of `"y"`. The semantic content -- channel, inputs, method
+//! name, continuation shape -- is what matters for the equivalence
+//! the desugaring promises.
+
+use rholang_parser::RholangParser;
+use rstest::rstest;
+
+/// Strip `span: SourceSpan { ... }` and `pos: SourcePos { ... }`
+/// sub-trees from a Debug-formatted AST so two ASTs that differ only
+/// in source positions compare equal. A line-based filter is enough:
+/// the Debug formatter puts each span/pos field on its own line, and
+/// `SourcePos`/`SourceSpan` payloads occupy a contiguous block of
+/// lines indented further than the `span:` / `pos:` opener.
+fn strip_positions(debug_str: &str) -> String {
+    let mut out = String::with_capacity(debug_str.len());
+    let mut skip_until_indent: Option<usize> = None;
+
+    for line in debug_str.lines() {
+        let trimmed = line.trim_start();
+        let indent = line.len() - trimmed.len();
+
+        if let Some(open_indent) = skip_until_indent {
+            // Keep skipping lines that are MORE indented than the
+            // span:/pos: opener, plus the closing `}` line at the
+            // exact same indent.
+            if indent > open_indent {
+                continue;
+            }
+            // Same-indent line: this is the closing `},` of the
+            // SourceSpan / SourcePos block. Skip it too, then turn
+            // off the skip filter.
+            if trimmed.starts_with('}') {
+                skip_until_indent = None;
+                continue;
+            }
+            // Fell out of the block another way (shouldn't happen
+            // with rustfmt-formatted Debug output, but be safe).
+            skip_until_indent = None;
+        }
+
+        if trimmed.starts_with("span: SourceSpan {") || trimmed.starts_with("pos: SourcePos {") {
+            skip_until_indent = Some(indent);
+            continue;
+        }
+
+        out.push_str(line);
+        out.push('\n');
+    }
+
+    out
+}
+
+/// Parse `source` and return the Validated outcome formatted with `{:#?}`
+/// and stripped of source positions.
+fn parse_stripped(source: &str) -> String {
+    let parser = RholangParser::new();
+    let result = parser.parse(source);
+    strip_positions(&format!("{result:#?}"))
+}
+
+#[rstest]
+#[case::terminator(
+    r#"new x in { x!y(1, 2). }"#,
+    r#"new x in { x!?("y", 1, 2). }"#,
+)]
+#[case::terminator_no_args(
+    r#"new x in { x!y(). }"#,
+    r#"new x in { x!?("y"). }"#,
+)]
+#[case::sequential(
+    r#"new x in { x!set(42); Nil }"#,
+    r#"new x in { x!?("set", 42); Nil }"#,
+)]
+#[case::sequential_uses_outer_scope(
+    r#"new x, z in { x!set(42); z!(1) }"#,
+    r#"new x, z in { x!?("set", 42); z!(1) }"#,
+)]
+fn proc_position_desugars_to_send_sync(#[case] sugared: &str, #[case] hand_written: &str) {
+    let s = parse_stripped(sugared);
+    let h = parse_stripped(hand_written);
+    pretty_assertions::assert_eq!(s, h, "x!y(args) AST should match x!?(\"y\", args) AST");
+}
+
+#[rstest]
+#[case::for_source(
+    r#"new x in { for (@z <- x!get()) { Nil } }"#,
+    r#"new x in { for (@z <- x!?("get")) { Nil } }"#,
+)]
+#[case::for_source_with_args(
+    r#"new x in { for (@z <- x!compute(1, 2, 3)) { Nil } }"#,
+    r#"new x in { for (@z <- x!?("compute", 1, 2, 3)) { Nil } }"#,
+)]
+#[case::for_source_with_body(
+    r#"new x, ret in { for (@val <- x!get()) { ret!(val) } }"#,
+    r#"new x, ret in { for (@val <- x!?("get")) { ret!(val) } }"#,
+)]
+fn for_source_desugars_to_send_receive(#[case] sugared: &str, #[case] hand_written: &str) {
+    let s = parse_stripped(sugared);
+    let h = parse_stripped(hand_written);
+    pretty_assertions::assert_eq!(
+        s,
+        h,
+        "for (z <- x!y(args)) AST should match for (z <- x!?(\"y\", args)) AST"
+    );
+}
+
+/// Sanity guard for the position-stripping helper itself: two parses
+/// of the SAME source should be string-equal both before and after
+/// stripping. If this fails, the strip routine is buggy and the other
+/// tests in this file would silently lose discriminating power.
+#[test]
+fn strip_positions_is_idempotent_for_same_source() {
+    let src = r#"new x in { x!?("y", 1, 2). }"#;
+    let a = parse_stripped(src);
+    let b = parse_stripped(src);
+    assert_eq!(a, b);
+    // And the stripped output should NOT contain span: / pos: opener lines.
+    assert!(
+        !a.contains("span: SourceSpan {"),
+        "strip_positions left a span: opener"
+    );
+    assert!(
+        !a.contains("pos: SourcePos {"),
+        "strip_positions left a pos: opener"
+    );
+}
