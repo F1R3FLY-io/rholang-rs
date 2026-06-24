@@ -1,0 +1,9 @@
+// Constraint violation: if any `private method` is declared, a
+// `private default` is required (mirrors the public side).
+new fooCtor in {
+  agent fooCtor {
+    constructor() { Nil } |
+    private method incr() { Nil } |
+    default(...@args) { Nil }
+  }
+}

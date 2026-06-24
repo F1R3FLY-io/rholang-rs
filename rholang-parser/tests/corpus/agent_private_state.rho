@@ -1,0 +1,17 @@
+// Demonstrates the `private` channel being usable as a compound
+// address-key component for instance-local state, even with no
+// `private method` / `private default` declared. The desugaring
+// always binds `private` -- this test guards that property.
+new Foo, stateToken in {
+  agent Foo {
+    constructor(@x) {
+      @[*private, *stateToken]!(x)
+    } |
+    method get() {
+      for (@state <<- @[*private, *stateToken]) {
+        return!(state)
+      }
+    } |
+    default(...@args) { Nil }
+  }
+}
