@@ -1,0 +1,20 @@
+// Hand-written equivalent of agent_minimal.rho. Paired with the
+// sugared form in tests/desugar_equivalence.rs and asserted equal
+// modulo source spans.
+//
+// The ctor body is `Nil` and slots in as the `Pc` position in the
+// par chain. The dispatch matches `_` to the pub default body (also
+// `Nil`).
+new fooCtor in {
+  for (__r <= fooCtor) {
+    new this, private in {
+      for (...@args <= this) {
+        match args {
+          _ => Nil
+        }
+      } |
+      Nil |
+      __r!(bundle+{*this})
+    }
+  }
+}
