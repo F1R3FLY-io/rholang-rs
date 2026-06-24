@@ -406,35 +406,6 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
-    pub(crate) fn alloc_send_method(
-        &self,
-        channel: Name<'ast>,
-        method: Id<'ast>,
-        messages: &[AnnProc<'ast>],
-    ) -> &Proc<'ast> {
-        self.arena.alloc(Proc::SendMethod {
-            channel,
-            method,
-            inputs: messages.to_smallvec(),
-            cont: SyncSendCont::Empty,
-        })
-    }
-
-    pub(crate) fn alloc_send_method_with_cont(
-        &self,
-        channel: Name<'ast>,
-        method: Id<'ast>,
-        messages: &[AnnProc<'ast>],
-        cont: AnnProc<'ast>,
-    ) -> &Proc<'ast> {
-        self.arena.alloc(Proc::SendMethod {
-            channel,
-            method,
-            inputs: messages.to_smallvec(),
-            cont: SyncSendCont::NonEmpty(cont),
-        })
-    }
-
     pub fn alloc_eval(&self, name: Name<'ast>) -> &Proc<'ast> {
         self.arena.alloc(Proc::Eval { name })
     }

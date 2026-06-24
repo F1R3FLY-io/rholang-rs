@@ -267,10 +267,7 @@ impl<'a, 'ast> TypeValidator<'a, 'ast> {
             | Proc::BinaryExp { .. } => Ok(MessageType::Unknown),
 
             // Invalid patterns
-            Proc::IfThenElse { .. }
-            | Proc::Select { .. }
-            | Proc::SendSync { .. }
-            | Proc::SendMethod { .. } => {
+            Proc::IfThenElse { .. } | Proc::Select { .. } | Proc::SendSync { .. } => {
                 Err(ValidationError::InvalidPatternStructure {
                     pid: PID(0), // Will be replaced by caller
                     position: Some(proc.span.start),

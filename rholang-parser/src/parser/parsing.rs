@@ -783,31 +783,37 @@ pub(super) fn node_to_ast<'ast>(
                     continue 'parse;
                 }
 
+                // `x!y(args)<cont>` desugars to `x!?("y", args)<cont>`
+                // at parse time -- the AST carries a Proc::SendSync
+                // with the method name prepended as a StringLiteral.
+                // Mirrors what send_method_source does for the for-
+                // source position; no AST variant for either form.
                 kind!("send_method") => {
                     let name_node = get_field(&node, field!("channel"));
                     let method_node = get_field(&node, field!("method"));
                     let messages_node = get_field(&node, field!("inputs"));
-                    let arity = messages_node.named_child_count();
+                    let original_arity = messages_node.named_child_count();
+                    // +1 for the synthesized method-name StringLiteral
+                    let synthesized_arity = original_arity + 1;
                     let sync_send_cont_node = get_field(&node, field!("cont"));
                     let choice_node = get_first_child(&sync_send_cont_node);
-                    let method = Id {
-                        name: get_node_value(&method_node, source),
-                        pos: method_node.start_position().into(),
+                    let method_name = get_node_value(&method_node, source);
+                    let method_lit = AnnProc {
+                        proc: ast_builder.alloc_string_literal(method_name),
+                        span: method_node.range().into(),
                     };
                     match choice_node.kind_id() {
                         kind!("empty_cont") => {
-                            cont_stack.push(K::ConsumeSendMethod {
+                            cont_stack.push(K::ConsumeSendSync {
                                 span,
-                                method,
-                                arity,
+                                arity: synthesized_arity,
                             });
                         }
                         kind!("non_empty_cont") => {
                             let cont_node = get_first_child(&choice_node);
-                            cont_stack.push(K::ConsumeSendMethodWithCont {
+                            cont_stack.push(K::ConsumeSendSyncWithCont {
                                 span,
-                                method,
-                                arity,
+                                arity: synthesized_arity,
                             });
                             cont_stack.push(K::EvalDelayed(cont_node));
                         }
@@ -815,7 +821,14 @@ pub(super) fn node_to_ast<'ast>(
                             "Continuations of send_method are either empty or non-empty"
                         ),
                     };
+                    // proc_stack target: [channel, method_lit, input0, ...]
+                    // cont_stack is LIFO; top runs first. Execution order:
+                    //   1. eval channel (immediate via node = name_node)
+                    //   2. PushAnnProc(method_lit) -- the prepended literal
+                    //   3. EvalList(inputs) -- one Continue per input
+                    //   4. ConsumeSendSync -- (pushed above the match arm)
                     cont_stack.push(K::EvalList(messages_node.walk()));
+                    cont_stack.push(K::PushAnnProc(method_lit));
                     node = name_node;
                     continue 'parse;
                 }
@@ -1181,36 +1194,6 @@ fn apply_cont<'tree, 'ast>(
                                 },
                             )
                         }
-                        K::ConsumeSendMethod {
-                            span,
-                            method,
-                            arity,
-                        } => proc_stack.replace_top_slice_with_mask(
-                            arity + 1,
-                            |name_inputs, mask| {
-                                let channel = into_name(name_inputs[0], mask[0]);
-                                ast_builder
-                                    .alloc_send_method(channel, method, &name_inputs[1..])
-                                    .ann(span)
-                            },
-                        ),
-                        K::ConsumeSendMethodWithCont {
-                            span,
-                            method,
-                            arity,
-                        } => proc_stack.replace_top_slice_with_mask(
-                            arity + 2,
-                            |name_inputs_cont, mask| {
-                                let channel = into_name(name_inputs_cont[0], mask[0]);
-                                // SAFETY: see ConsumeSendSyncWithCont; |arity + 2| elements
-                                let (last, messages) =
-                                    name_inputs_cont[1..].split_last().unwrap_unchecked();
-                                let cont = *last;
-                                ast_builder
-                                    .alloc_send_method_with_cont(channel, method, messages, cont)
-                                    .ann(span)
-                            },
-                        ),
                         K::ConsumeSet {
                             arity,
                             has_remainder,
@@ -1338,16 +1321,6 @@ enum K<'tree, 'ast> {
         span: SourceSpan,
         arity: usize,
     },
-    ConsumeSendMethod {
-        span: SourceSpan,
-        method: Id<'ast>,
-        arity: usize,
-    },
-    ConsumeSendMethodWithCont {
-        span: SourceSpan,
-        method: Id<'ast>,
-        arity: usize,
-    },
     ConsumeSet {
         arity: usize,
         has_remainder: bool,
@@ -1473,26 +1446,6 @@ impl Debug for K<'_, '_> {
                 .finish(),
             Self::ConsumeSendSyncWithCont { span, arity } => f
                 .debug_struct("ConsumeSendSyncWithCont")
-                .field("arity", arity)
-                .field("span", span)
-                .finish(),
-            Self::ConsumeSendMethod {
-                span,
-                method,
-                arity,
-            } => f
-                .debug_struct("ConsumeSendMethod")
-                .field("method", method)
-                .field("arity", arity)
-                .field("span", span)
-                .finish(),
-            Self::ConsumeSendMethodWithCont {
-                span,
-                method,
-                arity,
-            } => f
-                .debug_struct("ConsumeSendMethodWithCont")
-                .field("method", method)
                 .field("arity", arity)
                 .field("span", span)
                 .finish(),

@@ -20,7 +20,7 @@ Good(
                     },
                 ],
                 proc: AnnProc {
-                    proc: SendMethod {
+                    proc: SendSync {
                         channel: NameVar(
                             Id(
                                 Id {
@@ -32,14 +32,22 @@ Good(
                                 },
                             ),
                         ),
-                        method: Id {
-                            name: "y",
-                            pos: SourcePos {
-                                line: 2,
-                                col: 5,
-                            },
-                        },
                         inputs: [
+                            AnnProc {
+                                proc: StringLiteral(
+                                    "y",
+                                ),
+                                span: SourceSpan {
+                                    start: SourcePos {
+                                        line: 2,
+                                        col: 5,
+                                    },
+                                    end: SourcePos {
+                                        line: 2,
+                                        col: 6,
+                                    },
+                                },
+                            },
                             AnnProc {
                                 proc: LongLiteral(
                                     1,
