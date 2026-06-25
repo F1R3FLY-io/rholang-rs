@@ -1,0 +1,116 @@
+---
+source: rholang-parser/tests/golden.rs
+assertion_line: 23
+expression: result
+---
+Fail(
+    [
+        ParsingFailure {
+            partial_tree: Some(
+                AnnProc {
+                    proc: New {
+                        decls: [
+                            NameDecl {
+                                id: Id {
+                                    name: "x",
+                                    pos: SourcePos {
+                                        line: 7,
+                                        col: 5,
+                                    },
+                                },
+                                uri: None,
+                            },
+                        ],
+                        proc: AnnProc {
+                            proc: Send {
+                                channel: NameVar(
+                                    Id(
+                                        Id {
+                                            name: "x",
+                                            pos: SourcePos {
+                                                line: 8,
+                                                col: 3,
+                                            },
+                                        },
+                                    ),
+                                ),
+                                send_type: Single,
+                                inputs: [
+                                    AnnProc {
+                                        proc: LongLiteral(
+                                            1,
+                                        ),
+                                        span: SourceSpan {
+                                            start: SourcePos {
+                                                line: 8,
+                                                col: 9,
+                                            },
+                                            end: SourcePos {
+                                                line: 8,
+                                                col: 10,
+                                            },
+                                        },
+                                    },
+                                ],
+                            },
+                            span: SourceSpan {
+                                start: SourcePos {
+                                    line: 8,
+                                    col: 3,
+                                },
+                                end: SourcePos {
+                                    line: 8,
+                                    col: 11,
+                                },
+                            },
+                        },
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 7,
+                            col: 1,
+                        },
+                        end: SourcePos {
+                            line: 9,
+                            col: 2,
+                        },
+                    },
+                },
+            ),
+            errors: [
+                AnnParsingError {
+                    error: SyntaxError {
+                        sexp: "(ERROR)",
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 8,
+                            col: 5,
+                        },
+                        end: SourcePos {
+                            line: 8,
+                            col: 8,
+                        },
+                    },
+                    byte_range: 368..371,
+                },
+                AnnParsingError {
+                    error: SyntaxError {
+                        sexp: "(ERROR)",
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 8,
+                            col: 11,
+                        },
+                        end: SourcePos {
+                            line: 8,
+                            col: 12,
+                        },
+                    },
+                    byte_range: 374..375,
+                },
+            ],
+        },
+    ],
+)

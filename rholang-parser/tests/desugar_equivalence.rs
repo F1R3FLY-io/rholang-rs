@@ -87,6 +87,22 @@ fn parse_stripped(source: &str) -> String {
     r#"new x, z in { x!set(42); z!(1) }"#,
     r#"new x, z in { x!?("set", 42); z!(1) }"#,
 )]
+#[case::comparison_args(
+    r#"new x, a, b, c, d in { x!y(a < b, c > d). }"#,
+    r#"new x, a, b, c, d in { x!?("y", a < b, c > d). }"#,
+)]
+#[case::bundle_arg(
+    r#"new x, t in { x!y(bundle+{*t}). }"#,
+    r#"new x, t in { x!?("y", bundle+{*t}). }"#,
+)]
+#[case::nested_send_arg(
+    r#"new x, a, b in { x!y(a!(b)). }"#,
+    r#"new x, a, b in { x!?("y", a!(b)). }"#,
+)]
+#[case::nested_send_method_arg(
+    r#"new x, a, b in { x!y(a!z(b).). }"#,
+    r#"new x, a, b in { x!?("y", a!?("z", b).). }"#,
+)]
 fn proc_position_desugars_to_send_sync(#[case] sugared: &str, #[case] hand_written: &str) {
     let s = parse_stripped(sugared);
     let h = parse_stripped(hand_written);
@@ -113,6 +129,50 @@ fn for_source_desugars_to_send_receive(#[case] sugared: &str, #[case] hand_writt
         s,
         h,
         "for (z <- x!y(args)) AST should match for (z <- x!?(\"y\", args)) AST"
+    );
+}
+
+/// Reserved keywords (e.g. `new`) cannot be used as method names.
+/// The `var` token in the grammar excludes globally-reserved words,
+/// so the parser produces ERROR nodes around the keyword. This test
+/// locks the rejection in.
+#[test]
+fn reserved_keyword_as_method_name_is_rejected() {
+    let parser = RholangParser::new();
+    let result = parser.parse("new x in { x!new(1). }");
+    // Use the Debug output as the assertion vehicle -- the Validated
+    // variant tag distinguishes Good/Fail cleanly.
+    let dbg = format!("{result:#?}");
+    assert!(
+        dbg.starts_with("Fail("),
+        "expected Fail outcome, got: {dbg}"
+    );
+    assert!(
+        dbg.contains("UnexpectedVar") || dbg.contains("SyntaxError"),
+        "expected an UnexpectedVar/SyntaxError on `new`, got: {dbg}"
+    );
+}
+
+/// `!=` (neq) must NOT be parsed as a send_method whose method name
+/// starts with `=`. The grammar distinguishes by what follows the
+/// `!`: a var (method name) means send_method; otherwise it's an
+/// operator. This guard catches any future grammar churn that
+/// would conflate them.
+#[test]
+fn neq_operator_does_not_collide_with_send_method() {
+    let parser = RholangParser::new();
+    let dbg = format!(
+        "{:#?}",
+        parser.parse("new x, y in { if (x != y) { @0!(1) } }")
+    );
+    assert!(dbg.starts_with("Good("), "expected Good outcome: {dbg}");
+    assert!(
+        dbg.contains("neq:") || dbg.contains("Neq"),
+        "expected a `neq` node in the AST: {dbg}"
+    );
+    assert!(
+        !dbg.contains("SendMethod"),
+        "x != y should not parse as send_method"
     );
 }
 
