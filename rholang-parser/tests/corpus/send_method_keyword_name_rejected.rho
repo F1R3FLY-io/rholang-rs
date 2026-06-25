@@ -1,0 +1,9 @@
+// Reserved keywords cannot be used as method names because the
+// `var` token excludes globally-reserved words (`new` is one). The
+// snapshot will show a Fail outcome with ERROR nodes -- this
+// documents the rejection. If we ever want to relax this (and let
+// `x!new(...)` work), we'd need a separate non-reserved token for
+// the method-name slot.
+new x in {
+  x!new(1).
+}

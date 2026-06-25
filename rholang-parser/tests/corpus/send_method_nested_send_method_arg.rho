@@ -1,0 +1,8 @@
+// Nested method call as method-call argument. Both inner and outer
+// need explicit continuations (here both `.`). The desugaring runs
+// at each level independently, so the resulting AST has two nested
+// SendSyncs each prepending their own method-name StringLiteral --
+// equivalent to hand-written `x!?("y", a!?("z", b).).`.
+new x, a, b in {
+  x!y(a!z(b).).
+}

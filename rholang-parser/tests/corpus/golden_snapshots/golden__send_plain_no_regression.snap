@@ -1,0 +1,93 @@
+---
+source: rholang-parser/tests/golden.rs
+assertion_line: 23
+expression: result
+---
+Good(
+    [
+        AnnProc {
+            proc: New {
+                decls: [
+                    NameDecl {
+                        id: Id {
+                            name: "x",
+                            pos: SourcePos {
+                                line: 4,
+                                col: 5,
+                            },
+                        },
+                        uri: None,
+                    },
+                ],
+                proc: AnnProc {
+                    proc: Send {
+                        channel: NameVar(
+                            Id(
+                                Id {
+                                    name: "x",
+                                    pos: SourcePos {
+                                        line: 5,
+                                        col: 3,
+                                    },
+                                },
+                            ),
+                        ),
+                        send_type: Single,
+                        inputs: [
+                            AnnProc {
+                                proc: LongLiteral(
+                                    1,
+                                ),
+                                span: SourceSpan {
+                                    start: SourcePos {
+                                        line: 5,
+                                        col: 6,
+                                    },
+                                    end: SourcePos {
+                                        line: 5,
+                                        col: 7,
+                                    },
+                                },
+                            },
+                            AnnProc {
+                                proc: LongLiteral(
+                                    2,
+                                ),
+                                span: SourceSpan {
+                                    start: SourcePos {
+                                        line: 5,
+                                        col: 9,
+                                    },
+                                    end: SourcePos {
+                                        line: 5,
+                                        col: 10,
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 5,
+                            col: 3,
+                        },
+                        end: SourcePos {
+                            line: 5,
+                            col: 11,
+                        },
+                    },
+                },
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 4,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 6,
+                    col: 2,
+                },
+            },
+        },
+    ],
+)
