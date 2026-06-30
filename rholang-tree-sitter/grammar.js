@@ -35,16 +35,16 @@ module.exports = grammar({
             "bundle",
             "true",
             "false",
-            "where",
-            "agent",
-            "constructor",
-            "method",
-            "default"
-            // NOTE: `private` is NOT reserved globally. Tree-sitter's
-            // GLR parser disambiguates the qualifier (`private method`,
-            // `private default`) from the identifier by context, so
-            // user code can still write `*private` in expression
-            // position inside agent bodies.
+            "where"
+            // NOTE: `agent`, `constructor`, `method`, `default`, and
+            // `private` are NOT reserved globally. Tree-sitter's GLR
+            // parser disambiguates these by context: when followed
+            // by the syntactic patterns of an agent_block / agent_decl
+            // they're recognized as the keyword form; elsewhere they
+            // remain ordinary `var` identifiers. This preserves
+            // backward compatibility with existing Rholang code (e.g.
+            // SystemVault.rho's `contract _create(@vaultAddress,
+            // constructor, retCh) = { ... }` continues to parse).
         ],
     },
 
