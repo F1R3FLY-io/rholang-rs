@@ -16,6 +16,8 @@
 
 use rholang_parser::RholangParser;
 use rstest::rstest;
+use std::fs;
+use std::path::PathBuf;
 
 /// Strip `span: SourceSpan { ... }` and `pos: SourcePos { ... }`
 /// sub-trees from a Debug-formatted AST so two ASTs that differ only
@@ -68,6 +70,20 @@ fn parse_stripped(source: &str) -> String {
     let parser = RholangParser::new();
     let result = parser.parse(source);
     strip_positions(&format!("{result:#?}"))
+}
+
+/// Read a corpus file from `tests/corpus/<name>.rho` and return its
+/// parsed-and-stripped form. Used by the agent-block equivalence
+/// tests below to pair sugared and hand-written desugared files.
+fn parse_corpus_stripped(name: &str) -> String {
+    let mut path: PathBuf = std::env::var("CARGO_MANIFEST_DIR")
+        .expect("CARGO_MANIFEST_DIR set by cargo")
+        .into();
+    path.push("tests/corpus");
+    path.push(format!("{name}.rho"));
+    let source = fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+    parse_stripped(&source)
 }
 
 #[rstest]
@@ -173,6 +189,34 @@ fn neq_operator_does_not_collide_with_send_method() {
     assert!(
         !dbg.contains("SendMethod"),
         "x != y should not parse as send_method"
+    );
+}
+
+/// Agent block desugaring equivalence: each pair (`<name>.rho`,
+/// `<name>_desugared.rho`) in `tests/corpus/` is parsed and compared
+/// modulo source spans. The desugared form spells out the FIP
+/// expansion (`for + new this, private + match dispatch + bundle+`)
+/// using only constructs that exist before this PR; if the visitor's
+/// desugaring drifts from the FIP intent, these tests catch it.
+///
+/// Snapshot files for both halves already exist (`golden.rs` picks
+/// them up automatically); this assertion is the programmatic check
+/// that a reviewer doesn't have to verify by eye.
+#[rstest]
+#[case::minimal("agent_minimal", "agent_minimal_desugared")]
+#[case::with_methods("agent_with_methods", "agent_with_methods_desugared")]
+#[case::with_private("agent_with_private", "agent_with_private_desugared")]
+#[case::private_state("agent_private_state", "agent_private_state_desugared")]
+fn agent_block_desugars_to_handwritten_form(
+    #[case] sugared_basename: &str,
+    #[case] desugared_basename: &str,
+) {
+    let s = parse_corpus_stripped(sugared_basename);
+    let d = parse_corpus_stripped(desugared_basename);
+    pretty_assertions::assert_eq!(
+        s,
+        d,
+        "agent block AST should match its hand-written desugared form ({sugared_basename} vs {desugared_basename})"
     );
 }
 

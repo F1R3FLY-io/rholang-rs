@@ -1,0 +1,17 @@
+// Hand-written equivalent of agent_with_methods.rho (Cell shape).
+// Each method becomes a match arm [*return, "name", <formals>] => body.
+new Cell in {
+  for (__r, init <= Cell) {
+    new this, private in {
+      for (...@args <= this) {
+        match args {
+          [*return, "get"] => Nil
+          [*return, "set", newV] => Nil
+          _ => Nil
+        }
+      } |
+      new state in { state!(*init) } |
+      __r!(bundle+{*this})
+    }
+  }
+}

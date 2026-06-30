@@ -35,7 +35,16 @@ module.exports = grammar({
             "bundle",
             "true",
             "false",
-            "where"
+            "where",
+            "agent",
+            "constructor",
+            "method",
+            "default"
+            // NOTE: `private` is NOT reserved globally. Tree-sitter's
+            // GLR parser disambiguates the qualifier (`private method`,
+            // `private default`) from the identifier by context, so
+            // user code can still write `*private` in expression
+            // position inside agent bodies.
         ],
     },
 
@@ -54,6 +63,7 @@ module.exports = grammar({
             $.match,
             $.choice,
             $.contract,
+            $.agent_block,
             $.input,
             $.send,
             $._proc_expression
@@ -123,6 +133,56 @@ module.exports = grammar({
             '=',
             field('proc', $.block)
         )),
+
+        // Agent block sugar (FIP 2025-08-20 Agents + 2026-01-28 Private Methods).
+        // Desugars at parse time per Agents.md:19-35 to:
+        //   for (r, <ctorPtrns> <= fooCtor) {
+        //     new this, private in {
+        //       for (...@args <= this)    { match args { /* pub  */ } } |
+        //       for (...@args <= private) { match args { /* priv */ } } |  (only if private decls)
+        //       Pc |
+        //       r!(bundle+{*this})
+        //     }
+        //   }
+        agent_block: $ => prec(2, seq(
+            'agent',
+            field('name', $.name),
+            '{',
+            field('decls', $.agent_decls),
+            '}'
+        )),
+
+        agent_decls: $ => seq(
+            $.agent_decl,
+            repeat(seq('|', $.agent_decl))
+        ),
+
+        agent_decl: $ => choice(
+            $.constructor_decl,
+            $.method_decl,
+            $.default_decl
+        ),
+
+        constructor_decl: $ => seq(
+            'constructor',
+            '(', optional(field('formals', $.names)), ')',
+            field('body', $.block)
+        ),
+
+        method_decl: $ => seq(
+            optional(field('private', 'private')),
+            'method',
+            field('name', $.var),
+            '(', optional(field('formals', $.names)), ')',
+            field('body', $.block)
+        ),
+
+        default_decl: $ => seq(
+            optional(field('private', 'private')),
+            'default',
+            '(', optional(field('formals', $.names)), ')',
+            field('body', $.block)
+        ),
 
         input: $ => prec(2, seq(
             'for', '(', field('receipts', $.receipts), ')',

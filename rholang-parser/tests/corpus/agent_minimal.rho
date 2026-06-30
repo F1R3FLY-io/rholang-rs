@@ -1,0 +1,11 @@
+// Minimal agent: just a constructor and a default. Desugars to a
+// persistent for over `fooCtor` whose body opens `new this, private`,
+// runs the (empty) constructor body, sends bundle+{*this} back to
+// the reply channel, and listens persistently on `this` for method
+// calls -- the match falls through to the (no-op) default arm.
+new fooCtor in {
+  agent fooCtor {
+    constructor() { Nil } |
+    default(...@args) { Nil }
+  }
+}
