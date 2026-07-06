@@ -1,0 +1,6 @@
+// Constraint violation: every agent requires a `constructor`.
+new fooCtor in {
+  agent fooCtor {
+    default(...@args) { Nil }
+  }
+}

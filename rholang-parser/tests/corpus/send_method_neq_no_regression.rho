@@ -1,0 +1,9 @@
+// Regression guard for the !=/`!`-followed-by-var disambiguation.
+// `x != y` MUST parse as a neq binary expression, not as a
+// send_method with method name starting with `=`. The grammar
+// distinguishes by what follows the `!`: a var (method name) means
+// send_method; anything else (including `=`, `(`, `?`) means an
+// operator or plain send.
+new x, y in {
+  if (x != y) { @0!(1) }
+}

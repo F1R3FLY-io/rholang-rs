@@ -1,0 +1,13 @@
+// Agent with both public and private decls (FIP 2026-01-28
+// Private Methods). Desugars to two parallel dispatch loops, one
+// over `this` (public) and one over `private`; only `*this` is
+// bundled out so external callers can't invoke private methods.
+new Counter in {
+  agent Counter {
+    constructor(init) { Nil } |
+    method get() { Nil } |
+    private method incrInternal() { Nil } |
+    default(...@args) { Nil } |
+    private default(...@args) { Nil }
+  }
+}

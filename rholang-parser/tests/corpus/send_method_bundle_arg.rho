@@ -1,0 +1,7 @@
+// Regression guard: bundle+{*t} as a method-call argument. The
+// braces / dereference operator must not confuse the send_method
+// parse. This shape is what an agent body would use to hand out a
+// write-bundled view of an internal channel.
+new x, t in {
+  x!y(bundle+{*t}).
+}

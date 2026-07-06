@@ -1,0 +1,6 @@
+// Regression: plain send `x!(args)` (no method name) must still
+// parse as a `send`, not as `send_method`. The parser distinguishes
+// by what follows the `!` -- an opening paren means plain send.
+new x in {
+  x!(1, 2)
+}

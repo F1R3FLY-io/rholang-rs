@@ -1,0 +1,13 @@
+// Cell-shaped agent: constructor + two methods + default.
+// Demonstrates the canonical FIP shape; the snapshot doubles as
+// human-readable documentation of the desugaring.
+new Cell in {
+  agent Cell {
+    constructor(init) {
+      new state in { state!(*init) }
+    } |
+    method get() { Nil } |
+    method set(newV) { Nil } |
+    default(...@args) { Nil }
+  }
+}

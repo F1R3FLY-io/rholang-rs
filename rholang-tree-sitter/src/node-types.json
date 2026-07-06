@@ -118,6 +118,10 @@
         "named": true
       },
       {
+        "type": "send_method_source",
+        "named": true
+      },
+      {
         "type": "send_receive_source",
         "named": true
       },
@@ -145,6 +149,10 @@
         },
         {
           "type": "add",
+          "named": true
+        },
+        {
+          "type": "agent_block",
           "named": true
         },
         {
@@ -285,6 +293,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -319,6 +331,74 @@
     }
   },
   {
+    "type": "agent_block",
+    "named": true,
+    "fields": {
+      "decls": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "agent_decls",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
+            "type": "quote",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "agent_decl",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "constructor_decl",
+          "named": true
+        },
+        {
+          "type": "default_decl",
+          "named": true
+        },
+        {
+          "type": "method_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "agent_decls",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "agent_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "and",
     "named": true,
     "fields": {},
@@ -336,6 +416,10 @@
         },
         {
           "type": "add",
+          "named": true
+        },
+        {
+          "type": "agent_block",
           "named": true
         },
         {
@@ -476,6 +560,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -530,6 +618,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -667,6 +759,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -721,6 +817,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -858,6 +958,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -922,6 +1026,10 @@
           },
           {
             "type": "add",
+            "named": true
+          },
+          {
+            "type": "agent_block",
             "named": true
           },
           {
@@ -1062,6 +1170,10 @@
           },
           {
             "type": "send",
+            "named": true
+          },
+          {
+            "type": "send_method",
             "named": true
           },
           {
@@ -1326,6 +1438,10 @@
             "named": true
           },
           {
+            "type": "agent_block",
+            "named": true
+          },
+          {
             "type": "and",
             "named": true
           },
@@ -1463,6 +1579,10 @@
           },
           {
             "type": "send",
+            "named": true
+          },
+          {
+            "type": "send_method",
             "named": true
           },
           {
@@ -1520,6 +1640,10 @@
             "named": true
           },
           {
+            "type": "agent_block",
+            "named": true
+          },
+          {
             "type": "and",
             "named": true
           },
@@ -1657,6 +1781,10 @@
           },
           {
             "type": "send",
+            "named": true
+          },
+          {
+            "type": "send_method",
             "named": true
           },
           {
@@ -1714,6 +1842,10 @@
             "named": true
           },
           {
+            "type": "agent_block",
+            "named": true
+          },
+          {
             "type": "and",
             "named": true
           },
@@ -1851,6 +1983,10 @@
           },
           {
             "type": "send",
+            "named": true
+          },
+          {
+            "type": "send_method",
             "named": true
           },
           {
@@ -2025,6 +2161,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -2162,6 +2302,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -2216,6 +2360,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -2356,6 +2504,10 @@
           "named": true
         },
         {
+          "type": "send_method",
+          "named": true
+        },
+        {
           "type": "send_sync",
           "named": true
         },
@@ -2384,6 +2536,32 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "constructor_decl",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "formals": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "names",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -2453,6 +2631,42 @@
     }
   },
   {
+    "type": "default_decl",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "formals": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "names",
+            "named": true
+          }
+        ]
+      },
+      "private": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "private",
+            "named": false
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "diff",
     "named": true,
     "fields": {},
@@ -2470,6 +2684,10 @@
         },
         {
           "type": "add",
+          "named": true
+        },
+        {
+          "type": "agent_block",
           "named": true
         },
         {
@@ -2610,6 +2828,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -2664,6 +2886,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -2801,6 +3027,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -2855,6 +3085,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -2992,6 +3226,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -3051,6 +3289,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -3188,6 +3430,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -3277,6 +3523,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -3414,6 +3664,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -3468,6 +3722,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -3605,6 +3863,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -3711,6 +3973,10 @@
             "named": true
           },
           {
+            "type": "agent_block",
+            "named": true
+          },
+          {
             "type": "and",
             "named": true
           },
@@ -3848,6 +4114,10 @@
           },
           {
             "type": "send",
+            "named": true
+          },
+          {
+            "type": "send_method",
             "named": true
           },
           {
@@ -3905,6 +4175,10 @@
             "named": true
           },
           {
+            "type": "agent_block",
+            "named": true
+          },
+          {
             "type": "and",
             "named": true
           },
@@ -4042,6 +4316,10 @@
           },
           {
             "type": "send",
+            "named": true
+          },
+          {
+            "type": "send_method",
             "named": true
           },
           {
@@ -4099,6 +4377,10 @@
             "named": true
           },
           {
+            "type": "agent_block",
+            "named": true
+          },
+          {
             "type": "and",
             "named": true
           },
@@ -4236,6 +4518,10 @@
           },
           {
             "type": "send",
+            "named": true
+          },
+          {
+            "type": "send_method",
             "named": true
           },
           {
@@ -4321,6 +4607,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -4458,6 +4748,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -4512,6 +4806,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -4649,6 +4947,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -4711,6 +5013,10 @@
             "named": true
           },
           {
+            "type": "agent_block",
+            "named": true
+          },
+          {
             "type": "and",
             "named": true
           },
@@ -4848,6 +5154,10 @@
           },
           {
             "type": "send",
+            "named": true
+          },
+          {
+            "type": "send_method",
             "named": true
           },
           {
@@ -4905,6 +5215,10 @@
             "named": true
           },
           {
+            "type": "agent_block",
+            "named": true
+          },
+          {
             "type": "and",
             "named": true
           },
@@ -5042,6 +5356,10 @@
           },
           {
             "type": "send",
+            "named": true
+          },
+          {
+            "type": "send_method",
             "named": true
           },
           {
@@ -5115,6 +5433,10 @@
             "named": true
           },
           {
+            "type": "agent_block",
+            "named": true
+          },
+          {
             "type": "and",
             "named": true
           },
@@ -5255,6 +5577,10 @@
             "named": true
           },
           {
+            "type": "send_method",
+            "named": true
+          },
+          {
             "type": "send_sync",
             "named": true
           },
@@ -5304,6 +5630,10 @@
         },
         {
           "type": "add",
+          "named": true
+        },
+        {
+          "type": "agent_block",
           "named": true
         },
         {
@@ -5444,6 +5774,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -5554,6 +5888,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -5691,6 +6029,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -5745,6 +6087,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -5882,6 +6228,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -5936,6 +6286,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -6073,6 +6427,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -6311,6 +6669,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -6448,6 +6810,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -6502,6 +6868,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -6639,6 +7009,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -6718,6 +7092,10 @@
           },
           {
             "type": "add",
+            "named": true
+          },
+          {
+            "type": "agent_block",
             "named": true
           },
           {
@@ -6861,6 +7239,10 @@
             "named": true
           },
           {
+            "type": "send_method",
+            "named": true
+          },
+          {
             "type": "send_sync",
             "named": true
           },
@@ -6893,6 +7275,52 @@
     }
   },
   {
+    "type": "method_decl",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "formals": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "names",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "var",
+            "named": true
+          }
+        ]
+      },
+      "private": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "private",
+            "named": false
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "mod",
     "named": true,
     "fields": {},
@@ -6910,6 +7338,10 @@
         },
         {
           "type": "add",
+          "named": true
+        },
+        {
+          "type": "agent_block",
           "named": true
         },
         {
@@ -7050,6 +7482,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -7104,6 +7540,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -7241,6 +7681,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -7366,6 +7810,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -7503,6 +7951,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -7557,6 +8009,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -7694,6 +8150,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -7748,6 +8208,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -7885,6 +8349,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -7954,6 +8422,10 @@
           },
           {
             "type": "add",
+            "named": true
+          },
+          {
+            "type": "agent_block",
             "named": true
           },
           {
@@ -8097,6 +8569,10 @@
             "named": true
           },
           {
+            "type": "send_method",
+            "named": true
+          },
+          {
             "type": "send_sync",
             "named": true
           },
@@ -8146,6 +8622,10 @@
         },
         {
           "type": "add",
+          "named": true
+        },
+        {
+          "type": "agent_block",
           "named": true
         },
         {
@@ -8286,6 +8766,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -8340,6 +8824,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -8477,6 +8965,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -8531,6 +9023,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -8668,6 +9164,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -8722,6 +9222,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -8859,6 +9363,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -8924,6 +9432,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -9061,6 +9573,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -9145,6 +9661,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -9282,6 +9802,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -9336,6 +9860,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -9473,6 +10001,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -9532,6 +10064,10 @@
           },
           {
             "type": "add",
+            "named": true
+          },
+          {
+            "type": "agent_block",
             "named": true
           },
           {
@@ -9672,6 +10208,10 @@
           },
           {
             "type": "send",
+            "named": true
+          },
+          {
+            "type": "send_method",
             "named": true
           },
           {
@@ -9833,6 +10373,96 @@
     }
   },
   {
+    "type": "send_method",
+    "named": true,
+    "fields": {
+      "channel": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
+            "type": "quote",
+            "named": true
+          }
+        ]
+      },
+      "cont": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "sync_send_cont",
+            "named": true
+          }
+        ]
+      },
+      "inputs": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "messages",
+            "named": true
+          }
+        ]
+      },
+      "method": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "var",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "send_method_source",
+    "named": true,
+    "fields": {
+      "inputs": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "inputs",
+            "named": true
+          }
+        ]
+      },
+      "method": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "var",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "_proc_var",
+          "named": true
+        },
+        {
+          "type": "quote",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "send_receive_source",
     "named": true,
     "fields": {
@@ -9861,6 +10491,11 @@
         }
       ]
     }
+  },
+  {
+    "type": "send_single",
+    "named": true,
+    "fields": {}
   },
   {
     "type": "send_sync",
@@ -9931,6 +10566,10 @@
         },
         {
           "type": "add",
+          "named": true
+        },
+        {
+          "type": "agent_block",
           "named": true
         },
         {
@@ -10071,6 +10710,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -10196,6 +10839,10 @@
             "named": true
           },
           {
+            "type": "agent_block",
+            "named": true
+          },
+          {
             "type": "and",
             "named": true
           },
@@ -10333,6 +10980,10 @@
           },
           {
             "type": "send",
+            "named": true
+          },
+          {
+            "type": "send_method",
             "named": true
           },
           {
@@ -10396,6 +11047,10 @@
             "named": true
           },
           {
+            "type": "agent_block",
+            "named": true
+          },
+          {
             "type": "and",
             "named": true
           },
@@ -10533,6 +11188,10 @@
           },
           {
             "type": "send",
+            "named": true
+          },
+          {
+            "type": "send_method",
             "named": true
           },
           {
@@ -10623,6 +11282,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -10760,6 +11423,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -10837,6 +11504,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -10974,6 +11645,10 @@
         },
         {
           "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
           "named": true
         },
         {
@@ -11111,6 +11786,10 @@
           "named": true
         },
         {
+          "type": "agent_block",
+          "named": true
+        },
+        {
           "type": "and",
           "named": true
         },
@@ -11251,6 +11930,10 @@
           "named": true
         },
         {
+          "type": "send_method",
+          "named": true
+        },
+        {
           "type": "send_sync",
           "named": true
         },
@@ -11316,6 +11999,10 @@
     "type": "var_ref_kind",
     "named": true,
     "fields": {}
+  },
+  {
+    "type": "!",
+    "named": false
   },
   {
     "type": "!=",
@@ -11502,6 +12189,10 @@
     "named": false
   },
   {
+    "type": "agent",
+    "named": false
+  },
+  {
     "type": "and",
     "named": false
   },
@@ -11530,7 +12221,15 @@
     "named": true
   },
   {
+    "type": "constructor",
+    "named": false
+  },
+  {
     "type": "contract",
+    "named": false
+  },
+  {
+    "type": "default",
     "named": false
   },
   {
@@ -11578,6 +12277,10 @@
     "named": false
   },
   {
+    "type": "method",
+    "named": false
+  },
+  {
     "type": "new",
     "named": false
   },
@@ -11594,15 +12297,15 @@
     "named": false
   },
   {
+    "type": "private",
+    "named": false
+  },
+  {
     "type": "select",
     "named": false
   },
   {
     "type": "send_multiple",
-    "named": true
-  },
-  {
-    "type": "send_single",
     "named": true
   },
   {

@@ -1,0 +1,7 @@
+// Regression guard: `<` and `>` inside method-call args must parse
+// as comparisons (lt/gt), not collide with the operator-shape lookups
+// the parser does to dispatch send_method. The arg list here is
+// `(a < b, c > d)` -- two comparison expressions, comma-separated.
+new x, a, b, c, d in {
+  x!y(a < b, c > d).
+}

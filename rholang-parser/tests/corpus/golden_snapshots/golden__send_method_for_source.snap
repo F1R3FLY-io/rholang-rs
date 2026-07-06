@@ -1,0 +1,131 @@
+---
+source: rholang-parser/tests/golden.rs
+assertion_line: 23
+expression: result
+---
+Good(
+    [
+        AnnProc {
+            proc: New {
+                decls: [
+                    NameDecl {
+                        id: Id {
+                            name: "inst",
+                            pos: SourcePos {
+                                line: 1,
+                                col: 5,
+                            },
+                        },
+                        uri: None,
+                    },
+                ],
+                proc: AnnProc {
+                    proc: ForComprehension {
+                        receipts: [
+                            Receipt {
+                                binds: [
+                                    Linear {
+                                        lhs: Names {
+                                            names: [
+                                                Quote(
+                                                    AnnProc {
+                                                        proc: ProcVar(
+                                                            Id(
+                                                                Id {
+                                                                    name: "val",
+                                                                    pos: SourcePos {
+                                                                        line: 2,
+                                                                        col: 9,
+                                                                    },
+                                                                },
+                                                            ),
+                                                        ),
+                                                        span: SourceSpan {
+                                                            start: SourcePos {
+                                                                line: 2,
+                                                                col: 9,
+                                                            },
+                                                            end: SourcePos {
+                                                                line: 2,
+                                                                col: 12,
+                                                            },
+                                                        },
+                                                    },
+                                                ),
+                                            ],
+                                            remainder: None,
+                                        },
+                                        rhs: SendReceive {
+                                            name: NameVar(
+                                                Id(
+                                                    Id {
+                                                        name: "inst",
+                                                        pos: SourcePos {
+                                                            line: 2,
+                                                            col: 16,
+                                                        },
+                                                    },
+                                                ),
+                                            ),
+                                            inputs: [
+                                                AnnProc {
+                                                    proc: StringLiteral(
+                                                        "get",
+                                                    ),
+                                                    span: SourceSpan {
+                                                        start: SourcePos {
+                                                            line: 2,
+                                                            col: 21,
+                                                        },
+                                                        end: SourcePos {
+                                                            line: 2,
+                                                            col: 24,
+                                                        },
+                                                    },
+                                                },
+                                            ],
+                                        },
+                                    },
+                                ],
+                                guard: None,
+                            },
+                        ],
+                        proc: AnnProc {
+                            proc: Nil,
+                            span: SourceSpan {
+                                start: SourcePos {
+                                    line: 3,
+                                    col: 5,
+                                },
+                                end: SourcePos {
+                                    line: 3,
+                                    col: 8,
+                                },
+                            },
+                        },
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 2,
+                            col: 3,
+                        },
+                        end: SourcePos {
+                            line: 4,
+                            col: 4,
+                        },
+                    },
+                },
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 1,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 5,
+                    col: 2,
+                },
+            },
+        },
+    ],
+)

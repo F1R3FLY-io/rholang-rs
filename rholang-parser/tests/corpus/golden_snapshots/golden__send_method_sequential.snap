@@ -1,0 +1,107 @@
+---
+source: rholang-parser/tests/golden.rs
+assertion_line: 23
+expression: result
+---
+Good(
+    [
+        AnnProc {
+            proc: New {
+                decls: [
+                    NameDecl {
+                        id: Id {
+                            name: "x",
+                            pos: SourcePos {
+                                line: 1,
+                                col: 5,
+                            },
+                        },
+                        uri: None,
+                    },
+                ],
+                proc: AnnProc {
+                    proc: SendSync {
+                        channel: NameVar(
+                            Id(
+                                Id {
+                                    name: "x",
+                                    pos: SourcePos {
+                                        line: 2,
+                                        col: 3,
+                                    },
+                                },
+                            ),
+                        ),
+                        inputs: [
+                            AnnProc {
+                                proc: StringLiteral(
+                                    "set",
+                                ),
+                                span: SourceSpan {
+                                    start: SourcePos {
+                                        line: 2,
+                                        col: 5,
+                                    },
+                                    end: SourcePos {
+                                        line: 2,
+                                        col: 8,
+                                    },
+                                },
+                            },
+                            AnnProc {
+                                proc: LongLiteral(
+                                    42,
+                                ),
+                                span: SourceSpan {
+                                    start: SourcePos {
+                                        line: 2,
+                                        col: 9,
+                                    },
+                                    end: SourcePos {
+                                        line: 2,
+                                        col: 11,
+                                    },
+                                },
+                            },
+                        ],
+                        cont: NonEmpty(
+                            AnnProc {
+                                proc: Nil,
+                                span: SourceSpan {
+                                    start: SourcePos {
+                                        line: 2,
+                                        col: 14,
+                                    },
+                                    end: SourcePos {
+                                        line: 2,
+                                        col: 17,
+                                    },
+                                },
+                            },
+                        ),
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 2,
+                            col: 3,
+                        },
+                        end: SourcePos {
+                            line: 2,
+                            col: 17,
+                        },
+                    },
+                },
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 1,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 3,
+                    col: 2,
+                },
+            },
+        },
+    ],
+)

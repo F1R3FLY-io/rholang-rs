@@ -1,0 +1,26 @@
+// Hand-written equivalent of agent_with_private.rho. Two parallel
+// for-comprehensions: one over `this` (public dispatch) and one
+// over `private` (private dispatch). The visitor builds the par
+// chain as `priv | pub | Pc | reply` (left-associated); Rholang's
+// `|` is left-associative, so the source written here in the same
+// left-to-right order matches structurally.
+new Counter in {
+  for (__r, init <= Counter) {
+    new this, private in {
+      for (...@args <= private) {
+        match args {
+          [*return, "incrInternal"] => Nil
+          _ => Nil
+        }
+      } |
+      for (...@args <= this) {
+        match args {
+          [*return, "get"] => Nil
+          _ => Nil
+        }
+      } |
+      Nil |
+      __r!(bundle+{*this})
+    }
+  }
+}

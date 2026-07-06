@@ -1,0 +1,7 @@
+// Arity-0 method call: x!y(). Snapshot should show SendSync with
+// exactly one input (the synthesized "y" StringLiteral) and Empty
+// continuation. Equivalence with x!?("y"). is exercised in
+// tests/desugar_equivalence.rs (case::terminator_no_args).
+new x in {
+  x!y().
+}

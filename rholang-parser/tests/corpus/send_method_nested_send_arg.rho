@@ -1,0 +1,7 @@
+// Nested send as method-call argument: the inner `a!(b)` is a
+// plain send (no continuation needed). The desugared shape should
+// have the inner Send unchanged and the outer SendSync prepending
+// the method name "y".
+new x, a, b in {
+  x!y(a!(b)).
+}

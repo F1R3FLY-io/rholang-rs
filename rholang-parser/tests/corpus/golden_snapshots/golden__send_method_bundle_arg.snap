@@ -1,0 +1,128 @@
+---
+source: rholang-parser/tests/golden.rs
+assertion_line: 23
+expression: result
+---
+Good(
+    [
+        AnnProc {
+            proc: New {
+                decls: [
+                    NameDecl {
+                        id: Id {
+                            name: "x",
+                            pos: SourcePos {
+                                line: 5,
+                                col: 5,
+                            },
+                        },
+                        uri: None,
+                    },
+                    NameDecl {
+                        id: Id {
+                            name: "t",
+                            pos: SourcePos {
+                                line: 5,
+                                col: 8,
+                            },
+                        },
+                        uri: None,
+                    },
+                ],
+                proc: AnnProc {
+                    proc: SendSync {
+                        channel: NameVar(
+                            Id(
+                                Id {
+                                    name: "x",
+                                    pos: SourcePos {
+                                        line: 6,
+                                        col: 3,
+                                    },
+                                },
+                            ),
+                        ),
+                        inputs: [
+                            AnnProc {
+                                proc: StringLiteral(
+                                    "y",
+                                ),
+                                span: SourceSpan {
+                                    start: SourcePos {
+                                        line: 6,
+                                        col: 5,
+                                    },
+                                    end: SourcePos {
+                                        line: 6,
+                                        col: 6,
+                                    },
+                                },
+                            },
+                            AnnProc {
+                                proc: Bundle {
+                                    bundle_type: BundleWrite,
+                                    proc: AnnProc {
+                                        proc: Eval {
+                                            name: NameVar(
+                                                Id(
+                                                    Id {
+                                                        name: "t",
+                                                        pos: SourcePos {
+                                                            line: 6,
+                                                            col: 16,
+                                                        },
+                                                    },
+                                                ),
+                                            ),
+                                        },
+                                        span: SourceSpan {
+                                            start: SourcePos {
+                                                line: 6,
+                                                col: 15,
+                                            },
+                                            end: SourcePos {
+                                                line: 6,
+                                                col: 17,
+                                            },
+                                        },
+                                    },
+                                },
+                                span: SourceSpan {
+                                    start: SourcePos {
+                                        line: 6,
+                                        col: 7,
+                                    },
+                                    end: SourcePos {
+                                        line: 6,
+                                        col: 18,
+                                    },
+                                },
+                            },
+                        ],
+                        cont: Empty,
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 6,
+                            col: 3,
+                        },
+                        end: SourcePos {
+                            line: 6,
+                            col: 20,
+                        },
+                    },
+                },
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 5,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 7,
+                    col: 2,
+                },
+            },
+        },
+    ],
+)

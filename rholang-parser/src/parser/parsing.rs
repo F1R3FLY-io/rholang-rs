@@ -9,19 +9,53 @@ use std::slice::Iter as SliceIter;
 use validated::Validated;
 
 use crate::SourcePos;
-use crate::ast::{Name, Var};
+use crate::ast::Name;
 use crate::parser::errors::{self, ParsingFailure};
 use crate::{
     SourceSpan,
     ast::{
         AnnProc, BinaryExpOp, Bind, BundleType, Id, LetBinding, NameDecl, Names, Proc, SendType,
-        Signature, SimpleType, Source, TokenStack, UnaryExpOp, VarRefKind,
+        Signature, SimpleType, Source, TokenStack, UnaryExpOp, Var, VarRefKind,
     },
     parser::{
         ast_builder::ASTBuilder,
         errors::{AnnParsingError, ParsingError},
     },
 };
+
+/// Per-decl metadata collected while walking an `agent_block`'s
+/// declarations. Carried in `K::ConsumeAgentBlock` so the consume
+/// step can route slice elements (body + formals AnnProcs on
+/// `proc_stack`) to the right slot of the desugaring.
+#[derive(Debug, Clone)]
+pub(super) enum AgentDeclDesc<'ast> {
+    Constructor {
+        arity: usize,
+        has_cont: bool,
+    },
+    Method {
+        name: Id<'ast>,
+        arity: usize,
+        has_cont: bool,
+        is_private: bool,
+    },
+    Default {
+        arity: usize,
+        has_cont: bool,
+        is_private: bool,
+    },
+}
+
+impl<'ast> AgentDeclDesc<'ast> {
+    fn slice_len(&self) -> usize {
+        // body + formals
+        match self {
+            AgentDeclDesc::Constructor { arity, .. }
+            | AgentDeclDesc::Method { arity, .. }
+            | AgentDeclDesc::Default { arity, .. } => 1 + arity,
+        }
+    }
+}
 
 pub(super) fn parse_to_tree(source: &str) -> tree_sitter::Tree {
     let mut parser = tree_sitter::Parser::new();
@@ -516,6 +550,152 @@ pub(super) fn node_to_ast<'ast>(
                     continue 'parse;
                 }
 
+                // Agent block sugar (FIP 2025-08-20 Agents + 2026-01-28
+                // Private Methods). The visitor classifies each
+                // declaration, validates FIP constraints, and queues
+                // body/formals evaluation. The Consume step (see
+                // build_agent_desugaring) assembles the desugared
+                // for + new + match + dispatch tree at parse time, so
+                // no AST variant is needed.
+                kind!("agent_block") => {
+                    let name_node = get_field(&node, field!("name"));
+                    let decls_node = get_field(&node, field!("decls"));
+
+                    struct DeclEntry<'tree> {
+                        body_node: tree_sitter::Node<'tree>,
+                        formals_node: Option<tree_sitter::Node<'tree>>,
+                    }
+                    let decl_count = decls_node.named_child_count();
+                    let mut decls_desc: SmallVec<[AgentDeclDesc<'_>; 4]> =
+                        SmallVec::with_capacity(decl_count);
+                    let mut decl_entries: SmallVec<[DeclEntry<'_>; 4]> =
+                        SmallVec::with_capacity(decl_count);
+
+                    let mut ctor_pos: Option<SourcePos> = None;
+                    let mut pub_default_pos: Option<SourcePos> = None;
+                    let mut priv_default_pos: Option<SourcePos> = None;
+                    let mut has_priv_method = false;
+
+                    for decl_node in decls_node.named_children(&mut decls_node.walk()) {
+                        let inner = get_first_child(&decl_node);
+                        let inner_pos: SourcePos = inner.start_position().into();
+                        let body_node = get_field(&inner, field!("body"));
+                        let formals_node = inner.child_by_field_id(field!("formals"));
+                        let (arity, has_cont) = match formals_node {
+                            Some(n) => (
+                                n.named_child_count(),
+                                n.child_by_field_id(field!("cont")).is_some(),
+                            ),
+                            None => (0, false),
+                        };
+                        let is_private = inner.child_by_field_id(field!("private")).is_some();
+
+                        match inner.kind_id() {
+                            kind!("constructor_decl") => {
+                                if let Some(first) = ctor_pos {
+                                    errors.push(AnnParsingError::new(
+                                        ParsingError::DuplicateAgentDecl {
+                                            what: "constructor",
+                                            first,
+                                            second: inner_pos,
+                                        },
+                                        &inner,
+                                    ));
+                                } else {
+                                    ctor_pos = Some(inner_pos);
+                                }
+                                decls_desc.push(AgentDeclDesc::Constructor { arity, has_cont });
+                            }
+                            kind!("method_decl") => {
+                                let name_node = get_field(&inner, field!("name"));
+                                let method_name = Id {
+                                    name: get_node_value(&name_node, source),
+                                    pos: name_node.start_position().into(),
+                                };
+                                if is_private {
+                                    has_priv_method = true;
+                                }
+                                decls_desc.push(AgentDeclDesc::Method {
+                                    name: method_name,
+                                    arity,
+                                    has_cont,
+                                    is_private,
+                                });
+                            }
+                            kind!("default_decl") => {
+                                let (slot, what) = if is_private {
+                                    (&mut priv_default_pos, "private default")
+                                } else {
+                                    (&mut pub_default_pos, "default")
+                                };
+                                if let Some(first) = *slot {
+                                    errors.push(AnnParsingError::new(
+                                        ParsingError::DuplicateAgentDecl {
+                                            what,
+                                            first,
+                                            second: inner_pos,
+                                        },
+                                        &inner,
+                                    ));
+                                } else {
+                                    *slot = Some(inner_pos);
+                                }
+                                decls_desc.push(AgentDeclDesc::Default {
+                                    arity,
+                                    has_cont,
+                                    is_private,
+                                });
+                            }
+                            _ => unreachable!("agent_decl is one of three kinds"),
+                        }
+                        decl_entries.push(DeclEntry {
+                            body_node,
+                            formals_node,
+                        });
+                    }
+
+                    // Constraint violations are reported via `errors` --
+                    // the loop's `continue 'parse` resets the local
+                    // `bad` flag, so setting it here would be dead.
+                    // The visitor still queues all decl bodies for
+                    // evaluation; consume produces a best-effort tree
+                    // (with a Nil ctor fallback) but the final
+                    // node_to_ast returns Validated::fail because of
+                    // the errors Vec.
+                    if ctor_pos.is_none() {
+                        errors.push(AnnParsingError::new(
+                            ParsingError::MissingAgentDecl {
+                                what: "constructor",
+                            },
+                            &node,
+                        ));
+                    }
+                    if pub_default_pos.is_none() {
+                        errors.push(AnnParsingError::new(
+                            ParsingError::MissingAgentDecl { what: "default" },
+                            &node,
+                        ));
+                    }
+                    if has_priv_method && priv_default_pos.is_none() {
+                        errors.push(AnnParsingError::new(
+                            ParsingError::MissingAgentDecl {
+                                what: "private default",
+                            },
+                            &node,
+                        ));
+                    }
+
+                    cont_stack.push(K::ConsumeAgentBlock { span, decls_desc });
+                    for entry in decl_entries.into_iter().rev() {
+                        if let Some(formals_node) = entry.formals_node {
+                            cont_stack.push(K::EvalList(formals_node.walk()));
+                        }
+                        cont_stack.push(K::EvalDelayed(entry.body_node));
+                    }
+                    node = name_node;
+                    continue 'parse;
+                }
+
                 kind!("ifElse") => {
                     let condition_node = get_field(&node, field!("condition"));
                     let if_true_node = get_field(&node, field!("consequence"));
@@ -657,8 +837,15 @@ pub(super) fn node_to_ast<'ast>(
                                                 arity: inputs_node.named_child_count(),
                                             }
                                         }
+                                        kind!("send_method_source") => {
+                                            let inputs_node =
+                                                get_field(&source_node, field!("inputs"));
+                                            SourceDesc::SM {
+                                                arity: inputs_node.named_child_count(),
+                                            }
+                                        }
                                         _ => unreachable!(
-                                            "Sources in for-comprehensions have three kinds: simple, receive_send and send_receive"
+                                            "Sources in for-comprehensions have four kinds: simple, receive_send, send_receive, and send_method"
                                         ),
                                     };
 
@@ -689,6 +876,26 @@ pub(super) fn node_to_ast<'ast>(
                                     let inputs = get_field(&source_node, field!("inputs"));
                                     temp_cont_stack
                                         .push(K::EvalDelayed(get_first_child(&source_node)));
+                                    temp_cont_stack.push(K::EvalList(inputs.walk()));
+                                }
+                                BindDesc::Linear {
+                                    source: SourceDesc::SM { .. },
+                                    ..
+                                } => {
+                                    // proc_stack target after eval:
+                                    //   [channel, method_lit, input0, input1, ...]
+                                    // Push order (becomes reversed below):
+                                    //   channel last, then method_lit, then inputs.
+                                    let method_node = get_field(&source_node, field!("method"));
+                                    let inputs = get_field(&source_node, field!("inputs"));
+                                    let method_name = get_node_value(&method_node, source);
+                                    let method_lit = AnnProc {
+                                        proc: ast_builder.alloc_string_literal(method_name),
+                                        span: method_node.range().into(),
+                                    };
+                                    temp_cont_stack
+                                        .push(K::EvalDelayed(get_first_child(&source_node)));
+                                    temp_cont_stack.push(K::PushAnnProc(method_lit));
                                     temp_cont_stack.push(K::EvalList(inputs.walk()));
                                 }
                                 BindDesc::Linear { .. } => {
@@ -894,6 +1101,56 @@ pub(super) fn node_to_ast<'ast>(
                     continue 'parse;
                 }
 
+                // `x!y(args)<cont>` desugars to `x!?("y", args)<cont>`
+                // at parse time -- the AST carries a Proc::SendSync
+                // with the method name prepended as a StringLiteral.
+                // Mirrors what send_method_source does for the for-
+                // source position; no AST variant for either form.
+                kind!("send_method") => {
+                    let name_node = get_field(&node, field!("channel"));
+                    let method_node = get_field(&node, field!("method"));
+                    let messages_node = get_field(&node, field!("inputs"));
+                    let original_arity = messages_node.named_child_count();
+                    // +1 for the synthesized method-name StringLiteral
+                    let synthesized_arity = original_arity + 1;
+                    let sync_send_cont_node = get_field(&node, field!("cont"));
+                    let choice_node = get_first_child(&sync_send_cont_node);
+                    let method_name = get_node_value(&method_node, source);
+                    let method_lit = AnnProc {
+                        proc: ast_builder.alloc_string_literal(method_name),
+                        span: method_node.range().into(),
+                    };
+                    match choice_node.kind_id() {
+                        kind!("empty_cont") => {
+                            cont_stack.push(K::ConsumeSendSync {
+                                span,
+                                arity: synthesized_arity,
+                            });
+                        }
+                        kind!("non_empty_cont") => {
+                            let cont_node = get_first_child(&choice_node);
+                            cont_stack.push(K::ConsumeSendSyncWithCont {
+                                span,
+                                arity: synthesized_arity,
+                            });
+                            cont_stack.push(K::EvalDelayed(cont_node));
+                        }
+                        _ => unreachable!(
+                            "Continuations of send_method are either empty or non-empty"
+                        ),
+                    };
+                    // proc_stack target: [channel, method_lit, input0, ...]
+                    // cont_stack is LIFO; top runs first. Execution order:
+                    //   1. eval channel (immediate via node = name_node)
+                    //   2. PushAnnProc(method_lit) -- the prepended literal
+                    //   3. EvalList(inputs) -- one Continue per input
+                    //   4. ConsumeSendSync -- (pushed above the match arm)
+                    cont_stack.push(K::EvalList(messages_node.walk()));
+                    cont_stack.push(K::PushAnnProc(method_lit));
+                    node = name_node;
+                    continue 'parse;
+                }
+
                 kind!("var_ref") => {
                     let (var_ref_kind_node, var_node) = get_left_and_right(&node);
 
@@ -1040,6 +1297,11 @@ fn apply_cont<'tree, 'ast>(
                     return Step::Continue(node);
                 }
                 cont_stack.pop();
+            }
+            K::PushAnnProc(ann) => {
+                let ann = *ann;
+                cont_stack.pop();
+                proc_stack.push(ann.proc, ann.span);
             }
             _ => {
                 //consumes
@@ -1275,6 +1537,13 @@ fn apply_cont<'tree, 'ast>(
                                 },
                             )
                         }
+                        K::ConsumeAgentBlock { span, decls_desc } => {
+                            let total: usize =
+                                1 + decls_desc.iter().map(|d| d.slice_len()).sum::<usize>();
+                            proc_stack.replace_top_slice_with_mask(total, |slice, mask| {
+                                build_agent_desugaring(ast_builder, &decls_desc, slice, mask, span)
+                            })
+                        }
                         K::ConsumeSet {
                             arity,
                             has_remainder,
@@ -1417,6 +1686,10 @@ enum K<'tree, 'ast> {
         span: SourceSpan,
         arity: usize,
     },
+    ConsumeAgentBlock {
+        span: SourceSpan,
+        decls_desc: SmallVec<[AgentDeclDesc<'ast>; 4]>,
+    },
     ConsumeSet {
         arity: usize,
         has_remainder: bool,
@@ -1432,6 +1705,11 @@ enum K<'tree, 'ast> {
     },
     EvalDelayed(tree_sitter::Node<'tree>),
     EvalList(tree_sitter::TreeCursor<'tree>),
+    // Push an already-constructed AnnProc directly onto proc_stack
+    // without a tree-sitter parse step. Used for parse-time
+    // synthesized literals (e.g., the method-name StringLiteral
+    // injected by send_method_source).
+    PushAnnProc(AnnProc<'ast>),
 }
 
 impl Debug for K<'_, '_> {
@@ -1561,6 +1839,11 @@ impl Debug for K<'_, '_> {
                 .field("arity", arity)
                 .field("span", span)
                 .finish(),
+            Self::ConsumeAgentBlock { span, decls_desc } => f
+                .debug_struct("ConsumeAgentBlock")
+                .field("decls", decls_desc)
+                .field("span", span)
+                .finish(),
             Self::ConsumeSet { arity, span, .. } => f
                 .debug_struct("ConsumeSet")
                 .field("arity", arity)
@@ -1581,6 +1864,7 @@ impl Debug for K<'_, '_> {
                 .debug_struct("EvalList")
                 .field("at", &arg0.node())
                 .finish(),
+            Self::PushAnnProc(arg0) => f.debug_tuple("PushAnnProc").field(arg0).finish(),
         }
     }
 }
@@ -1866,6 +2150,12 @@ enum SourceDesc {
     Simple,
     RS,
     SR { arity: usize },
+    // send_method_source: `name '!' method '(' inputs ')'`. Rewritten
+    // at to_bind time into Source::SendReceive with a StringLiteral
+    // method-name AnnProc prepended. The proc_stack slice carries the
+    // pre-built StringLiteral AnnProc at index 1 (between the channel
+    // and the actual inputs).
+    SM { arity: usize },
 }
 
 impl SourceDesc {
@@ -1873,6 +2163,8 @@ impl SourceDesc {
         match self {
             SourceDesc::Simple | SourceDesc::RS => 1,
             SourceDesc::SR { arity } => *arity + 1,
+            // 1 (channel) + 1 (method-literal AnnProc) + arity (real inputs)
+            SourceDesc::SM { arity } => *arity + 2,
         }
     }
 }
@@ -1948,6 +2240,16 @@ impl BindDesc {
                                 inputs: inputs.to_smallvec(),
                             }
                         }
+                        // send_method_source -> Source::SendReceive with
+                        // method-name AnnProc already at rest[0] and
+                        // actual inputs at rest[1..arity+1].
+                        SourceDesc::SM { arity } => {
+                            let inputs = &rest[..arity + 1];
+                            Source::SendReceive {
+                                name: channel_name,
+                                inputs: inputs.to_smallvec(),
+                            }
+                        }
                     };
 
                     let lhs_start = source.len() - 1;
@@ -1978,6 +2280,16 @@ impl BindDesc {
                         SourceDesc::RS => Source::ReceiveSend { name: channel_name },
                         SourceDesc::SR { arity } => {
                             let inputs = &rest[..arity];
+                            Source::SendReceive {
+                                name: channel_name,
+                                inputs: inputs.to_smallvec(),
+                            }
+                        }
+                        // send_method_source -> Source::SendReceive with
+                        // method-name AnnProc already at rest[0] and
+                        // actual inputs at rest[1..arity+1].
+                        SourceDesc::SM { arity } => {
+                            let inputs = &rest[..arity + 1];
                             Source::SendReceive {
                                 name: channel_name,
                                 inputs: inputs.to_smallvec(),
@@ -2335,6 +2647,333 @@ fn into_names<'slice, 'a>(
     with_remainder: bool,
 ) -> Names<'a> {
     Names::from_iter(NamesIter::new(procs, mask), with_remainder).unwrap()
+}
+
+/// Assembles the agent-block desugaring tree at parse time, per
+/// `Agents.md:19-35` + `Private-Methods.md:50-88`. The slice carries
+/// the agent name at `slice[0]` followed by per-decl (body, formals)
+/// AnnProcs in source order. The decl metadata in `decls_desc` tells
+/// us how to route each slice element.
+///
+/// Output shape (`P` is `ctor_body`):
+///
+/// ```text
+/// for (r, <ctor_formals> <= name) {
+///   new this, private in {
+///     for (...@args <= this)    { match args { /* pub  */ } } |
+///     for (...@args <= private) { match args { /* priv */ } } |  (only if private decls)
+///     P |
+///     r!(bundle+{*this})
+///   }
+/// }
+/// ```
+///
+/// Both `for`-comprehensions use `Bind::Repeated` (the persistent
+/// `<=` operator) so the constructor channel and dispatch loops
+/// stay live in the rspace. `this`, `private`, `return`, `args` are
+/// literal names visible to user method bodies; `r` is a literal
+/// reserved name (`__r`) -- the FIP freshness requirement is the
+/// user's responsibility (matches the existing approach).
+fn build_agent_desugaring<'ast>(
+    builder: &'ast ASTBuilder<'ast>,
+    decls_desc: &[AgentDeclDesc<'ast>],
+    slice: &[AnnProc<'ast>],
+    mask: &BitSlice,
+    span: SourceSpan,
+) -> AnnProc<'ast> {
+    // Walk the slice in source order, partitioning into ctor / pub /
+    // priv slots.
+    let name = into_name(slice[0], mask[0]);
+    let mut idx: usize = 1;
+
+    let mut ctor: Option<ParsedCtor<'ast>> = None;
+    let mut pub_methods: Vec<ParsedMethodLike<'ast>> = Vec::new();
+    let mut priv_methods: Vec<ParsedMethodLike<'ast>> = Vec::new();
+    let mut pub_default: Option<ParsedDefaultLike<'ast>> = None;
+    let mut priv_default: Option<ParsedDefaultLike<'ast>> = None;
+
+    for desc in decls_desc {
+        let body = slice[idx];
+        idx += 1;
+        let (formals_opt, arity) = match desc {
+            AgentDeclDesc::Constructor { arity, has_cont }
+            | AgentDeclDesc::Method {
+                arity, has_cont, ..
+            }
+            | AgentDeclDesc::Default {
+                arity, has_cont, ..
+            } => {
+                let opt = if *arity > 0 {
+                    let f = into_names(&slice[idx..idx + arity], &mask[idx..idx + arity], *has_cont);
+                    Some(f)
+                } else {
+                    None
+                };
+                (opt, *arity)
+            }
+        };
+        idx += arity;
+
+        match desc {
+            AgentDeclDesc::Constructor { .. } => {
+                // The visitor pushed a duplicate error already; just
+                // keep the first one for desugaring purposes.
+                if ctor.is_none() {
+                    ctor = Some(ParsedCtor {
+                        formals: formals_opt,
+                        body,
+                    });
+                }
+            }
+            AgentDeclDesc::Method {
+                name: method_name,
+                is_private,
+                ..
+            } => {
+                let entry = ParsedMethodLike {
+                    name: *method_name,
+                    formals: formals_opt,
+                    body,
+                };
+                if *is_private {
+                    priv_methods.push(entry);
+                } else {
+                    pub_methods.push(entry);
+                }
+            }
+            AgentDeclDesc::Default { is_private, .. } => {
+                let slot = if *is_private {
+                    &mut priv_default
+                } else {
+                    &mut pub_default
+                };
+                if slot.is_none() {
+                    *slot = Some(ParsedDefaultLike { body });
+                }
+            }
+        }
+    }
+
+    // If the constructor is missing the visitor pushed an error; we
+    // synthesize a Nil body so consume can still emit a tree-shaped
+    // AnnProc rather than panic. The caller (node_to_ast) discards the
+    // result on `bad`-mode anyway.
+    let ctor = ctor.unwrap_or(ParsedCtor {
+        formals: None,
+        body: AnnProc {
+            proc: builder.const_nil(),
+            span,
+        },
+    });
+
+    let has_priv_dispatch = !priv_methods.is_empty() || priv_default.is_some();
+
+    // Fresh-name conventions. See the doc comment above.
+    let r_id = id_at(builder.alloc_str("__r"), span.start);
+    let args_id = id_at(builder.alloc_str("args"), span.start);
+    let this_id = id_at(builder.alloc_str("this"), span.start);
+    let private_id = id_at(builder.alloc_str("private"), span.start);
+    let return_id = id_at(builder.alloc_str("return"), span.start);
+
+    let r_name = Name::NameVar(Var::Id(r_id));
+    let this_name = Name::NameVar(Var::Id(this_id));
+    let private_name = Name::NameVar(Var::Id(private_id));
+
+    let pub_dispatch = build_dispatch(
+        builder,
+        &pub_methods,
+        pub_default.as_ref(),
+        return_id,
+        args_id,
+        this_name,
+        span,
+    );
+
+    let priv_dispatch = if has_priv_dispatch {
+        Some(build_dispatch(
+            builder,
+            &priv_methods,
+            priv_default.as_ref(),
+            return_id,
+            args_id,
+            private_name,
+            span,
+        ))
+    } else {
+        None
+    };
+
+    // r!(bundle+{*this})
+    let bundle_eval_this = ann(builder.alloc_eval(this_name), span);
+    let bundle_write = ann(
+        builder.alloc_bundle(BundleType::BundleWrite, bundle_eval_this),
+        span,
+    );
+    let reply_send = ann(
+        builder.alloc_send(SendType::Single, r_name, &[bundle_write]),
+        span,
+    );
+
+    // Par chain: [priv_dispatch |] pub_dispatch | Pc | reply_send
+    let mut combined = pub_dispatch;
+    if let Some(pd) = priv_dispatch {
+        combined = ann(builder.alloc_par(pd, combined), span);
+    }
+    combined = ann(builder.alloc_par(combined, ctor.body), span);
+    combined = ann(builder.alloc_par(combined, reply_send), span);
+
+    // new this, private in { combined }
+    let new_decls = vec![
+        NameDecl {
+            id: this_id,
+            uri: None,
+        },
+        NameDecl {
+            id: private_id,
+            uri: None,
+        },
+    ];
+    let new_this_in = ann(builder.alloc_new(combined, new_decls), span);
+
+    // for(r, <ctor_formals> <= name) { new_this_in }
+    let outer_lhs = {
+        let mut names: SmallVec<[Name<'ast>; 1]> = SmallVec::new();
+        names.push(r_name);
+        let mut remainder: Option<Var<'ast>> = None;
+        if let Some(ctor_formals) = ctor.formals {
+            for n in &ctor_formals.names {
+                names.push(*n);
+            }
+            remainder = ctor_formals.remainder;
+        }
+        Names { names, remainder }
+    };
+    let outer_bind = Bind::Repeated {
+        lhs: outer_lhs,
+        rhs: name,
+    };
+    ann(
+        builder.alloc_for([[outer_bind]], new_this_in),
+        span,
+    )
+}
+
+/// Build one dispatch loop:
+///
+/// ```text
+/// for (...@args_id <= channel) {
+///   match args_id {
+///     [*return, "methodName", <formals>] => method_body
+///     ...
+///     _ => default_body (or Nil if missing)
+///   }
+/// }
+/// ```
+///
+/// `methods` and `default` are assumed to be of the same visibility
+/// (the caller partitioned them).
+fn build_dispatch<'ast>(
+    builder: &'ast ASTBuilder<'ast>,
+    methods: &[ParsedMethodLike<'ast>],
+    default: Option<&ParsedDefaultLike<'ast>>,
+    return_id: Id<'ast>,
+    args_id: Id<'ast>,
+    channel: Name<'ast>,
+    span: SourceSpan,
+) -> AnnProc<'ast> {
+    let mut cases: Vec<AnnProc<'ast>> = Vec::with_capacity(2 * (methods.len() + 1));
+
+    for m in methods {
+        let mut elements: Vec<AnnProc<'ast>> = Vec::new();
+        // *return
+        elements.push(ann(
+            builder.alloc_eval(Name::NameVar(Var::Id(return_id))),
+            span,
+        ));
+        // "methodName"
+        elements.push(ann(builder.alloc_string_literal(m.name.name), span));
+        // formals as proc-patterns
+        let remainder = if let Some(formals) = &m.formals {
+            for n in &formals.names {
+                elements.push(name_to_proc_pattern(builder, n, span));
+            }
+            formals.remainder
+        } else {
+            None
+        };
+        let pattern_list = ann(
+            if let Some(rem) = remainder {
+                builder.alloc_list_with_remainder(&elements, rem)
+            } else {
+                builder.alloc_list(&elements)
+            },
+            span,
+        );
+        cases.push(pattern_list);
+        cases.push(m.body);
+    }
+
+    // Default arm: wildcard => default_body (or Nil if missing).
+    let default_body = match default {
+        Some(d) => d.body,
+        None => ann(builder.const_nil(), span),
+    };
+    cases.push(ann(builder.alloc_proc_var(Var::Wildcard), span));
+    cases.push(default_body);
+
+    let args_eval = ann(builder.alloc_proc_var(Var::Id(args_id)), span);
+    let dispatch_match = ann(builder.alloc_match(args_eval, &cases), span);
+
+    // for(...@args <= channel) { match args { ... } }
+    let names = Names {
+        names: SmallVec::new(),
+        remainder: Some(Var::Id(args_id)),
+    };
+    let bind = Bind::Repeated {
+        lhs: names,
+        rhs: channel,
+    };
+    ann(builder.alloc_for([[bind]], dispatch_match), span)
+}
+
+// Convert a name pattern (used in for/contract/agent formals) into a
+// Proc-position pattern element for use inside a match list pattern.
+fn name_to_proc_pattern<'ast>(
+    builder: &'ast ASTBuilder<'ast>,
+    n: &Name<'ast>,
+    span: SourceSpan,
+) -> AnnProc<'ast> {
+    match n {
+        Name::NameVar(var) => ann(builder.alloc_proc_var(*var), span),
+        Name::Quote(inner) => *inner,
+    }
+}
+
+#[inline]
+fn ann<'a>(proc: &'a Proc<'a>, span: SourceSpan) -> AnnProc<'a> {
+    AnnProc { proc, span }
+}
+
+#[inline]
+fn id_at(name: &str, pos: SourcePos) -> Id<'_> {
+    Id { name, pos }
+}
+
+// Parsed-decl staging types shared by build_agent_desugaring and
+// build_dispatch. Each captures the data extracted from a single
+// declaration (body, formals, and method name where applicable),
+// ready for assembly into the desugared tree.
+struct ParsedCtor<'a> {
+    formals: Option<Names<'a>>,
+    body: AnnProc<'a>,
+}
+struct ParsedMethodLike<'a> {
+    name: Id<'a>,
+    formals: Option<Names<'a>>,
+    body: AnnProc<'a>,
+}
+struct ParsedDefaultLike<'a> {
+    body: AnnProc<'a>,
 }
 
 pub struct NamesIter<'slice, 'a> {

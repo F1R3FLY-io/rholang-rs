@@ -26,6 +26,18 @@ pub enum ParsingError {
         lhs_arity: usize,
         rhs_arity: usize,
     },
+    /// Agent block declared more than one constructor, more than one
+    /// public default, or more than one private default.
+    DuplicateAgentDecl {
+        what: &'static str,
+        first: SourcePos,
+        second: SourcePos,
+    },
+    /// Agent block is missing a required declaration. Per the agent FIP:
+    ///   - Every agent must declare a constructor.
+    ///   - Every agent must declare a default.
+    ///   - If any `private method` is declared, a `private default` is required.
+    MissingAgentDecl { what: &'static str },
 }
 
 impl ParsingError {

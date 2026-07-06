@@ -1,0 +1,19 @@
+// Hand-written equivalent of agent_private_state.rho. Demonstrates
+// the `private` channel being usable as part of a compound state-key
+// (`@[*private, *stateToken]`) inside the ctor and method bodies,
+// even though no `private method` / `private default` is declared --
+// `private` is bound by `new this, private in` regardless.
+new Foo, stateToken in {
+  for (__r, @x <= Foo) {
+    new this, private in {
+      for (...@args <= this) {
+        match args {
+          [*return, "get"] => for (@state <<- @[*private, *stateToken]) { return!(state) }
+          _ => Nil
+        }
+      } |
+      @[*private, *stateToken]!(x) |
+      __r!(bundle+{*this})
+    }
+  }
+}

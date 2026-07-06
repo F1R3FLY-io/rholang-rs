@@ -1,0 +1,8 @@
+// Constraint violation: every agent requires a `default` clause
+// (the inner dispatch match needs a fallback arm). Snapshot shows
+// the Fail outcome with a MissingAgentDecl error.
+new fooCtor in {
+  agent fooCtor {
+    constructor() { Nil }
+  }
+}

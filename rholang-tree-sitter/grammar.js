@@ -36,6 +36,15 @@ module.exports = grammar({
             "true",
             "false",
             "where"
+            // NOTE: `agent`, `constructor`, `method`, `default`, and
+            // `private` are NOT reserved globally. Tree-sitter's GLR
+            // parser disambiguates these by context: when followed
+            // by the syntactic patterns of an agent_block / agent_decl
+            // they're recognized as the keyword form; elsewhere they
+            // remain ordinary `var` identifiers. This preserves
+            // backward compatibility with existing Rholang code (e.g.
+            // SystemVault.rho's `contract _create(@vaultAddress,
+            // constructor, retCh) = { ... }` continues to parse).
         ],
     },
 
@@ -46,6 +55,7 @@ module.exports = grammar({
         _proc: $ => choice(
             $.par,
             $.send_sync,
+            $.send_method,
             $.new,
             $.ifElse,
             $.let,
@@ -53,6 +63,7 @@ module.exports = grammar({
             $.match,
             $.choice,
             $.contract,
+            $.agent_block,
             $.input,
             $.send,
             $.signed_term,
@@ -66,6 +77,14 @@ module.exports = grammar({
             field('channel', $.name),
             '!?',
             field('inputs', alias($._proc_list, $.messages)), field('cont', $.sync_send_cont))
+        ),
+
+        send_method: $ => prec(1, seq(
+            field('channel', $.name),
+            '!',
+            field('method', $.var),
+            field('inputs', alias($._proc_list, $.messages)),
+            field('cont', $.sync_send_cont))
         ),
 
         new: $ => prec(1, seq(
@@ -116,6 +135,56 @@ module.exports = grammar({
             '=',
             field('proc', $.block)
         )),
+
+        // Agent block sugar (FIP 2025-08-20 Agents + 2026-01-28 Private Methods).
+        // Desugars at parse time per Agents.md:19-35 to:
+        //   for (r, <ctorPtrns> <= fooCtor) {
+        //     new this, private in {
+        //       for (...@args <= this)    { match args { /* pub  */ } } |
+        //       for (...@args <= private) { match args { /* priv */ } } |  (only if private decls)
+        //       Pc |
+        //       r!(bundle+{*this})
+        //     }
+        //   }
+        agent_block: $ => prec(2, seq(
+            'agent',
+            field('name', $.name),
+            '{',
+            field('decls', $.agent_decls),
+            '}'
+        )),
+
+        agent_decls: $ => seq(
+            $.agent_decl,
+            repeat(seq('|', $.agent_decl))
+        ),
+
+        agent_decl: $ => choice(
+            $.constructor_decl,
+            $.method_decl,
+            $.default_decl
+        ),
+
+        constructor_decl: $ => seq(
+            'constructor',
+            '(', optional(field('formals', $.names)), ')',
+            field('body', $.block)
+        ),
+
+        method_decl: $ => seq(
+            optional(field('private', 'private')),
+            'method',
+            field('name', $.var),
+            '(', optional(field('formals', $.names)), ')',
+            field('body', $.block)
+        ),
+
+        default_decl: $ => seq(
+            optional(field('private', 'private')),
+            'default',
+            '(', optional(field('formals', $.names)), ')',
+            field('body', $.block)
+        ),
 
         input: $ => prec(2, seq(
             'for', '(', field('receipts', $.receipts), ')',
@@ -343,11 +412,27 @@ module.exports = grammar({
         _source: $ => choice(
             $.simple_source,
             $.receive_send_source,
-            $.send_receive_source),
+            $.send_receive_source,
+            $.send_method_source),
 
         simple_source: $ => $.name,
         receive_send_source: $ => seq($.name, '?!'),
         send_receive_source: $ => seq($.name, '!?', field('inputs', alias($._proc_list, $.inputs))),
+
+        // For-source position of the method-call sugar (FIP 2025-08-20
+        // Agents §"Method-call sugar"):
+        //
+        //   for (x <- inst!y(args)) { P }
+        //   =
+        //   for (x <- inst!?("y", args)) { P }
+        //
+        // No AST variant; the visitor rewrites this into a
+        // Source::SendReceive at parse time with "y" prepended.
+        send_method_source: $ => seq(
+            $.name, '!',
+            field('method', $.var),
+            field('inputs', alias($._proc_list, $.inputs))
+        ),
 
         // sends
         _send_type: $ => choice($.send_single, $.send_multiple),

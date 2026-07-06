@@ -1,0 +1,21 @@
+// Regression test for the backward-compat bug introduced by the
+// agent-block sugar PR (#94): four words used as keyword markers
+// in an agent_block (`agent`, `constructor`, `method`, `default`)
+// were initially declared GLOBALLY reserved. That broke existing
+// Rholang code such as casper/src/main/resources/SystemVault.rho
+// which uses `constructor` as a contract parameter name.
+//
+// This file exercises each of the four words as an ordinary `var`
+// identifier in two contexts: as a contract formal and as a name
+// in a send/eval position. The snapshot must show plain `var` /
+// `send` nodes, NOT `agent_block` / `constructor_decl` / etc.
+//
+// The agent_block path is exercised separately by the dedicated
+// `agent_*` corpus files. The two grammar paths are disambiguated
+// by tree-sitter's GLR parser based on context.
+contract _create(@vaultAddress, constructor, retCh) = {
+  constructor!(*retCh)
+} |
+contract dispatch(method, default, agent) = {
+  method!(default, agent)
+}
