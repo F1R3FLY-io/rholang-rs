@@ -69,7 +69,6 @@ impl PartialEq for Box<dyn ProcessHolder> {
     }
 }
 
-
 /// Runtime value in RSpace.
 ///
 /// Values are the fundamental data type stored in RSpace channels,
@@ -96,10 +95,7 @@ pub enum Value {
     /// Exact rational number as ratio of BigInts (suffix `r`).
     BigRat(BigRational),
     /// Fixed-point decimal: actual_value = unscaled / 10^scale (suffix `p<scale>`).
-    FixedPoint {
-        unscaled: BigInt,
-        scale: u32,
-    },
+    FixedPoint { unscaled: BigInt, scale: u32 },
     /// Boolean value.
     Bool(bool),
     /// UTF-8 string.
@@ -316,10 +312,7 @@ impl fmt::Display for Value {
                 write!(f, "({})", inner.join(", "))
             }
             Value::Map(entries) => {
-                let inner: Vec<String> = entries
-                    .iter()
-                    .map(|(k, v)| format!("{k}: {v}"))
-                    .collect();
+                let inner: Vec<String> = entries.iter().map(|(k, v)| format!("{k}: {v}")).collect();
                 write!(f, "{{{}}}", inner.join(", "))
             }
             Value::Par(_) => write!(f, "<Par>"),
@@ -343,6 +336,8 @@ mod tests {
     }
 
     #[test]
+    // 3.14 is deliberate float test data, not an approximation of PI.
+    #[allow(clippy::approx_constant)]
     fn test_value_as_float() {
         assert_eq!(Value::Float(3.14).as_float(), Some(3.14));
         assert_eq!(Value::Int(1).as_float(), None);
@@ -416,10 +411,7 @@ mod tests {
         assert!(Value::Float(1.0) < Value::Float(2.0));
         assert!(Value::Float(2.0) > Value::Float(1.0));
         // NaN comparisons return None (not less, not greater, not equal)
-        assert_eq!(
-            Value::Float(f64::NAN).partial_cmp(&Value::Float(1.0)),
-            None
-        );
+        assert_eq!(Value::Float(f64::NAN).partial_cmp(&Value::Float(1.0)), None);
         assert_eq!(
             Value::Float(f64::NAN).partial_cmp(&Value::Float(f64::NAN)),
             None
@@ -503,7 +495,10 @@ mod tests {
     fn test_cross_type_not_equal() {
         assert_ne!(Value::Int(1), Value::Float(1.0));
         assert_ne!(Value::Int(1), Value::BigInt(BigInt::from(1)));
-        assert_ne!(Value::Float(1.0), Value::BigRat(BigRational::from(BigInt::from(1))));
+        assert_ne!(
+            Value::Float(1.0),
+            Value::BigRat(BigRational::from(BigInt::from(1)))
+        );
     }
 
     #[test]
@@ -558,6 +553,8 @@ mod tests {
     // =========================================================================
 
     #[test]
+    // 3.14 is deliberate float test data, not an approximation of PI.
+    #[allow(clippy::approx_constant)]
     fn test_display_numeric_types() {
         assert_eq!(Value::Int(42).to_string(), "42");
         assert_eq!(Value::Int(-7).to_string(), "-7");
@@ -573,12 +570,15 @@ mod tests {
 
     #[test]
     fn test_display_fixedpoint_edge_cases() {
-        let fp = |u: i64, s: u32| Value::FixedPoint { unscaled: BigInt::from(u), scale: s };
+        let fp = |u: i64, s: u32| Value::FixedPoint {
+            unscaled: BigInt::from(u),
+            scale: s,
+        };
         assert_eq!(fp(150, 2).to_string(), "1.50p2");
         assert_eq!(fp(42, 0).to_string(), "42p0");
-        assert_eq!(fp(3, 2).to_string(), "0.03p2");       // small positive
-        assert_eq!(fp(-150, 2).to_string(), "-1.50p2");    // negative
-        assert_eq!(fp(-3, 2).to_string(), "-0.03p2");      // negative small (was buggy)
+        assert_eq!(fp(3, 2).to_string(), "0.03p2"); // small positive
+        assert_eq!(fp(-150, 2).to_string(), "-1.50p2"); // negative
+        assert_eq!(fp(-3, 2).to_string(), "-0.03p2"); // negative small (was buggy)
     }
 
     #[test]
@@ -587,7 +587,13 @@ mod tests {
         assert_eq!(Value::Str("hello".into()).to_string(), "\"hello\"");
         assert_eq!(Value::Name("ch".into()).to_string(), "@\"ch\"");
         assert_eq!(Value::Nil.to_string(), "Nil");
-        assert_eq!(Value::List(vec![Value::Int(1), Value::Int(2)]).to_string(), "[1, 2]");
-        assert_eq!(Value::Tuple(vec![Value::Int(1), Value::Bool(true)]).to_string(), "(1, true)");
+        assert_eq!(
+            Value::List(vec![Value::Int(1), Value::Int(2)]).to_string(),
+            "[1, 2]"
+        );
+        assert_eq!(
+            Value::Tuple(vec![Value::Int(1), Value::Bool(true)]).to_string(),
+            "(1, true)"
+        );
     }
 }

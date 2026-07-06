@@ -410,11 +410,7 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::Eval { name })
     }
 
-    pub fn alloc_signed_term(
-        &self,
-        proc: AnnProc<'ast>,
-        sig: Signature<'ast>,
-    ) -> &Proc<'ast> {
+    pub fn alloc_signed_term(&self, proc: AnnProc<'ast>, sig: Signature<'ast>) -> &Proc<'ast> {
         self.arena.alloc(Proc::SignedTerm { proc, sig })
     }
 

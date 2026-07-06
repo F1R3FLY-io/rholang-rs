@@ -863,9 +863,7 @@ pub(super) fn node_to_ast<'ast>(
                                     name_count,
                                     cont_present,
                                 },
-                                _ => unreachable!(
-                                    "Filtered above"
-                                ),
+                                _ => unreachable!("Filtered above"),
                             };
 
                             match &bind_desc {
@@ -952,11 +950,9 @@ pub(super) fn node_to_ast<'ast>(
                     let mut guards_present: SmallVec<[bool; 4]> = SmallVec::new();
                     temp_cont_stack.reserve(3 * cases_node.named_child_count());
 
-                    for case in named_children_of_kind(
-                        &cases_node,
-                        kind!("case"),
-                        &mut cases_node.walk(),
-                    ) {
+                    for case in
+                        named_children_of_kind(&cases_node, kind!("case"), &mut cases_node.walk())
+                    {
                         let pattern_node = get_field(&case, field!("pattern"));
                         let guard_node = case.child_by_field_id(field!("guard"));
                         let proc_node = get_field(&case, field!("proc"));
@@ -1378,7 +1374,9 @@ fn apply_cont<'tree, 'ast>(
                                 layers.push(rebuild_signature(ops, procs));
                                 off += *proc_count;
                             }
-                            ast_builder.alloc_token_stack(TokenStack { layers }).ann(span)
+                            ast_builder
+                                .alloc_token_stack(TokenStack { layers })
+                                .ann(span)
                         }),
                         K::ConsumeIfThen { span } => proc_stack.replace_top2(|cond, if_true| {
                             ast_builder.alloc_if_then(cond, if_true).ann(span)
@@ -1463,11 +1461,10 @@ fn apply_cont<'tree, 'ast>(
                         } => {
                             // Total slice = expression + sum_per_case(2 if no
                             // guard, 3 if guard).
-                            let total: usize = 1
-                                + guards_present
-                                    .iter()
-                                    .map(|&g| if g { 3 } else { 2 })
-                                    .sum::<usize>();
+                            let total: usize = 1 + guards_present
+                                .iter()
+                                .map(|&g| if g { 3 } else { 2 })
+                                .sum::<usize>();
                             proc_stack.replace_top_slice(total, |slice| {
                                 let expr = slice[0];
                                 let mut idx = 1usize;
@@ -2151,7 +2148,7 @@ enum SourceDesc {
     RS,
     SR { arity: usize },
     // send_method_source: `name '!' method '(' inputs ')'`. Rewritten
-    // at to_bind time into Source::SendReceive with a StringLiteral
+    // at into_bind time into Source::SendReceive with a StringLiteral
     // method-name AnnProc prepended. The proc_stack slice carries the
     // pre-built StringLiteral AnnProc at index 1 (between the channel
     // and the actual inputs).
@@ -2214,7 +2211,7 @@ impl BindDesc {
         }
     }
 
-    fn to_bind<'a>(self, procs: &[AnnProc<'a>], mask: &BitSlice) -> Bind<'a> {
+    fn into_bind<'a>(self, procs: &[AnnProc<'a>], mask: &BitSlice) -> Bind<'a> {
         assert_eq!(procs.len(), self.len());
         unsafe {
             // SAFETY: We check above that the slice contains exactly |self.len()| elements which is
@@ -2344,7 +2341,7 @@ where
             self.procs = rest_procs;
             self.mask = rest_mask;
 
-            next.clone().to_bind(this_procs, this_mask)
+            next.clone().into_bind(this_procs, this_mask)
         })
     }
 
@@ -2419,7 +2416,11 @@ where
             // last on proc_stack within this receipt's range).
             let (bind_procs, bind_mask, guard) = if next.has_guard {
                 let last = this_procs.len() - 1;
-                (&this_procs[..last], &this_mask[..last], Some(this_procs[last]))
+                (
+                    &this_procs[..last],
+                    &this_mask[..last],
+                    Some(this_procs[last]),
+                )
             } else {
                 (this_procs, this_mask, None)
             };
@@ -2704,7 +2705,8 @@ fn build_agent_desugaring<'ast>(
                 arity, has_cont, ..
             } => {
                 let opt = if *arity > 0 {
-                    let f = into_names(&slice[idx..idx + arity], &mask[idx..idx + arity], *has_cont);
+                    let f =
+                        into_names(&slice[idx..idx + arity], &mask[idx..idx + arity], *has_cont);
                     Some(f)
                 } else {
                     None
@@ -2852,10 +2854,7 @@ fn build_agent_desugaring<'ast>(
         lhs: outer_lhs,
         rhs: name,
     };
-    ann(
-        builder.alloc_for([[outer_bind]], new_this_in),
-        span,
-    )
+    ann(builder.alloc_for([[outer_bind]], new_this_in), span)
 }
 
 /// Build one dispatch loop:

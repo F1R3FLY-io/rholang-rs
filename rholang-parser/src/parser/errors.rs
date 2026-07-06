@@ -37,7 +37,9 @@ pub enum ParsingError {
     ///   - Every agent must declare a constructor.
     ///   - Every agent must declare a default.
     ///   - If any `private method` is declared, a `private default` is required.
-    MissingAgentDecl { what: &'static str },
+    MissingAgentDecl {
+        what: &'static str,
+    },
 }
 
 impl ParsingError {

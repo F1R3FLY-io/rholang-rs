@@ -646,9 +646,18 @@ pub fn inputs<'a>(receipt: &'a [Bind<'a>]) -> impl DoubleEndedIterator<Item = &'
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Bind<'ast> {
-    Linear { lhs: Names<'ast>, rhs: Source<'ast> },
-    Repeated { lhs: Names<'ast>, rhs: Name<'ast> },
-    Peek { lhs: Names<'ast>, rhs: Name<'ast> },
+    Linear {
+        lhs: Names<'ast>,
+        rhs: Source<'ast>,
+    },
+    Repeated {
+        lhs: Names<'ast>,
+        rhs: Name<'ast>,
+    },
+    Peek {
+        lhs: Names<'ast>,
+        rhs: Name<'ast>,
+    },
     /// Per-clause signed bind `{% y <- x %}[s]` (Greg `app:concrete` SignedBind;
     /// Axis-C join — the rendezvous on `rhs` is funded independently by `sig`).
     Signed {

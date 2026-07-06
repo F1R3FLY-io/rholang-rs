@@ -5,8 +5,8 @@
 //! signed binds `{% y <- x %}[s]`, and signed `for(...) {% P %}` continuations.
 
 use rholang_parser::{
-    ast::{Bind, Name, Proc, Signature, Var},
     RholangParser,
+    ast::{Bind, Name, Proc, Signature, Var},
 };
 use validated::Validated;
 
