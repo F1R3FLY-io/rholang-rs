@@ -1,0 +1,87 @@
+====================
+try/catch (minimal)
+====================
+
+try @[file] <- fs!openFile("path") { Nil }
+catch @[code, msg] { Nil }
+
+---
+
+(source_file
+  (try_block
+    try_pattern: (quote
+      (collection
+        (list
+          (var))))
+    source: (send_method_source
+      (var)
+      method: (var)
+      inputs: (inputs
+        (string_literal)))
+    try_body: (block
+      (nil))
+    catch_pattern: (quote
+      (collection
+        (list
+          (var)
+          (var))))
+    catch_body: (block
+      (nil))))
+
+===================================
+try/catch/finally (all three parts)
+===================================
+
+try @[dir] <- fs!openDir("path") { Nil }
+catch @[code, msg] { Nil }
+finally { Nil }
+
+---
+
+(source_file
+  (try_block
+    try_pattern: (quote
+      (collection
+        (list
+          (var))))
+    source: (send_method_source
+      (var)
+      method: (var)
+      inputs: (inputs
+        (string_literal)))
+    try_body: (block
+      (nil))
+    catch_pattern: (quote
+      (collection
+        (list
+          (var)
+          (var))))
+    catch_body: (block
+      (nil))
+    finally_body: (block
+      (nil))))
+
+==============================================
+try with no result pattern (bare `try <-`)
+==============================================
+
+try <- file!close() { Nil }
+catch @[code, msg] { Nil }
+
+---
+
+(source_file
+  (try_block
+    source: (send_method_source
+      (var)
+      method: (var)
+      inputs: (inputs))
+    try_body: (block
+      (nil))
+    catch_pattern: (quote
+      (collection
+        (list
+          (var)
+          (var))))
+    catch_body: (block
+      (nil))))
