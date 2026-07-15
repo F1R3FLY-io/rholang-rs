@@ -1,0 +1,15 @@
+// Hand-written equivalent of try_catch_no_finally.rho. The two `let`
+// bodies contain only the branch's proc -- no finally join.
+new fs, log in {
+  for (@[__ok, ...__rest] <- fs!?("openFile", "path.txt")) {
+    if (__ok) {
+      let @[file] <- __rest in {
+        log!("opened", file)
+      }
+    } else {
+      let @[code, msg] <- __rest in {
+        log!("error", code, msg)
+      }
+    }
+  }
+}

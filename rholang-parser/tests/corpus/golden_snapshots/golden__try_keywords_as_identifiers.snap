@@ -1,0 +1,71 @@
+---
+source: rholang-parser/tests/golden.rs
+expression: result
+---
+Fail(
+    [
+        ParsingFailure {
+            partial_tree: Some(
+                AnnProc {
+                    proc: Bad,
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 15,
+                            col: 3,
+                        },
+                        end: SourcePos {
+                            line: 18,
+                            col: 2,
+                        },
+                    },
+                },
+            ),
+            errors: [
+                AnnParsingError {
+                    error: UnexpectedVar,
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 16,
+                            col: 10,
+                        },
+                        end: SourcePos {
+                            line: 16,
+                            col: 18,
+                        },
+                    },
+                    byte_range: 744..752,
+                },
+                AnnParsingError {
+                    error: UnexpectedVar,
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 16,
+                            col: 26,
+                        },
+                        end: SourcePos {
+                            line: 16,
+                            col: 31,
+                        },
+                    },
+                    byte_range: 760..765,
+                },
+                AnnParsingError {
+                    error: SyntaxError {
+                        sexp: "(ERROR)",
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 17,
+                            col: 9,
+                        },
+                        end: SourcePos {
+                            line: 17,
+                            col: 19,
+                        },
+                    },
+                    byte_range: 784..794,
+                },
+            ],
+        },
+    ],
+)

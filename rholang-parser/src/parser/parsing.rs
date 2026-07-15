@@ -626,20 +626,133 @@ pub(super) fn node_to_ast<'ast>(
                 }
 
                 // try/catch/finally sugar (FIP 2026-02-06 File-I/O
-                // §"Error syntax"). Grammar landed in this PR; parse-
-                // time desugaring per the FIP expansion is a follow-up
-                // commit. For now, emit a NotYetImplemented error and
-                // continue with Proc::Bad so callers observe a clean
-                // parse failure rather than a panic from the fallback
-                // `unimplemented!` arm.
+                // §"Error syntax"). Desugars at parse time to:
+                //
+                //   for (@[__ok, ...__rest] <- <source>) {
+                //     if (__ok) {
+                //       let @<try_pat> <- __rest in { <try_body> | <finally>? }
+                //     } else {
+                //       let @<catch_pat> <- __rest in { <catch_body> | <finally>? }
+                //     }
+                //   }
+                //
+                // The try-line `@<try_pat>` is optional (for methods that
+                // return `[true]` alone); when absent, the success branch
+                // drops the `let` and runs the try body directly, in
+                // parallel with any finally body.
+                //
+                // Source handling mirrors linear_bind: source can be any
+                // of the four `_source` shapes, and its pieces are
+                // pushed onto proc_stack in the same order the for-
+                // comprehension consumer expects, so reconstruction is
+                // via the same SourceDesc / into_name / into_names
+                // helpers.
                 kind!("try_block") => {
-                    errors.push(AnnParsingError::new(
-                        ParsingError::NotYetImplemented {
-                            construct: "try/catch/finally",
-                        },
-                        &node,
-                    ));
-                    bad = true;
+                    let source_node = get_field(&node, field!("source"));
+                    let try_pattern_node_opt =
+                        node.child_by_field_id(field!("try_pattern"));
+                    let try_body_node = get_field(&node, field!("try_body"));
+                    let catch_pattern_node = get_field(&node, field!("catch_pattern"));
+                    let catch_body_node = get_field(&node, field!("catch_body"));
+                    let finally_body_node_opt =
+                        node.child_by_field_id(field!("finally_body"));
+
+                    let source_desc = match source_node.kind_id() {
+                        kind!("simple_source") => SourceDesc::Simple,
+                        kind!("receive_send_source") => SourceDesc::RS,
+                        kind!("send_receive_source") => {
+                            let inputs_node =
+                                get_field(&source_node, field!("inputs"));
+                            SourceDesc::SR {
+                                arity: inputs_node.named_child_count(),
+                            }
+                        }
+                        kind!("send_method_source") => {
+                            let inputs_node =
+                                get_field(&source_node, field!("inputs"));
+                            SourceDesc::SM {
+                                arity: inputs_node.named_child_count(),
+                            }
+                        }
+                        _ => unreachable!(
+                            "try_block source is one of four _source kinds"
+                        ),
+                    };
+
+                    let has_try_pattern = try_pattern_node_opt.is_some();
+                    let has_finally = finally_body_node_opt.is_some();
+
+                    // Total slice length ConsumeTryBlock will pop:
+                    //   source_desc.len() + [try_pat] + try_body +
+                    //   catch_pat + catch_body + [finally_body]
+                    let total_len = source_desc.len()
+                        + (has_try_pattern as usize)
+                        + 3
+                        + (has_finally as usize);
+
+                    // Push evaluations into temp in forward order,
+                    // then reverse-append to cont_stack (same pattern
+                    // as ConsumeForComprehension).
+                    temp_cont_stack.reserve(total_len);
+
+                    // Source: mirror linear_bind's per-kind pattern.
+                    match source_desc {
+                        SourceDesc::Simple | SourceDesc::RS => {
+                            temp_cont_stack.push(K::EvalDelayed(
+                                get_first_child(&source_node),
+                            ));
+                        }
+                        SourceDesc::SR { .. } => {
+                            let inputs =
+                                get_field(&source_node, field!("inputs"));
+                            temp_cont_stack.push(K::EvalDelayed(
+                                get_first_child(&source_node),
+                            ));
+                            temp_cont_stack.push(K::EvalList(inputs.walk()));
+                        }
+                        SourceDesc::SM { .. } => {
+                            let method_node =
+                                get_field(&source_node, field!("method"));
+                            let inputs =
+                                get_field(&source_node, field!("inputs"));
+                            let method_name = get_node_value(&method_node, source);
+                            let method_lit = AnnProc {
+                                proc: ast_builder.alloc_string_literal(method_name),
+                                span: method_node.range().into(),
+                            };
+                            temp_cont_stack.push(K::EvalDelayed(
+                                get_first_child(&source_node),
+                            ));
+                            temp_cont_stack.push(K::PushAnnProc(method_lit));
+                            temp_cont_stack.push(K::EvalList(inputs.walk()));
+                        }
+                    }
+                    // Try pattern (optional)
+                    if let Some(tp) = try_pattern_node_opt {
+                        temp_cont_stack.push(K::EvalDelayed(tp));
+                    }
+                    // Try body
+                    temp_cont_stack.push(K::EvalDelayed(try_body_node));
+                    // Catch pattern
+                    temp_cont_stack.push(K::EvalDelayed(catch_pattern_node));
+                    // Catch body
+                    temp_cont_stack.push(K::EvalDelayed(catch_body_node));
+                    // Finally body (optional)
+                    if let Some(fb) = finally_body_node_opt {
+                        temp_cont_stack.push(K::EvalDelayed(fb));
+                    }
+
+                    temp_cont_stack.reverse();
+                    cont_stack.push(K::ConsumeTryBlock {
+                        span,
+                        source_desc,
+                        has_try_pattern,
+                        has_finally,
+                        total_len,
+                    });
+                    cont_stack.append(&mut temp_cont_stack);
+                    // Fall through to apply_cont, which will pull the
+                    // first evaluation off cont_stack.
                 }
 
                 kind!("ifElse") => {
@@ -1398,6 +1511,26 @@ fn apply_cont<'tree, 'ast>(
                                 build_agent_desugaring(ast_builder, &decls_desc, slice, mask, span)
                             })
                         }
+                        K::ConsumeTryBlock {
+                            span,
+                            source_desc,
+                            has_try_pattern,
+                            has_finally,
+                            total_len,
+                        } => proc_stack.replace_top_slice_with_mask(
+                            total_len,
+                            |slice, mask| {
+                                build_try_block_desugaring(
+                                    ast_builder,
+                                    source_desc,
+                                    has_try_pattern,
+                                    has_finally,
+                                    slice,
+                                    mask,
+                                    span,
+                                )
+                            },
+                        ),
                         K::ConsumeSet {
                             arity,
                             has_remainder,
@@ -1528,6 +1661,13 @@ enum K<'tree, 'ast> {
     ConsumeAgentBlock {
         span: SourceSpan,
         decls_desc: SmallVec<[AgentDeclDesc<'ast>; 4]>,
+    },
+    ConsumeTryBlock {
+        span: SourceSpan,
+        source_desc: SourceDesc,
+        has_try_pattern: bool,
+        has_finally: bool,
+        total_len: usize,
     },
     ConsumeSet {
         arity: usize,
@@ -1660,6 +1800,20 @@ impl Debug for K<'_, '_> {
             Self::ConsumeAgentBlock { span, decls_desc } => f
                 .debug_struct("ConsumeAgentBlock")
                 .field("decls", decls_desc)
+                .field("span", span)
+                .finish(),
+            Self::ConsumeTryBlock {
+                span,
+                source_desc,
+                has_try_pattern,
+                has_finally,
+                total_len,
+            } => f
+                .debug_struct("ConsumeTryBlock")
+                .field("source_desc", source_desc)
+                .field("has_try_pattern", has_try_pattern)
+                .field("has_finally", has_finally)
+                .field("total_len", total_len)
                 .field("span", span)
                 .finish(),
             Self::ConsumeSet { arity, span, .. } => f
@@ -2526,6 +2680,155 @@ fn build_agent_desugaring<'ast>(
         builder.alloc_for([[outer_bind]], new_this_in),
         span,
     )
+}
+
+/// Assemble the try/catch/finally desugaring per FIP 2026-02-06
+/// §"Error syntax". Called from apply_cont at K::ConsumeTryBlock
+/// after all pieces have been evaluated onto proc_stack.
+///
+/// The slice layout, driven by the push order in the visitor case
+/// for `kind!("try_block")`, is (bottom to top):
+///
+///   [0 .. source_desc.len()]   source pieces (name, [method_lit], [inputs...])
+///   [+0 or +1]                 try_pattern (if has_try_pattern)
+///   [+1]                       try_body
+///   [+1]                       catch_pattern
+///   [+1]                       catch_body
+///   [+0 or +1]                 finally_body (if has_finally)
+///
+/// The `mask` bit at each index tells whether the corresponding
+/// slot came from a `quote` node (needs `Name::Quote`) vs a proc-
+/// var (`Name::NameVar`) -- driven by the same
+/// `mark_quote` / `into_name` machinery the for-comp path uses.
+///
+/// The desugared shape is
+///   for (@[__ok, ...__rest] <- <source>) {
+///     if (__ok) {
+///       let @<try_pat> <- __rest in { <try_body> | <finally>? }
+///     } else {
+///       let @<catch_pat> <- __rest in { <catch_body> | <finally>? }
+///     }
+///   }
+///
+/// with the try-branch `let` dropped when `has_try_pattern` is
+/// false (bare `try <-` form for methods that return `[true]` alone).
+fn build_try_block_desugaring<'ast>(
+    builder: &'ast ASTBuilder<'ast>,
+    source_desc: SourceDesc,
+    has_try_pattern: bool,
+    has_finally: bool,
+    slice: &[AnnProc<'ast>],
+    mask: &BitSlice,
+    span: SourceSpan,
+) -> AnnProc<'ast> {
+    let src_len = source_desc.len();
+
+    // Reconstruct Source from the leading source_desc.len() slots.
+    // Same shape the for-comprehension consumer builds via
+    // BindDesc::to_bind's Linear arm.
+    let channel_name = into_name(slice[0], mask[0]);
+    let source = match source_desc {
+        SourceDesc::Simple => Source::Simple { name: channel_name },
+        SourceDesc::RS => Source::ReceiveSend { name: channel_name },
+        SourceDesc::SR { arity } => {
+            let inputs = &slice[1..1 + arity];
+            Source::SendReceive {
+                name: channel_name,
+                inputs: inputs.to_smallvec(),
+            }
+        }
+        // send_method_source already prepends the method-name literal at
+        // slice[1]; the actual inputs sit at slice[2..arity+2].
+        SourceDesc::SM { arity } => {
+            let inputs = &slice[1..1 + 1 + arity];
+            Source::SendReceive {
+                name: channel_name,
+                inputs: inputs.to_smallvec(),
+            }
+        }
+    };
+
+    // Slot offsets for the rest of the pieces.
+    let try_pat_off = src_len;
+    let try_body_off = try_pat_off + has_try_pattern as usize;
+    let catch_pat_off = try_body_off + 1;
+    let catch_body_off = catch_pat_off + 1;
+    let finally_off = catch_body_off + 1;
+
+    let try_pat_ann = has_try_pattern.then(|| slice[try_pat_off]);
+    let try_pat_q = has_try_pattern.then(|| mask[try_pat_off]);
+    let try_body = slice[try_body_off];
+    let catch_pat = into_name(slice[catch_pat_off], mask[catch_pat_off]);
+    let catch_body = slice[catch_body_off];
+    let finally_body = has_finally.then(|| slice[finally_off]);
+
+    // Fresh internal names for the outer @[__ok, ...__rest] pattern.
+    // Same convention as the agent-block desugaring's `__r` /
+    // `args` / `this` / `private`: rely on the double-underscore
+    // prefix + the surrounding scope's uniqueness to avoid capture.
+    let ok_id = id_at(builder.alloc_str("__ok"), span.start);
+    let rest_id = id_at(builder.alloc_str("__rest"), span.start);
+    let ok_var = Var::Id(ok_id);
+    let rest_var = Var::Id(rest_id);
+
+    // @[__ok, ...__rest]
+    let ok_pat_ann = ann(builder.alloc_proc_var(ok_var), span);
+    let outer_list = ann(
+        builder.alloc_list_with_remainder(&[ok_pat_ann], rest_var),
+        span,
+    );
+    let outer_pattern = Name::Quote(outer_list);
+
+    // __rest as a proc, used as the RHS of the two `let` bindings.
+    let rest_rhs = ann(builder.alloc_proc_var(rest_var), span);
+
+    // Try branch: [let @<try_pat> <- __rest in] (try_body | finally?)
+    let try_body_with_finally = match finally_body {
+        Some(fb) => ann(builder.alloc_par(try_body, fb), span),
+        None => try_body,
+    };
+    let try_branch = if has_try_pattern {
+        let try_pat_name = into_name(try_pat_ann.unwrap(), try_pat_q.unwrap());
+        let binding = LetBinding::single(try_pat_name, rest_rhs);
+        ann(
+            builder.alloc_let([binding], try_body_with_finally, false),
+            span,
+        )
+    } else {
+        try_body_with_finally
+    };
+
+    // Catch branch: let @<catch_pat> <- __rest in (catch_body | finally?)
+    let catch_body_with_finally = match finally_body {
+        Some(fb) => ann(builder.alloc_par(catch_body, fb), span),
+        None => catch_body,
+    };
+    let catch_binding = LetBinding::single(catch_pat, rest_rhs);
+    let catch_branch = ann(
+        builder.alloc_let([catch_binding], catch_body_with_finally, false),
+        span,
+    );
+
+    // if (__ok) { try_branch } else { catch_branch }
+    let ok_cond = ann(builder.alloc_proc_var(ok_var), span);
+    let if_expr = ann(
+        builder.alloc_if_then_else(ok_cond, try_branch, catch_branch),
+        span,
+    );
+
+    // for (@[__ok, ...__rest] <- <source>) { if_expr }
+    let outer_bind = Bind::Linear {
+        lhs: Names {
+            names: {
+                let mut ns: SmallVec<[Name<'ast>; 1]> = SmallVec::new();
+                ns.push(outer_pattern);
+                ns
+            },
+            remainder: None,
+        },
+        rhs: source,
+    };
+    ann(builder.alloc_for([[outer_bind]], if_expr), span)
 }
 
 /// Build one dispatch loop:

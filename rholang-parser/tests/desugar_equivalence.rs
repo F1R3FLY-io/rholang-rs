@@ -220,6 +220,33 @@ fn agent_block_desugars_to_handwritten_form(
     );
 }
 
+/// try/catch/finally desugaring equivalence: pairs the sugared and
+/// hand-written forms of the FIP 2026-02-06 §"Error syntax"
+/// expansion, asserting the ASTs match modulo source spans.
+///
+/// The hand-written form uses `__ok` / `__rest` as internal names to
+/// match the fresh names the desugaring emits; changing those names
+/// in the desugarer requires updating the desugared corpus files.
+#[rstest]
+#[case::full("try_catch_finally", "try_catch_finally_desugared")]
+#[case::no_finally("try_catch_no_finally", "try_catch_no_finally_desugared")]
+#[case::no_result_pattern(
+    "try_catch_no_result_pattern",
+    "try_catch_no_result_pattern_desugared",
+)]
+fn try_block_desugars_to_handwritten_form(
+    #[case] sugared_basename: &str,
+    #[case] desugared_basename: &str,
+) {
+    let s = parse_corpus_stripped(sugared_basename);
+    let d = parse_corpus_stripped(desugared_basename);
+    pretty_assertions::assert_eq!(
+        s,
+        d,
+        "try_block AST should match its hand-written desugared form ({sugared_basename} vs {desugared_basename})"
+    );
+}
+
 /// Sanity guard for the position-stripping helper itself: two parses
 /// of the SAME source should be string-equal both before and after
 /// stripping. If this fails, the strip routine is buggy and the other

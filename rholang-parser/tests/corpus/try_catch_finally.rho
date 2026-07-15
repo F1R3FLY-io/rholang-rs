@@ -1,0 +1,23 @@
+// Full try/catch/finally sugar per FIP 2026-02-06 §"Error syntax".
+// Desugars at parse time to
+//   for (@[__ok, ...__rest] <- <source>) {
+//     if (__ok) {
+//       let @[file] <- __rest in { <try_body> | <finally_body> }
+//     } else {
+//       let @[code, msg] <- __rest in { <catch_body> | <finally_body> }
+//     }
+//   }
+// The snapshot at golden__try_catch_finally.snap must show that shape:
+// a ForComprehension whose body is an IfThenElse whose branches are
+// Let bindings, with the finally body appearing once in each Par arm.
+new fs, log in {
+  try @[file] <- fs!openFile("path.txt") {
+    log!("opened", file)
+  }
+  catch @[code, msg] {
+    log!("error", code, msg)
+  }
+  finally {
+    log!("done")
+  }
+}
