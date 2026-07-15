@@ -625,6 +625,23 @@ pub(super) fn node_to_ast<'ast>(
                     continue 'parse;
                 }
 
+                // try/catch/finally sugar (FIP 2026-02-06 File-I/O
+                // §"Error syntax"). Grammar landed in this PR; parse-
+                // time desugaring per the FIP expansion is a follow-up
+                // commit. For now, emit a NotYetImplemented error and
+                // continue with Proc::Bad so callers observe a clean
+                // parse failure rather than a panic from the fallback
+                // `unimplemented!` arm.
+                kind!("try_block") => {
+                    errors.push(AnnParsingError::new(
+                        ParsingError::NotYetImplemented {
+                            construct: "try/catch/finally",
+                        },
+                        &node,
+                    ));
+                    bad = true;
+                }
+
                 kind!("ifElse") => {
                     let condition_node = get_field(&node, field!("condition"));
                     let if_true_node = get_field(&node, field!("consequence"));

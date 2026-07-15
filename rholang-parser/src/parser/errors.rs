@@ -38,6 +38,11 @@ pub enum ParsingError {
     ///   - Every agent must declare a default.
     ///   - If any `private method` is declared, a `private default` is required.
     MissingAgentDecl { what: &'static str },
+    /// The grammar production is known but its AST desugaring has not
+    /// been implemented yet. Currently emitted for `try_block` -- the
+    /// tree-sitter grammar recognizes the syntax but the parse-time
+    /// desugaring per the File I/O FIP §"Error syntax" is a follow-up.
+    NotYetImplemented { construct: &'static str },
 }
 
 impl ParsingError {
