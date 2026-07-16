@@ -87,37 +87,31 @@ fn parse_corpus_stripped(name: &str) -> String {
 }
 
 #[rstest]
-#[case::terminator(
-    r#"new x in { x!y(1, 2). }"#,
-    r#"new x in { x!?("y", 1, 2). }"#,
-)]
-#[case::terminator_no_args(
-    r#"new x in { x!y(). }"#,
-    r#"new x in { x!?("y"). }"#,
-)]
+#[case::terminator(r#"new x in { x!y(1, 2). }"#, r#"new x in { x!?("y", 1, 2). }"#)]
+#[case::terminator_no_args(r#"new x in { x!y(). }"#, r#"new x in { x!?("y"). }"#)]
 #[case::sequential(
     r#"new x in { x!set(42); Nil }"#,
-    r#"new x in { x!?("set", 42); Nil }"#,
+    r#"new x in { x!?("set", 42); Nil }"#
 )]
 #[case::sequential_uses_outer_scope(
     r#"new x, z in { x!set(42); z!(1) }"#,
-    r#"new x, z in { x!?("set", 42); z!(1) }"#,
+    r#"new x, z in { x!?("set", 42); z!(1) }"#
 )]
 #[case::comparison_args(
     r#"new x, a, b, c, d in { x!y(a < b, c > d). }"#,
-    r#"new x, a, b, c, d in { x!?("y", a < b, c > d). }"#,
+    r#"new x, a, b, c, d in { x!?("y", a < b, c > d). }"#
 )]
 #[case::bundle_arg(
     r#"new x, t in { x!y(bundle+{*t}). }"#,
-    r#"new x, t in { x!?("y", bundle+{*t}). }"#,
+    r#"new x, t in { x!?("y", bundle+{*t}). }"#
 )]
 #[case::nested_send_arg(
     r#"new x, a, b in { x!y(a!(b)). }"#,
-    r#"new x, a, b in { x!?("y", a!(b)). }"#,
+    r#"new x, a, b in { x!?("y", a!(b)). }"#
 )]
 #[case::nested_send_method_arg(
     r#"new x, a, b in { x!y(a!z(b).). }"#,
-    r#"new x, a, b in { x!?("y", a!?("z", b).). }"#,
+    r#"new x, a, b in { x!?("y", a!?("z", b).). }"#
 )]
 fn proc_position_desugars_to_send_sync(#[case] sugared: &str, #[case] hand_written: &str) {
     let s = parse_stripped(sugared);
@@ -128,15 +122,15 @@ fn proc_position_desugars_to_send_sync(#[case] sugared: &str, #[case] hand_writt
 #[rstest]
 #[case::for_source(
     r#"new x in { for (@z <- x!get()) { Nil } }"#,
-    r#"new x in { for (@z <- x!?("get")) { Nil } }"#,
+    r#"new x in { for (@z <- x!?("get")) { Nil } }"#
 )]
 #[case::for_source_with_args(
     r#"new x in { for (@z <- x!compute(1, 2, 3)) { Nil } }"#,
-    r#"new x in { for (@z <- x!?("compute", 1, 2, 3)) { Nil } }"#,
+    r#"new x in { for (@z <- x!?("compute", 1, 2, 3)) { Nil } }"#
 )]
 #[case::for_source_with_body(
     r#"new x, ret in { for (@val <- x!get()) { ret!(val) } }"#,
-    r#"new x, ret in { for (@val <- x!?("get")) { ret!(val) } }"#,
+    r#"new x, ret in { for (@val <- x!?("get")) { ret!(val) } }"#
 )]
 fn for_source_desugars_to_send_receive(#[case] sugared: &str, #[case] hand_written: &str) {
     let s = parse_stripped(sugared);
@@ -220,7 +214,7 @@ fn agent_block_desugars_to_handwritten_form(
     );
 }
 
-/// try/catch/finally desugaring equivalence: pairs the sugared and
+/// try/catch desugaring equivalence: pairs the sugared and
 /// hand-written forms of the FIP 2026-02-06 §"Error syntax"
 /// expansion, asserting the ASTs match modulo source spans.
 ///
@@ -228,12 +222,8 @@ fn agent_block_desugars_to_handwritten_form(
 /// match the fresh names the desugaring emits; changing those names
 /// in the desugarer requires updating the desugared corpus files.
 #[rstest]
-#[case::full("try_catch_finally", "try_catch_finally_desugared")]
-#[case::no_finally("try_catch_no_finally", "try_catch_no_finally_desugared")]
-#[case::no_result_pattern(
-    "try_catch_no_result_pattern",
-    "try_catch_no_result_pattern_desugared",
-)]
+#[case::basic("try_catch", "try_catch_desugared")]
+#[case::no_result_pattern("try_catch_no_result_pattern", "try_catch_no_result_pattern_desugared")]
 fn try_block_desugars_to_handwritten_form(
     #[case] sugared_basename: &str,
     #[case] desugared_basename: &str,

@@ -185,30 +185,37 @@ module.exports = grammar({
             field('body', $.block)
         ),
 
-        // try/catch/finally sugar (FIP 2026-02-06 File-I/O §"Error syntax").
+        // try/catch sugar (FIP 2026-02-06 File-I/O §"Error syntax").
         //
         //   try @<try_pat>? <- <source> { <try_body> }
         //   catch @<catch_pat> { <catch_body> }
-        //   [ finally { <finally_body> } ]
         //
         // Desugars at parse time to:
         //   for (@[ok, ...rest] <- <source>) {
         //     if (ok) {
-        //       let @<try_pat> <- rest in { <try_body> | <finally_body>? }
+        //       let @<try_pat> <- rest in { <try_body> }
         //     } else {
-        //       let @<catch_pat> <- rest in { <catch_body> | <finally_body>? }
+        //       let @<catch_pat> <- rest in { <catch_body> }
         //     }
         //   }
         //
         // If the try line has no `@<try_pat>` (e.g. for methods returning
         // just `[true]`), the success branch drops the let and runs the
-        // try body (parallel with any finally body) directly.
+        // try body directly.
         //
-        // `try`, `catch`, and `finally` are NOT globally reserved for
-        // the same backward-compat reason as `agent` / `constructor`:
-        // existing Rholang may use these as ordinary identifiers.
-        // GLR disambiguation kicks in when the following tokens match
-        // the try_block shape.
+        // No `finally` clause: Rholang branch bodies may be asynchronous
+        // (a body that ends by starting a for-receive doesn't complete
+        // when the `{...}` textually ends), so a keyword-based finally
+        // would silently race the branch. Programmers who want
+        // after-both-branches semantics use an explicit `done` channel
+        // in each branch and a `for(<- done)` receiver in parallel with
+        // the try block. See the FIP for the pattern.
+        //
+        // `try` and `catch` are NOT globally reserved for the same
+        // backward-compat reason as `agent` / `constructor`: existing
+        // Rholang may use these as ordinary identifiers. GLR
+        // disambiguation kicks in when the following tokens match the
+        // try_block shape.
         try_block: $ => seq(
             'try',
             optional(field('try_pattern', $.name)),
@@ -217,8 +224,7 @@ module.exports = grammar({
             field('try_body', $.block),
             'catch',
             field('catch_pattern', $.name),
-            field('catch_body', $.block),
-            optional(seq('finally', field('finally_body', $.block)))
+            field('catch_body', $.block)
         ),
 
         input: $ => prec(2, seq(

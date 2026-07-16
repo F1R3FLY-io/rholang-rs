@@ -1,8 +1,8 @@
-// Regression test for backward compatibility: `try`, `catch`, and
-// `finally` are NOT globally reserved keywords. Existing Rholang
-// code that uses these as identifiers in contexts where the GLR
-// parser can disambiguate (e.g., contract formals, quoted names)
-// continues to parse without becoming a try_block.
+// Regression test for backward compatibility: `try` and `catch`
+// are NOT globally reserved keywords. Existing Rholang code that
+// uses these as identifiers in contexts where the GLR parser can
+// disambiguate (e.g., contract formals, quoted names) continues to
+// parse without becoming a try_block.
 //
 // Send-position use (`try!(x)` at the start of a proc) exhibits the
 // same limitation the agent-block sugar documented for
@@ -10,9 +10,9 @@
 // on seeing `try` and cannot backtrack. That's exercised by a
 // separate snapshot that expects Fail(...), same shape as
 // agent_keywords_as_identifiers.rho.
-contract dispatchFinally(try, catch, finally) = {
-  finally
+contract dispatchOnCatch(try, catch) = {
+  catch!(try)
 } |
-contract useCatch(@try, @catch, ret) = {
+contract useTryAndCatch(@try, @catch, ret) = {
   ret!((try, catch))
 }
