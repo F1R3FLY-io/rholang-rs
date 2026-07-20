@@ -224,6 +224,7 @@ fn agent_block_desugars_to_handwritten_form(
 #[rstest]
 #[case::basic("try_catch", "try_catch_desugared")]
 #[case::no_result_pattern("try_catch_no_result_pattern", "try_catch_no_result_pattern_desugared")]
+#[case::hygiene("try_catch_hygiene", "try_catch_hygiene_desugared")]
 fn try_block_desugars_to_handwritten_form(
     #[case] sugared_basename: &str,
     #[case] desugared_basename: &str,
