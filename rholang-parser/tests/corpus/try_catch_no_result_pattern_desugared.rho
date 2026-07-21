@@ -1,0 +1,16 @@
+// Hand-written equivalent of try_catch_no_result_pattern.rho. When
+// the try line has no `@<pattern>`, the success branch drops the
+// `let` and runs the try body directly. The catch branch still uses
+// the `let @[code, msg] <- __rest in { ... }` shape (catch always
+// destructures).
+new file, log in {
+  for (@[__ok, ...__rest] <- file!?("close")) {
+    if (__ok) {
+      log!("closed")
+    } else {
+      let @[code, msg] <- __rest in {
+        log!("error", code, msg)
+      }
+    }
+  }
+}

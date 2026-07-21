@@ -1,0 +1,12 @@
+// Bare `try <-` form for methods that return `[true]` alone (e.g.
+// close, flush, rename). The success branch drops the `let` and
+// runs the try body directly. The __rest binding in the outer
+// for-comprehension still exists but is unused by the try branch.
+new file, log in {
+  try <- file!close() {
+    log!("closed")
+  }
+  catch @[code, msg] {
+    log!("error", code, msg)
+  }
+}

@@ -1,0 +1,18 @@
+// Hand-written equivalent of try_catch_hygiene.rho. The
+// desugarer detects that the user's bodies reference `__ok` and
+// `__rest`, and picks `__ok0` / `__rest0` for the synthetic
+// for-comprehension bindings so the user names remain in scope
+// throughout both branches.
+new __ok, __rest, fs, log in {
+  for (@[__ok0, ...__rest0] <- fs!?("openFile", "path.txt")) {
+    if (__ok0) {
+      let @[file] <- __rest0 in {
+        log!("opened", file, __ok, __rest)
+      }
+    } else {
+      let @[code, msg] <- __rest0 in {
+        log!("error", code, msg, __ok, __rest)
+      }
+    }
+  }
+}
