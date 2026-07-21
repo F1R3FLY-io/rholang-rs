@@ -2994,22 +2994,21 @@ fn build_try_block_desugaring<'ast>(
     let source = match source_desc {
         SourceDesc::Simple => Source::Simple { name: channel_name },
         SourceDesc::RS => Source::ReceiveSend { name: channel_name },
-        SourceDesc::SR { arity } => {
-            let inputs = &slice[1..1 + arity];
-            Source::SendReceive {
-                name: channel_name,
-                inputs: inputs.to_smallvec(),
-            }
-        }
-        // send_method_source already prepends the method-name literal at
-        // slice[1]; the actual inputs sit at slice[2..arity+2].
-        SourceDesc::SM { arity } => {
-            let inputs = &slice[1..1 + 1 + arity];
-            Source::SendReceive {
-                name: channel_name,
-                inputs: inputs.to_smallvec(),
-            }
-        }
+        // Both send-shaped sources collapse to `SendReceive`. The
+        // inputs slice is uniformly `slice[1..src_len]` -- every
+        // source slot after the channel name at `slice[0]`. For SR
+        // that's just the `arity` user-supplied inputs; for SM the
+        // visitor's `send_method_source` handler has already
+        // prepended the method-name literal at `slice[1]`, so the
+        // same slice folds `[method_literal, input_0, ..,
+        // input_{arity-1}]` into `SendReceive.inputs` -- exactly
+        // what the for-comprehension consumer expects to see for a
+        // `chan!method(args)` source. Matches `BindDesc::to_bind`'s
+        // linear-SM arm at ~line 2170.
+        SourceDesc::SR { .. } | SourceDesc::SM { .. } => Source::SendReceive {
+            name: channel_name,
+            inputs: slice[1..src_len].to_smallvec(),
+        },
     };
 
     // Slot offsets for the rest of the pieces.
