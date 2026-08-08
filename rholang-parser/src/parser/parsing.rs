@@ -3,6 +3,7 @@ use bitvec::vec::BitVec;
 use nonempty_collections::NEVec;
 use rholang_tree_sitter_proc_macro::{field, kind};
 use smallvec::{SmallVec, ToSmallVec};
+use std::collections::BTreeSet;
 use std::fmt::Debug;
 use std::iter::FusedIterator;
 use std::slice::Iter as SliceIter;
@@ -694,6 +695,116 @@ pub(super) fn node_to_ast<'ast>(
                     }
                     node = name_node;
                     continue 'parse;
+                }
+
+                // try/catch sugar (FIP 2026-02-06 File-I/O §"Error
+                // syntax"). Desugars at parse time to:
+                //
+                //   for (@[__ok, ...__rest] <- <source>) {
+                //     if (__ok) {
+                //       let @<try_pat> <- __rest in { <try_body> }
+                //     } else {
+                //       let @<catch_pat> <- __rest in { <catch_body> }
+                //     }
+                //   }
+                //
+                // The try-line `@<try_pat>` is optional (for methods
+                // that return `[true]` alone); when absent, the success
+                // branch drops the `let` and runs the try body directly.
+                //
+                // No `finally` clause: Rholang bodies may be
+                // asynchronous, so a keyword-based finally would race
+                // the branch. Programmers who want after-both-branches
+                // semantics use an explicit `done` channel in each
+                // branch and a `for(<- done)` receiver in parallel.
+                //
+                // Source handling mirrors linear_bind: source can be
+                // any of the four `_source` shapes, and its pieces are
+                // pushed onto proc_stack in the same order the for-
+                // comprehension consumer expects, so reconstruction is
+                // via the same SourceDesc / into_name / into_names
+                // helpers.
+                kind!("try_block") => {
+                    let source_node = get_field(&node, field!("source"));
+                    let try_pattern_node_opt = node.child_by_field_id(field!("try_pattern"));
+                    let try_body_node = get_field(&node, field!("try_body"));
+                    let catch_pattern_node = get_field(&node, field!("catch_pattern"));
+                    let catch_body_node = get_field(&node, field!("catch_body"));
+
+                    let source_desc = match source_node.kind_id() {
+                        kind!("simple_source") => SourceDesc::Simple,
+                        kind!("receive_send_source") => SourceDesc::RS,
+                        kind!("send_receive_source") => {
+                            let inputs_node = get_field(&source_node, field!("inputs"));
+                            SourceDesc::SR {
+                                arity: inputs_node.named_child_count(),
+                            }
+                        }
+                        kind!("send_method_source") => {
+                            let inputs_node = get_field(&source_node, field!("inputs"));
+                            SourceDesc::SM {
+                                arity: inputs_node.named_child_count(),
+                            }
+                        }
+                        _ => unreachable!("try_block source is one of four _source kinds"),
+                    };
+
+                    let has_try_pattern = try_pattern_node_opt.is_some();
+
+                    // Total slice length ConsumeTryBlock will pop:
+                    //   source_desc.len() + [try_pat] + try_body +
+                    //   catch_pat + catch_body
+                    let total_len = source_desc.len() + (has_try_pattern as usize) + 3;
+
+                    // Push evaluations into temp in forward order,
+                    // then reverse-append to cont_stack (same pattern
+                    // as ConsumeForComprehension).
+                    temp_cont_stack.reserve(total_len);
+
+                    // Source: mirror linear_bind's per-kind pattern.
+                    match source_desc {
+                        SourceDesc::Simple | SourceDesc::RS => {
+                            temp_cont_stack.push(K::EvalDelayed(get_first_child(&source_node)));
+                        }
+                        SourceDesc::SR { .. } => {
+                            let inputs = get_field(&source_node, field!("inputs"));
+                            temp_cont_stack.push(K::EvalDelayed(get_first_child(&source_node)));
+                            temp_cont_stack.push(K::EvalList(inputs.walk()));
+                        }
+                        SourceDesc::SM { .. } => {
+                            let method_node = get_field(&source_node, field!("method"));
+                            let inputs = get_field(&source_node, field!("inputs"));
+                            let method_name = get_node_value(&method_node, source);
+                            let method_lit = AnnProc {
+                                proc: ast_builder.alloc_string_literal(method_name),
+                                span: method_node.range().into(),
+                            };
+                            temp_cont_stack.push(K::EvalDelayed(get_first_child(&source_node)));
+                            temp_cont_stack.push(K::PushAnnProc(method_lit));
+                            temp_cont_stack.push(K::EvalList(inputs.walk()));
+                        }
+                    }
+                    // Try pattern (optional)
+                    if let Some(tp) = try_pattern_node_opt {
+                        temp_cont_stack.push(K::EvalDelayed(tp));
+                    }
+                    // Try body
+                    temp_cont_stack.push(K::EvalDelayed(try_body_node));
+                    // Catch pattern
+                    temp_cont_stack.push(K::EvalDelayed(catch_pattern_node));
+                    // Catch body
+                    temp_cont_stack.push(K::EvalDelayed(catch_body_node));
+
+                    temp_cont_stack.reverse();
+                    cont_stack.push(K::ConsumeTryBlock {
+                        span,
+                        source_desc,
+                        has_try_pattern,
+                        total_len,
+                    });
+                    cont_stack.append(&mut temp_cont_stack);
+                    // Fall through to apply_cont, which will pull the
+                    // first evaluation off cont_stack.
                 }
 
                 kind!("ifElse") => {
@@ -1541,6 +1652,21 @@ fn apply_cont<'tree, 'ast>(
                                 build_agent_desugaring(ast_builder, &decls_desc, slice, mask, span)
                             })
                         }
+                        K::ConsumeTryBlock {
+                            span,
+                            source_desc,
+                            has_try_pattern,
+                            total_len,
+                        } => proc_stack.replace_top_slice_with_mask(total_len, |slice, mask| {
+                            build_try_block_desugaring(
+                                ast_builder,
+                                source_desc,
+                                has_try_pattern,
+                                slice,
+                                mask,
+                                span,
+                            )
+                        }),
                         K::ConsumeSet {
                             arity,
                             has_remainder,
@@ -1686,6 +1812,12 @@ enum K<'tree, 'ast> {
     ConsumeAgentBlock {
         span: SourceSpan,
         decls_desc: SmallVec<[AgentDeclDesc<'ast>; 4]>,
+    },
+    ConsumeTryBlock {
+        span: SourceSpan,
+        source_desc: SourceDesc,
+        has_try_pattern: bool,
+        total_len: usize,
     },
     ConsumeSet {
         arity: usize,
@@ -1839,6 +1971,18 @@ impl Debug for K<'_, '_> {
             Self::ConsumeAgentBlock { span, decls_desc } => f
                 .debug_struct("ConsumeAgentBlock")
                 .field("decls", decls_desc)
+                .field("span", span)
+                .finish(),
+            Self::ConsumeTryBlock {
+                span,
+                source_desc,
+                has_try_pattern,
+                total_len,
+            } => f
+                .debug_struct("ConsumeTryBlock")
+                .field("source_desc", source_desc)
+                .field("has_try_pattern", has_try_pattern)
+                .field("total_len", total_len)
                 .field("span", span)
                 .finish(),
             Self::ConsumeSet { arity, span, .. } => f
@@ -2855,6 +2999,492 @@ fn build_agent_desugaring<'ast>(
         rhs: name,
     };
     ann(builder.alloc_for([[outer_bind]], new_this_in), span)
+}
+
+/// Collect every identifier name appearing anywhere inside
+/// `root`. Used by [`build_try_block_desugaring`] to guarantee
+/// the synthesized `__ok` / `__rest` bindings don't shadow a
+/// user identifier in the try/catch bodies or patterns.
+///
+/// Correctness is by conservative over-approximation: bindings
+/// AND references are collected in every position (proc vars,
+/// name vars, method names, `new` decls, VarRef, remainders of
+/// `let` / `for` / `contract` pattern lists, and cost-accounting
+/// signatures in signed terms, token stacks, and signed binds).
+/// Over-collecting only makes us pick a slightly less pretty
+/// fresh name; it never causes an incorrect capture.
+fn collect_ids_into<'ast>(root: AnnProc<'ast>, out: &mut BTreeSet<&'ast str>) {
+    use crate::ast::{
+        Case, Collection, LetBinding, Name, NameDecl, Names, Proc, Source, SyncSendCont,
+    };
+
+    // Iterative DFS with a work-queue of AnnProc values (Copy) so
+    // borrow-checker lifetimes stay simple: every reference we
+    // walk lives for `'ast` via the arena, but the queue itself
+    // only holds values.
+    let mut stack: SmallVec<[AnnProc<'ast>; 32]> = SmallVec::new();
+    stack.push(root);
+
+    while let Some(ann) = stack.pop() {
+        match ann.proc {
+            Proc::ProcVar(v) => {
+                if let Var::Id(id) = v {
+                    out.insert(id.name);
+                }
+            }
+            Proc::VarRef { var, .. } => {
+                out.insert(var.name);
+            }
+            Proc::Method {
+                receiver,
+                name,
+                args,
+            } => {
+                out.insert(name.name);
+                stack.push(*receiver);
+                for a in args.iter() {
+                    stack.push(*a);
+                }
+            }
+            Proc::New { decls, proc: inner } => {
+                collect_from_new_decls(decls, out);
+                stack.push(*inner);
+            }
+            Proc::Par { left, right } | Proc::BinaryExp { left, right, .. } => {
+                stack.push(*left);
+                stack.push(*right);
+            }
+            Proc::UnaryExp { arg, .. } => {
+                stack.push(*arg);
+            }
+            Proc::Bundle { proc: inner, .. } => {
+                stack.push(*inner);
+            }
+            Proc::IfThenElse {
+                condition,
+                if_true,
+                if_false,
+            } => {
+                stack.push(*condition);
+                stack.push(*if_true);
+                if let Some(p) = if_false {
+                    stack.push(*p);
+                }
+            }
+            Proc::Send {
+                channel, inputs, ..
+            } => {
+                collect_from_name(*channel, out, &mut stack);
+                for i in inputs.iter() {
+                    stack.push(*i);
+                }
+            }
+            Proc::SendSync {
+                channel,
+                inputs,
+                cont,
+            } => {
+                collect_from_name(*channel, out, &mut stack);
+                for i in inputs.iter() {
+                    stack.push(*i);
+                }
+                if let SyncSendCont::NonEmpty(p) = cont {
+                    stack.push(*p);
+                }
+            }
+            Proc::Eval { name } => {
+                collect_from_name(*name, out, &mut stack);
+            }
+            Proc::Contract {
+                name,
+                formals,
+                body,
+            } => {
+                collect_from_name(*name, out, &mut stack);
+                collect_from_names(formals, out, &mut stack);
+                stack.push(*body);
+            }
+            Proc::Let { bindings, body, .. } => {
+                for LetBinding { lhs, rhs } in bindings.iter() {
+                    collect_from_names(lhs, out, &mut stack);
+                    for p in rhs.iter() {
+                        stack.push(*p);
+                    }
+                }
+                stack.push(*body);
+            }
+            Proc::ForComprehension {
+                receipts,
+                proc: body,
+            } => {
+                for r in receipts.iter() {
+                    for b in r.binds.iter() {
+                        collect_from_names(b.names(), out, &mut stack);
+                        match b {
+                            Bind::Linear { rhs, .. } => {
+                                collect_from_source(rhs, out, &mut stack);
+                            }
+                            Bind::Repeated { rhs, .. } | Bind::Peek { rhs, .. } => {
+                                collect_from_name(*rhs, out, &mut stack);
+                            }
+                            // Signed bind `{% y <- x %}[s]`: the rendezvous
+                            // source is walked like Linear, and the funding
+                            // signature is walked so its identifiers count
+                            // toward hygiene too.
+                            Bind::Signed { rhs, sig, .. } => {
+                                collect_from_source(rhs, out, &mut stack);
+                                collect_from_signature(sig, out, &mut stack);
+                            }
+                        }
+                    }
+                    if let Some(g) = r.guard {
+                        stack.push(g);
+                    }
+                }
+                stack.push(*body);
+            }
+            Proc::Match { expression, cases } => {
+                stack.push(*expression);
+                for Case {
+                    pattern,
+                    guard,
+                    proc: body,
+                } in cases.iter()
+                {
+                    stack.push(*pattern);
+                    if let Some(g) = guard {
+                        stack.push(*g);
+                    }
+                    stack.push(*body);
+                }
+            }
+            Proc::Collection(coll) => match coll {
+                Collection::List {
+                    elements,
+                    remainder,
+                }
+                | Collection::Set {
+                    elements,
+                    remainder,
+                } => {
+                    for e in elements.iter() {
+                        stack.push(*e);
+                    }
+                    if let Some(Var::Id(id)) = remainder {
+                        out.insert(id.name);
+                    }
+                }
+                Collection::PathMap { elements, .. } | Collection::Tuple(elements) => {
+                    for e in elements.iter() {
+                        stack.push(*e);
+                    }
+                }
+                Collection::Map {
+                    elements,
+                    remainder,
+                } => {
+                    for (k, v) in elements.iter() {
+                        stack.push(*k);
+                        stack.push(*v);
+                    }
+                    if let Some(Var::Id(id)) = remainder {
+                        out.insert(id.name);
+                    }
+                }
+            },
+            // Cost-accounted forms: walk the embedded process and
+            // every funding signature so hygiene sees identifiers
+            // inside `{% P %}[s]` terms and token stacks.
+            Proc::SignedTerm { proc: inner, sig } => {
+                stack.push(*inner);
+                collect_from_signature(sig, out, &mut stack);
+            }
+            Proc::TokenStack { stack: token_stack } => {
+                for sig in token_stack.layers.iter() {
+                    collect_from_signature(sig, out, &mut stack);
+                }
+            }
+            // Pure leaves without embedded identifiers.
+            Proc::Nil
+            | Proc::Unit
+            | Proc::BoolLiteral(_)
+            | Proc::LongLiteral(_)
+            | Proc::SignedIntLiteral { .. }
+            | Proc::UnsignedIntLiteral { .. }
+            | Proc::BigIntLiteral(_)
+            | Proc::BigRatLiteral(_)
+            | Proc::FloatLiteral { .. }
+            | Proc::FixedPointLiteral { .. }
+            | Proc::StringLiteral(_)
+            | Proc::UriLiteral(_)
+            | Proc::SimpleType(_)
+            | Proc::Bad => {}
+            Proc::Select { .. } => {
+                // Select is unimplemented in this Rholang version;
+                // matches the same guard in `traverse::PreorderDfsIter`.
+                unimplemented!("Select is not implemented in this version of Rholang")
+            }
+        }
+    }
+
+    fn collect_from_name<'ast>(
+        name: Name<'ast>,
+        out: &mut BTreeSet<&'ast str>,
+        stack: &mut SmallVec<[AnnProc<'ast>; 32]>,
+    ) {
+        match name {
+            Name::NameVar(Var::Id(id)) => {
+                out.insert(id.name);
+            }
+            Name::NameVar(Var::Wildcard) => {}
+            Name::Quote(inner) => {
+                stack.push(inner);
+            }
+        }
+    }
+
+    fn collect_from_names<'ast>(
+        names: &Names<'ast>,
+        out: &mut BTreeSet<&'ast str>,
+        stack: &mut SmallVec<[AnnProc<'ast>; 32]>,
+    ) {
+        for n in names.names.iter() {
+            collect_from_name(*n, out, stack);
+        }
+        if let Some(Var::Id(id)) = names.remainder {
+            out.insert(id.name);
+        }
+    }
+
+    fn collect_from_new_decls<'ast>(decls: &[NameDecl<'ast>], out: &mut BTreeSet<&'ast str>) {
+        for d in decls.iter() {
+            out.insert(d.id.name);
+        }
+    }
+
+    fn collect_from_source<'ast>(
+        source: &Source<'ast>,
+        out: &mut BTreeSet<&'ast str>,
+        stack: &mut SmallVec<[AnnProc<'ast>; 32]>,
+    ) {
+        match source {
+            Source::Simple { name } | Source::ReceiveSend { name } => {
+                collect_from_name(*name, out, stack);
+            }
+            Source::SendReceive { name, inputs } => {
+                collect_from_name(*name, out, stack);
+                for i in inputs.iter() {
+                    stack.push(*i);
+                }
+            }
+        }
+    }
+
+    fn collect_from_signature<'ast>(
+        sig: &Signature<'ast>,
+        out: &mut BTreeSet<&'ast str>,
+        stack: &mut SmallVec<[AnnProc<'ast>; 32]>,
+    ) {
+        match sig {
+            Signature::Ground(name) => {
+                collect_from_name(*name, out, stack);
+            }
+            Signature::Hash(inner) => {
+                stack.push(*inner);
+            }
+            Signature::Compound(left, right) | Signature::Transfer(left, right) => {
+                collect_from_signature(left, out, stack);
+                collect_from_signature(right, out, stack);
+            }
+        }
+    }
+}
+
+/// Pick a fresh identifier name based on `base` that isn't
+/// present in `avoid`. Tries `base` first, then `base0`, `base1`,
+/// ... until it finds a free slot. Inserts the chosen name into
+/// `avoid` so a subsequent call to `pick_fresh` (e.g. for
+/// `__rest` after `__ok`) doesn't reuse it.
+///
+/// The returned `&'ast str` lives in the AST arena via
+/// `builder.alloc_str`, so it satisfies the same lifetime
+/// contract as any other identifier in the produced tree.
+fn pick_fresh<'ast>(
+    builder: &'ast ASTBuilder<'ast>,
+    base: &str,
+    pos: SourcePos,
+    avoid: &mut BTreeSet<&'ast str>,
+) -> Id<'ast> {
+    for n in 0usize.. {
+        let candidate: String = if n == 0 {
+            base.to_string()
+        } else {
+            format!("{base}{}", n - 1)
+        };
+        if !avoid.contains(candidate.as_str()) {
+            let stored: &'ast str = builder.alloc_str(&candidate);
+            avoid.insert(stored);
+            return id_at(stored, pos);
+        }
+    }
+    unreachable!("pick_fresh exhausted the entire usize range without finding a free name")
+}
+
+/// Assemble the try/catch desugaring per FIP 2026-02-06
+/// §"Error syntax". Called from apply_cont at K::ConsumeTryBlock
+/// after all pieces have been evaluated onto proc_stack.
+///
+/// The slice layout, driven by the push order in the visitor case
+/// for `kind!("try_block")`, is (bottom to top):
+///
+///   [0 .. source_desc.len()]   source pieces (name, [method_lit], [inputs...])
+///   [+0 or +1]                 try_pattern (if has_try_pattern)
+///   [+1]                       try_body
+///   [+1]                       catch_pattern
+///   [+1]                       catch_body
+///
+/// The `mask` bit at each index tells whether the corresponding
+/// slot came from a `quote` node (needs `Name::Quote`) vs a proc-
+/// var (`Name::NameVar`) -- driven by the same
+/// `mark_quote` / `into_name` machinery the for-comp path uses.
+///
+/// The desugared shape is
+///   for (@[__ok, ...__rest] <- <source>) {
+///     if (__ok) {
+///       let @<try_pat> <- __rest in { <try_body> }
+///     } else {
+///       let @<catch_pat> <- __rest in { <catch_body> }
+///     }
+///   }
+///
+/// with the try-branch `let` dropped when `has_try_pattern` is
+/// false (bare `try <-` form for methods that return `[true]` alone).
+///
+/// # Hygiene
+///
+/// The outer `for` introduces two synthetic bindings (`__ok`,
+/// `__rest`) that would silently capture any user reference to
+/// those identifiers inside the try/catch bodies or patterns.
+/// [`collect_ids_into`] scans all four subtrees for identifier
+/// occurrences and [`pick_fresh`] chooses names that don't
+/// collide -- falling back to `__ok0`, `__ok1`, ... when the base
+/// name is taken. When the user writes nothing named `__ok` /
+/// `__rest`, the emitted names are unchanged (so the existing
+/// desugared-corpus tests keep passing).
+fn build_try_block_desugaring<'ast>(
+    builder: &'ast ASTBuilder<'ast>,
+    source_desc: SourceDesc,
+    has_try_pattern: bool,
+    slice: &[AnnProc<'ast>],
+    mask: &BitSlice,
+    span: SourceSpan,
+) -> AnnProc<'ast> {
+    let src_len = source_desc.len();
+
+    // Reconstruct Source from the leading source_desc.len() slots.
+    // Same shape the for-comprehension consumer builds via
+    // BindDesc::to_bind's Linear arm.
+    let channel_name = into_name(slice[0], mask[0]);
+    let source = match source_desc {
+        SourceDesc::Simple => Source::Simple { name: channel_name },
+        SourceDesc::RS => Source::ReceiveSend { name: channel_name },
+        // Both send-shaped sources collapse to `SendReceive`. The
+        // inputs slice is uniformly `slice[1..src_len]` -- every
+        // source slot after the channel name at `slice[0]`. For SR
+        // that's just the `arity` user-supplied inputs; for SM the
+        // visitor's `send_method_source` handler has already
+        // prepended the method-name literal at `slice[1]`, so the
+        // same slice folds `[method_literal, input_0, ..,
+        // input_{arity-1}]` into `SendReceive.inputs` -- exactly
+        // what the for-comprehension consumer expects to see for a
+        // `chan!method(args)` source. Matches `BindDesc::to_bind`'s
+        // linear-SM arm at ~line 2170.
+        SourceDesc::SR { .. } | SourceDesc::SM { .. } => Source::SendReceive {
+            name: channel_name,
+            inputs: slice[1..src_len].to_smallvec(),
+        },
+    };
+
+    // Slot offsets for the rest of the pieces.
+    let try_pat_off = src_len;
+    let try_body_off = try_pat_off + has_try_pattern as usize;
+    let catch_pat_off = try_body_off + 1;
+    let catch_body_off = catch_pat_off + 1;
+
+    let try_pat_ann = has_try_pattern.then(|| slice[try_pat_off]);
+    let try_pat_q = has_try_pattern.then(|| mask[try_pat_off]);
+    let try_body = slice[try_body_off];
+    let catch_pat = into_name(slice[catch_pat_off], mask[catch_pat_off]);
+    let catch_body = slice[catch_body_off];
+
+    // Fresh internal names for the outer @[__ok, ...__rest] pattern.
+    // These bindings are introduced BY the desugaring; if the user's
+    // try/catch bodies or patterns reference an identifier of the
+    // same name, our synthesized binding would shadow that reference
+    // and change its meaning silently. Hygiene: scan the four
+    // subtrees (both bodies, both patterns) for every identifier
+    // occurrence, then pick names that don't collide -- starting
+    // with the intuitive `__ok`/`__rest` and appending a numeric
+    // suffix if needed. Corpus tests continue to pass because their
+    // bodies don't mention either name; only user code that
+    // deliberately (or accidentally) uses those identifiers triggers
+    // renaming.
+    let mut avoid: BTreeSet<&'ast str> = BTreeSet::new();
+    if let Some(try_pat) = try_pat_ann {
+        collect_ids_into(try_pat, &mut avoid);
+    }
+    collect_ids_into(try_body, &mut avoid);
+    collect_ids_into(slice[catch_pat_off], &mut avoid);
+    collect_ids_into(catch_body, &mut avoid);
+    let ok_id = pick_fresh(builder, "__ok", span.start, &mut avoid);
+    let rest_id = pick_fresh(builder, "__rest", span.start, &mut avoid);
+    let ok_var = Var::Id(ok_id);
+    let rest_var = Var::Id(rest_id);
+
+    // @[__ok, ...__rest]
+    let ok_pat_ann = ann(builder.alloc_proc_var(ok_var), span);
+    let outer_list = ann(
+        builder.alloc_list_with_remainder(&[ok_pat_ann], rest_var),
+        span,
+    );
+    let outer_pattern = Name::Quote(outer_list);
+
+    // __rest as a proc, used as the RHS of the two `let` bindings.
+    let rest_rhs = ann(builder.alloc_proc_var(rest_var), span);
+
+    // Try branch: [let @<try_pat> <- __rest in] try_body
+    let try_branch = if has_try_pattern {
+        let try_pat_name = into_name(try_pat_ann.unwrap(), try_pat_q.unwrap());
+        let binding = LetBinding::single(try_pat_name, rest_rhs);
+        ann(builder.alloc_let([binding], try_body, false), span)
+    } else {
+        try_body
+    };
+
+    // Catch branch: let @<catch_pat> <- __rest in catch_body
+    let catch_binding = LetBinding::single(catch_pat, rest_rhs);
+    let catch_branch = ann(builder.alloc_let([catch_binding], catch_body, false), span);
+
+    // if (__ok) { try_branch } else { catch_branch }
+    let ok_cond = ann(builder.alloc_proc_var(ok_var), span);
+    let if_expr = ann(
+        builder.alloc_if_then_else(ok_cond, try_branch, catch_branch),
+        span,
+    );
+
+    // for (@[__ok, ...__rest] <- <source>) { if_expr }
+    let outer_bind = Bind::Linear {
+        lhs: Names {
+            names: {
+                let mut ns: SmallVec<[Name<'ast>; 1]> = SmallVec::new();
+                ns.push(outer_pattern);
+                ns
+            },
+            remainder: None,
+        },
+        rhs: source,
+    };
+    ann(builder.alloc_for([[outer_bind]], if_expr), span)
 }
 
 /// Build one dispatch loop:

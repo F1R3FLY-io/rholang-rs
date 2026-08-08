@@ -64,6 +64,7 @@ module.exports = grammar({
             $.choice,
             $.contract,
             $.agent_block,
+            $.try_block,
             $.input,
             $.send,
             $.signed_term,
@@ -184,6 +185,48 @@ module.exports = grammar({
             'default',
             '(', optional(field('formals', $.names)), ')',
             field('body', $.block)
+        ),
+
+        // try/catch sugar (FIP 2026-02-06 File-I/O §"Error syntax").
+        //
+        //   try @<try_pat>? <- <source> { <try_body> }
+        //   catch @<catch_pat> { <catch_body> }
+        //
+        // Desugars at parse time to:
+        //   for (@[ok, ...rest] <- <source>) {
+        //     if (ok) {
+        //       let @<try_pat> <- rest in { <try_body> }
+        //     } else {
+        //       let @<catch_pat> <- rest in { <catch_body> }
+        //     }
+        //   }
+        //
+        // If the try line has no `@<try_pat>` (e.g. for methods returning
+        // just `[true]`), the success branch drops the let and runs the
+        // try body directly.
+        //
+        // No `finally` clause: Rholang branch bodies may be asynchronous
+        // (a body that ends by starting a for-receive doesn't complete
+        // when the `{...}` textually ends), so a keyword-based finally
+        // would silently race the branch. Programmers who want
+        // after-both-branches semantics use an explicit `done` channel
+        // in each branch and a `for(<- done)` receiver in parallel with
+        // the try block. See the FIP for the pattern.
+        //
+        // `try` and `catch` are NOT globally reserved for the same
+        // backward-compat reason as `agent` / `constructor`: existing
+        // Rholang may use these as ordinary identifiers. GLR
+        // disambiguation kicks in when the following tokens match the
+        // try_block shape.
+        try_block: $ => seq(
+            'try',
+            optional(field('try_pattern', $.name)),
+            '<-',
+            field('source', $._source),
+            field('try_body', $.block),
+            'catch',
+            field('catch_pattern', $.name),
+            field('catch_body', $.block)
         ),
 
         input: $ => prec(2, seq(

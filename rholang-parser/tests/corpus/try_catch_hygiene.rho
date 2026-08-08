@@ -1,0 +1,20 @@
+// Regression: the try/catch sugar's synthesized `__ok` / `__rest`
+// bindings must not shadow user identifiers of the same name in
+// the try/catch bodies or patterns. Here the user has an outer
+// `new __ok, __rest, log in { ... }` and references both inside
+// both branches -- if the desugarer emitted the plain `__ok` /
+// `__rest`, the log messages would silently see the inner
+// for-comprehension bindings (a bool and a list) instead of the
+// intended outer names.
+//
+// The paired hand-written form is try_catch_hygiene_desugared.rho,
+// which uses `__ok0` / `__rest0` for the synthetic bindings so the
+// user's `__ok` / `__rest` remain accessible.
+new __ok, __rest, fs, log in {
+  try @[file] <- fs!openFile("path.txt") {
+    log!("opened", file, __ok, __rest)
+  }
+  catch @[code, msg] {
+    log!("error", code, msg, __ok, __rest)
+  }
+}

@@ -1,0 +1,14 @@
+// Basic try/catch. Desugars to
+//   for (@[__ok, ...__rest] <- fs!?("openFile", "path.txt")) {
+//     if (__ok) { let @[file] <- __rest in { log!("opened", file) } }
+//     else      { let @[code, msg] <- __rest in { log!("error", code, msg) } }
+//   }
+// The paired hand-written form is try_catch_desugared.rho.
+new fs, log in {
+  try @[file] <- fs!openFile("path.txt") {
+    log!("opened", file)
+  }
+  catch @[code, msg] {
+    log!("error", code, msg)
+  }
+}

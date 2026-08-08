@@ -1,0 +1,186 @@
+---
+source: rholang-parser/tests/golden.rs
+expression: result
+---
+Fail(
+    [
+        ParsingFailure {
+            partial_tree: Some(
+                AnnProc {
+                    proc: Contract {
+                        name: NameVar(
+                            Id(
+                                Id {
+                                    name: "dispatchOnCatch",
+                                    pos: SourcePos {
+                                        line: 13,
+                                        col: 10,
+                                    },
+                                },
+                            ),
+                        ),
+                        formals: Names {
+                            names: [
+                                NameVar(
+                                    Id(
+                                        Id {
+                                            name: "try",
+                                            pos: SourcePos {
+                                                line: 13,
+                                                col: 26,
+                                            },
+                                        },
+                                    ),
+                                ),
+                                NameVar(
+                                    Id(
+                                        Id {
+                                            name: "catch",
+                                            pos: SourcePos {
+                                                line: 13,
+                                                col: 31,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            ],
+                            remainder: None,
+                        },
+                        body: AnnProc {
+                            proc: Send {
+                                channel: NameVar(
+                                    Id(
+                                        Id {
+                                            name: "catch",
+                                            pos: SourcePos {
+                                                line: 14,
+                                                col: 3,
+                                            },
+                                        },
+                                    ),
+                                ),
+                                send_type: Single,
+                                inputs: [
+                                    AnnProc {
+                                        proc: Bad,
+                                        span: SourceSpan {
+                                            start: SourcePos {
+                                                line: 14,
+                                                col: 10,
+                                            },
+                                            end: SourcePos {
+                                                line: 14,
+                                                col: 13,
+                                            },
+                                        },
+                                    },
+                                ],
+                            },
+                            span: SourceSpan {
+                                start: SourcePos {
+                                    line: 14,
+                                    col: 3,
+                                },
+                                end: SourcePos {
+                                    line: 14,
+                                    col: 14,
+                                },
+                            },
+                        },
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 13,
+                            col: 1,
+                        },
+                        end: SourcePos {
+                            line: 15,
+                            col: 2,
+                        },
+                    },
+                },
+            ),
+            errors: [
+                AnnParsingError {
+                    error: SyntaxError {
+                        sexp: "(ERROR)",
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 14,
+                            col: 10,
+                        },
+                        end: SourcePos {
+                            line: 14,
+                            col: 13,
+                        },
+                    },
+                    byte_range: 709..712,
+                },
+            ],
+        },
+        ParsingFailure {
+            partial_tree: Some(
+                AnnProc {
+                    proc: Bad,
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 15,
+                            col: 3,
+                        },
+                        end: SourcePos {
+                            line: 18,
+                            col: 2,
+                        },
+                    },
+                },
+            ),
+            errors: [
+                AnnParsingError {
+                    error: UnexpectedVar,
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 16,
+                            col: 10,
+                        },
+                        end: SourcePos {
+                            line: 16,
+                            col: 24,
+                        },
+                    },
+                    byte_range: 727..741,
+                },
+                AnnParsingError {
+                    error: UnexpectedVar,
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 16,
+                            col: 32,
+                        },
+                        end: SourcePos {
+                            line: 16,
+                            col: 37,
+                        },
+                    },
+                    byte_range: 749..754,
+                },
+                AnnParsingError {
+                    error: SyntaxError {
+                        sexp: "(ERROR)",
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 17,
+                            col: 9,
+                        },
+                        end: SourcePos {
+                            line: 17,
+                            col: 19,
+                        },
+                    },
+                    byte_range: 773..783,
+                },
+            ],
+        },
+    ],
+)

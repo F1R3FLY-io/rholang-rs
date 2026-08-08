@@ -1,0 +1,16 @@
+// Hand-written equivalent of try_catch.rho. Each let body contains
+// only the branch's proc; the try_block sugar has no `finally`
+// clause, so there is no cross-branch join.
+new fs, log in {
+  for (@[__ok, ...__rest] <- fs!?("openFile", "path.txt")) {
+    if (__ok) {
+      let @[file] <- __rest in {
+        log!("opened", file)
+      }
+    } else {
+      let @[code, msg] <- __rest in {
+        log!("error", code, msg)
+      }
+    }
+  }
+}
