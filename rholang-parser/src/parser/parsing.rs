@@ -790,6 +790,15 @@ pub(super) fn node_to_ast<'ast>(
                             } else {
                                 (None, get_first_child(&bind_node))
                             };
+                            // A source the grammar could not parse (a process
+                            // where a name is required, say) arrives as an ERROR
+                            // node, which is none of the four source kinds. Skip
+                            // the bind; query_errors reports the ERROR node once
+                            // the parse completes.
+                            if source_node.is_error() || source_node.is_missing() {
+                                continue;
+                            }
+
                             let (name_count, cont_present) = match names_node {
                                 Some(names) => (
                                     names.named_child_count(),

@@ -1,0 +1,79 @@
+---
+source: rholang-parser/tests/golden.rs
+expression: result
+---
+Fail(
+    [
+        ParsingFailure {
+            partial_tree: Some(
+                AnnProc {
+                    proc: ForComprehension {
+                        receipts: [
+                            Receipt {
+                                binds: [],
+                                guard: None,
+                            },
+                        ],
+                        proc: AnnProc {
+                            proc: Nil,
+                            span: SourceSpan {
+                                start: SourcePos {
+                                    line: 1,
+                                    col: 27,
+                                },
+                                end: SourcePos {
+                                    line: 1,
+                                    col: 30,
+                                },
+                            },
+                        },
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 1,
+                            col: 1,
+                        },
+                        end: SourcePos {
+                            line: 1,
+                            col: 32,
+                        },
+                    },
+                },
+            ),
+            errors: [
+                AnnParsingError {
+                    error: SyntaxError {
+                        sexp: "(ERROR)",
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 1,
+                            col: 11,
+                        },
+                        end: SourcePos {
+                            line: 1,
+                            col: 12,
+                        },
+                    },
+                    byte_range: 10..11,
+                },
+                AnnParsingError {
+                    error: SyntaxError {
+                        sexp: "(ERROR)",
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 1,
+                            col: 21,
+                        },
+                        end: SourcePos {
+                            line: 1,
+                            col: 22,
+                        },
+                    },
+                    byte_range: 20..21,
+                },
+            ],
+        },
+    ],
+)
