@@ -344,7 +344,7 @@ mod tests {
 
     #[test]
     fn test_value_as_float() {
-        assert_eq!(Value::Float(3.14).as_float(), Some(3.14));
+        assert_eq!(Value::Float(2.5).as_float(), Some(2.5));
         assert_eq!(Value::Int(1).as_float(), None);
     }
 
@@ -561,7 +561,7 @@ mod tests {
     fn test_display_numeric_types() {
         assert_eq!(Value::Int(42).to_string(), "42");
         assert_eq!(Value::Int(-7).to_string(), "-7");
-        assert_eq!(Value::Float(3.14).to_string(), "3.14f64");
+        assert_eq!(Value::Float(2.5).to_string(), "2.5f64");
         assert_eq!(Value::BigInt(BigInt::from(100)).to_string(), "100n");
         assert_eq!(Value::BigInt(BigInt::from(-42)).to_string(), "-42n");
 
