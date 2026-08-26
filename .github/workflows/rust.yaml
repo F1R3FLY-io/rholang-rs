@@ -26,6 +26,10 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt, clippy
+          # gxhash (transitive) compile_error!s on x86_64 without aes+sse2.
+          # This action sets RUSTFLAGS itself, which would override any
+          # .cargo/config.toml, so the flags have to be supplied here.
+          rustflags: "-D warnings -C target-feature=+aes,+sse2"
 
       - name: Check formatting
         run: cargo fmt --all --check
@@ -43,6 +47,9 @@ jobs:
 
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          # See the lint job.
+          rustflags: "-D warnings -C target-feature=+aes,+sse2"
 
       - name: Build
         run: cargo build --workspace --all-targets
