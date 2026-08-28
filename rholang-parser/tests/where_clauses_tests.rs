@@ -122,7 +122,10 @@ fn receive_join_with_guard() {
         Proc::ForComprehension { receipts, .. } => {
             assert_eq!(receipts.len(), 1);
             assert_eq!(receipts[0].binds.len(), 2);
-            assert!(receipts[0].guard.is_some(), "guard should attach to the &-joined receipt");
+            assert!(
+                receipts[0].guard.is_some(),
+                "guard should attach to the &-joined receipt"
+            );
         }
         ref other => panic!("expected ForComprehension, got {other:?}"),
     }
@@ -147,8 +150,15 @@ fn remainder_bind_with_guard() {
     match procs[0].proc {
         Proc::ForComprehension { receipts, .. } => {
             assert_eq!(receipts.len(), 1);
-            assert_eq!(receipts[0].binds.len(), 1, "one bind with multiple names + remainder");
-            assert!(receipts[0].guard.is_some(), "guard populated despite remainder");
+            assert_eq!(
+                receipts[0].binds.len(),
+                1,
+                "one bind with multiple names + remainder"
+            );
+            assert!(
+                receipts[0].guard.is_some(),
+                "guard populated despite remainder"
+            );
         }
         ref other => panic!("expected ForComprehension, got {other:?}"),
     }
@@ -158,8 +168,7 @@ fn remainder_bind_with_guard() {
 fn three_bind_atomic_join_with_guard() {
     // Three-or-more &-joined binds sharing a single guard.
     let parser = RholangParser::new();
-    let parsed = parser
-        .parse("for (@x <- a & @y <- b & @z <- c where x + y + z > 0) { Nil }");
+    let parsed = parser.parse("for (@x <- a & @y <- b & @z <- c where x + y + z > 0) { Nil }");
 
     let procs = match parsed {
         Validated::Good(p) => p,
@@ -170,7 +179,10 @@ fn three_bind_atomic_join_with_guard() {
         Proc::ForComprehension { receipts, .. } => {
             assert_eq!(receipts.len(), 1);
             assert_eq!(receipts[0].binds.len(), 3);
-            assert!(receipts[0].guard.is_some(), "guard should attach to the 3-bind join");
+            assert!(
+                receipts[0].guard.is_some(),
+                "guard should attach to the 3-bind join"
+            );
         }
         ref other => panic!("expected ForComprehension, got {other:?}"),
     }
@@ -196,7 +208,10 @@ fn nested_for_comp_inner_guard_refs_outer_var() {
             proc: outer_body,
         } => {
             assert_eq!(outer_receipts.len(), 1);
-            assert!(outer_receipts[0].guard.is_none(), "outer receipt has no guard");
+            assert!(
+                outer_receipts[0].guard.is_none(),
+                "outer receipt has no guard"
+            );
             match outer_body.proc {
                 Proc::ForComprehension {
                     receipts: inner_receipts,
@@ -221,8 +236,7 @@ fn for_receipt_guard_is_match_expression() {
     // produces drives downstream classification (e.g., f1r3node-rust's
     // `EMatchExpr` recognizer).
     let parser = RholangParser::new();
-    let parsed =
-        parser.parse("for (@x <- a where match x { 1 => true _ => false }) { Nil }");
+    let parsed = parser.parse("for (@x <- a where match x { 1 => true _ => false }) { Nil }");
 
     let procs = match parsed {
         Validated::Good(p) => p,
@@ -232,10 +246,7 @@ fn for_receipt_guard_is_match_expression() {
     match procs[0].proc {
         Proc::ForComprehension { receipts, .. } => {
             assert_eq!(receipts.len(), 1);
-            let guard = receipts[0]
-                .guard
-                .as_ref()
-                .expect("guard should be present");
+            let guard = receipts[0].guard.as_ref().expect("guard should be present");
             assert!(
                 matches!(guard.proc, Proc::Match { .. }),
                 "guard should be Proc::Match, got {:?}",
@@ -251,8 +262,7 @@ fn match_case_guard_is_match_expression() {
     // Match case whose guard is itself a `match` — same shape, different
     // host node.
     let parser = RholangParser::new();
-    let parsed =
-        parser.parse("match x { y where match y { _ => true } => big _ => small }");
+    let parsed = parser.parse("match x { y where match y { _ => true } => big _ => small }");
 
     let procs = match parsed {
         Validated::Good(p) => p,
@@ -324,10 +334,7 @@ fn for_receipt_guard_with_method_call() {
 
     match procs[0].proc {
         Proc::ForComprehension { receipts, .. } => {
-            let guard = receipts[0]
-                .guard
-                .as_ref()
-                .expect("guard should be present");
+            let guard = receipts[0].guard.as_ref().expect("guard should be present");
             // Top-level is a comparison; the lhs is the method call.
             match guard.proc {
                 Proc::BinaryExp {
@@ -352,8 +359,7 @@ fn for_receipt_guard_with_method_call() {
 fn match_with_some_cases_guarded_others_not() {
     // Mixed: per-case guard population varies across the cases vector.
     let parser = RholangParser::new();
-    let parsed =
-        parser.parse("match v { 0 => zero n where n > 0 => pos _ => neg_or_other }");
+    let parsed = parser.parse("match v { 0 => zero n where n > 0 => pos _ => neg_or_other }");
 
     let procs = match parsed {
         Validated::Good(p) => p,
@@ -375,8 +381,7 @@ fn match_with_some_cases_guarded_others_not() {
 fn for_receipt_guard_is_boolean_combinator() {
     // Guard with `and`/`or` — checks that connectives parse inside guards.
     let parser = RholangParser::new();
-    let parsed =
-        parser.parse("for (@x <- a where x > 0 and x < 100) { Nil }");
+    let parsed = parser.parse("for (@x <- a where x > 0 and x < 100) { Nil }");
 
     let procs = match parsed {
         Validated::Good(p) => p,

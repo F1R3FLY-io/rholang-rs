@@ -163,7 +163,10 @@ impl Process {
             }
 
             let inst = code[pc];
-            match self.vm.execute(&mut self.locals, &self.names, &self.constants, inst) {
+            match self
+                .vm
+                .execute(&mut self.locals, &self.names, &self.constants, inst)
+            {
                 Ok(StepResult::Next) => {
                     pc += 1;
                 }

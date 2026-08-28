@@ -790,6 +790,15 @@ pub(super) fn node_to_ast<'ast>(
                             } else {
                                 (None, get_first_child(&bind_node))
                             };
+                            // A source the grammar could not parse (a process
+                            // where a name is required, say) arrives as an ERROR
+                            // node, which is none of the four source kinds. Skip
+                            // the bind; query_errors reports the ERROR node once
+                            // the parse completes.
+                            if source_node.is_error() || source_node.is_missing() {
+                                continue;
+                            }
+
                             let (name_count, cont_present) = match names_node {
                                 Some(names) => (
                                     names.named_child_count(),
@@ -2652,48 +2661,6 @@ fn build_agent_desugaring<'ast>(
     ann(builder.alloc_for([[outer_bind]], new_this_in), span)
 }
 
-/// Assemble the try/catch desugaring per FIP 2026-02-06
-/// §"Error syntax". Called from apply_cont at K::ConsumeTryBlock
-/// after all pieces have been evaluated onto proc_stack.
-///
-/// The slice layout, driven by the push order in the visitor case
-/// for `kind!("try_block")`, is (bottom to top):
-///
-///   [0 .. source_desc.len()]   source pieces (name, [method_lit], [inputs...])
-///   [+0 or +1]                 try_pattern (if has_try_pattern)
-///   [+1]                       try_body
-///   [+1]                       catch_pattern
-///   [+1]                       catch_body
-///
-/// The `mask` bit at each index tells whether the corresponding
-/// slot came from a `quote` node (needs `Name::Quote`) vs a proc-
-/// var (`Name::NameVar`) -- driven by the same
-/// `mark_quote` / `into_name` machinery the for-comp path uses.
-///
-/// The desugared shape is
-///   for (@[__ok, ...__rest] <- <source>) {
-///     if (__ok) {
-///       let @<try_pat> <- __rest in { <try_body> }
-///     } else {
-///       let @<catch_pat> <- __rest in { <catch_body> }
-///     }
-///   }
-///
-/// with the try-branch `let` dropped when `has_try_pattern` is
-/// false (bare `try <-` form for methods that return `[true]` alone).
-///
-/// # Hygiene
-///
-/// The outer `for` introduces two synthetic bindings (`__ok`,
-/// `__rest`) that would silently capture any user reference to
-/// those identifiers inside the try/catch bodies or patterns.
-/// [`collect_ids_into`] scans all four subtrees for identifier
-/// occurrences and [`pick_fresh`] chooses names that don't
-/// collide -- falling back to `__ok0`, `__ok1`, ... when the base
-/// name is taken. When the user writes nothing named `__ok` /
-/// `__rest`, the emitted names are unchanged (so the existing
-/// desugared-corpus tests keep passing).
-
 /// Collect every identifier name appearing anywhere inside
 /// `root`. Used by [`build_try_block_desugaring`] to guarantee
 /// the synthesized `__ok` / `__rest` bindings don't shadow a
@@ -2862,10 +2829,8 @@ fn collect_ids_into<'ast>(root: AnnProc<'ast>, out: &mut BTreeSet<&'ast str>) {
                     for e in elements.iter() {
                         stack.push(*e);
                     }
-                    if let Some(rem) = remainder {
-                        if let Var::Id(id) = rem {
-                            out.insert(id.name);
-                        }
+                    if let Some(Var::Id(id)) = remainder {
+                        out.insert(id.name);
                     }
                 }
                 Collection::PathMap { elements, .. } | Collection::Tuple(elements) => {
@@ -2881,10 +2846,8 @@ fn collect_ids_into<'ast>(root: AnnProc<'ast>, out: &mut BTreeSet<&'ast str>) {
                         stack.push(*k);
                         stack.push(*v);
                     }
-                    if let Some(rem) = remainder {
-                        if let Var::Id(id) = rem {
-                            out.insert(id.name);
-                        }
+                    if let Some(Var::Id(id)) = remainder {
+                        out.insert(id.name);
                     }
                 }
             },
@@ -2977,6 +2940,47 @@ fn pick_fresh<'ast>(
     unreachable!("pick_fresh exhausted the entire usize range without finding a free name")
 }
 
+/// Assemble the try/catch desugaring per FIP 2026-02-06
+/// §"Error syntax". Called from apply_cont at K::ConsumeTryBlock
+/// after all pieces have been evaluated onto proc_stack.
+///
+/// The slice layout, driven by the push order in the visitor case
+/// for `kind!("try_block")`, is (bottom to top):
+///
+///   [0 .. source_desc.len()]   source pieces (name, [method_lit], [inputs...])
+///   [+0 or +1]                 try_pattern (if has_try_pattern)
+///   [+1]                       try_body
+///   [+1]                       catch_pattern
+///   [+1]                       catch_body
+///
+/// The `mask` bit at each index tells whether the corresponding
+/// slot came from a `quote` node (needs `Name::Quote`) vs a proc-
+/// var (`Name::NameVar`) -- driven by the same
+/// `mark_quote` / `into_name` machinery the for-comp path uses.
+///
+/// The desugared shape is
+///   for (@[__ok, ...__rest] <- <source>) {
+///     if (__ok) {
+///       let @<try_pat> <- __rest in { <try_body> }
+///     } else {
+///       let @<catch_pat> <- __rest in { <catch_body> }
+///     }
+///   }
+///
+/// with the try-branch `let` dropped when `has_try_pattern` is
+/// false (bare `try <-` form for methods that return `[true]` alone).
+///
+/// # Hygiene
+///
+/// The outer `for` introduces two synthetic bindings (`__ok`,
+/// `__rest`) that would silently capture any user reference to
+/// those identifiers inside the try/catch bodies or patterns.
+/// [`collect_ids_into`] scans all four subtrees for identifier
+/// occurrences and [`pick_fresh`] chooses names that don't
+/// collide -- falling back to `__ok0`, `__ok1`, ... when the base
+/// name is taken. When the user writes nothing named `__ok` /
+/// `__rest`, the emitted names are unchanged (so the existing
+/// desugared-corpus tests keep passing).
 fn build_try_block_desugaring<'ast>(
     builder: &'ast ASTBuilder<'ast>,
     source_desc: SourceDesc,

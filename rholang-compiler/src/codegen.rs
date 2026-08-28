@@ -342,10 +342,7 @@ impl<'a> CodegenContext<'a> {
         if bits == 32 {
             let f32_val = f as f32;
             if f32_val.is_infinite() && !f.is_infinite() {
-                bail!(
-                    "Float literal '{}' overflows f32 (would become Inf)",
-                    value
-                );
+                bail!("Float literal '{}' overflows f32 (would become Inf)", value);
             }
         }
 

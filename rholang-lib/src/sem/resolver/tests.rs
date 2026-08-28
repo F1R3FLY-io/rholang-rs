@@ -1267,10 +1267,7 @@ match 1 {
     _ => Nil
 }"#, pipeline = pipeline
 )]
-fn test_match_guard_unbound_var<'test>(
-    _tree: ProcRef<'test>,
-    db: &'test SemanticDb<'test>,
-) {
+fn test_match_guard_unbound_var<'test>(_tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     expect::error(db, ErrorKind::UnboundVariable, matches::proc_var("missing"));
 }
 
@@ -1281,10 +1278,7 @@ match 1 {
     _ => Nil
 }"#, pipeline = pipeline
 )]
-fn test_match_guard_bound_var<'test>(
-    _tree: ProcRef<'test>,
-    db: &'test SemanticDb<'test>,
-) {
+fn test_match_guard_bound_var<'test>(_tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     expect::no_warnings_or_errors(db);
 }
 
@@ -1294,10 +1288,7 @@ new chan in {
     for (@x <- chan where missing) { Nil }
 }"#, pipeline = pipeline
 )]
-fn test_for_receipt_guard_unbound_var<'test>(
-    _tree: ProcRef<'test>,
-    db: &'test SemanticDb<'test>,
-) {
+fn test_for_receipt_guard_unbound_var<'test>(_tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     expect::error(db, ErrorKind::UnboundVariable, matches::proc_var("missing"));
 }
 
@@ -1307,10 +1298,7 @@ new chan in {
     for (@x <- chan where x) { Nil }
 }"#, pipeline = pipeline
 )]
-fn test_for_receipt_guard_bound_var<'test>(
-    _tree: ProcRef<'test>,
-    db: &'test SemanticDb<'test>,
-) {
+fn test_for_receipt_guard_bound_var<'test>(_tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     expect::no_warnings_or_errors(db);
 }
 
@@ -1442,10 +1430,7 @@ match 1 {
     _ => Nil
 }"#, pipeline = pipeline
 )]
-fn test_match_mixed_guards_all_resolve<'test>(
-    _tree: ProcRef<'test>,
-    db: &'test SemanticDb<'test>,
-) {
+fn test_match_mixed_guards_all_resolve<'test>(_tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
     expect::no_warnings_or_errors(db);
 }
 

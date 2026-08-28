@@ -64,33 +64,74 @@ fn unaryop(a: Value, op: Opcode) -> Result<Value, String> {
 
 #[test]
 fn test_float_arithmetic() {
-    assert_eq!(binop(Value::Float(1.5), Value::Float(2.25), Opcode::ADD).unwrap(), Value::Float(3.75));
-    assert_eq!(binop(Value::Float(5.0), Value::Float(3.0), Opcode::SUB).unwrap(), Value::Float(2.0));
-    assert_eq!(binop(Value::Float(2.5), Value::Float(4.0), Opcode::MUL).unwrap(), Value::Float(10.0));
-    assert_eq!(binop(Value::Float(10.0), Value::Float(4.0), Opcode::DIV).unwrap(), Value::Float(2.5));
-    assert_eq!(unaryop(Value::Float(3.15), Opcode::NEG).unwrap(), Value::Float(-3.15));
+    assert_eq!(
+        binop(Value::Float(1.5), Value::Float(2.25), Opcode::ADD).unwrap(),
+        Value::Float(3.75)
+    );
+    assert_eq!(
+        binop(Value::Float(5.0), Value::Float(3.0), Opcode::SUB).unwrap(),
+        Value::Float(2.0)
+    );
+    assert_eq!(
+        binop(Value::Float(2.5), Value::Float(4.0), Opcode::MUL).unwrap(),
+        Value::Float(10.0)
+    );
+    assert_eq!(
+        binop(Value::Float(10.0), Value::Float(4.0), Opcode::DIV).unwrap(),
+        Value::Float(2.5)
+    );
+    assert_eq!(
+        unaryop(Value::Float(3.15), Opcode::NEG).unwrap(),
+        Value::Float(-3.15)
+    );
 }
 
 #[test]
 fn test_float_ieee754_edge_cases() {
     // div by zero -> Inf (IEEE 754, not an error)
-    assert_eq!(binop(Value::Float(1.0), Value::Float(0.0), Opcode::DIV).unwrap(), Value::Float(f64::INFINITY));
+    assert_eq!(
+        binop(Value::Float(1.0), Value::Float(0.0), Opcode::DIV).unwrap(),
+        Value::Float(f64::INFINITY)
+    );
     // MOD on float is an error per spec
-    assert!(binop_err(Value::Float(5.0), Value::Float(3.0), Opcode::MOD).contains("not defined on floating point"));
+    assert!(binop_err(Value::Float(5.0), Value::Float(3.0), Opcode::MOD)
+        .contains("not defined on floating point"));
 }
 
 #[test]
 fn test_float_nan_semantics() {
     // NaN != NaN (IEEE 754)
-    assert_eq!(binop(Value::Float(f64::NAN), Value::Float(f64::NAN), Opcode::CMP_EQ).unwrap(), Value::Bool(false));
-    assert_eq!(binop(Value::Float(f64::NAN), Value::Float(f64::NAN), Opcode::CMP_NEQ).unwrap(), Value::Bool(true));
+    assert_eq!(
+        binop(
+            Value::Float(f64::NAN),
+            Value::Float(f64::NAN),
+            Opcode::CMP_EQ
+        )
+        .unwrap(),
+        Value::Bool(false)
+    );
+    assert_eq!(
+        binop(
+            Value::Float(f64::NAN),
+            Value::Float(f64::NAN),
+            Opcode::CMP_NEQ
+        )
+        .unwrap(),
+        Value::Bool(true)
+    );
     // NaN ordering is undefined -> error
-    assert!(binop_err(Value::Float(f64::NAN), Value::Float(1.0), Opcode::CMP_LT).contains("not comparable"));
+    assert!(
+        binop_err(Value::Float(f64::NAN), Value::Float(1.0), Opcode::CMP_LT)
+            .contains("not comparable")
+    );
 }
 
 #[test]
 fn test_float_comparison() {
-    assert_eq!(binop(Value::Float(1.5), Value::Float(2.5), Opcode::CMP_LT).unwrap(), Value::Bool(true));
+    assert_eq!(
+        binop(Value::Float(1.5), Value::Float(2.5), Opcode::CMP_LT).unwrap(),
+        Value::Bool(true)
+    );
 }
 
 // ==========================================================================
@@ -120,7 +161,10 @@ fn test_bigint_errors() {
 #[test]
 fn test_bigint_comparison() {
     let bi = |n: i64| Value::BigInt(BigInt::from(n));
-    assert_eq!(binop(bi(100), bi(200), Opcode::CMP_LT).unwrap(), Value::Bool(true));
+    assert_eq!(
+        binop(bi(100), bi(200), Opcode::CMP_LT).unwrap(),
+        Value::Bool(true)
+    );
 }
 
 // ==========================================================================
@@ -130,13 +174,28 @@ fn test_bigint_comparison() {
 #[test]
 fn test_bigrat_arithmetic() {
     // Uses non-trivial rationals to verify normalization
-    assert_eq!(binop(bigrat(1, 3), bigrat(1, 6), Opcode::ADD).unwrap(), bigrat(1, 2));  // 1/3 + 1/6 = 1/2
-    assert_eq!(binop(bigrat(3, 4), bigrat(1, 4), Opcode::SUB).unwrap(), bigrat(1, 2));  // 3/4 - 1/4 = 1/2
-    assert_eq!(binop(bigrat(2, 3), bigrat(3, 4), Opcode::MUL).unwrap(), bigrat(1, 2));  // 2/3 * 3/4 = 1/2
-    // Spec: `10r / 3r == 3r + 1r/3r` i.e. 10/3
-    assert_eq!(binop(bigrat(1, 2), bigrat(1, 4), Opcode::DIV).unwrap(), bigrat(2, 1));
+    assert_eq!(
+        binop(bigrat(1, 3), bigrat(1, 6), Opcode::ADD).unwrap(),
+        bigrat(1, 2)
+    ); // 1/3 + 1/6 = 1/2
+    assert_eq!(
+        binop(bigrat(3, 4), bigrat(1, 4), Opcode::SUB).unwrap(),
+        bigrat(1, 2)
+    ); // 3/4 - 1/4 = 1/2
+    assert_eq!(
+        binop(bigrat(2, 3), bigrat(3, 4), Opcode::MUL).unwrap(),
+        bigrat(1, 2)
+    ); // 2/3 * 3/4 = 1/2
+       // Spec: `10r / 3r == 3r + 1r/3r` i.e. 10/3
+    assert_eq!(
+        binop(bigrat(1, 2), bigrat(1, 4), Opcode::DIV).unwrap(),
+        bigrat(2, 1)
+    );
     // Spec: modulus always gives 0 since (a/b)*b == a exactly
-    assert_eq!(binop(bigrat(7, 3), bigrat(2, 5), Opcode::MOD).unwrap(), bigrat(0, 1));
+    assert_eq!(
+        binop(bigrat(7, 3), bigrat(2, 5), Opcode::MOD).unwrap(),
+        bigrat(0, 1)
+    );
     assert_eq!(unaryop(bigrat(3, 4), Opcode::NEG).unwrap(), bigrat(-3, 4));
 }
 
@@ -157,7 +216,10 @@ fn test_int_division_by_zero() {
 
 #[test]
 fn test_bigrat_comparison() {
-    assert_eq!(binop(bigrat(1, 3), bigrat(1, 2), Opcode::CMP_LT).unwrap(), Value::Bool(true));
+    assert_eq!(
+        binop(bigrat(1, 3), bigrat(1, 2), Opcode::CMP_LT).unwrap(),
+        Value::Bool(true)
+    );
 }
 
 // ==========================================================================
@@ -167,17 +229,29 @@ fn test_bigrat_comparison() {
 #[test]
 fn test_fixedpoint_add_sub() {
     // Same-scale required; 1.50 + 2.25 = 3.75
-    assert_eq!(binop(fixed(150, 2), fixed(225, 2), Opcode::ADD).unwrap(), fixed(375, 2));
+    assert_eq!(
+        binop(fixed(150, 2), fixed(225, 2), Opcode::ADD).unwrap(),
+        fixed(375, 2)
+    );
     // 5.00 - 3.25 = 1.75
-    assert_eq!(binop(fixed(500, 2), fixed(325, 2), Opcode::SUB).unwrap(), fixed(175, 2));
+    assert_eq!(
+        binop(fixed(500, 2), fixed(325, 2), Opcode::SUB).unwrap(),
+        fixed(175, 2)
+    );
 }
 
 #[test]
 fn test_fixedpoint_mul_preserves_scale() {
     // Scale-preserving: 1.5p1 * 2.0p1 = 3.0p1 (unscaled: (15*20)/10 = 30)
-    assert_eq!(binop(fixed(15, 1), fixed(20, 1), Opcode::MUL).unwrap(), fixed(30, 1));
+    assert_eq!(
+        binop(fixed(15, 1), fixed(20, 1), Opcode::MUL).unwrap(),
+        fixed(30, 1)
+    );
     // Precision loss: 0.1p1 * 0.1p1 = 0.0p1 (unscaled: (1*1)/10 = 0, floor)
-    assert_eq!(binop(fixed(1, 1), fixed(1, 1), Opcode::MUL).unwrap(), fixed(0, 1));
+    assert_eq!(
+        binop(fixed(1, 1), fixed(1, 1), Opcode::MUL).unwrap(),
+        fixed(0, 1)
+    );
     // Scale mismatch is an error
     assert!(binop_err(fixed(15, 1), fixed(150, 2), Opcode::MUL).contains("type mismatch"));
 }
@@ -185,11 +259,20 @@ fn test_fixedpoint_mul_preserves_scale() {
 #[test]
 fn test_fixedpoint_div_and_mod_c99() {
     // Spec: `10p1 / 3p1 == 3.3p1` (shifted integer division)
-    assert_eq!(binop(fixed(100, 1), fixed(30, 1), Opcode::DIV).unwrap(), fixed(33, 1));
+    assert_eq!(
+        binop(fixed(100, 1), fixed(30, 1), Opcode::DIV).unwrap(),
+        fixed(33, 1)
+    );
     // Spec: `10p1 % 3p1 == 0.1p1`, satisfying C99 identity (a/b)*b + a%b == a
-    assert_eq!(binop(fixed(100, 1), fixed(30, 1), Opcode::MOD).unwrap(), fixed(1, 1));
+    assert_eq!(
+        binop(fixed(100, 1), fixed(30, 1), Opcode::MOD).unwrap(),
+        fixed(1, 1)
+    );
     // Exact division: 6.0p1 % 3.0p1 = 0.0p1
-    assert_eq!(binop(fixed(60, 1), fixed(30, 1), Opcode::MOD).unwrap(), fixed(0, 1));
+    assert_eq!(
+        binop(fixed(60, 1), fixed(30, 1), Opcode::MOD).unwrap(),
+        fixed(0, 1)
+    );
 }
 
 #[test]

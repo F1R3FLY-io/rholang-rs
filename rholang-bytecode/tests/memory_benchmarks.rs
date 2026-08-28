@@ -33,12 +33,11 @@ fn get_memory_usage() -> usize {
     {
         if let Ok(contents) = std::fs::read_to_string("/proc/self/status") {
             for line in contents.lines() {
-                if line.starts_with("VmRSS:") {
-                    if let Some(kb_str) = line.split_whitespace().nth(1) {
-                        if let Ok(kb) = kb_str.parse::<usize>() {
-                            return kb * 1024; // Convert KB to bytes
-                        }
-                    }
+                if line.starts_with("VmRSS:")
+                    && let Some(kb_str) = line.split_whitespace().nth(1)
+                    && let Ok(kb) = kb_str.parse::<usize>()
+                {
+                    return kb * 1024; // Convert KB to bytes
                 }
             }
         }
