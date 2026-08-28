@@ -3,8 +3,8 @@ use typed_arena::Arena;
 
 use crate::ast::{
     AnnProc, BinaryExpOp, Bind, BundleType, Case, Collection, Id, KeyValuePair, LetBinding, Name,
-    NameDecl, Names, Proc, Receipt, SendType, SimpleType, SyncSendCont, UnaryExpOp, Var,
-    VarRefKind,
+    NameDecl, Names, Proc, Receipt, SendType, Signature, SimpleType, SyncSendCont, TokenStack,
+    UnaryExpOp, Var, VarRefKind,
 };
 
 pub struct ASTBuilder<'ast> {
@@ -408,6 +408,14 @@ impl<'ast> ASTBuilder<'ast> {
 
     pub fn alloc_eval(&self, name: Name<'ast>) -> &Proc<'ast> {
         self.arena.alloc(Proc::Eval { name })
+    }
+
+    pub fn alloc_signed_term(&self, proc: AnnProc<'ast>, sig: Signature<'ast>) -> &Proc<'ast> {
+        self.arena.alloc(Proc::SignedTerm { proc, sig })
+    }
+
+    pub fn alloc_token_stack(&self, stack: TokenStack<'ast>) -> &Proc<'ast> {
+        self.arena.alloc(Proc::TokenStack { stack })
     }
 
     pub fn alloc_method(
