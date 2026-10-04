@@ -1,6 +1,5 @@
 ---
 source: rholang-parser/tests/golden.rs
-assertion_line: 23
 expression: result
 ---
 Good(
@@ -16,6 +15,7 @@ Good(
                                 col: 5,
                             },
                         },
+                        space: None,
                         uri: None,
                     },
                     NameDecl {
@@ -26,6 +26,7 @@ Good(
                                 col: 8,
                             },
                         },
+                        space: None,
                         uri: None,
                     },
                 ],
@@ -99,6 +100,7 @@ Good(
                                 },
                             },
                         ],
+                        params: None,
                         cont: Empty,
                     },
                     span: SourceSpan {

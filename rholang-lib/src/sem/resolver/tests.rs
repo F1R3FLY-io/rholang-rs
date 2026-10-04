@@ -1504,3 +1504,146 @@ fn cost_signed_term_in_contract_formal_is_rejected<'test>(
         true
     });
 }
+
+// ── Reified RSpaces ─────────────────────────────────────────────────────────
+// The resolver gives every Reified RSpaces position its scope. Value checks
+// (ranges, `k` XOR `results`, arities, a space on a URI binder) belong to the
+// node's shared validators, not to rholang-lib.
+
+// `use s { P }`: the space, then the body, both in the current scope.
+#[test_rholang_code(
+    r#"
+new s, ch in {
+    use s { ch!(1) } |
+    use @"global" { ch!(2) }
+}"#, pipeline = pipeline
+)]
+fn resolve_use_block_space_and_body<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
+    let root_scope = expect::scope(db, tree, 2);
+    let binders: Vec<BinderId> = match_proc!(tree.proc, ast::Proc::New { decls, .. } => {
+        expect::name_decls(db, decls, root_scope).collect()
+    });
+    expect::bound(
+        db,
+        &[
+            VarBinding::Bound(binders[0]), // s in `use s`
+            VarBinding::Bound(binders[1]), // ch in the first body
+            VarBinding::Bound(binders[1]), // ch in the second body
+        ],
+    );
+    expect::no_warnings_or_errors(db);
+}
+
+// `free Th(args)`: the arguments resolve like any process.
+#[test_rholang_code(
+    r#"
+new ret, arg in {
+    ret!(free Nat(*arg, 1))
+}"#, pipeline = pipeline
+)]
+fn resolve_free_theory_args<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
+    let root_scope = expect::scope(db, tree, 2);
+    let binders: Vec<BinderId> = match_proc!(tree.proc, ast::Proc::New { decls, .. } => {
+        expect::name_decls(db, decls, root_scope).collect()
+    });
+    expect::bound(
+        db,
+        &[
+            VarBinding::Bound(binders[0]), // ret
+            VarBinding::Bound(binders[1]), // arg in the theory arguments
+        ],
+    );
+    expect::no_warnings_or_errors(db);
+}
+
+// Send and sync-send hyperparameters resolve in the current scope.
+#[test_rholang_code(
+    r#"
+new x, p, q in {
+    x!(1; *p, priority = *q) |
+    x!?(2; ttl = *p).
+}"#, pipeline = pipeline
+)]
+fn resolve_send_params_in_scope<'test>(tree: ProcRef<'test>, db: &'test SemanticDb<'test>) {
+    let root_scope = expect::scope(db, tree, 3);
+    let binders: Vec<BinderId> = match_proc!(tree.proc, ast::Proc::New { decls, .. } => {
+        expect::name_decls(db, decls, root_scope).collect()
+    });
+    expect::bound(
+        db,
+        &[
+            VarBinding::Bound(binders[0]), // x
+            VarBinding::Bound(binders[1]), // *p, positional
+            VarBinding::Bound(binders[2]), // *q, priority
+            VarBinding::Bound(binders[0]), // x of the sync send
+            VarBinding::Bound(binders[1]), // *p, ttl
+        ],
+    );
+    expect::no_warnings_or_errors(db);
+}
+
+// A receive query resolves with the sources: it sees the binders of earlier
+// `;`-separated receipts (`a`), but not the binders of its own receipt (`b`).
+#[test_rholang_code(
+    r#"
+new ch, q in {
+    for (@a <- ch ~ (*q; k = *q); @b <- ch ~ (a; k = b)) { ch!(b) }
+}"#, pipeline = pipeline
+)]
+fn resolve_query_payload_and_params_in_outer_scope<'test>(
+    _tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    expect::errors(db, 1);
+    expect::error(db, ErrorKind::UnboundVariable, matches::proc_var("b"));
+}
+
+// A space annotation resolves in the scope around the `new`, before its
+// binders: `s` is the outer binder, and `x` in `y : x` is unbound.
+#[test_rholang_code(
+    r#"
+new s in {
+    new x : s, y : x in { x!(1) | y!(2) }
+}"#, pipeline = pipeline
+)]
+fn resolve_new_space_annotation_in_outer_scope<'test>(
+    tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    let outer_scope = expect::scope(db, tree, 1);
+    let [outer_s] = match_proc!(tree.proc, ast::Proc::New { decls, .. } => {
+        let binders: Vec<BinderId> = expect::name_decls(db, decls, outer_scope).collect();
+        [binders[0]]
+    });
+    expect::errors(db, 1);
+    expect::error(
+        db,
+        ErrorKind::UnboundVariable,
+        |node: ProcRef| matches!(node.proc, ast::Proc::New { decls, .. } if decls.len() == 2),
+    );
+    let s_occurrences = db
+        .bound_positions()
+        .filter(|bound| bound.binding == VarBinding::Bound(outer_s))
+        .count();
+    assert_eq!(
+        s_occurrences, 1,
+        "the annotation `s` resolves to the outer binder"
+    );
+}
+
+// A wildcard is a connective, so it cannot be a query payload.
+#[test_rholang_code(
+    r#"
+new ch in {
+    for (@y <- ch ~ _) { ch!(y) }
+}"#, pipeline = pipeline
+)]
+fn wildcard_in_query_payload_is_connective_error<'test>(
+    _tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    expect::errors(db, 1);
+    expect::error(db, ErrorKind::ConnectiveOutsidePattern, |node: ProcRef| {
+        matches!(node.proc, ast::Proc::ProcVar(ast::Var::Wildcard))
+    });
+}

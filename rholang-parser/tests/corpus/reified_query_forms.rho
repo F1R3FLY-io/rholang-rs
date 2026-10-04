@@ -1,0 +1,12 @@
+// Every receive-query form, and how a query composes with `where`, joins and
+// signed binds.
+new ch, stdout(`rho:io:stdout`) in {
+  for (@a <- ch ~ 1) { stdout!(a) } |
+  for (@b <- ch ~ (1, 2)) { stdout!(b) } |
+  for (@c <- ch ~ (1, 2;)) { stdout!(c) } |
+  for (@d <- ch ~ (1; k = 2)) { stdout!(d) } |
+  for (@e <- ch ~ (; k = 2, metric = "cosine")) { stdout!(e) } |
+  for (@f <- ch ~ [1, 2] where f > 0) { stdout!(f) } |
+  for (@g <- ch ~ 1 & @h <- ch ~ 2; @i <- ch ~ (g; k = h)) { stdout!(i) } |
+  for (@j <- ch ~ 1 & {% @k <- ch %}[s]) { stdout!(j) }
+}

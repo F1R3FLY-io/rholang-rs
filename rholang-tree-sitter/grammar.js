@@ -6,6 +6,127 @@ module.exports = grammar({
         $._block_comment,
         /\s/,
     ],
+
+    // ─── Contextual keywords `use` and `free` (Reified RSpaces) ─────────────
+    //
+    // `use` and `free` are not reserved. At 02cef80 they are ordinary
+    // identifiers (`use!(1)`, `contract f(use) = { … }`, `free | Nil`), and
+    // every program that parses at 02cef80 must keep its exact syntax tree.
+    // The external scanner (src/scanner.c) therefore emits `_use_keyword` and
+    // `_free_keyword` only when the text that follows can never continue a
+    // valid 02cef80 process. In every other case it returns false, and the
+    // internal lexer produces an ordinary `var`.
+    //
+    // `use` is a keyword only when all of these hold:
+    //   1. `_use_keyword` is valid in the current parse state, and the parser
+    //      is not in error recovery (`_error_recovery_sentinel` is used by no
+    //      rule, so it is valid only when tree-sitter marks every external
+    //      token valid during error recovery);
+    //   2. the text is `use`, and the next character cannot continue an
+    //      identifier ([a-zA-Z0-9_']);
+    //   3. at least one whitespace character or comment follows;
+    //   4. a space name follows: an identifier that is not a `use W {`
+    //      exclusion, `_`, or `@` and a simple quoted process (an identifier
+    //      that is not a `use @W {` exclusion, `_`, a string, URI or number
+    //      literal, or one balanced `{ … }`, `( … )` or `[ … ]` group);
+    //   5. after optional whitespace and comments, the next character is `{`.
+    // `free` is a keyword only when conditions 1–3 hold for `free`, an
+    // identifier that is not a `free W (` exclusion follows, and then, after
+    // optional whitespace and comments, the next character is `(`.
+    //
+    // Why the lookahead reaches the `{` or the `(`: `cases` (match) and
+    // `branches` (select) are repetitions with no separator, so inside one
+    // 02cef80 process a `var` can be followed by another `var`, by `_`, or
+    // by `@`:
+    //   match e { 1 => use _ => Nil }          (body `use`, next pattern `_`)
+    //   match e { 1 => free x => Nil }         (body `free`, next pattern `x`)
+    //   select { a <- b => free c <- d => P }  (next branch starts with `c`)
+    // This adjacency is the only way that a name can follow a `var`. A name
+    // followed by `{`, or an identifier followed by `(`, never continues a
+    // 02cef80 process. These facts of the 02cef80 grammar.json, with `_proc`
+    // as the start symbol, show it:
+    //   - FOLLOW_2(_proc) has no pair `var {` or `_ {`, and
+    //     FOLLOW_2(_proc_expression) has no pair `var (`;
+    //   - FIRST_2(_proc) has no pair `var {`, `_ {` or `<literal> {`, and no
+    //     bracket construct that starts a process is followed by `{`, so a
+    //     simple quoted process ends before the `{`;
+    //   - a complete quoted name that starts a case is followed by `!`, `!!`
+    //     or `!?`, and one that starts a branch by `,`, `...` or `<-`.
+    // scripts/derive_scanner_exclusions.js checks each of these facts.
+    //
+    // Exclusions. A keyword W is excluded from a form exactly when the form
+    // continues a 02cef80 program in which `use` or `free` is a variable.
+    // scripts/derive_scanner_exclusions.js derives the three tables from the
+    // 02cef80 grammar.json: the pairs `W {` in FOLLOW_2(_proc), `W (` in
+    // FOLLOW_2(_proc_expression), and `W {` in FIRST_2(_proc). FOLLOW_2 of
+    // the `var` token itself, over every position of a variable, gives the
+    // same `use` and `free` tables. Each witness below parses at 02cef80, and
+    // test/corpus/conservative_extension.txt pins its 02cef80 tree.
+    //   `use W {` (11 words)
+    //     and      use and { Nil }
+    //     or       use or { Nil }
+    //     matches  use matches { Nil }
+    //     else     if (c) use else { Nil }
+    //     in       let x = use in { x }
+    //     where    match e { use where { true } => Nil }
+    //     bundle   match e { 1 => use bundle { Nil } => Nil }
+    //     bundle0  match e { 1 => use bundle0 { Nil } => Nil }
+    //     match    match e { 1 => use match { x } { _ => Nil } => Nil }
+    //     not      match e { 1 => use not { true } => Nil }
+    //     select   match e { 1 => use select { a <- b => Nil } => Nil }
+    //   `free W (` (11 words)
+    //     and      free and (true)
+    //     or       free or (true)
+    //     matches  free matches (true)
+    //     else     if (c) free else (Nil)
+    //     in       let x = free in (x)
+    //     where    match e { free where (true) => Nil }
+    //     Set      match e { 1 => free Set(1) => Nil }
+    //     if       match e { 1 => free if (c) Nil => Nil }
+    //     for      match e { 1 => free for (x <- c) { Nil } => Nil }
+    //     not      match e { 1 => free not (true) => Nil }
+    //     match    match e { 1 => free match (x) { _ => Nil } => Nil }
+    //   `use @W {` (5 words)
+    //     bundle   match e { 1 => use @bundle { Nil }!(1) => Nil }
+    //     bundle0  match e { 1 => use @bundle0 { Nil }!(1) => Nil }
+    //     match    match e { 1 => use @match { x } { _ => Nil }!(1) => Nil }
+    //     not      match e { 1 => use @not { true }!(1) => Nil }
+    //     select   match e { 1 => use @select { a <- b => Nil }!(1) => Nil }
+    // The infix keywords (`and`, `or`, `matches`) and the continuation
+    // keywords (`else`, `in`, `where`) follow a complete process. The other
+    // excluded words start a process whose second token is `{` or `(`, and
+    // match-case adjacency puts such a process right after a complete one.
+    //
+    // Every other keyword is accepted, because the form can never continue a
+    // 02cef80 program. A simple type (`Bool`, `Int`, `String`, `Uri`,
+    // `ByteArray`), `Nil`, `true` and `false` are complete atoms, and `{` or
+    // `(` never follows an atom. `new`, `let`, `contract`, `agent` and `try`
+    // are followed by declarations, a name or `<-`. `Set`, `if` and `for` are
+    // followed only by `(`, and `bundle`, `bundle0` and `select` only by `{`.
+    // `catch`, `constructor`, `default`, `method` and `private` never follow
+    // a variable. So `free Int()` and `use Set { P }` are keyword forms. A
+    // reserved word in the name position (`use new { P }`) stays a parse
+    // error, as at 02cef80.
+    //
+    // Limits:
+    //   - `source_file` is `repeat($._proc)`, so at top level 02cef80 parses
+    //     `use s { P }` as the three processes `use`, `s` and `{ P }`, and
+    //     `free Th()` as `free`, `Th` and `()`. These sources now parse as
+    //     one process. The node rejects every source with more than one
+    //     top-level process ("Expected single process"), so no program that
+    //     the node accepts changes.
+    //   - A compound quoted space name needs a block or parentheses:
+    //     `use @{ x /\ y } { P }`, not `use @x /\ y { P }`.
+    //   - A space or theory name cannot be an excluded word of its form.
+    //
+    // The scanner also emits `_bare_exponent_float` (see `float_literal`).
+    externals: $ => [
+        $._use_keyword,
+        $._free_keyword,
+        $._bare_exponent_float,
+        $._error_recovery_sentinel,
+    ],
+
     word: $ => $.var,
 
     supertypes: $ => [
@@ -63,6 +184,7 @@ module.exports = grammar({
             $.match,
             $.choice,
             $.contract,
+            $.use_block,
             $.agent_block,
             $.try_block,
             $.input,
@@ -77,14 +199,15 @@ module.exports = grammar({
         send_sync: $ => prec(1, seq(
             field('channel', $.name),
             '!?',
-            field('inputs', alias($._proc_list, $.messages)), field('cont', $.sync_send_cont))
+            field('inputs', choice(alias($._proc_list, $.messages), $.hyper_inputs)),
+            field('cont', $.sync_send_cont))
         ),
 
         send_method: $ => prec(1, seq(
             field('channel', $.name),
             '!',
             field('method', $.var),
-            field('inputs', alias($._proc_list, $.messages)),
+            field('inputs', choice(alias($._proc_list, $.messages), $.hyper_inputs)),
             field('cont', $.sync_send_cont))
         ),
 
@@ -134,6 +257,15 @@ module.exports = grammar({
             field('name', $.name),
             '(', optional(field('formals', $.names)), ')',
             '=',
+            field('proc', $.block)
+        )),
+
+        // Reified RSpaces `use` block: `use s { P }` makes `s` the default
+        // space for the untagged channels of `P`. The keyword comes from the
+        // external scanner (see `externals`).
+        use_block: $ => prec(2, seq(
+            alias($._use_keyword, 'use'),
+            field('space', $.name),
             field('proc', $.block)
         )),
 
@@ -242,8 +374,41 @@ module.exports = grammar({
         send: $ => prec(3, seq(
             field('channel', $.name),
             field('send_type', $._send_type),
-            field('inputs', alias($._proc_list, $.inputs))
+            field('inputs', choice(alias($._proc_list, $.inputs), $.hyper_inputs))
         )),
+
+        // Reified RSpaces hyperparameters (the parens-`;` rule).
+        //
+        // A parenthesized list with a `;` is `hyper_inputs`: data before the
+        // `;`, parameters after it. Without a `;` the list keeps the 02cef80
+        // shape (`inputs`/`messages`), so the tree of every ordinary send is
+        // unchanged:
+        //   x!(a, b)            inputs (a, b)                no parameters
+        //   x!(a, b;)           data (a, b), empty section   parameters []
+        //   x!(a; p, k = v)     data (a), positional p, named k = v
+        //   x!(; k = v)         no data, named k = v
+        // The same rule holds for `!!`, `!?`, the method sugar `x!m(…)`, and
+        // the `!?` and `!m` receive sources. A receive query uses it too
+        // (see `query_spec`): `ch ~ (a, b)` queries the one tuple `(a, b)`,
+        // and `ch ~ (a, b;)` queries the two payload elements `a` and `b`.
+        //
+        // The grammar accepts any process as a parameter key, and positional
+        // and named parameters in any order. The AST builder rejects a key
+        // that is not an identifier (`NonIdentifierParamKey`), a positional
+        // parameter after a named one (`PositionalAfterNamed`), and a repeated
+        // key (`DuplicateParamKey`), so these errors carry precise spans.
+        hyper_inputs: $ => seq(
+            '(',
+            optional(field('data', $.send_data)),
+            field('params', $.params_section),
+            ')'
+        ),
+        send_data: $ => commaSep1($._proc),
+        params_section: $ => seq(';', optional($.param_list)),
+        param_list: $ => commaSep1($.param),
+        param: $ => choice($.named_param, $.positional_param),
+        named_param: $ => prec(2, seq(field('key', $._proc), '=', field('value', $._proc))),
+        positional_param: $ => $._proc,
 
         // ─── Cost-accounted Rholang surface ──────────────────────────────────
         // Constructs + semantics are authoritative in the mettail
@@ -306,6 +471,7 @@ module.exports = grammar({
             $.div,
             $.eq,
             $.eval,
+            $.free_call,
             $.gt,
             $.gte,
             $.interpolation,
@@ -358,6 +524,20 @@ module.exports = grammar({
         disjunction: $ => prec.left(13, seq($._proc, '\\/', $._proc)),
         conjunction: $ => prec.left(14, seq($._proc, '/\\', $._proc)),
         negation: $ => prec(15, seq('~', $._proc)),
+        // Reified RSpaces theory reference `free Th(args)` (the tree-sitter
+        // rendering of `free theory_call`; the AST node is
+        // `Proc::FreeTheory`). The keyword comes from the external scanner
+        // (see `externals`). The builtin theories `Nat`, `Int`, `String`,
+        // `Bool` and `Any` all parse here: a type word such as `Int` lexes as
+        // `var` in this position, because a contextual (unreserved) keyword
+        // becomes a keyword token only in a parse state where it has an
+        // action, and a theory name accepts only `var`.
+        free_call: $ => prec(10, seq(
+            alias($._free_keyword, 'free'),
+            field('name', $.var),
+            '(', optional(field('args', $.free_args)), ')'
+        )),
+        free_args: $ => commaSep1($._proc),
         _ground_expression: $ => prec(16, choice($.block, $._literal, $.nil, $.collection, $._proc_var, $.simple_type, $.unit)),
 
         // synchronous send continuations
@@ -368,7 +548,18 @@ module.exports = grammar({
 
         // new name declaration
         name_decls: $ => commaSep1($.name_decl),
-        name_decl: $ => seq($.var, optional(seq('(', field('uri', $.uri_literal), ')'))),
+        // A binder is plain (`x`), annotated with a Reified RSpaces space
+        // (`x : s`, where `s` is any name, quoted names included), or bound
+        // to a system URI (`x(`rho:io:stdout`)`). A URI binder names a fixed
+        // system channel, so it cannot carry a space annotation: both
+        // `x : s(`uri`)` and `x(`uri`) : s` are syntax errors.
+        name_decl: $ => seq(
+            $.var,
+            optional(choice(
+                seq(':', field('space_type', $.name)),
+                seq('(', field('uri', $.uri_literal), ')')
+            ))
+        ),
 
         // let declarations
         _let_decls: $ => choice(
@@ -436,8 +627,23 @@ module.exports = grammar({
         linear_bind: $ => seq(
             optional(field('names', $.names)),
             '<-',
-            field('input', $._source)
+            field('input', $._source),
+            optional(field('query_spec', $.query_spec))
         ),
+
+        // Reified RSpaces receive query `ch ~ q` (linear binds only). The
+        // query is a payload list plus optional named parameters, and it
+        // follows the parens-`;` rule of `hyper_inputs`:
+        //   ch ~ e               payload [e]
+        //   ch ~ (a, b)          payload [(a, b)]   (one tuple)
+        //   ch ~ (a, b;)         payload [a, b]
+        //   ch ~ (a; k = v)      payload [a], named k = v
+        //   ch ~ (; k = v)       empty payload, named k = v
+        // `ch ~ (e;)` and `ch ~ e` build the same AST. The AST builder
+        // rejects (`MalformedQuerySpec`) a positional parameter in a query,
+        // the empty group `ch ~ (;)`, and a query on a `!?`, `?!` or `!m`
+        // source, whose reply channel is fresh.
+        query_spec: $ => seq('~', field('query', choice($.hyper_inputs, $._proc))),
 
         repeated_bind: $ => seq(
             optional(field('names', $.names)),
@@ -460,7 +666,7 @@ module.exports = grammar({
 
         simple_source: $ => $.name,
         receive_send_source: $ => seq($.name, '?!'),
-        send_receive_source: $ => seq($.name, '!?', field('inputs', alias($._proc_list, $.inputs))),
+        send_receive_source: $ => seq($.name, '!?', field('inputs', choice(alias($._proc_list, $.inputs), $.hyper_inputs))),
 
         // For-source position of the method-call sugar (FIP 2025-08-20
         // Agents §"Method-call sugar"):
@@ -474,7 +680,7 @@ module.exports = grammar({
         send_method_source: $ => seq(
             $.name, '!',
             field('method', $.var),
-            field('inputs', alias($._proc_list, $.inputs))
+            field('inputs', choice(alias($._proc_list, $.inputs), $.hyper_inputs))
         ),
 
         // sends
@@ -495,6 +701,7 @@ module.exports = grammar({
             $.bigint_literal,
             $.bigrat_literal,
             $.float_literal,
+            alias($._bare_exponent_float, $.float_literal),
             $.fixed_point_literal,
             $.long_literal,
             $.string_literal,
@@ -504,7 +711,32 @@ module.exports = grammar({
         unsigned_int_literal: $ => token(/\d+u[1-9]\d*/),
         bigint_literal: $ => token(/-?\d+n/),
         bigrat_literal: $ => token(/-?\d+r/),
-        float_literal: $ => token(/-?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?f(?:32|64|128|256)/),
+        // Floats. A suffix (`f32`, `f64`, `f128`, `f256`) gives the width,
+        // and a bare float (no suffix) is an f64:
+        //   1.5f32   2.5   .5   1.5e3   -2.5e-3      (this token)
+        //   1e3   2E-4   -7e+2                        (`_bare_exponent_float`)
+        // A bare float needs a digit after its dot, so `5.method()` stays a
+        // method call on an integer. `5.` and `5.e3` are not bare floats.
+        //
+        // Bare decimal floats keep every 02cef80 tree: at 02cef80 the text
+        // `1.5` or `.5` lexes as `.` followed by digits, and `.` can then only
+        // be a method call (which needs an identifier) or the empty
+        // continuation of a synchronous send. In `x!?(a).5` only `.` and `;`
+        // are valid after `x!?(a)`, so the lexer still produces `.` and then
+        // the integer `5`, exactly as at 02cef80.
+        //
+        // The bare exponent form comes from the external scanner, which emits
+        // it only when no identifier character follows the exponent digits.
+        // At 02cef80 `1e5x` lexes as the integer `1` and the identifier `e5x`
+        // (two adjacent match cases in `match v { 1 => 1e5x => Nil }`), and
+        // the node's `preprocess_floats` leaves that text unchanged; a regex
+        // token would read `1e5` and `x` instead. Directly after a complete
+        // process, `1e5` alone is a float now, where 02cef80 read `1` and
+        // `e5`; the node's `preprocess_floats` already reads it as `1e5f64`,
+        // so programs that the node accepts keep their meaning.
+        float_literal: $ => token(choice(
+            /-?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?f(?:32|64|128|256)/,
+            /-?(?:\d+\.\d+|\.\d+)(?:[eE][+-]?\d+)?/)),
         fixed_point_literal: $ => token(/-?(?:\d+\.\d*|\.\d+|\d+)p\d+/),
         long_literal: $ => token(/-?\d+/),
         string_literal: $ => token(/"([^"\\]|(\\[0nrt\\"])|(\\[0-9]+))*"/),

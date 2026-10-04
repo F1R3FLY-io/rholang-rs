@@ -1,0 +1,898 @@
+============================================
+Conservative extension: use in an expression
+============================================
+
+x!(use + 1)
+
+---
+
+(source_file
+  (send
+    channel: (var)
+    send_type: (send_single)
+    inputs: (inputs
+      (add
+        (var)
+        (long_literal)))))
+
+==================================================
+Conservative extension: free as a match expression
+==================================================
+
+match free { _ => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (wildcard)
+        proc: (nil)))))
+
+========================================
+Conservative extension: free as a branch
+========================================
+
+if (c) free else Nil
+
+---
+
+(source_file
+  (ifElse
+    condition: (var)
+    consequence: (var)
+    alternative: (nil)))
+
+======================================
+Conservative extension: use before and
+======================================
+
+use and true
+
+---
+
+(source_file
+  (and
+    (var)
+    (bool_literal)))
+
+==============================================
+Conservative extension: use as a send argument
+==============================================
+
+out!(use)
+
+---
+
+(source_file
+  (send
+    channel: (var)
+    send_type: (send_single)
+    inputs: (inputs
+      (var))))
+
+=====================================
+Conservative extension: free in a par
+=====================================
+
+free | Nil
+
+---
+
+(source_file
+  (par
+    (var)
+    (nil)))
+
+===============================================
+Conservative extension: use and free as binders
+===============================================
+
+new use, free in { use!(free) }
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var))
+      (name_decl
+        (var)))
+    proc: (block
+      (send
+        channel: (var)
+        send_type: (send_single)
+        inputs: (inputs
+          (var))))))
+
+==================================================
+Conservative extension: use before a block comment
+==================================================
+
+x!(use /* c */ + 1)
+
+---
+
+(source_file
+  (send
+    channel: (var)
+    send_type: (send_single)
+    inputs: (inputs
+      (add
+        (var)
+        (long_literal)))))
+
+==================================================
+Conservative extension: free before a line comment
+==================================================
+
+x!(free // c
+ + 1)
+
+---
+
+(source_file
+  (send
+    channel: (var)
+    send_type: (send_single)
+    inputs: (inputs
+      (add
+        (var)
+        (long_literal)))))
+
+=====================================
+Conservative extension: use before in
+=====================================
+
+let x = use in { x }
+
+---
+
+(source_file
+  (let
+    decls: (linear_decls
+      (let_var_decl
+        (var)
+        (var)))
+    proc: (block
+      (var))))
+
+==================================================
+Conservative extension: use before a wildcard case
+==================================================
+
+match e { 1 => use _ => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (var))
+      (case
+        pattern: (wildcard)
+        proc: (nil)))))
+
+=====================================================
+Conservative extension: use before an identifier case
+=====================================================
+
+match e { 1 => use x => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (var))
+      (case
+        pattern: (var)
+        proc: (nil)))))
+
+========================================================
+Conservative extension: use before a quoted-channel case
+========================================================
+
+match e { 1 => use @x!(1) => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (var))
+      (case
+        pattern: (send
+          channel: (quote
+            (var))
+          send_type: (send_single)
+          inputs: (inputs
+            (long_literal)))
+        proc: (nil)))))
+
+======================================================
+Conservative extension: free before an identifier case
+======================================================
+
+match e { 1 => free x => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (var))
+      (case
+        pattern: (var)
+        proc: (nil)))))
+
+==============================================
+Conservative extension: free before a Set case
+==============================================
+
+match e { 1 => free Set(1) => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (var))
+      (case
+        pattern: (collection
+          (set
+            (long_literal)))
+        proc: (nil)))))
+
+================================================
+Conservative extension: use before a bundle case
+================================================
+
+match e { 1 => use bundle0 { Nil } => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (var))
+      (case
+        pattern: (bundle
+          bundle_type: (bundle_equiv)
+          proc: (block
+            (nil)))
+        proc: (nil)))))
+
+===================================================
+Conservative extension: free before a select branch
+===================================================
+
+select { a <- b => free c <- d => Nil }
+
+---
+
+(source_file
+  (choice
+    branches: (branches
+      (branch
+        pattern: (linear_bind
+          names: (names
+            (var))
+          input: (simple_source
+            (var)))
+        proc: (var))
+      (branch
+        pattern: (linear_bind
+          names: (names
+            (var))
+          input: (simple_source
+            (var)))
+        proc: (nil)))))
+
+==============================================
+Conservative extension: free as a channel name
+==============================================
+
+free!(1)
+
+---
+
+(source_file
+  (send
+    channel: (var)
+    send_type: (send_single)
+    inputs: (inputs
+      (long_literal))))
+
+========================================================
+Conservative extension: use and free as contract formals
+========================================================
+
+contract f(use, free) = { use!(free) }
+
+---
+
+(source_file
+  (contract
+    name: (var)
+    formals: (names
+      (var)
+      (var))
+    proc: (block
+      (send
+        channel: (var)
+        send_type: (send_single)
+        inputs: (inputs
+          (var))))))
+
+===============================================================
+Conservative extension: dot then digit after a synchronous send
+===============================================================
+
+x!?(a).5
+
+---
+
+(source_file
+  (send_sync
+    channel: (var)
+    inputs: (messages
+      (var))
+    cont: (sync_send_cont
+      (empty_cont)))
+  (long_literal))
+
+====================================================
+Conservative extension: dot then digit before a case
+====================================================
+
+match e { 1 => y!?(a).5 => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (send_sync
+          channel: (var)
+          inputs: (messages
+            (var))
+          cont: (sync_send_cont
+            (empty_cont))))
+      (case
+        pattern: (long_literal)
+        proc: (nil)))))
+
+===================================================================
+Conservative extension: exponent-shaped identifier after an integer
+===================================================================
+
+match e { 1 => 1e5x => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (long_literal))
+      (case
+        pattern: (var)
+        proc: (nil)))))
+
+============================
+Exclusion witness: use and {
+============================
+
+use and { Nil }
+
+---
+
+(source_file
+  (and
+    (var)
+    (block
+      (nil))))
+
+===========================
+Exclusion witness: use or {
+===========================
+
+use or { Nil }
+
+---
+
+(source_file
+  (or
+    (var)
+    (block
+      (nil))))
+
+================================
+Exclusion witness: use matches {
+================================
+
+use matches { Nil }
+
+---
+
+(source_file
+  (matches
+    (var)
+    (block
+      (nil))))
+
+=============================
+Exclusion witness: use else {
+=============================
+
+if (c) use else { Nil }
+
+---
+
+(source_file
+  (ifElse
+    condition: (var)
+    consequence: (var)
+    alternative: (block
+      (nil))))
+
+==============================
+Exclusion witness: use where {
+==============================
+
+match e { use where { true } => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (var)
+        guard: (block
+          (bool_literal))
+        proc: (nil)))))
+
+===============================
+Exclusion witness: use bundle {
+===============================
+
+match e { 1 => use bundle { Nil } => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (var))
+      (case
+        pattern: (bundle
+          bundle_type: (bundle_read_write)
+          proc: (block
+            (nil)))
+        proc: (nil)))))
+
+==============================
+Exclusion witness: use match {
+==============================
+
+match e { 1 => use match { x } { _ => Nil } => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (var))
+      (case
+        pattern: (match
+          expression: (block
+            (var))
+          cases: (cases
+            (case
+              pattern: (wildcard)
+              proc: (nil))))
+        proc: (nil)))))
+
+============================
+Exclusion witness: use not {
+============================
+
+match e { 1 => use not { true } => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (var))
+      (case
+        pattern: (not
+          (block
+            (bool_literal)))
+        proc: (nil)))))
+
+===============================
+Exclusion witness: use select {
+===============================
+
+match e { 1 => use select { a <- b => Nil } => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (var))
+      (case
+        pattern: (choice
+          branches: (branches
+            (branch
+              pattern: (linear_bind
+                names: (names
+                  (var))
+                input: (simple_source
+                  (var)))
+              proc: (nil))))
+        proc: (nil)))))
+
+=============================
+Exclusion witness: free and (
+=============================
+
+free and (true)
+
+---
+
+(source_file
+  (and
+    (var)
+    (bool_literal)))
+
+============================
+Exclusion witness: free or (
+============================
+
+free or (true)
+
+---
+
+(source_file
+  (or
+    (var)
+    (bool_literal)))
+
+=================================
+Exclusion witness: free matches (
+=================================
+
+free matches (true)
+
+---
+
+(source_file
+  (matches
+    (var)
+    (bool_literal)))
+
+==============================
+Exclusion witness: free else (
+==============================
+
+if (c) free else (Nil)
+
+---
+
+(source_file
+  (ifElse
+    condition: (var)
+    consequence: (var)
+    alternative: (nil)))
+
+============================
+Exclusion witness: free in (
+============================
+
+let x = free in (x)
+
+---
+
+(source_file
+  (let
+    decls: (linear_decls
+      (let_var_decl
+        (var)
+        (var)))
+    proc: (var)))
+
+===============================
+Exclusion witness: free where (
+===============================
+
+match e { free where (true) => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (var)
+        guard: (bool_literal)
+        proc: (nil)))))
+
+============================
+Exclusion witness: free if (
+============================
+
+match e { 1 => free if (c) Nil => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (var))
+      (case
+        pattern: (ifElse
+          condition: (var)
+          consequence: (nil))
+        proc: (nil)))))
+
+=============================
+Exclusion witness: free for (
+=============================
+
+match e { 1 => free for (x <- c) { Nil } => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (var))
+      (case
+        pattern: (input
+          receipts: (receipts
+            (receipt
+              (linear_bind
+                names: (names
+                  (var))
+                input: (simple_source
+                  (var)))))
+          proc: (block
+            (nil)))
+        proc: (nil)))))
+
+=============================
+Exclusion witness: free not (
+=============================
+
+match e { 1 => free not (true) => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (var))
+      (case
+        pattern: (not
+          (bool_literal))
+        proc: (nil)))))
+
+===============================
+Exclusion witness: free match (
+===============================
+
+match e { 1 => free match (x) { _ => Nil } => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (var))
+      (case
+        pattern: (match
+          expression: (var)
+          cases: (cases
+            (case
+              pattern: (wildcard)
+              proc: (nil))))
+        proc: (nil)))))
+
+================================
+Exclusion witness: use @bundle {
+================================
+
+match e { 1 => use @bundle { Nil }!(1) => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (var))
+      (case
+        pattern: (send
+          channel: (quote
+            (bundle
+              bundle_type: (bundle_read_write)
+              proc: (block
+                (nil))))
+          send_type: (send_single)
+          inputs: (inputs
+            (long_literal)))
+        proc: (nil)))))
+
+=================================
+Exclusion witness: use @bundle0 {
+=================================
+
+match e { 1 => use @bundle0 { Nil }!(1) => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (var))
+      (case
+        pattern: (send
+          channel: (quote
+            (bundle
+              bundle_type: (bundle_equiv)
+              proc: (block
+                (nil))))
+          send_type: (send_single)
+          inputs: (inputs
+            (long_literal)))
+        proc: (nil)))))
+
+===============================
+Exclusion witness: use @match {
+===============================
+
+match e { 1 => use @match { x } { _ => Nil }!(1) => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (var))
+      (case
+        pattern: (send
+          channel: (quote
+            (match
+              expression: (block
+                (var))
+              cases: (cases
+                (case
+                  pattern: (wildcard)
+                  proc: (nil)))))
+          send_type: (send_single)
+          inputs: (inputs
+            (long_literal)))
+        proc: (nil)))))
+
+=============================
+Exclusion witness: use @not {
+=============================
+
+match e { 1 => use @not { true }!(1) => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (var))
+      (case
+        pattern: (send
+          channel: (quote
+            (not
+              (block
+                (bool_literal))))
+          send_type: (send_single)
+          inputs: (inputs
+            (long_literal)))
+        proc: (nil)))))
+
+================================
+Exclusion witness: use @select {
+================================
+
+match e { 1 => use @select { a <- b => Nil }!(1) => Nil }
+
+---
+
+(source_file
+  (match
+    expression: (var)
+    cases: (cases
+      (case
+        pattern: (long_literal)
+        proc: (var))
+      (case
+        pattern: (send
+          channel: (quote
+            (choice
+              branches: (branches
+                (branch
+                  pattern: (linear_bind
+                    names: (names
+                      (var))
+                    input: (simple_source
+                      (var)))
+                  proc: (nil)))))
+          send_type: (send_single)
+          inputs: (inputs
+            (long_literal)))
+        proc: (nil)))))

@@ -256,7 +256,8 @@ impl<'a, 'ast> TypeValidator<'a, 'ast> {
             | Proc::Match { .. }
             | Proc::Let { .. }
             | Proc::New { .. }
-            | Proc::Contract { .. } => Ok(MessageType::Process),
+            | Proc::Contract { .. }
+            | Proc::UseBlock { .. } => Ok(MessageType::Process),
 
             // Variables and expressions
             Proc::ProcVar(_)
@@ -264,7 +265,8 @@ impl<'a, 'ast> TypeValidator<'a, 'ast> {
             | Proc::Eval { .. }
             | Proc::Method { .. }
             | Proc::UnaryExp { .. }
-            | Proc::BinaryExp { .. } => Ok(MessageType::Unknown),
+            | Proc::BinaryExp { .. }
+            | Proc::FreeTheory { .. } => Ok(MessageType::Unknown),
 
             // Invalid patterns
             Proc::IfThenElse { .. } | Proc::Select { .. } | Proc::SendSync { .. } => {

@@ -40,7 +40,38 @@ pub enum ParsingError {
     MissingAgentDecl {
         what: &'static str,
     },
+    /// A Reified RSpaces hyperparameter section repeats a key. The error span
+    /// is the repeated key; `first` is the span of its first occurrence.
+    DuplicateParamKey {
+        key: String,
+        first: SourceSpan,
+    },
+    /// A positional hyperparameter follows a named one in the same section.
+    /// The error span is the positional hyperparameter.
+    PositionalAfterNamed,
+    /// A hyperparameter key is not an identifier (`x!(a; 1 = 2)`). The error
+    /// span is the key.
+    NonIdentifierParamKey,
+    /// A malformed Reified RSpaces receive query; `reason` is one of
+    /// [`QUERY_POSITIONAL_PARAM`], [`QUERY_EMPTY_GROUP`] and
+    /// [`QUERY_NON_SIMPLE_SOURCE`].
+    MalformedQuerySpec {
+        reason: &'static str,
+    },
 }
+
+/// [`ParsingError::MalformedQuerySpec`] reason: a receive query has a
+/// positional parameter (`ch ~ (a; 1)`). Query parameters are named only. The
+/// error span is the positional parameter.
+pub const QUERY_POSITIONAL_PARAM: &str = "positional parameter in a receive query";
+
+/// [`ParsingError::MalformedQuerySpec`] reason: the empty query group
+/// `ch ~ (;)`. The error span is the group.
+pub const QUERY_EMPTY_GROUP: &str = "empty receive query group";
+
+/// [`ParsingError::MalformedQuerySpec`] reason: a query on a `!?`, `?!` or
+/// `!m` source, whose reply channel is fresh. The error span is the query.
+pub const QUERY_NON_SIMPLE_SOURCE: &str = "receive query on a non-simple source";
 
 impl ParsingError {
     fn from_error_node(node: &tree_sitter::Node, code: &[u8]) -> Self {

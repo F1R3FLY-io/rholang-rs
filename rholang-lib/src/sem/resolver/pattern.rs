@@ -2,6 +2,7 @@ use super::*;
 use ast::Proc::*;
 use ast::Var;
 use rholang_parser::ast::BinaryExpOp;
+use rholang_parser::ast::Hyperparam;
 use rholang_parser::ast::SyncSendCont;
 
 pub(super) fn resolve_proc_pattern<'a>(
@@ -301,21 +302,26 @@ fn resolve_proc_pattern_rec<'a>(
 
         // sends
         Send {
-            channel, inputs, ..
+            channel,
+            inputs,
+            params,
+            ..
         }
         | SendSync {
             channel,
             inputs,
+            params,
             cont: SyncSendCont::Empty,
         } => {
-            resolve_send_pattern(channel, inputs, None, db, env, res);
+            resolve_send_pattern(channel, inputs, params.as_deref(), None, db, env, res);
         }
         SendSync {
             channel,
             inputs,
+            params,
             cont: SyncSendCont::NonEmpty(cont),
         } => {
-            resolve_send_pattern(channel, inputs, Some(cont), db, env, res);
+            resolve_send_pattern(channel, inputs, params.as_deref(), Some(cont), db, env, res);
         }
 
         // for-comprehension
@@ -333,10 +339,23 @@ fn resolve_proc_pattern_rec<'a>(
                     // 1. Resolve the source name
                     resolve_single_name(db, env, res, bind.source_name());
 
-                    // 2. Resolve inputs if present
+                    // 2. Resolve inputs if present, then the Reified
+                    //    RSpaces source hyperparameters and the payload and
+                    //    parameters of the receive query
                     if let Some(inputs) = bind.input() {
                         for input_pattern in inputs {
                             resolve_proc_pattern_rec(db, env, res, input_pattern);
+                        }
+                    }
+                    for value in bind.source_params().into_iter().flatten() {
+                        resolve_proc_pattern_rec(db, env, res, value.value());
+                    }
+                    if let Some(query) = bind.query_spec() {
+                        for payload_pattern in &query.payload {
+                            resolve_proc_pattern_rec(db, env, res, payload_pattern);
+                        }
+                        for value in query.params.iter().flatten() {
+                            resolve_proc_pattern_rec(db, env, res, value.value());
                         }
                     }
 
@@ -378,11 +397,34 @@ fn resolve_proc_pattern_rec<'a>(
 
         // new
         New { decls, proc } => {
+            // Reified RSpaces space annotations come before the binders.
+            for space in decls.iter().filter_map(|decl| decl.space.as_ref()) {
+                resolve_single_name(db, env, res, space);
+            }
             for n in decls {
                 let interned_uri = n.uri.map(|uri| db.intern(&uri));
                 res.introduce_free(n.id, BinderKind::Name(interned_uri), db);
             }
             resolve_proc_pattern_rec(db, env, res, proc);
+        }
+
+        // Reified RSpaces
+        UseBlock { space, proc } => {
+            resolve_single_name(db, env, res, space);
+            resolve_proc_pattern_rec(db, env, res, proc);
+        }
+        FreeTheory { args, .. } => {
+            for arg in args {
+                resolve_proc_pattern_rec(db, env, res, arg);
+            }
+
+            if res.top_level() {
+                db.warning(
+                    res.id,
+                    WarningKind::TopLevelPatternExpr { span: pattern.span },
+                    None,
+                )
+            }
         }
 
         Bundle { .. } => {
@@ -409,6 +451,7 @@ fn resolve_proc_pattern_rec<'a>(
 fn resolve_send_pattern<'a>(
     channel: &'a ast::Name<'a>,
     inputs: &'a [ast::AnnProc<'a>],
+    params: Option<&'a [Hyperparam<'a>]>,
     continuation: Option<ProcRef<'a>>,
     db: &mut SemanticDb<'a>,
     env: &mut BindingStack,
@@ -417,6 +460,9 @@ fn resolve_send_pattern<'a>(
     resolve_single_name(db, env, res, channel);
     for input in inputs {
         resolve_proc_pattern_rec(db, env, res, input);
+    }
+    for value in params.into_iter().flatten() {
+        resolve_proc_pattern_rec(db, env, res, value.value());
     }
 
     if let Some(cont) = continuation {

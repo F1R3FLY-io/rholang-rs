@@ -1,0 +1,9 @@
+// Reified RSpaces syntax errors, each reported by kind and span.
+new x, ch in {
+  x!(1; k = 1, k = 2) |
+  x!(1; k = 1, 2) |
+  x!(1; 2 = 3) |
+  for (@y <- ch ~ (; 1)) { Nil } |
+  for (@y <- ch ~ (;)) { Nil } |
+  for (@y <- ch!?(1) ~ 2) { Nil }
+}

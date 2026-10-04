@@ -1,0 +1,528 @@
+==================
+Use block
+==================
+
+use s { Nil }
+
+---
+
+(source_file
+  (use_block
+    space: (var)
+    proc: (block
+      (nil))))
+
+=====================================
+Nested use blocks with a quoted space
+=====================================
+
+use @"outer" { use inner { Nil } }
+
+---
+
+(source_file
+  (use_block
+    space: (quote
+      (string_literal))
+    proc: (block
+      (use_block
+        space: (var)
+        proc: (block
+          (nil))))))
+
+=====================
+Use as a channel name
+=====================
+
+use!(1)
+
+---
+
+(source_file
+  (send
+    channel: (var)
+    send_type: (send_single)
+    inputs: (inputs
+      (long_literal))))
+
+=========================================
+Send with positional and named parameters
+=========================================
+
+x!(1; 2, k = 3)
+
+---
+
+(source_file
+  (send
+    channel: (var)
+    send_type: (send_single)
+    inputs: (hyper_inputs
+      data: (send_data
+        (long_literal))
+      params: (params_section
+        (param_list
+          (param
+            (positional_param
+              (long_literal)))
+          (param
+            (named_param
+              key: (var)
+              value: (long_literal))))))))
+
+===============================
+Persistent send with parameters
+===============================
+
+x!!(1; k = 3)
+
+---
+
+(source_file
+  (send
+    channel: (var)
+    send_type: (send_multiple)
+    inputs: (hyper_inputs
+      data: (send_data
+        (long_literal))
+      params: (params_section
+        (param_list
+          (param
+            (named_param
+              key: (var)
+              value: (long_literal))))))))
+
+================================
+Synchronous send with parameters
+================================
+
+x!?(1; k = 3).
+
+---
+
+(source_file
+  (send_sync
+    channel: (var)
+    inputs: (hyper_inputs
+      data: (send_data
+        (long_literal))
+      params: (params_section
+        (param_list
+          (param
+            (named_param
+              key: (var)
+              value: (long_literal))))))
+    cont: (sync_send_cont
+      (empty_cont))))
+
+=================================================
+Synchronous send with parameters and continuation
+=================================================
+
+x!?(1; k = 3); Nil
+
+---
+
+(source_file
+  (send_sync
+    channel: (var)
+    inputs: (hyper_inputs
+      data: (send_data
+        (long_literal))
+      params: (params_section
+        (param_list
+          (param
+            (named_param
+              key: (var)
+              value: (long_literal))))))
+    cont: (sync_send_cont
+      (non_empty_cont
+        (nil)))))
+
+===========================
+Method send with parameters
+===========================
+
+x!m(1; k = 3).
+
+---
+
+(source_file
+  (send_method
+    channel: (var)
+    method: (var)
+    inputs: (hyper_inputs
+      data: (send_data
+        (long_literal))
+      params: (params_section
+        (param_list
+          (param
+            (named_param
+              key: (var)
+              value: (long_literal))))))
+    cont: (sync_send_cont
+      (empty_cont))))
+
+===================================
+Send-receive source with parameters
+===================================
+
+for (r <- ch!?(d; ttl = 60)) { Nil }
+
+---
+
+(source_file
+  (input
+    receipts: (receipts
+      (receipt
+        (linear_bind
+          names: (names
+            (var))
+          input: (send_receive_source
+            (var)
+            inputs: (hyper_inputs
+              data: (send_data
+                (var))
+              params: (params_section
+                (param_list
+                  (param
+                    (named_param
+                      key: (var)
+                      value: (long_literal))))))))))
+    proc: (block
+      (nil))))
+
+=============================
+Method source with parameters
+=============================
+
+for (r <- ch!get(1; k = 2)) { Nil }
+
+---
+
+(source_file
+  (input
+    receipts: (receipts
+      (receipt
+        (linear_bind
+          names: (names
+            (var))
+          input: (send_method_source
+            (var)
+            method: (var)
+            inputs: (hyper_inputs
+              data: (send_data
+                (long_literal))
+              params: (params_section
+                (param_list
+                  (param
+                    (named_param
+                      key: (var)
+                      value: (long_literal))))))))))
+    proc: (block
+      (nil))))
+
+================================
+Explicit empty parameter section
+================================
+
+x!(1;)
+
+---
+
+(source_file
+  (send
+    channel: (var)
+    send_type: (send_single)
+    inputs: (hyper_inputs
+      data: (send_data
+        (long_literal))
+      params: (params_section))))
+
+===================
+Parameter-only send
+===================
+
+x!(; k = 1)
+
+---
+
+(source_file
+  (send
+    channel: (var)
+    send_type: (send_single)
+    inputs: (hyper_inputs
+      params: (params_section
+        (param_list
+          (param
+            (named_param
+              key: (var)
+              value: (long_literal))))))))
+
+=========================
+Parenthesized tuple query
+=========================
+
+for (y <- ch ~ (1, 2)) { Nil }
+
+---
+
+(source_file
+  (input
+    receipts: (receipts
+      (receipt
+        (linear_bind
+          names: (names
+            (var))
+          input: (simple_source
+            (var))
+          query_spec: (query_spec
+            query: (collection
+              (tuple
+                (long_literal)
+                (long_literal)))))))
+    proc: (block
+      (nil))))
+
+==================
+Query group
+==================
+
+for (y <- ch ~ (1, 2; k = 3)) { Nil }
+
+---
+
+(source_file
+  (input
+    receipts: (receipts
+      (receipt
+        (linear_bind
+          names: (names
+            (var))
+          input: (simple_source
+            (var))
+          query_spec: (query_spec
+            query: (hyper_inputs
+              data: (send_data
+                (long_literal)
+                (long_literal))
+              params: (params_section
+                (param_list
+                  (param
+                    (named_param
+                      key: (var)
+                      value: (long_literal))))))))))
+    proc: (block
+      (nil))))
+
+====================
+Parameter-only query
+====================
+
+for (y <- ch ~ (; k = 3)) { Nil }
+
+---
+
+(source_file
+  (input
+    receipts: (receipts
+      (receipt
+        (linear_bind
+          names: (names
+            (var))
+          input: (simple_source
+            (var))
+          query_spec: (query_spec
+            query: (hyper_inputs
+              params: (params_section
+                (param_list
+                  (param
+                    (named_param
+                      key: (var)
+                      value: (long_literal))))))))))
+    proc: (block
+      (nil))))
+
+==================
+Bare vector query
+==================
+
+for (y <- ch ~ [1, 2]) { Nil }
+
+---
+
+(source_file
+  (input
+    receipts: (receipts
+      (receipt
+        (linear_bind
+          names: (names
+            (var))
+          input: (simple_source
+            (var))
+          query_spec: (query_spec
+            query: (collection
+              (list
+                (long_literal)
+                (long_literal)))))))
+    proc: (block
+      (nil))))
+
+=====================================
+Queries with a join and a where guard
+=====================================
+
+for (y <- ch ~ 1 & z <- c ~ 2 where y > z) { Nil }
+
+---
+
+(source_file
+  (input
+    receipts: (receipts
+      (receipt
+        (linear_bind
+          names: (names
+            (var))
+          input: (simple_source
+            (var))
+          query_spec: (query_spec
+            query: (long_literal)))
+        (linear_bind
+          names: (names
+            (var))
+          input: (simple_source
+            (var))
+          query_spec: (query_spec
+            query: (long_literal)))
+        guard: (gt
+          (var)
+          (var))))
+    proc: (block
+      (nil))))
+
+==========================
+Query before a signed bind
+==========================
+
+for (y <- ch ~ q & {% z <- c %}[s]) { Nil }
+
+---
+
+(source_file
+  (input
+    receipts: (receipts
+      (receipt
+        (linear_bind
+          names: (names
+            (var))
+          input: (simple_source
+            (var))
+          query_spec: (query_spec
+            query: (var)))
+        (signed_bind
+          names: (names
+            (var))
+          input: (simple_source
+            (var))
+          sig: (signature
+            (ground_sig
+              name: (var))))))
+    proc: (block
+      (nil))))
+
+==========================
+New with space annotations
+==========================
+
+new x : s, y, z : @"q" in { Nil }
+
+---
+
+(source_file
+  (new
+    decls: (name_decls
+      (name_decl
+        (var)
+        space_type: (var))
+      (name_decl
+        (var))
+      (name_decl
+        (var)
+        space_type: (quote
+          (string_literal))))
+    proc: (block
+      (nil))))
+
+==========================
+Free theory with arguments
+==========================
+
+x!(free Nat(1, 2))
+
+---
+
+(source_file
+  (send
+    channel: (var)
+    send_type: (send_single)
+    inputs: (inputs
+      (free_call
+        name: (var)
+        args: (free_args
+          (long_literal)
+          (long_literal))))))
+
+=============================
+Free theory without arguments
+=============================
+
+free Nat()
+
+---
+
+(source_file
+  (free_call
+    name: (var)))
+
+========================
+Bare and suffixed floats
+========================
+
+x!(1.5, .5, 1e3, -2.5e-3, 1.5f32)
+
+---
+
+(source_file
+  (send
+    channel: (var)
+    send_type: (send_single)
+    inputs: (inputs
+      (float_literal)
+      (float_literal)
+      (float_literal)
+      (float_literal)
+      (float_literal))))
+
+=======================================
+Free theories with builtin theory names
+=======================================
+
+x!(free Nat(), free Int(), free String(), free Bool(), free Any())
+
+---
+
+(source_file
+  (send
+    channel: (var)
+    send_type: (send_single)
+    inputs: (inputs
+      (free_call
+        name: (var))
+      (free_call
+        name: (var))
+      (free_call
+        name: (var))
+      (free_call
+        name: (var))
+      (free_call
+        name: (var)))))

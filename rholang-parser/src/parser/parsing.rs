@@ -11,12 +11,15 @@ use validated::Validated;
 
 use crate::SourcePos;
 use crate::ast::Name;
-use crate::parser::errors::{self, ParsingFailure};
+use crate::parser::errors::{
+    self, ParsingFailure, QUERY_EMPTY_GROUP, QUERY_NON_SIMPLE_SOURCE, QUERY_POSITIONAL_PARAM,
+};
 use crate::{
     SourceSpan,
     ast::{
-        AnnProc, BinaryExpOp, Bind, BundleType, Id, LetBinding, NameDecl, Names, Proc, SendType,
-        Signature, SimpleType, Source, TokenStack, UnaryExpOp, Var, VarRefKind,
+        AnnProc, BinaryExpOp, Bind, BundleType, Hyperparam, HyperparamList, Id, LetBinding,
+        NameDecl, Names, Proc, QuerySpec, SendType, Signature, SimpleType, Source, SyncSendCont,
+        TokenStack, UnaryExpOp, Var, VarRefKind,
     },
     parser::{
         ast_builder::ASTBuilder,
@@ -408,17 +411,31 @@ pub(super) fn node_to_ast<'ast>(
                         kind!("send_multiple") => SendType::Multiple,
                         _ => unreachable!("Send type can only be: single or multiple"),
                     };
-                    let arity = inputs_node.named_child_count();
+                    let args = send_args(inputs_node, source, &mut errors);
                     cont_stack.push(K::ConsumeSend {
                         send_type,
-                        arity,
+                        arity: args.arity,
+                        params: args.params,
                         span,
                     });
-                    if arity > 0 {
-                        cont_stack.push(K::EvalList(inputs_node.walk()));
-                    }
+                    push_send_args_reversed(args.data, args.param_values, &mut cont_stack);
                     node = name_node;
                     continue 'parse;
+                }
+
+                // Reified RSpaces theory reference `free Th(args)`.
+                kind!("free_call") => {
+                    let name_node = get_field(&node, field!("name"));
+                    let name = Id {
+                        name: get_node_value(&name_node, source),
+                        pos: name_node.start_position().into(),
+                    };
+                    let args = node.child_by_field_id(field!("args"));
+                    let arity = args.map_or(0, |args| args.named_child_count());
+                    cont_stack.push(K::ConsumeFreeTheory { name, arity, span });
+                    if let Some(args) = args {
+                        cont_stack.push(K::EvalList(args.walk()));
+                    }
                 }
 
                 // Cost-accounted Rholang: signed term {% P %}[ s ].
@@ -513,7 +530,7 @@ pub(super) fn node_to_ast<'ast>(
                     let decls_node = get_field(&node, field!("decls"));
                     let proc_node = get_field(&node, field!("proc"));
 
-                    let decls = parse_decls(&decls_node, source);
+                    let (decls, annotations) = parse_decls(&decls_node, source);
                     // IMPORTANT: Do NOT sort decls - preserve source order for correct variable indexing
                     // The old parser (rust/dev) and Scala implementation expect source order
                     if let Some((first, second)) = check_for_duplicate_decls(&decls) {
@@ -523,8 +540,35 @@ pub(super) fn node_to_ast<'ast>(
                         ));
                     }
 
-                    cont_stack.push(K::ConsumeNew { decls, span });
-                    node = proc_node;
+                    // Reified RSpaces space annotations (`new x : s in P`) are
+                    // names, so they are evaluated like any other name (a
+                    // quoted annotation keeps its quote mask): in source order
+                    // before the body. The proc_stack slice is
+                    // [annotations…, body].
+                    let annotated = annotations.iter().map(|(index, _)| *index).collect();
+                    cont_stack.push(K::ConsumeNew {
+                        decls,
+                        annotated,
+                        span,
+                    });
+                    if annotations.is_empty() {
+                        node = proc_node;
+                        continue 'parse;
+                    }
+                    cont_stack.push(K::EvalDelayed(proc_node));
+                    for (_, annotation) in annotations.iter().rev() {
+                        cont_stack.push(K::EvalDelayed(*annotation));
+                    }
+                    // Fall through to apply_cont, which pops the first
+                    // annotation.
+                }
+
+                kind!("use_block") => {
+                    let space_node = get_field(&node, field!("space"));
+                    let proc_node = get_field(&node, field!("proc"));
+                    cont_stack.push(K::ConsumeUseBlock { span });
+                    cont_stack.push(K::EvalDelayed(proc_node));
+                    node = space_node;
                     continue 'parse;
                 }
 
@@ -731,59 +775,25 @@ pub(super) fn node_to_ast<'ast>(
                     let catch_pattern_node = get_field(&node, field!("catch_pattern"));
                     let catch_body_node = get_field(&node, field!("catch_body"));
 
-                    let source_desc = match source_node.kind_id() {
-                        kind!("simple_source") => SourceDesc::Simple,
-                        kind!("receive_send_source") => SourceDesc::RS,
-                        kind!("send_receive_source") => {
-                            let inputs_node = get_field(&source_node, field!("inputs"));
-                            SourceDesc::SR {
-                                arity: inputs_node.named_child_count(),
-                            }
-                        }
-                        kind!("send_method_source") => {
-                            let inputs_node = get_field(&source_node, field!("inputs"));
-                            SourceDesc::SM {
-                                arity: inputs_node.named_child_count(),
-                            }
-                        }
-                        _ => unreachable!("try_block source is one of four _source kinds"),
-                    };
-
                     let has_try_pattern = try_pattern_node_opt.is_some();
+
+                    // Push evaluations into temp in forward order,
+                    // then reverse-append to cont_stack (same pattern
+                    // as ConsumeForComprehension). Source: the same
+                    // per-kind slots as a linear_bind.
+                    let source_desc = source_evals(
+                        source_node,
+                        source,
+                        ast_builder,
+                        &mut errors,
+                        &mut temp_cont_stack,
+                    );
 
                     // Total slice length ConsumeTryBlock will pop:
                     //   source_desc.len() + [try_pat] + try_body +
                     //   catch_pat + catch_body
                     let total_len = source_desc.len() + (has_try_pattern as usize) + 3;
 
-                    // Push evaluations into temp in forward order,
-                    // then reverse-append to cont_stack (same pattern
-                    // as ConsumeForComprehension).
-                    temp_cont_stack.reserve(total_len);
-
-                    // Source: mirror linear_bind's per-kind pattern.
-                    match source_desc {
-                        SourceDesc::Simple | SourceDesc::RS => {
-                            temp_cont_stack.push(K::EvalDelayed(get_first_child(&source_node)));
-                        }
-                        SourceDesc::SR { .. } => {
-                            let inputs = get_field(&source_node, field!("inputs"));
-                            temp_cont_stack.push(K::EvalDelayed(get_first_child(&source_node)));
-                            temp_cont_stack.push(K::EvalList(inputs.walk()));
-                        }
-                        SourceDesc::SM { .. } => {
-                            let method_node = get_field(&source_node, field!("method"));
-                            let inputs = get_field(&source_node, field!("inputs"));
-                            let method_name = get_node_value(&method_node, source);
-                            let method_lit = AnnProc {
-                                proc: ast_builder.alloc_string_literal(method_name),
-                                span: method_node.range().into(),
-                            };
-                            temp_cont_stack.push(K::EvalDelayed(get_first_child(&source_node)));
-                            temp_cont_stack.push(K::PushAnnProc(method_lit));
-                            temp_cont_stack.push(K::EvalList(inputs.walk()));
-                        }
-                    }
                     // Try pattern (optional)
                     if let Some(tp) = try_pattern_node_opt {
                         temp_cont_stack.push(K::EvalDelayed(tp));
@@ -864,17 +874,14 @@ pub(super) fn node_to_ast<'ast>(
                                     None => (0, false),
                                 };
 
-                                let source_desc = match source_node.kind_id() {
-                                    kind!("simple_source") => SourceDesc::Simple,
-                                    kind!("receive_send_source") => SourceDesc::RS,
-                                    kind!("send_receive_source") => SourceDesc::SR {
-                                        arity: get_field(&source_node, field!("inputs"))
-                                            .named_child_count(),
-                                    },
-                                    _ => unreachable!(
-                                        "Sources in for-comprehensions have three kinds: simple, receive_send and send_receive"
-                                    ),
-                                };
+                                // Slot order = push order here.
+                                let source_desc = source_evals(
+                                    source_node,
+                                    source,
+                                    ast_builder,
+                                    &mut errors,
+                                    &mut temp_cont_stack,
+                                );
 
                                 let mut sig_ops: SmallVec<[SigOp; 4]> = SmallVec::new();
                                 let mut sig_procs: Vec<tree_sitter::Node> = Vec::new();
@@ -888,19 +895,6 @@ pub(super) fn node_to_ast<'ast>(
                                     sig_proc_count: sig_procs.len(),
                                 };
 
-                                // Slot order = push order here.
-                                match source_desc {
-                                    SourceDesc::SR { .. } => {
-                                        let inputs = get_field(&source_node, field!("inputs"));
-                                        temp_cont_stack
-                                            .push(K::EvalDelayed(get_first_child(&source_node)));
-                                        temp_cont_stack.push(K::EvalList(inputs.walk()));
-                                    }
-                                    _ => {
-                                        temp_cont_stack
-                                            .push(K::EvalDelayed(get_first_child(&source_node)));
-                                    }
-                                }
                                 if let Some(names) = names_node {
                                     temp_cont_stack.push(K::EvalList(names.walk()));
                                 }
@@ -922,12 +916,8 @@ pub(super) fn node_to_ast<'ast>(
                                 continue;
                             }
 
-                            let (names_node, source_node) = if bind_node.named_child_count() > 1 {
-                                let (ns, s) = get_left_and_right(&bind_node);
-                                (Some(ns), s)
-                            } else {
-                                (None, get_first_child(&bind_node))
-                            };
+                            let names_node = bind_node.child_by_field_id(field!("names"));
+                            let source_node = get_field(&bind_node, field!("input"));
                             let (name_count, cont_present) = match names_node {
                                 Some(names) => (
                                     names.named_child_count(),
@@ -936,89 +926,57 @@ pub(super) fn node_to_ast<'ast>(
                                 None => (0, false),
                             };
 
+                            // Slot order = push order: the source pieces, the
+                            // names, then (linear binds only) the payload and
+                            // parameter values of the receive query.
                             let bind_desc = match bind_kind {
                                 kind!("linear_bind") => {
-                                    let source_desc = match source_node.kind_id() {
-                                        kind!("simple_source") => SourceDesc::Simple,
-                                        kind!("receive_send_source") => SourceDesc::RS,
-                                        kind!("send_receive_source") => {
-                                            let inputs_node =
-                                                get_field(&source_node, field!("inputs"));
-                                            SourceDesc::SR {
-                                                arity: inputs_node.named_child_count(),
-                                            }
-                                        }
-                                        kind!("send_method_source") => {
-                                            let inputs_node =
-                                                get_field(&source_node, field!("inputs"));
-                                            SourceDesc::SM {
-                                                arity: inputs_node.named_child_count(),
-                                            }
-                                        }
-                                        _ => unreachable!(
-                                            "Sources in for-comprehensions have four kinds: simple, receive_send, send_receive, and send_method"
-                                        ),
-                                    };
-
+                                    let source_desc = source_evals(
+                                        source_node,
+                                        source,
+                                        ast_builder,
+                                        &mut errors,
+                                        &mut temp_cont_stack,
+                                    );
+                                    if let Some(names) = names_node {
+                                        temp_cont_stack.push(K::EvalList(names.walk()));
+                                    }
+                                    let query = query_evals(
+                                        bind_node,
+                                        &source_desc,
+                                        source,
+                                        &mut errors,
+                                        &mut temp_cont_stack,
+                                    );
                                     BindDesc::Linear {
                                         name_count,
                                         cont_present,
                                         source: source_desc,
+                                        query,
                                     }
                                 }
-                                kind!("repeated_bind") => BindDesc::Repeated {
-                                    name_count,
-                                    cont_present,
-                                },
-                                kind!("peek_bind") => BindDesc::Peek {
-                                    name_count,
-                                    cont_present,
-                                },
+                                kind!("repeated_bind") => {
+                                    temp_cont_stack.push(K::EvalDelayed(source_node));
+                                    if let Some(names) = names_node {
+                                        temp_cont_stack.push(K::EvalList(names.walk()));
+                                    }
+                                    BindDesc::Repeated {
+                                        name_count,
+                                        cont_present,
+                                    }
+                                }
+                                kind!("peek_bind") => {
+                                    temp_cont_stack.push(K::EvalDelayed(source_node));
+                                    if let Some(names) = names_node {
+                                        temp_cont_stack.push(K::EvalList(names.walk()));
+                                    }
+                                    BindDesc::Peek {
+                                        name_count,
+                                        cont_present,
+                                    }
+                                }
                                 _ => unreachable!("Filtered above"),
                             };
-
-                            match &bind_desc {
-                                BindDesc::Linear {
-                                    source: SourceDesc::SR { .. },
-                                    ..
-                                } => {
-                                    let inputs = get_field(&source_node, field!("inputs"));
-                                    temp_cont_stack
-                                        .push(K::EvalDelayed(get_first_child(&source_node)));
-                                    temp_cont_stack.push(K::EvalList(inputs.walk()));
-                                }
-                                BindDesc::Linear {
-                                    source: SourceDesc::SM { .. },
-                                    ..
-                                } => {
-                                    // proc_stack target after eval:
-                                    //   [channel, method_lit, input0, input1, ...]
-                                    // Push order (becomes reversed below):
-                                    //   channel last, then method_lit, then inputs.
-                                    let method_node = get_field(&source_node, field!("method"));
-                                    let inputs = get_field(&source_node, field!("inputs"));
-                                    let method_name = get_node_value(&method_node, source);
-                                    let method_lit = AnnProc {
-                                        proc: ast_builder.alloc_string_literal(method_name),
-                                        span: method_node.range().into(),
-                                    };
-                                    temp_cont_stack
-                                        .push(K::EvalDelayed(get_first_child(&source_node)));
-                                    temp_cont_stack.push(K::PushAnnProc(method_lit));
-                                    temp_cont_stack.push(K::EvalList(inputs.walk()));
-                                }
-                                BindDesc::Linear { .. } => {
-                                    temp_cont_stack
-                                        .push(K::EvalDelayed(get_first_child(&source_node)));
-                                }
-                                _ => {
-                                    temp_cont_stack.push(K::EvalDelayed(source_node));
-                                }
-                            }
-
-                            if let Some(names) = names_node {
-                                temp_cont_stack.push(K::EvalList(names.walk()));
-                            }
 
                             receipt_len += bind_desc.len();
                             bs.push(bind_desc);
@@ -1187,23 +1145,31 @@ pub(super) fn node_to_ast<'ast>(
                 kind!("send_sync") => {
                     let name_node = get_field(&node, field!("channel"));
                     let messages_node = get_field(&node, field!("inputs"));
-                    let arity = messages_node.named_child_count();
+                    let args = send_args(messages_node, source, &mut errors);
                     let sync_send_cont_node = get_field(&node, field!("cont"));
                     let choice_node = get_first_child(&sync_send_cont_node);
                     match choice_node.kind_id() {
                         kind!("empty_cont") => {
-                            cont_stack.push(K::ConsumeSendSync { span, arity });
+                            cont_stack.push(K::ConsumeSendSync {
+                                span,
+                                arity: args.arity,
+                                params: args.params,
+                            });
                         }
                         kind!("non_empty_cont") => {
                             let cont_node = get_first_child(&choice_node);
-                            cont_stack.push(K::ConsumeSendSyncWithCont { span, arity });
+                            cont_stack.push(K::ConsumeSendSyncWithCont {
+                                span,
+                                arity: args.arity,
+                                params: args.params,
+                            });
                             cont_stack.push(K::EvalDelayed(cont_node));
                         }
                         _ => {
                             unreachable!("Continuations of send_sync are either empty or non-empty")
                         }
                     };
-                    cont_stack.push(K::EvalList(messages_node.walk()));
+                    push_send_args_reversed(args.data, args.param_values, &mut cont_stack);
                     node = name_node;
                     continue 'parse;
                 }
@@ -1217,9 +1183,9 @@ pub(super) fn node_to_ast<'ast>(
                     let name_node = get_field(&node, field!("channel"));
                     let method_node = get_field(&node, field!("method"));
                     let messages_node = get_field(&node, field!("inputs"));
-                    let original_arity = messages_node.named_child_count();
+                    let args = send_args(messages_node, source, &mut errors);
                     // +1 for the synthesized method-name StringLiteral
-                    let synthesized_arity = original_arity + 1;
+                    let synthesized_arity = args.arity + 1;
                     let sync_send_cont_node = get_field(&node, field!("cont"));
                     let choice_node = get_first_child(&sync_send_cont_node);
                     let method_name = get_node_value(&method_node, source);
@@ -1232,6 +1198,7 @@ pub(super) fn node_to_ast<'ast>(
                             cont_stack.push(K::ConsumeSendSync {
                                 span,
                                 arity: synthesized_arity,
+                                params: args.params,
                             });
                         }
                         kind!("non_empty_cont") => {
@@ -1239,6 +1206,7 @@ pub(super) fn node_to_ast<'ast>(
                             cont_stack.push(K::ConsumeSendSyncWithCont {
                                 span,
                                 arity: synthesized_arity,
+                                params: args.params,
                             });
                             cont_stack.push(K::EvalDelayed(cont_node));
                         }
@@ -1246,13 +1214,14 @@ pub(super) fn node_to_ast<'ast>(
                             "Continuations of send_method are either empty or non-empty"
                         ),
                     };
-                    // proc_stack target: [channel, method_lit, input0, ...]
+                    // proc_stack target: [channel, method_lit, input0, ..., param0, ...]
                     // cont_stack is LIFO; top runs first. Execution order:
                     //   1. eval channel (immediate via node = name_node)
                     //   2. PushAnnProc(method_lit) -- the prepended literal
                     //   3. EvalList(inputs) -- one Continue per input
-                    //   4. ConsumeSendSync -- (pushed above the match arm)
-                    cont_stack.push(K::EvalList(messages_node.walk()));
+                    //   4. EvalDelayed(param) -- one per hyperparameter value
+                    //   5. ConsumeSendSync -- (pushed above the match arm)
+                    push_send_args_reversed(args.data, args.param_values, &mut cont_stack);
                     cont_stack.push(K::PushAnnProc(method_lit));
                     node = name_node;
                     continue 'parse;
@@ -1319,10 +1288,328 @@ pub(super) fn node_to_ast<'ast>(
     }
 }
 
-fn parse_decls<'a>(from: &tree_sitter::Node, source: &'a str) -> Vec<NameDecl<'a>> {
-    let mut result = Vec::with_capacity(from.named_child_count());
+/// The keys of one Reified RSpaces hyperparameter section, in source order:
+/// `Some(key)` for a named hyperparameter, `None` for a positional one.
+type ParamKeys<'ast> = SmallVec<[Option<Id<'ast>>; 2]>;
 
-    for decl_node in from.named_children(&mut from.walk()) {
+/// The value nodes of one hyperparameter section, in source order.
+type ParamValueNodes<'tree> = SmallVec<[tree_sitter::Node<'tree>; 2]>;
+
+/// The context of a hyperparameter section. It decides how a positional
+/// hyperparameter is checked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ParamSection {
+    /// A send or a send-receive source: positional hyperparameters precede
+    /// the named ones.
+    Send,
+    /// A receive query: query parameters are named only.
+    Query,
+}
+
+/// Walks the `params_section` of one `hyper_inputs` node and validates it.
+/// Every section is walked exactly once. Returns the keys, appends the value
+/// nodes to `values` in source order, and reports:
+/// - a repeated key (`DuplicateParamKey`; the span is the repeated key and
+///   `first` is the span of its first occurrence);
+/// - a key that is not an identifier (`NonIdentifierParamKey`);
+/// - a positional hyperparameter after a named one in a send
+///   (`PositionalAfterNamed`), or any positional parameter in a query
+///   (`MalformedQuerySpec`).
+///
+/// A `hyper_inputs` node that contains a syntax error is not validated:
+/// error recovery can reshape it (`k =` with no value can become a
+/// positional `k`), and the syntax error itself is reported by
+/// `query_errors`.
+fn walk_hyperparams<'tree, 'ast>(
+    hyper_inputs: tree_sitter::Node<'tree>,
+    context: ParamSection,
+    source: &'ast str,
+    errors: &mut Vec<AnnParsingError>,
+    values: &mut ParamValueNodes<'tree>,
+) -> ParamKeys<'ast> {
+    let Some(list) = hyper_inputs
+        .child_by_field_id(field!("params"))
+        .and_then(|section| section.named_child(0))
+    else {
+        return ParamKeys::new();
+    };
+    let mut keys = ParamKeys::with_capacity(list.named_child_count());
+    values.reserve(list.named_child_count());
+    let mut section_errors = Vec::new();
+    // The span of the first occurrence of every key seen so far.
+    let mut first_spans: SmallVec<[(&'ast str, SourceSpan); 2]> = SmallVec::new();
+    let mut named_seen = false;
+    for param in list.named_children(&mut list.walk()) {
+        // Error recovery can leave a `param` without its parts; the tree
+        // error is reported by `query_errors`.
+        let Some(inner) = param.named_child(0) else {
+            continue;
+        };
+        match inner.kind_id() {
+            kind!("named_param") => {
+                named_seen = true;
+                let (Some(key_node), Some(value_node)) = (
+                    inner.child_by_field_id(field!("key")),
+                    inner.child_by_field_id(field!("value")),
+                ) else {
+                    continue;
+                };
+                let key = Id {
+                    name: get_node_value(&key_node, source),
+                    pos: key_node.start_position().into(),
+                };
+                if key_node.kind_id() == kind!("var") {
+                    match first_spans.iter().find(|(name, _)| *name == key.name) {
+                        Some((_, first)) => section_errors.push(AnnParsingError::new(
+                            ParsingError::DuplicateParamKey {
+                                key: key.name.to_owned(),
+                                first: *first,
+                            },
+                            &key_node,
+                        )),
+                        None => first_spans.push((key.name, key_node.range().into())),
+                    }
+                } else {
+                    section_errors.push(AnnParsingError::new(
+                        ParsingError::NonIdentifierParamKey,
+                        &key_node,
+                    ));
+                }
+                keys.push(Some(key));
+                values.push(value_node);
+            }
+            kind!("positional_param") => {
+                let Some(value_node) = inner.named_child(0) else {
+                    continue;
+                };
+                match context {
+                    ParamSection::Query => section_errors.push(AnnParsingError::new(
+                        ParsingError::MalformedQuerySpec {
+                            reason: QUERY_POSITIONAL_PARAM,
+                        },
+                        &inner,
+                    )),
+                    ParamSection::Send if named_seen => section_errors.push(AnnParsingError::new(
+                        ParsingError::PositionalAfterNamed,
+                        &inner,
+                    )),
+                    ParamSection::Send => {}
+                }
+                keys.push(None);
+                values.push(value_node);
+            }
+            _ => {}
+        }
+    }
+    if !hyper_inputs.has_error() {
+        errors.append(&mut section_errors);
+    }
+    keys
+}
+
+/// The data and the Reified RSpaces hyperparameters of one argument list
+/// (`inputs`, `messages` or `hyper_inputs`), walked once by [`send_args`].
+struct SendArgs<'tree, 'ast> {
+    /// The node whose named children are the data processes.
+    data: Option<tree_sitter::Node<'tree>>,
+    /// The number of data processes.
+    arity: usize,
+    /// The hyperparameter keys; `None` when the list has no `;`.
+    params: Option<ParamKeys<'ast>>,
+    /// The hyperparameter values, in source order.
+    param_values: ParamValueNodes<'tree>,
+}
+
+/// Splits an argument list into its data and its hyperparameters, walking
+/// and validating the hyperparameter section once.
+fn send_args<'tree, 'ast>(
+    inputs: tree_sitter::Node<'tree>,
+    source: &'ast str,
+    errors: &mut Vec<AnnParsingError>,
+) -> SendArgs<'tree, 'ast> {
+    match inputs.kind_id() {
+        kind!("hyper_inputs") => {
+            let data = inputs.child_by_field_id(field!("data"));
+            let mut param_values = ParamValueNodes::new();
+            let keys = walk_hyperparams(
+                inputs,
+                ParamSection::Send,
+                source,
+                errors,
+                &mut param_values,
+            );
+            SendArgs {
+                data,
+                arity: data.map_or(0, |data| data.named_child_count()),
+                params: Some(keys),
+                param_values,
+            }
+        }
+        _ => SendArgs {
+            data: Some(inputs),
+            arity: inputs.named_child_count(),
+            params: None,
+            param_values: ParamValueNodes::new(),
+        },
+    }
+}
+
+/// Pushes the evaluations of a send's data and hyperparameter values onto
+/// the LIFO continuation stack, so that the data evaluate first, in source
+/// order, and the hyperparameter values follow.
+fn push_send_args_reversed<'tree, 'ast>(
+    data: Option<tree_sitter::Node<'tree>>,
+    param_values: ParamValueNodes<'tree>,
+    cont_stack: &mut Vec<K<'tree, 'ast>>,
+) {
+    cont_stack.extend(param_values.into_iter().rev().map(K::EvalDelayed));
+    if let Some(data) = data {
+        cont_stack.push(K::EvalList(data.walk()));
+    }
+}
+
+/// Classifies a `_source` node and appends the evaluations of its pieces to
+/// the forward-ordered `evals`, in slot order: the channel, the method-name
+/// literal (`!m` sources only), the data, then the hyperparameter values. The
+/// hyperparameter section is walked and validated here, once.
+fn source_evals<'tree, 'ast>(
+    source_node: tree_sitter::Node<'tree>,
+    source: &'ast str,
+    ast_builder: &'ast ASTBuilder<'ast>,
+    errors: &mut Vec<AnnParsingError>,
+    evals: &mut Vec<K<'tree, 'ast>>,
+) -> SourceDesc<'ast> {
+    evals.push(K::EvalDelayed(get_first_child(&source_node)));
+    match source_node.kind_id() {
+        kind!("simple_source") => SourceDesc::Simple,
+        kind!("receive_send_source") => SourceDesc::RS,
+        kind!("send_receive_source") => {
+            let args = send_args(get_field(&source_node, field!("inputs")), source, errors);
+            evals.extend(args.data.map(|data| K::EvalList(data.walk())));
+            evals.extend(args.param_values.into_iter().map(K::EvalDelayed));
+            SourceDesc::SR {
+                arity: args.arity,
+                params: args.params,
+            }
+        }
+        // proc_stack target after eval:
+        //   [channel, method_lit, input0, input1, ..., param0, ...]
+        kind!("send_method_source") => {
+            let method_node = get_field(&source_node, field!("method"));
+            let args = send_args(get_field(&source_node, field!("inputs")), source, errors);
+            evals.push(K::PushAnnProc(AnnProc {
+                proc: ast_builder.alloc_string_literal(get_node_value(&method_node, source)),
+                span: method_node.range().into(),
+            }));
+            evals.extend(args.data.map(|data| K::EvalList(data.walk())));
+            evals.extend(args.param_values.into_iter().map(K::EvalDelayed));
+            SourceDesc::SM {
+                arity: args.arity,
+                params: args.params,
+            }
+        }
+        _ => unreachable!(
+            "Sources have four kinds: simple, receive_send, send_receive and send_method"
+        ),
+    }
+}
+
+/// Walks the receive query of a linear bind once, appends the evaluations of
+/// its payload and parameter values to the forward-ordered `evals`, and
+/// reports a malformed query (`MalformedQuerySpec`): a query on a source
+/// that is not simple, the empty group `~ (;)`, or a positional parameter.
+/// `~ e` and `~ (e;)` give the same description: payload `[e]`, no
+/// parameters. As in [`walk_hyperparams`], a query that contains a syntax
+/// error is not validated.
+fn query_evals<'tree, 'ast>(
+    bind_node: tree_sitter::Node<'tree>,
+    source_desc: &SourceDesc<'ast>,
+    source: &'ast str,
+    errors: &mut Vec<AnnParsingError>,
+    evals: &mut Vec<K<'tree, 'ast>>,
+) -> Option<QueryDesc<'ast>> {
+    let spec = bind_node.child_by_field_id(field!("query_spec"))?;
+    let report_errors = !spec.has_error();
+    match source_desc {
+        SourceDesc::Simple => {}
+        SourceDesc::RS | SourceDesc::SR { .. } | SourceDesc::SM { .. } if report_errors => {
+            errors.push(AnnParsingError::new(
+                ParsingError::MalformedQuerySpec {
+                    reason: QUERY_NON_SIMPLE_SOURCE,
+                },
+                &spec,
+            ));
+        }
+        SourceDesc::RS | SourceDesc::SR { .. } | SourceDesc::SM { .. } => {}
+    }
+    let query = get_field(&spec, field!("query"));
+    if query.kind_id() != kind!("hyper_inputs") {
+        evals.push(K::EvalDelayed(query));
+        return Some(QueryDesc {
+            payload_arity: 1,
+            params: None,
+        });
+    }
+    let data = query.child_by_field_id(field!("data"));
+    let payload_arity = data.map_or(0, |data| data.named_child_count());
+    let mut param_values = ParamValueNodes::new();
+    let keys = walk_hyperparams(
+        query,
+        ParamSection::Query,
+        source,
+        errors,
+        &mut param_values,
+    );
+    if report_errors && payload_arity == 0 && keys.is_empty() {
+        errors.push(AnnParsingError::new(
+            ParsingError::MalformedQuerySpec {
+                reason: QUERY_EMPTY_GROUP,
+            },
+            &query,
+        ));
+    }
+    evals.extend(data.map(|data| K::EvalList(data.walk())));
+    evals.extend(param_values.into_iter().map(K::EvalDelayed));
+    Some(QueryDesc {
+        payload_arity,
+        params: (!keys.is_empty()).then_some(keys),
+    })
+}
+
+/// Pairs the keys of a hyperparameter section with their evaluated values.
+fn build_hyperparams<'ast>(
+    keys: &[Option<Id<'ast>>],
+    values: &[AnnProc<'ast>],
+) -> HyperparamList<'ast> {
+    keys.iter()
+        .zip(values)
+        .map(|(key, value)| match key {
+            Some(key) => Hyperparam::Named {
+                key: *key,
+                value: *value,
+            },
+            None => Hyperparam::Positional(*value),
+        })
+        .collect()
+}
+
+/// The binders of a `new` in source order, and the space annotations with the
+/// index of their binder. An annotation is a name that can be quoted, so it
+/// is evaluated through the continuation stack, and `ConsumeNew` fills in
+/// `NameDecl::space`.
+type ParsedDecls<'tree, 'a> = (
+    Vec<NameDecl<'a>>,
+    SmallVec<[(usize, tree_sitter::Node<'tree>); 2]>,
+);
+
+fn parse_decls<'tree, 'a>(
+    from: &tree_sitter::Node<'tree>,
+    source: &'a str,
+) -> ParsedDecls<'tree, 'a> {
+    let mut result = Vec::with_capacity(from.named_child_count());
+    let mut annotations = SmallVec::new();
+
+    for (index, decl_node) in from.named_children(&mut from.walk()).enumerate() {
         let var_node = get_first_child(&decl_node);
         let id = Id {
             name: get_node_value(&var_node, source),
@@ -1331,11 +1618,18 @@ fn parse_decls<'a>(from: &tree_sitter::Node, source: &'a str) -> Vec<NameDecl<'a
         let uri = decl_node
             .child_by_field_id(field!("uri"))
             .map(|uri_literal| get_node_value(&uri_literal, source).into());
+        if let Some(space_node) = decl_node.child_by_field_id(field!("space_type")) {
+            annotations.push((index, space_node));
+        }
 
-        result.push(NameDecl { id, uri });
+        result.push(NameDecl {
+            id,
+            space: None,
+            uri,
+        });
     }
 
-    result
+    (result, annotations)
 }
 
 fn parse_sized_int_literal(literal: &str, suffix: char) -> Option<(&str, u32)> {
@@ -1348,11 +1642,17 @@ fn parse_sized_int_literal(literal: &str, suffix: char) -> Option<(&str, u32)> {
 }
 
 fn parse_float_literal(literal: &str) -> Option<(&str, u16)> {
-    let (value, width) = literal.rsplit_once('f')?;
-    let bits: u16 = width.parse().ok()?;
-    match bits {
-        32 | 64 | 128 | 256 => Some((value, bits)),
-        _ => None,
+    // A float literal contains `f` only in its width suffix. A bare float
+    // (no suffix) is an f64.
+    match literal.rsplit_once('f') {
+        Some((value, width)) => {
+            let bits: u16 = width.parse().ok()?;
+            match bits {
+                32 | 64 | 128 | 256 => Some((value, bits)),
+                _ => None,
+            }
+        }
+        None => Some((literal, 64)),
     }
 }
 
@@ -1606,42 +1906,121 @@ fn apply_cont<'tree, 'ast>(
                                 ast_builder.alloc_method(id, recv, args).ann(span)
                             })
                         }
-                        K::ConsumeNew { decls, span } => proc_stack
-                            .replace_top(|body| ast_builder.alloc_new(body, decls).ann(span)),
+                        K::ConsumeUseBlock { span } => {
+                            proc_stack.replace_top_slice_with_mask(2, |space_body, mask| {
+                                let space = into_name_or_quote(space_body[0], mask[0]);
+                                ast_builder.alloc_use_block(space, space_body[1]).ann(span)
+                            })
+                        }
+                        K::ConsumeNew {
+                            mut decls,
+                            annotated,
+                            span,
+                        } => proc_stack.replace_top_slice_with_mask(
+                            annotated.len() + 1,
+                            |annotations_body, mask| {
+                                for (slot, decl_index) in annotated.iter().enumerate() {
+                                    decls[*decl_index].space = Some(into_name_or_quote(
+                                        annotations_body[slot],
+                                        mask[slot],
+                                    ));
+                                }
+                                let body = annotations_body[annotated.len()];
+                                ast_builder.alloc_new(body, decls).ann(span)
+                            },
+                        ),
                         K::ConsumePar { span } => proc_stack.replace_top2(|left, right| {
                             ast_builder.alloc_par(left, right).ann(span)
                         }),
                         K::ConsumeSend {
                             send_type,
                             arity,
+                            params,
                             span,
                         } => {
-                            proc_stack.replace_top_slice_with_mask(arity + 1, |name_args, mask| {
-                                let channel = into_name(name_args[0], mask[0]);
-                                let inputs = &name_args[1..];
-                                ast_builder.alloc_send(send_type, channel, inputs).ann(span)
-                            })
-                        }
-                        K::ConsumeSendSync { span, arity } => proc_stack
-                            .replace_top_slice_with_mask(arity + 1, |name_inputs, mask| {
-                                let channel = into_name(name_inputs[0], mask[0]);
-                                ast_builder
-                                    .alloc_send_sync(channel, &name_inputs[1..])
-                                    .ann(span)
-                            }),
-                        K::ConsumeSendSyncWithCont { span, arity } => {
+                            // slice = [channel, inputs…, param values…]
+                            let param_count = params.as_ref().map_or(0, |keys| keys.len());
                             proc_stack.replace_top_slice_with_mask(
-                                arity + 2,
+                                arity + param_count + 1,
+                                |name_args, mask| {
+                                    let channel = into_name(name_args[0], mask[0]);
+                                    let (inputs, param_values) = name_args[1..].split_at(arity);
+                                    match params {
+                                        Some(keys) => ast_builder
+                                            .alloc_send_with_params(
+                                                send_type,
+                                                channel,
+                                                inputs,
+                                                build_hyperparams(&keys, param_values),
+                                            )
+                                            .ann(span),
+                                        None => ast_builder
+                                            .alloc_send(send_type, channel, inputs)
+                                            .ann(span),
+                                    }
+                                },
+                            )
+                        }
+                        K::ConsumeFreeTheory { name, arity, span } => proc_stack
+                            .replace_top_slice(arity, |args| {
+                                ast_builder.alloc_free_theory(name, args).ann(span)
+                            }),
+                        K::ConsumeSendSync {
+                            span,
+                            arity,
+                            params,
+                        } => {
+                            // slice = [channel, inputs…, param values…]
+                            let param_count = params.as_ref().map_or(0, |keys| keys.len());
+                            proc_stack.replace_top_slice_with_mask(
+                                arity + param_count + 1,
+                                |name_inputs, mask| {
+                                    let channel = into_name(name_inputs[0], mask[0]);
+                                    let (inputs, param_values) = name_inputs[1..].split_at(arity);
+                                    match params {
+                                        Some(keys) => ast_builder
+                                            .alloc_send_sync_with_params(
+                                                channel,
+                                                inputs,
+                                                build_hyperparams(&keys, param_values),
+                                                SyncSendCont::Empty,
+                                            )
+                                            .ann(span),
+                                        None => {
+                                            ast_builder.alloc_send_sync(channel, inputs).ann(span)
+                                        }
+                                    }
+                                },
+                            )
+                        }
+                        K::ConsumeSendSyncWithCont {
+                            span,
+                            arity,
+                            params,
+                        } => {
+                            // slice = [channel, inputs…, param values…, cont]
+                            let param_count = params.as_ref().map_or(0, |keys| keys.len());
+                            proc_stack.replace_top_slice_with_mask(
+                                arity + param_count + 2,
                                 |name_inputs_cont, mask| {
                                     let channel = into_name(name_inputs_cont[0], mask[0]);
-                                    // SAFETY: Because we successfully consumed |arity + 2|
-                                    // elements, then the slice.len() is greater or equal 2
-                                    let (last, messages) =
-                                        name_inputs_cont[1..].split_last().unwrap_unchecked();
-                                    let cont = *last;
-                                    ast_builder
-                                        .alloc_send_sync_with_cont(channel, messages, cont)
-                                        .ann(span)
+                                    let cont_index = 1 + arity + param_count;
+                                    let cont = name_inputs_cont[cont_index];
+                                    let (messages, param_values) =
+                                        name_inputs_cont[1..cont_index].split_at(arity);
+                                    match params {
+                                        Some(keys) => ast_builder
+                                            .alloc_send_sync_with_params(
+                                                channel,
+                                                messages,
+                                                build_hyperparams(&keys, param_values),
+                                                SyncSendCont::NonEmpty(cont),
+                                            )
+                                            .ann(span),
+                                        None => ast_builder
+                                            .alloc_send_sync_with_cont(channel, messages, cont)
+                                            .ann(span),
+                                    }
                                 },
                             )
                         }
@@ -1708,8 +2087,8 @@ enum Step<'a> {
 }
 
 type LetDecls = SmallVec<[LetDecl; 1]>;
-type ReceiptDescripts = SmallVec<[ReceiptDesc; 1]>;
-type BindDescripts = SmallVec<[BindDesc; 1]>;
+type ReceiptDescripts<'ast> = SmallVec<[ReceiptDesc<'ast>; 1]>;
+type BindDescripts<'ast> = SmallVec<[BindDesc<'ast>; 1]>;
 
 #[derive(Clone)]
 enum K<'tree, 'ast> {
@@ -1730,7 +2109,7 @@ enum K<'tree, 'ast> {
         span: SourceSpan,
     },
     ConsumeForComprehension {
-        desc: ReceiptDescripts,
+        desc: ReceiptDescripts<'ast>,
         total_len: usize,
         span: SourceSpan,
     },
@@ -1788,26 +2167,42 @@ enum K<'tree, 'ast> {
         id: Id<'ast>,
         arity: usize,
     },
+    // `annotated` lists, in source order, the indices of the binders that
+    // carry a space annotation; the proc_stack slice is [annotations…, body].
     ConsumeNew {
         decls: Vec<NameDecl<'ast>>,
+        annotated: SmallVec<[usize; 2]>,
+        span: SourceSpan,
+    },
+    ConsumeUseBlock {
         span: SourceSpan,
     },
     ConsumePar {
         span: SourceSpan,
     },
     ConsumeQuote,
+    // `params` holds the hyperparameter keys (`None`: no `;` section); the
+    // proc_stack slice is [channel, inputs…, param values…].
     ConsumeSend {
         send_type: SendType,
         arity: usize,
+        params: Option<ParamKeys<'ast>>,
         span: SourceSpan,
     },
     ConsumeSendSync {
         span: SourceSpan,
         arity: usize,
+        params: Option<ParamKeys<'ast>>,
     },
     ConsumeSendSyncWithCont {
         span: SourceSpan,
         arity: usize,
+        params: Option<ParamKeys<'ast>>,
+    },
+    ConsumeFreeTheory {
+        name: Id<'ast>,
+        arity: usize,
+        span: SourceSpan,
     },
     ConsumeAgentBlock {
         span: SourceSpan,
@@ -1815,7 +2210,7 @@ enum K<'tree, 'ast> {
     },
     ConsumeTryBlock {
         span: SourceSpan,
-        source_desc: SourceDesc,
+        source_desc: SourceDesc<'ast>,
         has_try_pattern: bool,
         total_len: usize,
     },
@@ -1941,9 +2336,18 @@ impl Debug for K<'_, '_> {
                 .field("arity", arity)
                 .field("span", span)
                 .finish(),
-            Self::ConsumeNew { decls, span } => f
+            Self::ConsumeNew {
+                decls,
+                annotated,
+                span,
+            } => f
                 .debug_struct("ConsumeNew")
                 .field("decls", decls)
+                .field("annotated", annotated)
+                .field("span", span)
+                .finish(),
+            Self::ConsumeUseBlock { span } => f
+                .debug_struct("ConsumeUseBlock")
                 .field("span", span)
                 .finish(),
             Self::ConsumePar { span } => f.debug_struct("ConsumePar").field("span", span).finish(),
@@ -1951,20 +2355,38 @@ impl Debug for K<'_, '_> {
             Self::ConsumeSend {
                 send_type,
                 arity,
+                params,
                 span,
             } => f
                 .debug_struct("ConsumeSend")
                 .field("send_type", send_type)
                 .field("arity", arity)
+                .field("params", params)
                 .field("span", span)
                 .finish(),
-            Self::ConsumeSendSync { span, arity } => f
+            Self::ConsumeSendSync {
+                span,
+                arity,
+                params,
+            } => f
                 .debug_struct("ConsumeSendSync")
                 .field("arity", arity)
+                .field("params", params)
                 .field("span", span)
                 .finish(),
-            Self::ConsumeSendSyncWithCont { span, arity } => f
+            Self::ConsumeSendSyncWithCont {
+                span,
+                arity,
+                params,
+            } => f
                 .debug_struct("ConsumeSendSyncWithCont")
+                .field("arity", arity)
+                .field("params", params)
+                .field("span", span)
+                .finish(),
+            Self::ConsumeFreeTheory { name, arity, span } => f
+                .debug_struct("ConsumeFreeTheory")
+                .field("name", name)
                 .field("arity", arity)
                 .field("span", span)
                 .finish(),
@@ -2286,36 +2708,95 @@ fn named_children_of_kind<'a>(
         .filter(move |child| child.kind_id() == kind)
 }
 
-#[derive(Debug, Clone, Copy)]
-enum SourceDesc {
+// The proc_stack slice of a source is [channel, method literal (SM only),
+// inputs…, hyperparameter values…]; `params` holds the hyperparameter keys
+// (`None`: no `;` section).
+#[derive(Debug, Clone)]
+enum SourceDesc<'ast> {
     Simple,
     RS,
-    SR { arity: usize },
+    SR {
+        arity: usize,
+        params: Option<ParamKeys<'ast>>,
+    },
     // send_method_source: `name '!' method '(' inputs ')'`. Rewritten
     // at into_bind time into Source::SendReceive with a StringLiteral
     // method-name AnnProc prepended. The proc_stack slice carries the
     // pre-built StringLiteral AnnProc at index 1 (between the channel
     // and the actual inputs).
-    SM { arity: usize },
+    SM {
+        arity: usize,
+        params: Option<ParamKeys<'ast>>,
+    },
 }
 
-impl SourceDesc {
+impl<'ast> SourceDesc<'ast> {
     fn len(&self) -> usize {
         match self {
             SourceDesc::Simple | SourceDesc::RS => 1,
-            SourceDesc::SR { arity } => *arity + 1,
+            SourceDesc::SR { arity, params } => {
+                1 + arity + params.as_ref().map_or(0, |keys| keys.len())
+            }
             // 1 (channel) + 1 (method-literal AnnProc) + arity (real inputs)
-            SourceDesc::SM { arity } => *arity + 2,
+            SourceDesc::SM { arity, params } => {
+                2 + arity + params.as_ref().map_or(0, |keys| keys.len())
+            }
+        }
+    }
+
+    /// Builds the source from the channel name and the slots that follow the
+    /// channel (`rest`, which may continue past the source).
+    fn build_source(&self, name: Name<'ast>, rest: &[AnnProc<'ast>]) -> Source<'ast> {
+        match self {
+            SourceDesc::Simple => Source::Simple { name },
+            SourceDesc::RS => Source::ReceiveSend { name },
+            SourceDesc::SR { arity, params } => send_receive_source(name, rest, *arity, params),
+            // The method literal is the first input.
+            SourceDesc::SM { arity, params } => send_receive_source(name, rest, arity + 1, params),
         }
     }
 }
 
+/// Builds `Source::SendReceive` from the slots after the channel: `input_count`
+/// inputs, then one value per hyperparameter key.
+fn send_receive_source<'ast>(
+    name: Name<'ast>,
+    rest: &[AnnProc<'ast>],
+    input_count: usize,
+    params: &Option<ParamKeys<'ast>>,
+) -> Source<'ast> {
+    let (inputs, after_inputs) = rest.split_at(input_count);
+    Source::SendReceive {
+        name,
+        inputs: inputs.to_smallvec(),
+        params: params
+            .as_ref()
+            .map(|keys| Box::new(build_hyperparams(keys, &after_inputs[..keys.len()]))),
+    }
+}
+
+// A receive query: `payload_arity` payload slots, then one value slot per
+// parameter key. `params` is `None` when the query has no parameters, so
+// `~ e` and `~ (e;)` share one description.
 #[derive(Debug, Clone)]
-enum BindDesc {
+struct QueryDesc<'ast> {
+    payload_arity: usize,
+    params: Option<ParamKeys<'ast>>,
+}
+
+impl QueryDesc<'_> {
+    fn len(&self) -> usize {
+        self.payload_arity + self.params.as_ref().map_or(0, |keys| keys.len())
+    }
+}
+
+#[derive(Debug, Clone)]
+enum BindDesc<'ast> {
     Linear {
         name_count: usize,
         cont_present: bool,
-        source: SourceDesc,
+        source: SourceDesc<'ast>,
+        query: Option<QueryDesc<'ast>>,
     },
     Repeated {
         name_count: usize,
@@ -2331,18 +2812,21 @@ enum BindDesc {
     Signed {
         name_count: usize,
         cont_present: bool,
-        source: SourceDesc,
+        source: SourceDesc<'ast>,
         sig_ops: SmallVec<[SigOp; 4]>,
         sig_proc_count: usize,
     },
 }
 
-impl BindDesc {
+impl<'a> BindDesc<'a> {
     fn len(&self) -> usize {
         match self {
             BindDesc::Linear {
-                name_count, source, ..
-            } => name_count + source.len(),
+                name_count,
+                source,
+                query,
+                ..
+            } => name_count + source.len() + query.as_ref().map_or(0, QueryDesc::len),
             BindDesc::Signed {
                 name_count,
                 source,
@@ -2355,7 +2839,7 @@ impl BindDesc {
         }
     }
 
-    fn into_bind<'a>(self, procs: &[AnnProc<'a>], mask: &BitSlice) -> Bind<'a> {
+    fn into_bind(self, procs: &[AnnProc<'a>], mask: &BitSlice) -> Bind<'a> {
         assert_eq!(procs.len(), self.len());
         unsafe {
             // SAFETY: We check above that the slice contains exactly |self.len()| elements which is
@@ -2369,34 +2853,35 @@ impl BindDesc {
                 BindDesc::Linear {
                     cont_present,
                     source,
-                    ..
+                    name_count,
+                    query,
                 } => {
-                    let rhs = match source {
-                        SourceDesc::Simple => Source::Simple { name: channel_name },
-                        SourceDesc::RS => Source::ReceiveSend { name: channel_name },
-                        SourceDesc::SR { arity } => {
-                            let inputs = &rest[..arity];
-                            Source::SendReceive {
-                                name: channel_name,
-                                inputs: inputs.to_smallvec(),
-                            }
-                        }
-                        // send_method_source -> Source::SendReceive with
-                        // method-name AnnProc already at rest[0] and
-                        // actual inputs at rest[1..arity+1].
-                        SourceDesc::SM { arity } => {
-                            let inputs = &rest[..arity + 1];
-                            Source::SendReceive {
-                                name: channel_name,
-                                inputs: inputs.to_smallvec(),
-                            }
-                        }
-                    };
+                    let rhs = source.build_source(channel_name, rest);
 
                     let lhs_start = source.len() - 1;
-                    let lhs = into_names(&rest[lhs_start..], &qs[lhs_start..], cont_present);
+                    let lhs_end = lhs_start + name_count;
+                    let lhs = into_names(
+                        &rest[lhs_start..lhs_end],
+                        &qs[lhs_start..lhs_end],
+                        cont_present,
+                    );
+                    // rest = [source slots…][names…][payload…][param values…]
+                    let query_spec = query.map(|query| {
+                        let (payload, param_values) = rest[lhs_end..].split_at(query.payload_arity);
+                        Box::new(QuerySpec {
+                            payload: payload.to_smallvec(),
+                            params: query
+                                .params
+                                .as_ref()
+                                .map(|keys| build_hyperparams(keys, param_values)),
+                        })
+                    });
 
-                    Bind::Linear { lhs, rhs }
+                    Bind::Linear {
+                        lhs,
+                        rhs,
+                        query_spec,
+                    }
                 }
 
                 BindDesc::Repeated { cont_present, .. } => Bind::Repeated {
@@ -2416,27 +2901,7 @@ impl BindDesc {
                     sig_proc_count,
                     ..
                 } => {
-                    let rhs = match source {
-                        SourceDesc::Simple => Source::Simple { name: channel_name },
-                        SourceDesc::RS => Source::ReceiveSend { name: channel_name },
-                        SourceDesc::SR { arity } => {
-                            let inputs = &rest[..arity];
-                            Source::SendReceive {
-                                name: channel_name,
-                                inputs: inputs.to_smallvec(),
-                            }
-                        }
-                        // send_method_source -> Source::SendReceive with
-                        // method-name AnnProc already at rest[0] and
-                        // actual inputs at rest[1..arity+1].
-                        SourceDesc::SM { arity } => {
-                            let inputs = &rest[..arity + 1];
-                            Source::SendReceive {
-                                name: channel_name,
-                                inputs: inputs.to_smallvec(),
-                            }
-                        }
-                    };
+                    let rhs = source.build_source(channel_name, rest);
                     // rest = [SR inputs…][names…][sig_procs…]; carve the names out
                     // between the source inputs and the trailing signature procs.
                     let lhs_start = source.len() - 1;
@@ -2455,15 +2920,15 @@ impl BindDesc {
 }
 
 #[derive(Debug, Clone)]
-struct ReceiptDesc {
-    parts: BindDescripts,
+struct ReceiptDesc<'ast> {
+    parts: BindDescripts<'ast>,
     len: usize,
     has_guard: bool,
 }
 
 struct BindIter<'slice, 'a, O>
 where
-    O: Iterator<Item = &'slice BindDesc> + ExactSizeIterator,
+    O: Iterator<Item = &'slice BindDesc<'a>> + ExactSizeIterator,
 {
     iter: O,
     procs: &'slice [AnnProc<'a>],
@@ -2472,7 +2937,7 @@ where
 
 impl<'slice, 'a, O> Iterator for BindIter<'slice, 'a, O>
 where
-    O: Iterator<Item = &'slice BindDesc> + ExactSizeIterator,
+    O: Iterator<Item = &'slice BindDesc<'a>> + ExactSizeIterator,
 {
     type Item = Bind<'a>;
 
@@ -2498,7 +2963,7 @@ where
 
 impl<'slice, 'a, O> ExactSizeIterator for BindIter<'slice, 'a, O>
 where
-    O: Iterator<Item = &'slice BindDesc> + ExactSizeIterator,
+    O: Iterator<Item = &'slice BindDesc<'a>> + ExactSizeIterator,
 {
     fn len(&self) -> usize {
         self.iter.len()
@@ -2506,13 +2971,13 @@ where
 }
 
 impl<'slice, 'a, O> FusedIterator for BindIter<'slice, 'a, O> where
-    O: Iterator<Item = &'slice BindDesc> + ExactSizeIterator
+    O: Iterator<Item = &'slice BindDesc<'a>> + ExactSizeIterator
 {
 }
 
 struct ReceiptIter<'slice, 'a, O>
 where
-    O: Iterator<Item = &'slice ReceiptDesc> + ExactSizeIterator,
+    O: Iterator<Item = &'slice ReceiptDesc<'a>> + ExactSizeIterator,
 {
     iter: O,
     procs: &'slice [AnnProc<'a>],
@@ -2521,7 +2986,7 @@ where
 
 impl<'slice, 'a, O> ReceiptIter<'slice, 'a, O>
 where
-    O: Iterator<Item = &'slice ReceiptDesc> + ExactSizeIterator,
+    O: Iterator<Item = &'slice ReceiptDesc<'a>> + ExactSizeIterator,
 {
     fn new(
         receipts: impl IntoIterator<Item = O::Item, IntoIter = O>,
@@ -2539,10 +3004,10 @@ where
 
 impl<'slice, 'a, O> Iterator for ReceiptIter<'slice, 'a, O>
 where
-    O: Iterator<Item = &'slice ReceiptDesc> + ExactSizeIterator,
+    O: Iterator<Item = &'slice ReceiptDesc<'a>> + ExactSizeIterator,
 {
     type Item = (
-        BindIter<'slice, 'a, SliceIter<'slice, BindDesc>>,
+        BindIter<'slice, 'a, SliceIter<'slice, BindDesc<'a>>>,
         Option<AnnProc<'a>>,
     );
 
@@ -2589,7 +3054,7 @@ where
 
 impl<'slice, 'a, O> ExactSizeIterator for ReceiptIter<'slice, 'a, O>
 where
-    O: Iterator<Item = &'slice ReceiptDesc> + ExactSizeIterator,
+    O: Iterator<Item = &'slice ReceiptDesc<'a>> + ExactSizeIterator,
 {
     fn len(&self) -> usize {
         self.iter.len()
@@ -2597,7 +3062,7 @@ where
 }
 
 impl<'slice, 'a, O> std::iter::FusedIterator for ReceiptIter<'slice, 'a, O> where
-    O: Iterator<Item = &'slice ReceiptDesc> + ExactSizeIterator
+    O: Iterator<Item = &'slice ReceiptDesc<'a>> + ExactSizeIterator
 {
 }
 
@@ -2776,6 +3241,18 @@ fn into_name(ann_proc: AnnProc, quoted: bool) -> Name {
             Proc::ProcVar(var) => Name::NameVar(*var),
             _ => panic!("invalid proc variant for into_name"),
         }
+    }
+}
+
+/// `into_name` for the Reified RSpaces name positions (a `use` space and a
+/// `new` annotation). Under error recovery a missing or erroneous name is a
+/// `Bad` process; the parse fails anyway (the tree errors are collected
+/// separately), so it becomes a quote instead of a panic.
+#[inline]
+fn into_name_or_quote(ann_proc: AnnProc, quoted: bool) -> Name {
+    match ann_proc.proc {
+        Proc::ProcVar(var) if !quoted => Name::NameVar(*var),
+        _ => Name::Quote(ann_proc),
     }
 }
 
@@ -2972,10 +3449,12 @@ fn build_agent_desugaring<'ast>(
     let new_decls = vec![
         NameDecl {
             id: this_id,
+            space: None,
             uri: None,
         },
         NameDecl {
             id: private_id,
+            space: None,
             uri: None,
         },
     ];
@@ -3011,6 +3490,10 @@ fn build_agent_desugaring<'ast>(
 /// name vars, method names, `new` decls, VarRef, remainders of
 /// `let` / `for` / `contract` pattern lists, and cost-accounting
 /// signatures in signed terms, token stacks, and signed binds).
+/// The Reified RSpaces positions count too: `use` spaces, `new`
+/// space annotations, theory names and arguments, and the keys
+/// and values of send, source and query hyperparameters, and
+/// query payloads.
 /// Over-collecting only makes us pick a slightly less pretty
 /// fresh name; it never causes an incorrect capture.
 fn collect_ids_into<'ast>(root: AnnProc<'ast>, out: &mut BTreeSet<&'ast str>) {
@@ -3047,7 +3530,11 @@ fn collect_ids_into<'ast>(root: AnnProc<'ast>, out: &mut BTreeSet<&'ast str>) {
                 }
             }
             Proc::New { decls, proc: inner } => {
-                collect_from_new_decls(decls, out);
+                collect_from_new_decls(decls, out, &mut stack);
+                stack.push(*inner);
+            }
+            Proc::UseBlock { space, proc: inner } => {
+                collect_from_name(*space, out, &mut stack);
                 stack.push(*inner);
             }
             Proc::Par { left, right } | Proc::BinaryExp { left, right, .. } => {
@@ -3072,25 +3559,35 @@ fn collect_ids_into<'ast>(root: AnnProc<'ast>, out: &mut BTreeSet<&'ast str>) {
                 }
             }
             Proc::Send {
-                channel, inputs, ..
+                channel,
+                inputs,
+                params,
+                ..
             } => {
                 collect_from_name(*channel, out, &mut stack);
                 for i in inputs.iter() {
                     stack.push(*i);
                 }
+                collect_from_hyperparams(params.as_deref(), out, &mut stack);
             }
             Proc::SendSync {
                 channel,
                 inputs,
+                params,
                 cont,
             } => {
                 collect_from_name(*channel, out, &mut stack);
                 for i in inputs.iter() {
                     stack.push(*i);
                 }
+                collect_from_hyperparams(params.as_deref(), out, &mut stack);
                 if let SyncSendCont::NonEmpty(p) = cont {
                     stack.push(*p);
                 }
+            }
+            Proc::FreeTheory { name, args } => {
+                out.insert(name.name);
+                stack.extend(args.iter().copied());
             }
             Proc::Eval { name } => {
                 collect_from_name(*name, out, &mut stack);
@@ -3121,8 +3618,20 @@ fn collect_ids_into<'ast>(root: AnnProc<'ast>, out: &mut BTreeSet<&'ast str>) {
                     for b in r.binds.iter() {
                         collect_from_names(b.names(), out, &mut stack);
                         match b {
-                            Bind::Linear { rhs, .. } => {
+                            // A Reified RSpaces query: its payload and its
+                            // parameter keys and values count as well.
+                            Bind::Linear {
+                                rhs, query_spec, ..
+                            } => {
                                 collect_from_source(rhs, out, &mut stack);
+                                if let Some(query) = query_spec {
+                                    stack.extend(query.payload.iter().copied());
+                                    collect_from_hyperparams(
+                                        query.params.as_deref(),
+                                        out,
+                                        &mut stack,
+                                    );
+                                }
                             }
                             Bind::Repeated { rhs, .. } | Bind::Peek { rhs, .. } => {
                                 collect_from_name(*rhs, out, &mut stack);
@@ -3256,9 +3765,34 @@ fn collect_ids_into<'ast>(root: AnnProc<'ast>, out: &mut BTreeSet<&'ast str>) {
         }
     }
 
-    fn collect_from_new_decls<'ast>(decls: &[NameDecl<'ast>], out: &mut BTreeSet<&'ast str>) {
+    // The binders and their Reified RSpaces space annotations.
+    fn collect_from_new_decls<'ast>(
+        decls: &[NameDecl<'ast>],
+        out: &mut BTreeSet<&'ast str>,
+        stack: &mut SmallVec<[AnnProc<'ast>; 32]>,
+    ) {
         for d in decls.iter() {
             out.insert(d.id.name);
+            if let Some(space) = d.space {
+                collect_from_name(space, out, stack);
+            }
+        }
+    }
+
+    // The keys and values of a Reified RSpaces hyperparameter section.
+    fn collect_from_hyperparams<'ast>(
+        params: Option<&[Hyperparam<'ast>]>,
+        out: &mut BTreeSet<&'ast str>,
+        stack: &mut SmallVec<[AnnProc<'ast>; 32]>,
+    ) {
+        for param in params.into_iter().flatten() {
+            match param {
+                Hyperparam::Positional(value) => stack.push(*value),
+                Hyperparam::Named { key, value } => {
+                    out.insert(key.name);
+                    stack.push(*value);
+                }
+            }
         }
     }
 
@@ -3271,11 +3805,16 @@ fn collect_ids_into<'ast>(root: AnnProc<'ast>, out: &mut BTreeSet<&'ast str>) {
             Source::Simple { name } | Source::ReceiveSend { name } => {
                 collect_from_name(*name, out, stack);
             }
-            Source::SendReceive { name, inputs } => {
+            Source::SendReceive {
+                name,
+                inputs,
+                params,
+            } => {
                 collect_from_name(*name, out, stack);
                 for i in inputs.iter() {
                     stack.push(*i);
                 }
+                collect_from_hyperparams(params.as_deref().map(|list| list.as_slice()), out, stack);
             }
         }
     }
@@ -3373,7 +3912,7 @@ fn pick_fresh<'ast>(
 /// desugared-corpus tests keep passing).
 fn build_try_block_desugaring<'ast>(
     builder: &'ast ASTBuilder<'ast>,
-    source_desc: SourceDesc,
+    source_desc: SourceDesc<'ast>,
     has_try_pattern: bool,
     slice: &[AnnProc<'ast>],
     mask: &BitSlice,
@@ -3385,25 +3924,7 @@ fn build_try_block_desugaring<'ast>(
     // Same shape the for-comprehension consumer builds via
     // BindDesc::to_bind's Linear arm.
     let channel_name = into_name(slice[0], mask[0]);
-    let source = match source_desc {
-        SourceDesc::Simple => Source::Simple { name: channel_name },
-        SourceDesc::RS => Source::ReceiveSend { name: channel_name },
-        // Both send-shaped sources collapse to `SendReceive`. The
-        // inputs slice is uniformly `slice[1..src_len]` -- every
-        // source slot after the channel name at `slice[0]`. For SR
-        // that's just the `arity` user-supplied inputs; for SM the
-        // visitor's `send_method_source` handler has already
-        // prepended the method-name literal at `slice[1]`, so the
-        // same slice folds `[method_literal, input_0, ..,
-        // input_{arity-1}]` into `SendReceive.inputs` -- exactly
-        // what the for-comprehension consumer expects to see for a
-        // `chan!method(args)` source. Matches `BindDesc::to_bind`'s
-        // linear-SM arm at ~line 2170.
-        SourceDesc::SR { .. } | SourceDesc::SM { .. } => Source::SendReceive {
-            name: channel_name,
-            inputs: slice[1..src_len].to_smallvec(),
-        },
-    };
+    let source = source_desc.build_source(channel_name, &slice[1..src_len]);
 
     // Slot offsets for the rest of the pieces.
     let try_pat_off = src_len;
@@ -3483,6 +4004,7 @@ fn build_try_block_desugaring<'ast>(
             remainder: None,
         },
         rhs: source,
+        query_spec: None,
     };
     ann(builder.alloc_for([[outer_bind]], if_expr), span)
 }

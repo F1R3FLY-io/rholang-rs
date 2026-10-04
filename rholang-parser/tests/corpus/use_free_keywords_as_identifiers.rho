@@ -1,0 +1,49 @@
+// `use` and `free` stay identifiers wherever 02cef80 accepts them: the
+// keyword needs a space or theory name and then `{` or `(`.
+new use, free, out, c, x, e in {
+  x!(use + 1) |
+  { match free { _ => Nil } } |
+  { if (c) free else Nil } |
+  (use and true) |
+  use!(1) |
+  out!(use) |
+  { free | Nil } |
+  use!(free) |
+  x!(use /* comment */ + 1) |
+  x!(free // comment
+     + 1) |
+  { let y = use in { y } } |
+  { match e { 1 => use _ => Nil } } |
+  { match e { 1 => use x => Nil } } |
+  { match e { 1 => free x => Nil } } |
+  { match e { 1 => free Set(1) => Nil } } |
+  contract out(use) = { use!(free) } |
+  // The 02cef80 witnesses of the excluded words (grammar.js), except the
+  // `select` witnesses: the AST builder does not implement `select`.
+  // `use W {`
+  { use and { Nil } } |
+  { use or { Nil } } |
+  { use matches { Nil } } |
+  { if (c) use else { Nil } } |
+  { match e { use where { true } => Nil } } |
+  { match e { 1 => use bundle { Nil } => Nil } } |
+  { match e { 1 => use bundle0 { Nil } => Nil } } |
+  { match e { 1 => use match { x } { _ => Nil } => Nil } } |
+  { match e { 1 => use not { true } => Nil } } |
+  // `free W (`
+  { free and (true) } |
+  { free or (true) } |
+  { free matches (true) } |
+  { if (c) free else (Nil) } |
+  { let z = free in (z) } |
+  { match e { free where (true) => Nil } } |
+  { match e { 1 => free if (c) Nil => Nil } } |
+  { match e { 1 => free for (y <- c) { Nil } => Nil } } |
+  { match e { 1 => free not (true) => Nil } } |
+  { match e { 1 => free match (x) { _ => Nil } => Nil } } |
+  // `use @W {`
+  { match e { 1 => use @bundle { Nil }!(1) => Nil } } |
+  { match e { 1 => use @bundle0 { Nil }!(1) => Nil } } |
+  { match e { 1 => use @match { x } { _ => Nil }!(1) => Nil } } |
+  { match e { 1 => use @not { true }!(1) => Nil } }
+}

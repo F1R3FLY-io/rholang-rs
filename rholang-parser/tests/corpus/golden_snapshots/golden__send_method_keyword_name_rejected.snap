@@ -1,6 +1,5 @@
 ---
 source: rholang-parser/tests/golden.rs
-assertion_line: 23
 expression: result
 ---
 Fail(
@@ -18,6 +17,7 @@ Fail(
                                         col: 5,
                                     },
                                 },
+                                space: None,
                                 uri: None,
                             },
                         ],
@@ -52,6 +52,7 @@ Fail(
                                         },
                                     },
                                 ],
+                                params: None,
                             },
                             span: SourceSpan {
                                 start: SourcePos {

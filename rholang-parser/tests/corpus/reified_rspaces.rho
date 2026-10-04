@@ -1,0 +1,15 @@
+// Reified RSpaces surface syntax: factories with theories, use blocks,
+// space annotations, send hyperparameters and receive queries.
+new HMB(`rho:space:HashMapBagSpace`), stdout(`rho:io:stdout`) in {
+  for (space <- HMB!?("default", free Nat()); queue <- HMB!?("queue", free Th(1, 2); capacity = 10)) {
+    use space {
+      new x : space, y, z : @"sequence" in {
+        x!(1; 7, priority = 2) |
+        y!!(2;) |
+        z!?(3; ttl = 60). |
+        for (@v <- x ~ (1, 2; k = 3)) { stdout!(v) } |
+        use @"inner" { y!(; priority = 1) }
+      }
+    }
+  }
+}

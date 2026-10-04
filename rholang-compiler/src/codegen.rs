@@ -169,10 +169,31 @@ impl<'a> CodegenContext<'a> {
                 self.compile_new(pid, body)?;
             }
 
+            // Reified RSpaces constructs: the node compiles them; the MVP
+            // bytecode compiler rejects each one with a named error.
+            Proc::Send {
+                params: Some(_), ..
+            }
+            | Proc::SendSync {
+                params: Some(_), ..
+            } => bail!(
+                "Send hyperparameters (Reified RSpaces) not supported in MVP at {}",
+                proc.span.start
+            ),
+            Proc::UseBlock { .. } => bail!(
+                "Use blocks (Reified RSpaces) not supported in MVP at {}",
+                proc.span.start
+            ),
+            Proc::FreeTheory { .. } => bail!(
+                "Theory references (Reified RSpaces) not supported in MVP at {}",
+                proc.span.start
+            ),
+
             Proc::Send {
                 channel,
                 inputs,
                 send_type: _,
+                ..
             } => {
                 // Look up PID for the send operation
                 // SAFETY: We cast proc to the correct lifetime since it comes from the AST
@@ -673,7 +694,13 @@ impl<'a> CodegenContext<'a> {
             // For MVP, we only support single binds per receipt
             for bind in receipt {
                 match bind {
-                    Bind::Linear { lhs, rhs } => {
+                    Bind::Linear {
+                        query_spec: Some(_),
+                        ..
+                    } => {
+                        bail!("Receive queries (Reified RSpaces) not supported in MVP");
+                    }
+                    Bind::Linear { lhs, rhs, .. } => {
                         match rhs {
                             Source::Simple { name } => {
                                 self.compile_name(name, pid)?;
@@ -931,6 +958,45 @@ mod tests {
         AnnProc {
             proc,
             span: SourceSpan::default(),
+        }
+    }
+
+    #[test]
+    fn codegen_rejects_reified_constructs_with_named_errors() {
+        for (source, expected) in [
+            (
+                "use s { Nil }",
+                "Use blocks (Reified RSpaces) not supported in MVP",
+            ),
+            (
+                "free Nat(1)",
+                "Theory references (Reified RSpaces) not supported in MVP",
+            ),
+            (
+                "x!(1; priority = 2)",
+                "Send hyperparameters (Reified RSpaces) not supported in MVP",
+            ),
+            (
+                "x!?(1; priority = 2).",
+                "Send hyperparameters (Reified RSpaces) not supported in MVP",
+            ),
+            (
+                "for (y <- x ~ 1) { Nil }",
+                "Receive queries (Reified RSpaces) not supported in MVP",
+            ),
+        ] {
+            let parser = rholang_parser::RholangParser::new();
+            let validated::Validated::Good(procs) = parser.parse(source) else {
+                panic!("{source} must parse");
+            };
+            let mut db = SemanticDb::new();
+            db.build_index(&procs[0]);
+            let mut ctx = CodegenContext::new(&db, 0);
+            let error = ctx
+                .compile_proc(&procs[0])
+                .expect_err("a Reified RSpaces construct must be rejected")
+                .to_string();
+            assert!(error.starts_with(expected), "{source}: {error}");
         }
     }
 

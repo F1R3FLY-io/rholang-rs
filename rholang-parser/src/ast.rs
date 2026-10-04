@@ -9,6 +9,34 @@ use crate::{SourcePos, SourceSpan, traverse::*};
 
 pub type ProcList<'a> = SmallVec<[AnnProc<'a>; 1]>;
 
+/// One Reified RSpaces hyperparameter. Hyperparameters follow the data of a
+/// send, a send-receive source or a receive query after a `;`:
+/// `x!(data…; positional…, key = value…)`.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Hyperparam<'ast> {
+    /// A positional hyperparameter. Positional hyperparameters keep their
+    /// source order and precede every named one.
+    Positional(AnnProc<'ast>),
+    /// A named hyperparameter `key = value`. The keys of one section are
+    /// distinct identifiers.
+    Named { key: Id<'ast>, value: AnnProc<'ast> },
+}
+
+impl<'ast> Hyperparam<'ast> {
+    /// The value of the hyperparameter, positional or named.
+    pub fn value(&self) -> &AnnProc<'ast> {
+        match self {
+            Hyperparam::Positional(value) | Hyperparam::Named { value, .. } => value,
+        }
+    }
+}
+
+/// The hyperparameters of one section, in source order. A hyperparameter
+/// field (`Option<HyperparamList>`, boxed on a send-receive source) is `None`
+/// when the source has no `;` section. On a send or a send-receive source,
+/// `Some` of an empty list is the explicit empty section `(…;)`.
+pub type HyperparamList<'ast> = SmallVec<[Hyperparam<'ast>; 2]>;
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Proc<'ast> {
     Nil,
@@ -56,6 +84,9 @@ pub enum Proc<'ast> {
         channel: Name<'ast>,
         send_type: SendType,
         inputs: ProcList<'ast>,
+        /// Reified RSpaces hyperparameters (`x!(a; p, k = v)`); `None` when
+        /// the argument list has no `;`.
+        params: Option<HyperparamList<'ast>>,
     },
 
     ForComprehension {
@@ -94,10 +125,27 @@ pub enum Proc<'ast> {
         body: AnnProc<'ast>,
     },
 
+    /// Reified RSpaces `use s { P }`: `space` is the default space for the
+    /// untagged channels of `proc`.
+    UseBlock {
+        space: Name<'ast>,
+        proc: AnnProc<'ast>,
+    },
+
     SendSync {
         channel: Name<'ast>,
+        /// For the method sugar `x!m(a; p)`, the inputs are `["m", a…]`.
         inputs: ProcList<'ast>,
+        /// Reified RSpaces hyperparameters; `None` when the argument list has
+        /// no `;`.
+        params: Option<HyperparamList<'ast>>,
         cont: SyncSendCont<'ast>,
+    },
+
+    /// Reified RSpaces theory reference `free Th(args)`.
+    FreeTheory {
+        name: Id<'ast>,
+        args: ProcList<'ast>,
     },
 
     // expressions
@@ -644,11 +692,27 @@ pub fn inputs<'a>(receipt: &'a [Bind<'a>]) -> impl DoubleEndedIterator<Item = &'
     receipt.iter().filter_map(|bind| bind.input()).flatten()
 }
 
+/// A Reified RSpaces receive query `ch ~ q` on a linear bind with a simple
+/// source. `ch ~ e` and `ch ~ (e;)` both give the payload `[e]` and no
+/// parameters; `ch ~ (a, b; k = v)` gives the payload `[a, b]` and the named
+/// parameter `k`.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct QuerySpec<'ast> {
+    /// The query payload, in source order.
+    pub payload: ProcList<'ast>,
+    /// The named query parameters; `None` when the query has none, so a
+    /// present list is never empty.
+    pub params: Option<HyperparamList<'ast>>,
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Bind<'ast> {
     Linear {
         lhs: Names<'ast>,
         rhs: Source<'ast>,
+        /// Reified RSpaces receive query (`y <- ch ~ q`). Boxed, so that the
+        /// rare query does not enlarge every `Bind` and every `Proc`.
+        query_spec: Option<Box<QuerySpec<'ast>>>,
     },
     Repeated {
         lhs: Names<'ast>,
@@ -683,7 +747,27 @@ impl<'a> Bind<'a> {
         match self {
             Bind::Linear { rhs, .. } | Bind::Signed { rhs, .. } => match rhs {
                 Source::Simple { .. } | Source::ReceiveSend { .. } => None,
-                Source::SendReceive { name: _, inputs } => Some(inputs),
+                Source::SendReceive { inputs, .. } => Some(inputs),
+            },
+            Bind::Repeated { .. } | Bind::Peek { .. } => None,
+        }
+    }
+
+    /// The receive query of a linear bind, if any.
+    pub fn query_spec(&self) -> Option<&QuerySpec<'a>> {
+        match self {
+            Bind::Linear { query_spec, .. } => query_spec.as_deref(),
+            Bind::Repeated { .. } | Bind::Peek { .. } | Bind::Signed { .. } => None,
+        }
+    }
+
+    /// The hyperparameters of a send-receive source (`y <- ch!?(a; k = v)`),
+    /// if any.
+    pub fn source_params(&self) -> Option<&HyperparamList<'a>> {
+        match self {
+            Bind::Linear { rhs, .. } | Bind::Signed { rhs, .. } => match rhs {
+                Source::SendReceive { params, .. } => params.as_deref(),
+                Source::Simple { .. } | Source::ReceiveSend { .. } => None,
             },
             Bind::Repeated { .. } | Bind::Peek { .. } => None,
         }
@@ -691,7 +775,7 @@ impl<'a> Bind<'a> {
 
     pub fn names(&self) -> &Names<'a> {
         match self {
-            Bind::Linear { lhs, rhs: _ }
+            Bind::Linear { lhs, .. }
             | Bind::Repeated { lhs, rhs: _ }
             | Bind::Peek { lhs, rhs: _ }
             | Bind::Signed { lhs, .. } => lhs,
@@ -716,6 +800,10 @@ pub enum Source<'ast> {
     SendReceive {
         name: Name<'ast>,
         inputs: ProcList<'ast>,
+        /// Reified RSpaces hyperparameters of the request (`ch!?(a; k = v)`);
+        /// `None` when the argument list has no `;`. Boxed, so that the rare
+        /// list does not enlarge every `Source`, `Bind` and `Proc`.
+        params: Option<Box<HyperparamList<'ast>>>,
     },
 }
 
@@ -876,9 +964,13 @@ impl<'a> LetBinding<'a> {
 
 // new name declaration
 
+/// One binder of a `new`. Equality and ordering compare only `id`.
 #[derive(Debug, Clone, Copy)]
 pub struct NameDecl<'ast> {
     pub id: Id<'ast>,
+    /// Reified RSpaces space annotation (`new x : s in P`). Only a binder
+    /// without a URI can carry one.
+    pub space: Option<Name<'ast>>,
     pub uri: Option<Uri<'ast>>,
 }
 

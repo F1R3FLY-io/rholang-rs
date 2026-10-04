@@ -2,9 +2,9 @@ use smallvec::ToSmallVec;
 use typed_arena::Arena;
 
 use crate::ast::{
-    AnnProc, BinaryExpOp, Bind, BundleType, Case, Collection, Id, KeyValuePair, LetBinding, Name,
-    NameDecl, Names, Proc, Receipt, SendType, Signature, SimpleType, SyncSendCont, TokenStack,
-    UnaryExpOp, Var, VarRefKind,
+    AnnProc, BinaryExpOp, Bind, BundleType, Case, Collection, HyperparamList, Id, KeyValuePair,
+    LetBinding, Name, NameDecl, Names, Proc, Receipt, SendType, Signature, SimpleType,
+    SyncSendCont, TokenStack, UnaryExpOp, Var, VarRefKind,
 };
 
 pub struct ASTBuilder<'ast> {
@@ -267,6 +267,33 @@ impl<'ast> ASTBuilder<'ast> {
             channel,
             send_type,
             inputs: inputs.to_smallvec(),
+            params: None,
+        })
+    }
+
+    /// Allocates a send with a Reified RSpaces hyperparameter section
+    /// (`channel!(inputs; params)`). An empty `params` is the explicit empty
+    /// section `(…;)`.
+    pub fn alloc_send_with_params(
+        &self,
+        send_type: SendType,
+        channel: Name<'ast>,
+        inputs: &[AnnProc<'ast>],
+        params: HyperparamList<'ast>,
+    ) -> &Proc<'ast> {
+        self.arena.alloc(Proc::Send {
+            channel,
+            send_type,
+            inputs: inputs.to_smallvec(),
+            params: Some(params),
+        })
+    }
+
+    /// Allocates the Reified RSpaces theory reference `free name(args)`.
+    pub fn alloc_free_theory(&self, name: Id<'ast>, args: &[AnnProc<'ast>]) -> &Proc<'ast> {
+        self.arena.alloc(Proc::FreeTheory {
+            name,
+            args: args.to_smallvec(),
         })
     }
 
@@ -381,6 +408,11 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
+    /// Allocates the Reified RSpaces block `use space { proc }`.
+    pub fn alloc_use_block(&self, space: Name<'ast>, proc: AnnProc<'ast>) -> &Proc<'ast> {
+        self.arena.alloc(Proc::UseBlock { space, proc })
+    }
+
     pub(crate) fn alloc_send_sync(
         &self,
         channel: Name<'ast>,
@@ -389,6 +421,7 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::SendSync {
             channel,
             inputs: messages.to_smallvec(),
+            params: None,
             cont: SyncSendCont::Empty,
         })
     }
@@ -402,7 +435,23 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::SendSync {
             channel,
             inputs: messages.to_smallvec(),
+            params: None,
             cont: SyncSendCont::NonEmpty(cont),
+        })
+    }
+
+    pub(crate) fn alloc_send_sync_with_params(
+        &self,
+        channel: Name<'ast>,
+        messages: &[AnnProc<'ast>],
+        params: HyperparamList<'ast>,
+        cont: SyncSendCont<'ast>,
+    ) -> &Proc<'ast> {
+        self.arena.alloc(Proc::SendSync {
+            channel,
+            inputs: messages.to_smallvec(),
+            params: Some(params),
+            cont,
         })
     }
 

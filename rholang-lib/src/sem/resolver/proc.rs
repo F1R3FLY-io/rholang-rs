@@ -1,4 +1,4 @@
-use rholang_parser::ast::{SyncSendCont, inputs, source_names};
+use rholang_parser::ast::{Hyperparam, SyncSendCont, inputs, source_names};
 
 use crate::sem::resolver::pattern::{resolve_name_pattern, resolve_proc_pattern};
 
@@ -182,20 +182,53 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
 
         // -- sends --
         Send {
-            channel, inputs, ..
+            channel,
+            inputs,
+            params,
+            ..
         }
         | SendSync {
             channel,
             inputs,
+            params,
             cont: SyncSendCont::Empty,
         } => {
-            resolve_send(db[this], channel, inputs, None, db, stack);
+            resolve_send(
+                db[this],
+                channel,
+                inputs,
+                params.as_deref(),
+                None,
+                db,
+                stack,
+            );
         }
         SendSync {
             channel,
             inputs,
+            params,
             cont: SyncSendCont::NonEmpty(proc),
-        } => resolve_send(db[this], channel, inputs, Some(proc), db, stack),
+        } => resolve_send(
+            db[this],
+            channel,
+            inputs,
+            params.as_deref(),
+            Some(proc),
+            db,
+            stack,
+        ),
+
+        // -- Reified RSpaces --
+        // The space and the body are both resolved in the current scope.
+        UseBlock { space, proc } => {
+            resolve_name(space, db[this], db, stack);
+            resolve_rec(db, stack, proc);
+        }
+        FreeTheory { args, .. } => {
+            for arg in args {
+                resolve_unguarded(db, stack, arg);
+            }
+        }
 
         // -- new --
         New { decls, proc } => {
@@ -221,6 +254,12 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
             }
 
             let current = db[this];
+            // Reified RSpaces space annotations (`new x : s in P`) are
+            // resolved in the scope around the `new`, before its binders
+            // exist: an annotation never sees the names that it annotates.
+            for space in decls.iter().filter_map(|decl| decl.space.as_ref()) {
+                resolve_name(space, current, db, stack);
+            }
             let locals = bind_decls(db, decls, current, this.span);
 
             let mut block = LexicallyScoped::new(db, stack, current, locals);
@@ -251,6 +290,30 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
                         // 1. Resolve sources first (unguarded).
                         for arg in inputs(concurrent) {
                             resolve_unguarded(db, stack, arg);
+                        }
+                        // Then, per bind, the Reified RSpaces source
+                        // hyperparameters and the payload and parameters of
+                        // the receive query. Like the sources, they do not
+                        // see this receipt's binders, but they see the
+                        // binders of earlier `;`-separated receipts.
+                        for bind in concurrent {
+                            let query = bind.query_spec();
+                            let values = bind
+                                .source_params()
+                                .into_iter()
+                                .flatten()
+                                .map(Hyperparam::value)
+                                .chain(query.into_iter().flat_map(|query| query.payload.iter()))
+                                .chain(
+                                    query
+                                        .and_then(|query| query.params.as_ref())
+                                        .into_iter()
+                                        .flatten()
+                                        .map(Hyperparam::value),
+                                );
+                            for value in values {
+                                resolve_unguarded(db, stack, value);
+                            }
                         }
 
                         // 2. Resolve names bound by sources
@@ -395,10 +458,13 @@ fn resolve_signature<'a>(
     }
 }
 
+/// Resolves a send in the current scope: the channel, the inputs, the
+/// Reified RSpaces hyperparameter values, then the continuation.
 fn resolve_send<'a>(
     send: PID,
     channel: &'a ast::Name<'a>,
     inputs: &'a [ast::AnnProc<'a>],
+    params: Option<&'a [Hyperparam<'a>]>,
     continuation: Option<ProcRef<'a>>,
     db: &mut SemanticDb<'a>,
     stack: &mut BindingStack,
@@ -406,6 +472,9 @@ fn resolve_send<'a>(
     resolve_name(channel, send, db, stack);
     for input in inputs {
         resolve_unguarded(db, stack, input);
+    }
+    for value in params.into_iter().flatten().map(Hyperparam::value) {
+        resolve_unguarded(db, stack, value);
     }
     if let Some(cont) = continuation {
         resolve_rec(db, stack, cont);

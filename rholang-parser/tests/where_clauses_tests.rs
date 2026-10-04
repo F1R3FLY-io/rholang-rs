@@ -406,3 +406,51 @@ fn for_receipt_guard_is_boolean_combinator() {
         ref other => panic!("expected ForComprehension, got {other:?}"),
     }
 }
+
+#[test]
+fn query_spec_composes_with_where_guard_and_joins() {
+    // A Reified RSpaces receive query ends at `&`, `;` or `where`: each bind
+    // of the join keeps its own query, and the guard stays on the receipt.
+    let parser = RholangParser::new();
+    let parsed =
+        parser.parse("for (@x <- a ~ 1 & @y <- b ~ (2; k = 3) where x > y; @z <- c ~ x) { Nil }");
+
+    let procs = match parsed {
+        Validated::Good(p) => p,
+        Validated::Fail(e) => panic!("parse failed: {e:?}"),
+    };
+
+    match procs[0].proc {
+        Proc::ForComprehension { receipts, .. } => {
+            assert_eq!(receipts.len(), 2);
+            let joined = &receipts[0];
+            assert_eq!(joined.binds.len(), 2);
+            let first = joined.binds[0].query_spec().expect("first query");
+            assert!(
+                matches!(first.payload.as_slice(), [p] if matches!(p.proc, Proc::LongLiteral(1)))
+            );
+            assert!(first.params.is_none());
+            let second = joined.binds[1].query_spec().expect("second query");
+            assert!(
+                matches!(second.payload.as_slice(), [p] if matches!(p.proc, Proc::LongLiteral(2)))
+            );
+            assert_eq!(second.params.as_ref().map(|params| params.len()), Some(1));
+            let guard = joined.guard.as_ref().expect("guard");
+            assert!(
+                matches!(
+                    guard.proc,
+                    Proc::BinaryExp {
+                        op: BinaryExpOp::Gt,
+                        ..
+                    }
+                ),
+                "expected the guard `x > y`, got {:?}",
+                guard.proc
+            );
+            let later = receipts[1].binds[0].query_spec().expect("later query");
+            assert!(matches!(later.payload.as_slice(), [p] if p.is_ident("x")));
+            assert!(receipts[1].guard.is_none());
+        }
+        ref other => panic!("expected ForComprehension, got {other:?}"),
+    }
+}

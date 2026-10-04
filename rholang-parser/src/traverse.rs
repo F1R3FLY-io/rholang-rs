@@ -4,6 +4,40 @@ use smallvec::{SmallVec, smallvec};
 
 use crate::ast::*;
 
+/// The values of a Reified RSpaces hyperparameter section, in source order.
+fn hyperparam_values<'a>(
+    params: Option<&'a HyperparamList<'a>>,
+) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
+    params.into_iter().flatten().map(Hyperparam::value)
+}
+
+/// The process positions of one bind, in traversal order: the inputs of a
+/// send-receive source, its hyperparameter values, then the payload and the
+/// parameter values of a Reified RSpaces receive query. A quoted source name
+/// is not included.
+fn bind_processes<'a>(binding: &'a Bind<'a>) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
+    let query = binding.query_spec();
+    binding
+        .input()
+        .into_iter()
+        .flatten()
+        .chain(hyperparam_values(binding.source_params()))
+        .chain(query.into_iter().flat_map(|query| query.payload.iter()))
+        .chain(hyperparam_values(
+            query.and_then(|query| query.params.as_ref()),
+        ))
+}
+
+/// The quoted space annotations of the binders of a `new`, in source order.
+fn quoted_annotations<'a>(
+    decls: &'a [NameDecl<'a>],
+) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
+    decls.iter().filter_map(|decl| match &decl.space {
+        Some(Name::Quote(quoted)) => Some(quoted),
+        Some(Name::NameVar(_)) | None => None,
+    })
+}
+
 /// Collect the *process positions* embedded in a cost-accounting signature, in
 /// source order: hash bodies `#(P)`, and the quoted body of any `@P` ground
 /// name. Bare-var ground names contribute nothing here (their var is surfaced
@@ -88,30 +122,50 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
                 self.stack.push(body);
                 self.push_name(name);
             }
-            Proc::New { proc: inner, .. }
-            | Proc::Bundle { proc: inner, .. }
-            | Proc::UnaryExp { arg: inner, .. } => {
+            // Order: the space (when quoted), then the body.
+            Proc::UseBlock { space, proc } => {
+                self.stack.push(proc);
+                self.push_name(space);
+            }
+            // Order: the quoted space annotations in source order, then the
+            // body.
+            Proc::New { decls, proc } => {
+                self.stack.push(proc);
+                self.remember(quoted_annotations(decls));
+            }
+            Proc::Bundle { proc: inner, .. } | Proc::UnaryExp { arg: inner, .. } => {
                 self.stack.push(inner);
             }
 
+            // Order: the channel (when quoted), the inputs, then the
+            // hyperparameter values.
             Proc::Send {
-                inputs, channel, ..
+                inputs,
+                channel,
+                params,
+                ..
             } => {
+                self.remember(hyperparam_values(params.as_ref()));
                 self.remember(inputs);
                 self.push_name(channel);
             }
+            // Order: the channel (when quoted), the inputs, the
+            // hyperparameter values, then the continuation.
             Proc::SendSync {
                 channel,
                 inputs,
+                params,
                 cont,
-                ..
             } => {
                 if let SyncSendCont::NonEmpty(proc) = cont {
                     self.stack.push(proc);
                 }
+                self.remember(hyperparam_values(params.as_ref()));
                 self.remember(inputs);
                 self.push_name(channel);
             }
+
+            Proc::FreeTheory { args, .. } => self.remember(args),
 
             Proc::Match { expression, cases } => {
                 self.remember(match_cases(cases));
@@ -301,15 +355,16 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
 
             Proc::ForComprehension { receipts, proc } => {
                 // Per receipt: visit any in-source-position procs (e.g.
-                // send-receive inputs `@x!?(P)` whose `P` is a process)
-                // followed by the optional `where` guard.
-                self.push_children(
-                    iter::once(proc).chain(
-                        receipts
-                            .iter()
-                            .flat_map(|r| inputs(&r.binds).chain(r.guard.as_ref())),
-                    ),
-                );
+                // send-receive inputs `@x!?(P)` whose `P` is a process, then
+                // their hyperparameter values, then the payload and the
+                // parameter values of a receive query) followed by the
+                // optional `where` guard.
+                self.push_children(iter::once(proc).chain(receipts.iter().flat_map(|r| {
+                    r.binds
+                        .iter()
+                        .flat_map(bind_processes)
+                        .chain(r.guard.as_ref())
+                })));
             }
 
             Proc::Let { bindings, body, .. } => {
@@ -376,29 +431,42 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
                 self.push_children([condition, if_true, if_false]);
             }
 
+            // The space of a `use` block and the space annotations of a `new`
+            // are names: `NameAwareDfsEventIter` reports them.
             Proc::New { proc: inner, .. }
+            | Proc::UseBlock { proc: inner, .. }
             | Proc::Bundle { proc: inner, .. }
             | Proc::UnaryExp { arg: inner, .. } => {
                 self.stack.push(Frame::Node(inner));
             }
 
             Proc::Send {
-                inputs, channel: _, ..
+                inputs,
+                params,
+                channel: _,
+                ..
             } => {
-                self.push_children(inputs);
+                self.push_children(inputs.iter().chain(hyperparam_values(params.as_ref())));
             }
             Proc::SendSync {
                 channel: _,
                 inputs,
+                params,
                 cont,
-                ..
             } => {
                 let cont_iter = match cont {
                     SyncSendCont::NonEmpty(p) => Some(p),
                     _ => None,
                 };
-                self.push_children(inputs.iter().chain(cont_iter));
+                self.push_children(
+                    inputs
+                        .iter()
+                        .chain(hyperparam_values(params.as_ref()))
+                        .chain(cont_iter),
+                );
             }
+
+            Proc::FreeTheory { args, .. } => self.push_children(args),
 
             Proc::Method { receiver, args, .. } => {
                 self.push_children(iter::once(receiver).chain(args));
@@ -540,6 +608,14 @@ impl<'a, const S: usize> NameAwareDfsEventIter<'a, S> {
                 self.pending.extend(formals.names.iter().rev());
                 self.pending.push(name);
             }
+            Proc::UseBlock { space, .. } => {
+                self.pending.push(space);
+            }
+            // The space annotations, in source order, before the body.
+            Proc::New { decls, .. } => {
+                self.pending
+                    .extend(decls.iter().rev().filter_map(|decl| decl.space.as_ref()));
+            }
             Proc::Let { bindings, .. } => {
                 self.pending.extend(let_lhss(bindings));
             }
@@ -627,7 +703,9 @@ fn let_lhss<'a>(bindings: &'a [LetBinding<'a>]) -> impl DoubleEndedIterator<Item
 
 /// Helper: extract sources + their inputs + optional `where` guards from
 /// `ForComprehension` receipts. Per receipt, yields each bind's quoted-source
-/// process and send-receive inputs, then the receipt's guard if present.
+/// process, send-receive inputs and their hyperparameter values, and the
+/// payload and parameter values of its receive query, then the receipt's
+/// guard if present.
 fn for_comprehension_inputs<'a>(
     receipts: &'a [Receipt<'a>],
 ) -> impl DoubleEndedIterator<Item = &'a AnnProc<'a>> {
@@ -641,9 +719,7 @@ fn for_comprehension_inputs<'a>(
                 } else {
                     None
                 };
-                let quoted_iter = name_proc.into_iter();
-                let input_iter = binding.input().into_iter().flatten();
-                quoted_iter.chain(input_iter)
+                name_proc.into_iter().chain(bind_processes(binding))
             })
             .chain(receipt.guard.as_ref())
     })
@@ -1164,7 +1240,9 @@ mod tests {
                 }
                 .into(),
                 inputs: smallvec![inner_rhs.ann(SourcePos::at_col(36).span_of(2))],
+                params: None,
             },
+            query_spec: None,
         };
 
         let inner_proc = Proc::ForComprehension {
@@ -1192,7 +1270,9 @@ mod tests {
                     outer_rhs.ann(SourcePos::at_col(15).span_of(2)),
                     inner_proc.ann(SourcePos::at_col(21).span_of(27))
                 ],
+                params: None,
             },
+            query_spec: None,
         };
 
         let outer_proc = Proc::ForComprehension {
@@ -1394,6 +1474,7 @@ mod tests {
             rhs: Source::Simple {
                 name: Name::Quote(par_in_bind.ann(SourcePos::at_col(12).span_of(15))),
             },
+            query_spec: None,
         };
 
         let arg1_in_send = Proc::ProcVar(Var::Id(Id {
@@ -1420,6 +1501,7 @@ mod tests {
             channel: Name::Quote(par_in_send.ann(SourcePos { line: 2, col: 4 }.span_of(15))),
             send_type: SendType::Single,
             inputs: smallvec![arg2.ann(SourcePos { line: 2, col: 21 }.span_of(4))],
+            params: None,
         };
 
         let true_lit = Proc::BoolLiteral(true);
@@ -1430,6 +1512,7 @@ mod tests {
             })),
             send_type: SendType::Single,
             inputs: smallvec![true_lit.ann(SourcePos { line: 3, col: 8 }.span_of(4))],
+            params: None,
         };
 
         let for_body = Proc::Par {
@@ -1837,6 +1920,7 @@ mod tests {
                     pos: SourcePos::at_col(11),
                 })),
             },
+            query_spec: None,
         };
         let g = Proc::ProcVar(Var::Id(Id {
             name: "g",
@@ -1890,6 +1974,93 @@ mod tests {
                     ..
                 })
             ]
+        );
+    }
+
+    /// A program with every Reified RSpaces child position. Every literal is
+    /// distinct, so the visit order is the sequence of literals.
+    const REIFIED_PROGRAM: &str = "new x : @{1}, y in {
+  use @{2} { x!(3; 4, k = 5) } |
+  { x!?(6; j = 7); 8 } |
+  for (@a <- x!?(9; p = 10) & @b <- y ~ (11; q = 12) where 13) { 14 } |
+  y!(free Th(15))
+}";
+
+    fn literal(proc: &Proc) -> Option<i64> {
+        match proc {
+            Proc::LongLiteral(value) => Some(*value),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn preorder_visits_each_reified_child_once_in_order() {
+        let parser = crate::RholangParser::new();
+        let validated::Validated::Good(procs) = parser.parse(REIFIED_PROGRAM) else {
+            panic!("the reified program must parse");
+        };
+        let literals: Vec<i64> = procs[0]
+            .iter_preorder_dfs()
+            .filter_map(|ann| literal(ann.proc))
+            .collect();
+        // `new`: the quoted annotation, then the body. `use`: the quoted space,
+        // then the body. Sends: inputs, then hyperparameters (then the
+        // continuation). `for`: the body first, then per bind the source
+        // inputs, the source hyperparameters, the query payload and the query
+        // parameters, then the guard. `free`: the arguments.
+        assert_eq!(
+            literals,
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 14, 9, 10, 11, 12, 13, 15]
+        );
+    }
+
+    #[test]
+    fn dfs_events_visit_each_reified_child_once_in_order() {
+        let parser = crate::RholangParser::new();
+        let validated::Validated::Good(procs) = parser.parse(REIFIED_PROGRAM) else {
+            panic!("the reified program must parse");
+        };
+        let root = &procs[0];
+
+        // The process-only iterator enters each reified process child once.
+        let events: Vec<DfsEvent> = root.iter_dfs_event().collect();
+        let entered: Vec<i64> = events
+            .iter()
+            .filter_map(|event| match event {
+                DfsEvent::Enter(ann) => literal(ann.proc),
+                DfsEvent::Exit(_) => None,
+            })
+            .collect();
+        assert_eq!(entered, vec![3, 4, 5, 6, 7, 8, 14, 9, 10, 11, 12, 13, 15]);
+        let exited = events
+            .iter()
+            .filter(|event| matches!(event, DfsEvent::Exit(_)))
+            .count();
+        assert_eq!(exited * 2, events.len(), "every Enter has its Exit");
+
+        // The name-aware iterator adds the names: the `new` annotation right
+        // after entering the `new`, before its body, and the `use` space
+        // right after entering the `use` block.
+        let tokens: Vec<String> = root
+            .iter_dfs_event_with_names()
+            .filter_map(|event| match event {
+                DfsEventExt::Enter(ann) => literal(ann.proc).map(|value| value.to_string()),
+                DfsEventExt::Name(Name::Quote(quoted)) => {
+                    literal(quoted.proc).map(|value| format!("@{value}"))
+                }
+                DfsEventExt::Name(Name::NameVar(_)) | DfsEventExt::Exit(_) => None,
+            })
+            .collect();
+        assert_eq!(
+            tokens,
+            [
+                "@1", "@2", "3", "4", "5", "6", "7", "8", "14", "9", "10", "11", "12", "13", "15"
+            ]
+        );
+        assert_same_events(
+            events,
+            root.iter_dfs_event_with_names()
+                .filter(|event| !matches!(event, DfsEventExt::Name(_))),
         );
     }
 }

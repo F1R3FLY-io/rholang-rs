@@ -1,6 +1,5 @@
 ---
 source: rholang-parser/tests/golden.rs
-assertion_line: 23
 expression: result
 ---
 Good(
@@ -16,6 +15,7 @@ Good(
                                 col: 5,
                             },
                         },
+                        space: None,
                         uri: None,
                     },
                 ],
@@ -84,7 +84,9 @@ Good(
                                                     },
                                                 },
                                             ],
+                                            params: None,
                                         },
+                                        query_spec: None,
                                     },
                                 ],
                                 guard: None,

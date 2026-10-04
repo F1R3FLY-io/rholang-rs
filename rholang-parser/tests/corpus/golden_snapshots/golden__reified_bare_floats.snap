@@ -1,0 +1,449 @@
+---
+source: rholang-parser/tests/golden.rs
+expression: result
+---
+Good(
+    [
+        AnnProc {
+            proc: New {
+                decls: [
+                    NameDecl {
+                        id: Id {
+                            name: "out",
+                            pos: SourcePos {
+                                line: 3,
+                                col: 5,
+                            },
+                        },
+                        space: None,
+                        uri: None,
+                    },
+                ],
+                proc: AnnProc {
+                    proc: Par {
+                        left: AnnProc {
+                            proc: Par {
+                                left: AnnProc {
+                                    proc: Send {
+                                        channel: NameVar(
+                                            Id(
+                                                Id {
+                                                    name: "out",
+                                                    pos: SourcePos {
+                                                        line: 4,
+                                                        col: 3,
+                                                    },
+                                                },
+                                            ),
+                                        ),
+                                        send_type: Single,
+                                        inputs: [
+                                            AnnProc {
+                                                proc: FloatLiteral {
+                                                    value: "1.5",
+                                                    bits: 64,
+                                                },
+                                                span: SourceSpan {
+                                                    start: SourcePos {
+                                                        line: 4,
+                                                        col: 8,
+                                                    },
+                                                    end: SourcePos {
+                                                        line: 4,
+                                                        col: 11,
+                                                    },
+                                                },
+                                            },
+                                            AnnProc {
+                                                proc: FloatLiteral {
+                                                    value: "0.25",
+                                                    bits: 64,
+                                                },
+                                                span: SourceSpan {
+                                                    start: SourcePos {
+                                                        line: 4,
+                                                        col: 13,
+                                                    },
+                                                    end: SourcePos {
+                                                        line: 4,
+                                                        col: 17,
+                                                    },
+                                                },
+                                            },
+                                            AnnProc {
+                                                proc: FloatLiteral {
+                                                    value: ".5",
+                                                    bits: 64,
+                                                },
+                                                span: SourceSpan {
+                                                    start: SourcePos {
+                                                        line: 4,
+                                                        col: 19,
+                                                    },
+                                                    end: SourcePos {
+                                                        line: 4,
+                                                        col: 21,
+                                                    },
+                                                },
+                                            },
+                                            AnnProc {
+                                                proc: FloatLiteral {
+                                                    value: "1.5e3",
+                                                    bits: 64,
+                                                },
+                                                span: SourceSpan {
+                                                    start: SourcePos {
+                                                        line: 4,
+                                                        col: 23,
+                                                    },
+                                                    end: SourcePos {
+                                                        line: 4,
+                                                        col: 28,
+                                                    },
+                                                },
+                                            },
+                                            AnnProc {
+                                                proc: FloatLiteral {
+                                                    value: "2.5E-3",
+                                                    bits: 64,
+                                                },
+                                                span: SourceSpan {
+                                                    start: SourcePos {
+                                                        line: 4,
+                                                        col: 30,
+                                                    },
+                                                    end: SourcePos {
+                                                        line: 4,
+                                                        col: 36,
+                                                    },
+                                                },
+                                            },
+                                            AnnProc {
+                                                proc: FloatLiteral {
+                                                    value: "1e3",
+                                                    bits: 64,
+                                                },
+                                                span: SourceSpan {
+                                                    start: SourcePos {
+                                                        line: 4,
+                                                        col: 38,
+                                                    },
+                                                    end: SourcePos {
+                                                        line: 4,
+                                                        col: 41,
+                                                    },
+                                                },
+                                            },
+                                            AnnProc {
+                                                proc: FloatLiteral {
+                                                    value: "2E-4",
+                                                    bits: 64,
+                                                },
+                                                span: SourceSpan {
+                                                    start: SourcePos {
+                                                        line: 4,
+                                                        col: 43,
+                                                    },
+                                                    end: SourcePos {
+                                                        line: 4,
+                                                        col: 47,
+                                                    },
+                                                },
+                                            },
+                                            AnnProc {
+                                                proc: FloatLiteral {
+                                                    value: "-7e+2",
+                                                    bits: 64,
+                                                },
+                                                span: SourceSpan {
+                                                    start: SourcePos {
+                                                        line: 4,
+                                                        col: 49,
+                                                    },
+                                                    end: SourcePos {
+                                                        line: 4,
+                                                        col: 54,
+                                                    },
+                                                },
+                                            },
+                                            AnnProc {
+                                                proc: FloatLiteral {
+                                                    value: "-2.5",
+                                                    bits: 64,
+                                                },
+                                                span: SourceSpan {
+                                                    start: SourcePos {
+                                                        line: 4,
+                                                        col: 56,
+                                                    },
+                                                    end: SourcePos {
+                                                        line: 4,
+                                                        col: 60,
+                                                    },
+                                                },
+                                            },
+                                            AnnProc {
+                                                proc: FloatLiteral {
+                                                    value: "-.5",
+                                                    bits: 64,
+                                                },
+                                                span: SourceSpan {
+                                                    start: SourcePos {
+                                                        line: 4,
+                                                        col: 62,
+                                                    },
+                                                    end: SourcePos {
+                                                        line: 4,
+                                                        col: 65,
+                                                    },
+                                                },
+                                            },
+                                        ],
+                                        params: None,
+                                    },
+                                    span: SourceSpan {
+                                        start: SourcePos {
+                                            line: 4,
+                                            col: 3,
+                                        },
+                                        end: SourcePos {
+                                            line: 4,
+                                            col: 66,
+                                        },
+                                    },
+                                },
+                                right: AnnProc {
+                                    proc: Send {
+                                        channel: NameVar(
+                                            Id(
+                                                Id {
+                                                    name: "out",
+                                                    pos: SourcePos {
+                                                        line: 5,
+                                                        col: 3,
+                                                    },
+                                                },
+                                            ),
+                                        ),
+                                        send_type: Single,
+                                        inputs: [
+                                            AnnProc {
+                                                proc: FloatLiteral {
+                                                    value: "1.5",
+                                                    bits: 32,
+                                                },
+                                                span: SourceSpan {
+                                                    start: SourcePos {
+                                                        line: 5,
+                                                        col: 8,
+                                                    },
+                                                    end: SourcePos {
+                                                        line: 5,
+                                                        col: 14,
+                                                    },
+                                                },
+                                            },
+                                            AnnProc {
+                                                proc: FloatLiteral {
+                                                    value: "2.5",
+                                                    bits: 64,
+                                                },
+                                                span: SourceSpan {
+                                                    start: SourcePos {
+                                                        line: 5,
+                                                        col: 16,
+                                                    },
+                                                    end: SourcePos {
+                                                        line: 5,
+                                                        col: 22,
+                                                    },
+                                                },
+                                            },
+                                            AnnProc {
+                                                proc: FloatLiteral {
+                                                    value: "1e3",
+                                                    bits: 128,
+                                                },
+                                                span: SourceSpan {
+                                                    start: SourcePos {
+                                                        line: 5,
+                                                        col: 24,
+                                                    },
+                                                    end: SourcePos {
+                                                        line: 5,
+                                                        col: 31,
+                                                    },
+                                                },
+                                            },
+                                            AnnProc {
+                                                proc: FloatLiteral {
+                                                    value: ".5",
+                                                    bits: 256,
+                                                },
+                                                span: SourceSpan {
+                                                    start: SourcePos {
+                                                        line: 5,
+                                                        col: 33,
+                                                    },
+                                                    end: SourcePos {
+                                                        line: 5,
+                                                        col: 39,
+                                                    },
+                                                },
+                                            },
+                                        ],
+                                        params: None,
+                                    },
+                                    span: SourceSpan {
+                                        start: SourcePos {
+                                            line: 5,
+                                            col: 3,
+                                        },
+                                        end: SourcePos {
+                                            line: 5,
+                                            col: 40,
+                                        },
+                                    },
+                                },
+                            },
+                            span: SourceSpan {
+                                start: SourcePos {
+                                    line: 4,
+                                    col: 3,
+                                },
+                                end: SourcePos {
+                                    line: 5,
+                                    col: 40,
+                                },
+                            },
+                        },
+                        right: AnnProc {
+                            proc: Send {
+                                channel: NameVar(
+                                    Id(
+                                        Id {
+                                            name: "out",
+                                            pos: SourcePos {
+                                                line: 6,
+                                                col: 3,
+                                            },
+                                        },
+                                    ),
+                                ),
+                                send_type: Single,
+                                inputs: [
+                                    AnnProc {
+                                        proc: Method {
+                                            receiver: AnnProc {
+                                                proc: LongLiteral(
+                                                    5,
+                                                ),
+                                                span: SourceSpan {
+                                                    start: SourcePos {
+                                                        line: 6,
+                                                        col: 8,
+                                                    },
+                                                    end: SourcePos {
+                                                        line: 6,
+                                                        col: 9,
+                                                    },
+                                                },
+                                            },
+                                            name: Id {
+                                                name: "toString",
+                                                pos: SourcePos {
+                                                    line: 6,
+                                                    col: 10,
+                                                },
+                                            },
+                                            args: [],
+                                        },
+                                        span: SourceSpan {
+                                            start: SourcePos {
+                                                line: 6,
+                                                col: 8,
+                                            },
+                                            end: SourcePos {
+                                                line: 6,
+                                                col: 20,
+                                            },
+                                        },
+                                    },
+                                    AnnProc {
+                                        proc: Method {
+                                            receiver: AnnProc {
+                                                proc: FloatLiteral {
+                                                    value: "2.5",
+                                                    bits: 64,
+                                                },
+                                                span: SourceSpan {
+                                                    start: SourcePos {
+                                                        line: 6,
+                                                        col: 22,
+                                                    },
+                                                    end: SourcePos {
+                                                        line: 6,
+                                                        col: 25,
+                                                    },
+                                                },
+                                            },
+                                            name: Id {
+                                                name: "toString",
+                                                pos: SourcePos {
+                                                    line: 6,
+                                                    col: 26,
+                                                },
+                                            },
+                                            args: [],
+                                        },
+                                        span: SourceSpan {
+                                            start: SourcePos {
+                                                line: 6,
+                                                col: 22,
+                                            },
+                                            end: SourcePos {
+                                                line: 6,
+                                                col: 36,
+                                            },
+                                        },
+                                    },
+                                ],
+                                params: None,
+                            },
+                            span: SourceSpan {
+                                start: SourcePos {
+                                    line: 6,
+                                    col: 3,
+                                },
+                                end: SourcePos {
+                                    line: 6,
+                                    col: 37,
+                                },
+                            },
+                        },
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 4,
+                            col: 3,
+                        },
+                        end: SourcePos {
+                            line: 6,
+                            col: 37,
+                        },
+                    },
+                },
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 3,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 7,
+                    col: 2,
+                },
+            },
+        },
+    ],
+)

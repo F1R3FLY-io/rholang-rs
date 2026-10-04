@@ -1,0 +1,7 @@
+// Bare floats are f64; a suffix gives the width; a trailing dot is not part
+// of a bare float, so `5.toString()` stays a method call on an integer.
+new out in {
+  out!(1.5, 0.25, .5, 1.5e3, 2.5E-3, 1e3, 2E-4, -7e+2, -2.5, -.5) |
+  out!(1.5f32, 2.5f64, 1e3f128, .5f256) |
+  out!(5.toString(), 2.5.toString())
+}

@@ -113,6 +113,14 @@ fn parse_corpus_stripped(name: &str) -> String {
     r#"new x, a, b in { x!y(a!z(b).). }"#,
     r#"new x, a, b in { x!?("y", a!?("z", b).). }"#
 )]
+#[case::params_terminator(
+    r#"new x in { x!y(1, 2; 3, k = 4). }"#,
+    r#"new x in { x!?("y", 1, 2; 3, k = 4). }"#
+)]
+#[case::params_sequential(
+    r#"new x in { x!set(42; priority = 1); Nil }"#,
+    r#"new x in { x!?("set", 42; priority = 1); Nil }"#
+)]
 fn proc_position_desugars_to_send_sync(#[case] sugared: &str, #[case] hand_written: &str) {
     let s = parse_stripped(sugared);
     let h = parse_stripped(hand_written);
@@ -132,6 +140,10 @@ fn proc_position_desugars_to_send_sync(#[case] sugared: &str, #[case] hand_writt
     r#"new x, ret in { for (@val <- x!get()) { ret!(val) } }"#,
     r#"new x, ret in { for (@val <- x!?("get")) { ret!(val) } }"#
 )]
+#[case::params_source(
+    r#"new x in { for (@z <- x!get(1; ttl = 60)) { Nil } }"#,
+    r#"new x in { for (@z <- x!?("get", 1; ttl = 60)) { Nil } }"#
+)]
 fn for_source_desugars_to_send_receive(#[case] sugared: &str, #[case] hand_written: &str) {
     let s = parse_stripped(sugared);
     let h = parse_stripped(hand_written);
@@ -140,6 +152,38 @@ fn for_source_desugars_to_send_receive(#[case] sugared: &str, #[case] hand_writt
         h,
         "for (z <- x!y(args)) AST should match for (z <- x!?(\"y\", args)) AST"
     );
+}
+
+/// A bare Reified RSpaces query `~ e` is the one-element payload `[e]`, so it
+/// builds the same AST as the group `~ (e;)` with an empty parameter
+/// section. The parens-`;` rule keeps a parenthesized tuple whole: `~ (1, 2)`
+/// is the group `~ ((1, 2);)`.
+#[test]
+fn bare_query_equals_parenthesized_query() {
+    for (bare, grouped) in [
+        (
+            r#"new ch in { for (@y <- ch ~ 1) { Nil } }"#,
+            r#"new ch in { for (@y <- ch ~ (1;)) { Nil } }"#,
+        ),
+        (
+            r#"new ch, q in { for (@y <- ch ~ *q) { Nil } }"#,
+            r#"new ch, q in { for (@y <- ch ~ (*q;)) { Nil } }"#,
+        ),
+        (
+            r#"new ch in { for (@y <- ch ~ [1, 2]) { Nil } }"#,
+            r#"new ch in { for (@y <- ch ~ ([1, 2];)) { Nil } }"#,
+        ),
+        (
+            r#"new ch in { for (@y <- ch ~ (1, 2)) { Nil } }"#,
+            r#"new ch in { for (@y <- ch ~ ((1, 2);)) { Nil } }"#,
+        ),
+    ] {
+        pretty_assertions::assert_eq!(
+            parse_stripped(bare),
+            parse_stripped(grouped),
+            "`~ e` should match `~ (e;)` ({bare} vs {grouped})"
+        );
+    }
 }
 
 /// Reserved keywords (e.g. `new`) cannot be used as method names.

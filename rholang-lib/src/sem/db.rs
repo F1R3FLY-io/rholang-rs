@@ -698,6 +698,7 @@ mod tests {
             .into(),
             send_type: ast::SendType::Single,
             inputs: send_inputs,
+            params: None,
         };
         let if_true = send_proc.ann(SourcePos::at_col(11).span_of(10));
 
