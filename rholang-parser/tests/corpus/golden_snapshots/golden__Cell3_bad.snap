@@ -39,79 +39,45 @@ Fail(
                     error: UnexpectedVar,
                     span: SourceSpan {
                         start: SourcePos {
-                            line: 4,
-                            col: 9,
+                            line: 5,
+                            col: 37,
                         },
                         end: SourcePos {
-                            line: 4,
-                            col: 12,
-                        },
-                    },
-                    byte_range: 108..111,
-                },
-                AnnParsingError {
-                    error: UnexpectedMatchAfter {
-                        rule: "par",
-                        offender: "tuple",
-                    },
-                    span: SourceSpan {
-                        start: SourcePos {
                             line: 5,
                             col: 41,
                         },
-                        end: SourcePos {
-                            line: 5,
-                            col: 60,
-                        },
                     },
-                    byte_range: 165..184,
+                    byte_range: 161..165,
                 },
                 AnnParsingError {
                     error: UnexpectedVar,
                     span: SourceSpan {
                         start: SourcePos {
+                            line: 8,
+                            col: 31,
+                        },
+                        end: SourcePos {
+                            line: 8,
+                            col: 35,
+                        },
+                    },
+                    byte_range: 252..256,
+                },
+                AnnParsingError {
+                    error: SyntaxError {
+                        sexp: "(ERROR (ground_sig name: (var)) (block (var)))",
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
                             line: 7,
                             col: 9,
                         },
                         end: SourcePos {
                             line: 7,
-                            col: 12,
+                            col: 27,
                         },
                     },
-                    byte_range: 201..204,
-                },
-                AnnParsingError {
-                    error: UnexpectedMatchAfter {
-                        rule: "par",
-                        offender: "tuple",
-                    },
-                    span: SourceSpan {
-                        start: SourcePos {
-                            line: 8,
-                            col: 35,
-                        },
-                        end: SourcePos {
-                            line: 8,
-                            col: 54,
-                        },
-                    },
-                    byte_range: 256..275,
-                },
-                AnnParsingError {
-                    error: Unexpected(
-                        '#',
-                    ),
-                    span: SourceSpan {
-                        start: SourcePos {
-                            line: 4,
-                            col: 14,
-                        },
-                        end: SourcePos {
-                            line: 4,
-                            col: 15,
-                        },
-                    },
-                    byte_range: 113..114,
+                    byte_range: 201..219,
                 },
             ],
         },

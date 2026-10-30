@@ -126,6 +126,22 @@ pub enum Proc<'ast> {
         var: Id<'ast>,
     },
 
+    // Cost-accounted Rholang (worktree `Wrap`/`SNil`/`SCons`; paper sugars).
+    /// Signed term `{P}_s` (surface `{% P %}[ s ]`): process `proc` owned/funded
+    /// by signature `sig`.
+    SignedTerm {
+        proc: AnnProc<'ast>,
+        sig: Signature<'ast>,
+    },
+    /// Token stack `() | s :: S` (Greg `app:concrete` `Stk`): a bare stack is
+    /// directly a signed process — there is no `purse(...)` wrapper. Located /
+    /// parallel stacks are ordinary `Par` (`S1 | S2`), and ring-fencing is via
+    /// `new`-bound signatures (binding-sensitive `Σ⟦s⟧` in the normalizer). A bare
+    /// empty `()` is `Proc::Unit`, so a proc-level stack always has ≥ 1 layer.
+    TokenStack {
+        stack: TokenStack<'ast>,
+    },
+
     Bad, // bad process usually represents a parsing error
 }
 
@@ -415,6 +431,28 @@ impl<'a> From<Id<'a>> for Name<'a> {
     }
 }
 
+/// A cost-accounting signature `s ::= g | #P | s1 * s2 | s1 -o s2`.
+///
+/// `Ground` is a name (worktree `SGround`; v1 surface = a bare name var);
+/// `Hash` is `#P` (worktree `SQuote`); `Compound` is `s1 * s2` (worktree
+/// `SCompose`); `Transfer` is the paper's lollipop `s1 -o s2` sugar, desugared
+/// in the normalizer. Kept structural (no parse-time desugaring).
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Signature<'ast> {
+    Ground(Name<'ast>),
+    Hash(AnnProc<'ast>),
+    Compound(Box<Signature<'ast>>, Box<Signature<'ast>>),
+    Transfer(Box<Signature<'ast>>, Box<Signature<'ast>>),
+}
+
+/// A token stack `() | s :: S` (worktree `SNil`/`SCons`), flattened
+/// innermost-first: `purse(a :: b :: ())` ⇒ `layers: [a, b]`; the empty stack
+/// `()` ⇒ `layers: []`.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct TokenStack<'ast> {
+    pub layers: SmallVec<[Signature<'ast>; 2]>,
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct Names<'ast> {
     pub names: SmallVec<[Name<'ast>; 1]>,
@@ -608,15 +646,31 @@ pub fn inputs<'a>(receipt: &'a [Bind<'a>]) -> impl DoubleEndedIterator<Item = &'
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Bind<'ast> {
-    Linear { lhs: Names<'ast>, rhs: Source<'ast> },
-    Repeated { lhs: Names<'ast>, rhs: Name<'ast> },
-    Peek { lhs: Names<'ast>, rhs: Name<'ast> },
+    Linear {
+        lhs: Names<'ast>,
+        rhs: Source<'ast>,
+    },
+    Repeated {
+        lhs: Names<'ast>,
+        rhs: Name<'ast>,
+    },
+    Peek {
+        lhs: Names<'ast>,
+        rhs: Name<'ast>,
+    },
+    /// Per-clause signed bind `{% y <- x %}[s]` (Greg `app:concrete` SignedBind;
+    /// Axis-C join — the rendezvous on `rhs` is funded independently by `sig`).
+    Signed {
+        lhs: Names<'ast>,
+        rhs: Source<'ast>,
+        sig: Signature<'ast>,
+    },
 }
 
 impl<'a> Bind<'a> {
     pub fn source_name(&self) -> &Name<'a> {
         match self {
-            Bind::Linear { lhs: _, rhs } => match rhs {
+            Bind::Linear { rhs, .. } | Bind::Signed { rhs, .. } => match rhs {
                 Source::Simple { name }
                 | Source::ReceiveSend { name }
                 | Source::SendReceive { name, .. } => name,
@@ -627,7 +681,7 @@ impl<'a> Bind<'a> {
 
     pub fn input(&self) -> Option<&[AnnProc<'a>]> {
         match self {
-            Bind::Linear { lhs: _, rhs } => match rhs {
+            Bind::Linear { rhs, .. } | Bind::Signed { rhs, .. } => match rhs {
                 Source::Simple { .. } | Source::ReceiveSend { .. } => None,
                 Source::SendReceive { name: _, inputs } => Some(inputs),
             },
@@ -639,7 +693,8 @@ impl<'a> Bind<'a> {
         match self {
             Bind::Linear { lhs, rhs: _ }
             | Bind::Repeated { lhs, rhs: _ }
-            | Bind::Peek { lhs, rhs: _ } => lhs,
+            | Bind::Peek { lhs, rhs: _ }
+            | Bind::Signed { lhs, .. } => lhs,
         }
     }
 

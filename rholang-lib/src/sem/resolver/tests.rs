@@ -1462,3 +1462,45 @@ fn test_concurrent_join_guard_refs_other_group<'test>(
 ) {
     expect::no_warnings_or_errors(db);
 }
+
+// ── Cost-accounting syntax is rejected in pattern position ──────────────────
+// A signed term `{% P %}[s]` / a bare token stack `s :: ()` lowers to a `for`/send and is not a
+// valid pattern. f1r3node's normalizer re-implements this rejection in its own
+// `pattern_guard` (it does NOT depend on rholang-lib); these tests cover the
+// rholang-lib / tooling (LSP) path via `ErrorKind::CostSyntaxInsidePattern`.
+
+#[test_rholang_code(r#"match 1 { {% Nil %}[ s ] => Nil }"#, pipeline = pipeline)]
+fn cost_signed_term_in_match_pattern_is_rejected<'test>(
+    _tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    expect::error(db, ErrorKind::CostSyntaxInsidePattern, |node: ProcRef| {
+        matches!(node.proc, ast::Proc::SignedTerm { .. })
+    });
+}
+
+// For receive-bind and contract formals the resolver attaches the error to the
+// bind/name node rather than the inner cost node, so we assert the rejection by
+// kind (a node-agnostic matcher) — the presence of the diagnostic IS the
+// rejection.
+#[test_rholang_code(r#"new ch in { for( @{ s :: () } <- ch ){ Nil } }"#, pipeline = pipeline)]
+fn cost_token_stack_in_receive_pattern_is_rejected<'test>(
+    _tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    expect::error(db, ErrorKind::CostSyntaxInsidePattern, |node: ProcRef| {
+        let _ = node;
+        true
+    });
+}
+
+#[test_rholang_code(r#"new c in { contract c( @{% Nil %}[ s ] ) = { Nil } }"#, pipeline = pipeline)]
+fn cost_signed_term_in_contract_formal_is_rejected<'test>(
+    _tree: ProcRef<'test>,
+    db: &'test SemanticDb<'test>,
+) {
+    expect::error(db, ErrorKind::CostSyntaxInsidePattern, |node: ProcRef| {
+        let _ = node;
+        true
+    });
+}

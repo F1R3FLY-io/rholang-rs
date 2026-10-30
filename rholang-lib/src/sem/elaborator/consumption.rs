@@ -139,7 +139,7 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
         for receipt in receipts.iter() {
             for bind in receipt.iter() {
                 let (mode, source_name, pos) = match bind {
-                    Bind::Linear { rhs, .. } => {
+                    Bind::Linear { rhs, .. } | Bind::Signed { rhs, .. } => {
                         let name = self.extract_name_from_source(rhs);
                         let pos = self.get_name_position(name);
                         (ConsumptionMode::Linear, name, pos)
@@ -199,7 +199,7 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
         for receipt in receipts.iter() {
             for bind in receipt.iter() {
                 let source = match bind {
-                    Bind::Linear { rhs, .. } => rhs,
+                    Bind::Linear { rhs, .. } | Bind::Signed { rhs, .. } => rhs,
                     Bind::Repeated { .. } | Bind::Peek { .. } => {
                         // Repeated and Peek only have Name, not Source
                         // So they cannot have reentrancy patterns
@@ -230,7 +230,9 @@ impl<'a, 'ast> ConsumptionValidator<'a, 'ast> {
         for receipt in receipts.iter() {
             for bind in receipt.iter() {
                 let name = match bind {
-                    Bind::Linear { rhs, .. } => self.extract_name_from_source(rhs),
+                    Bind::Linear { rhs, .. } | Bind::Signed { rhs, .. } => {
+                        self.extract_name_from_source(rhs)
+                    }
                     Bind::Repeated { rhs, .. } => rhs,
                     Bind::Peek { rhs, .. } => rhs,
                 };

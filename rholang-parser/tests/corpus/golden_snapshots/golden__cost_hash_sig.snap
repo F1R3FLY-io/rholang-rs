@@ -1,0 +1,86 @@
+---
+source: rholang-parser/tests/golden.rs
+expression: result
+---
+Good(
+    [
+        AnnProc {
+            proc: SignedTerm {
+                proc: AnnProc {
+                    proc: Nil,
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 1,
+                            col: 4,
+                        },
+                        end: SourcePos {
+                            line: 1,
+                            col: 7,
+                        },
+                    },
+                },
+                sig: Hash(
+                    AnnProc {
+                        proc: Send {
+                            channel: Quote(
+                                AnnProc {
+                                    proc: LongLiteral(
+                                        0,
+                                    ),
+                                    span: SourceSpan {
+                                        start: SourcePos {
+                                            line: 1,
+                                            col: 17,
+                                        },
+                                        end: SourcePos {
+                                            line: 1,
+                                            col: 18,
+                                        },
+                                    },
+                                },
+                            ),
+                            send_type: Single,
+                            inputs: [
+                                AnnProc {
+                                    proc: LongLiteral(
+                                        1,
+                                    ),
+                                    span: SourceSpan {
+                                        start: SourcePos {
+                                            line: 1,
+                                            col: 20,
+                                        },
+                                        end: SourcePos {
+                                            line: 1,
+                                            col: 21,
+                                        },
+                                    },
+                                },
+                            ],
+                        },
+                        span: SourceSpan {
+                            start: SourcePos {
+                                line: 1,
+                                col: 16,
+                            },
+                            end: SourcePos {
+                                line: 1,
+                                col: 22,
+                            },
+                        },
+                    },
+                ),
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 1,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 1,
+                    col: 26,
+                },
+            },
+        },
+    ],
+)

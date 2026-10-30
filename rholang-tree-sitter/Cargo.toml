@@ -3,6 +3,11 @@ name = "rholang-tree-sitter"
 description = "Rholang grammar for tree-sitter"
 version = "0.1.2"
 edition = "2021"
+# Matches rholang-interpreter, rholang-wasm and rholang-wasm-draft in this
+# workspace. Previously absent, which made every downstream consumer report this
+# crate as `unlicensed` under cargo-deny and forced them to skip the licence check
+# entirely -- see the deny.toml files in libgrammstein, pgmcp and latex-corrector.
+license = "Apache-2.0"
 
 build = "bindings/rust/build.rs"
 include = ["bindings/rust/*", "grammar.js", "queries/*", "src/*"]

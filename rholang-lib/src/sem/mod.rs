@@ -501,6 +501,9 @@ pub enum ErrorKind {
     ProcInNamePosition(BinderId, Symbol),
     ConnectiveOutsidePattern,
     BundleInsidePattern,
+    /// A cost-accounting construct (`{% P %}[s]` signed term or `purse(...)`)
+    /// used in match-pattern position, where it is not a valid pattern.
+    CostSyntaxInsidePattern,
     UnmatchedVarInDisjunction(Symbol),
     FreeVariable(SymbolOccurrence),
     BadCode,

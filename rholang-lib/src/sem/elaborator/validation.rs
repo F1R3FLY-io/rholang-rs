@@ -284,6 +284,16 @@ impl<'a, 'ast> TypeValidator<'a, 'ast> {
                 reason: "Bundle cannot appear in pattern".to_string(),
             }),
 
+            Proc::SignedTerm { .. } | Proc::TokenStack { .. } => {
+                Err(ValidationError::InvalidPatternStructure {
+                    pid: PID(0),
+                    position: Some(proc.span.start),
+                    reason:
+                        "cost-accounting syntax (signed term / purse) cannot appear in a pattern"
+                            .to_string(),
+                })
+            }
+
             Proc::Bad => Err(ValidationError::InvalidPatternStructure {
                 pid: PID(0),
                 position: Some(proc.span.start),

@@ -392,6 +392,13 @@ fn resolve_proc_pattern_rec<'a>(
                 Some(pattern.span.start),
             );
         }
+        SignedTerm { .. } | TokenStack { .. } => {
+            db.error(
+                res.id,
+                ErrorKind::CostSyntaxInsidePattern,
+                Some(pattern.span.start),
+            );
+        }
         Select { branches: _ } => {
             unimplemented!("Select is not implemented in this version of Rholang")
         }
