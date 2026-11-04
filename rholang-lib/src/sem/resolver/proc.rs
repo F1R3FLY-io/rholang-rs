@@ -359,6 +359,32 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
         Select { branches: _ } => {
             unimplemented!("Select is not implemented in this version of Rholang")
         }
+
+        // CoC (Phase 1b + 2a + 2b): lambda, application, and Pi types. The
+        // resolver walks their sub-terms so name references resolve against
+        // the surrounding scope. Binders inside lambda/Pi params are
+        // scoped by the downstream normalizer (`p_lambda_normalizer`,
+        // `p_pi_normalizer`); this pass is name-resolution only.
+        Lambda { params, body } => {
+            for (_id, ty) in params.iter() {
+                if let Some(t) = ty {
+                    resolve_unguarded(db, stack, t);
+                }
+            }
+            resolve_unguarded(db, stack, body);
+        }
+        App { fun, args } => {
+            resolve_unguarded(db, stack, fun);
+            for a in args.iter() {
+                resolve_unguarded(db, stack, a);
+            }
+        }
+        Pi { params, codomain } => {
+            for (_id, ty) in params.iter() {
+                resolve_unguarded(db, stack, ty);
+            }
+            resolve_unguarded(db, stack, codomain);
+        }
     }
 }
 

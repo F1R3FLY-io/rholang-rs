@@ -22,20 +22,31 @@ Fail(
                             },
                         ],
                         proc: AnnProc {
-                            proc: Send {
-                                channel: NameVar(
-                                    Id(
-                                        Id {
-                                            name: "x",
-                                            pos: SourcePos {
-                                                line: 8,
-                                                col: 3,
+                            proc: App {
+                                fun: AnnProc {
+                                    proc: ProcVar(
+                                        Id(
+                                            Id {
+                                                name: "x",
+                                                pos: SourcePos {
+                                                    line: 8,
+                                                    col: 3,
+                                                },
                                             },
-                                        },
+                                        ),
                                     ),
-                                ),
-                                send_type: Single,
-                                inputs: [
+                                    span: SourceSpan {
+                                        start: SourcePos {
+                                            line: 8,
+                                            col: 3,
+                                        },
+                                        end: SourcePos {
+                                            line: 8,
+                                            col: 4,
+                                        },
+                                    },
+                                },
+                                args: [
                                     AnnProc {
                                         proc: LongLiteral(
                                             1,
@@ -85,14 +96,14 @@ Fail(
                     span: SourceSpan {
                         start: SourcePos {
                             line: 8,
-                            col: 5,
+                            col: 4,
                         },
                         end: SourcePos {
                             line: 8,
                             col: 8,
                         },
                     },
-                    byte_range: 368..371,
+                    byte_range: 367..371,
                 },
                 AnnParsingError {
                     error: SyntaxError {

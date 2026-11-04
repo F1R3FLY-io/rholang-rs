@@ -400,6 +400,30 @@ fn resolve_proc_pattern_rec<'a>(
         Select { branches: _ } => {
             unimplemented!("Select is not implemented in this version of Rholang")
         }
+        // CoC term/type forms are not yet valid pattern shapes. They resolve
+        // their sub-terms so name references inside them are still bound
+        // correctly, but the typechecker rejects them as patterns proper
+        // once it's wired in.
+        Lambda { params, body } => {
+            for (_id, ty) in params.iter() {
+                if let Some(t) = ty {
+                    resolve_proc_pattern_rec(db, env, res, t);
+                }
+            }
+            resolve_proc_pattern_rec(db, env, res, body);
+        }
+        App { fun, args } => {
+            resolve_proc_pattern_rec(db, env, res, fun);
+            for a in args.iter() {
+                resolve_proc_pattern_rec(db, env, res, a);
+            }
+        }
+        Pi { params, codomain } => {
+            for (_id, ty) in params.iter() {
+                resolve_proc_pattern_rec(db, env, res, ty);
+            }
+            resolve_proc_pattern_rec(db, env, res, codomain);
+        }
         Bad => unreachable!(),
     }
 }

@@ -444,6 +444,43 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::VarRef { kind, var })
     }
 
+    /// Calculus of Constructions (Phase 1b): allocate a lambda abstraction.
+    /// `params` are the surface binder identifiers; the body is normalized
+    /// under a scope extended with those names (see
+    /// `rholang::compiler::normalizer::processes::p_lambda_normalizer`).
+    pub fn alloc_lambda(
+        &self,
+        params: &[(Id<'ast>, Option<AnnProc<'ast>>)],
+        body: AnnProc<'ast>,
+    ) -> &Proc<'ast> {
+        self.arena.alloc(Proc::Lambda {
+            params: params.to_smallvec(),
+            body,
+        })
+    }
+
+    /// Calculus of Constructions (Phase 1b): allocate a function application.
+    pub fn alloc_app(&self, fun: AnnProc<'ast>, args: &[AnnProc<'ast>]) -> &Proc<'ast> {
+        self.arena.alloc(Proc::App {
+            fun,
+            args: args.to_smallvec(),
+        })
+    }
+
+    /// Calculus of Constructions (Phase 2a): allocate a dependent function
+    /// type `(x_0: A_0, …, x_{n-1}: A_{n-1}) -> B`. For non-dependent sugar
+    /// `A -> B`, pass a single param with a synthetic `_` identifier.
+    pub fn alloc_pi(
+        &self,
+        params: &[(Id<'ast>, AnnProc<'ast>)],
+        codomain: AnnProc<'ast>,
+    ) -> &Proc<'ast> {
+        self.arena.alloc(Proc::Pi {
+            params: params.to_smallvec(),
+            codomain,
+        })
+    }
+
     pub fn alloc_str(&'ast self, s: &str) -> &'ast str {
         let allocated_string = self.string_arena.alloc(s.to_string());
         allocated_string.as_str()
