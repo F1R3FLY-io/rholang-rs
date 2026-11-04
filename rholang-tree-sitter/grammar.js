@@ -302,7 +302,7 @@ module.exports = grammar({
         disjunction: $ => prec.left(13, seq($._proc, '\\/', $._proc)),
         conjunction: $ => prec.left(14, seq($._proc, '/\\', $._proc)),
         negation: $ => prec(15, seq('~', $._proc)),
-        _ground_expression: $ => prec(16, choice($.block, $._literal, $.nil, $.collection, $._proc_var, $.simple_type, $.unit)),
+        _ground_expression: $ => prec(16, choice($.block, $._literal, $.nil, $.collection, $._proc_var, $.simple_type, $.fixed_point_pattern, $.unit)),
 
         // synchronous send continuations
         sync_send_cont: $ => choice($.empty_cont, $.non_empty_cont),
@@ -421,7 +421,31 @@ module.exports = grammar({
 
         block: $ => seq('{', $._proc, '}'),
 
-        simple_type: $ => choice('Bool', 'Int', 'String', 'Uri', 'ByteArray'),
+        simple_type: $ => choice(
+            'Bool',
+            'Int',
+            'Int64',
+            'Int32',
+            'UInt64',
+            'UInt32',
+            'UInt16',
+            'UInt8',
+            'Float64',
+            'Float32',
+            'BigInt',
+            'BigRat',
+            'String',
+            'Uri',
+            'ByteArray'),
+
+        // FixedPoint type pattern: bare `FixedPoint` matches any scale;
+        // `FixedPoint(<pat>)` matches by pattern against the scale. The
+        // left-prec resolves the ambiguity with a following parenthesized
+        // expression: `FixedPoint(x)` is always the parameterized form.
+        fixed_point_pattern: $ => prec.left(16, choice(
+            'FixedPoint',
+            seq('FixedPoint', '(', field('scale', $._proc), ')')
+        )),
 
         _literal: $ => choice(
             $.bool_literal,

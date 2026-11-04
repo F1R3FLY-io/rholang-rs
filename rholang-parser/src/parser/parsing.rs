@@ -129,14 +129,37 @@ pub(super) fn node_to_ast<'ast>(
                     let simple_type_value = match lit_value {
                         "Bool" => SimpleType::Bool,
                         "Int" => SimpleType::Int,
+                        "Int64" => SimpleType::Int64,
+                        "Int32" => SimpleType::Int32,
+                        "UInt64" => SimpleType::UInt64,
+                        "UInt32" => SimpleType::UInt32,
+                        "UInt16" => SimpleType::UInt16,
+                        "UInt8" => SimpleType::UInt8,
+                        "Float64" => SimpleType::Float64,
+                        "Float32" => SimpleType::Float32,
+                        "BigInt" => SimpleType::BigInt,
+                        "BigRat" => SimpleType::BigRat,
                         "String" => SimpleType::String,
                         "Uri" => SimpleType::Uri,
                         "ByteArray" => SimpleType::ByteArray,
-                        _ => unreachable!(
-                            "Simple type is always 'Bool', 'Int', 'String', 'Uri', or 'ByteArray'"
-                        ),
+                        _ => unreachable!("Simple type is one of the known keywords"),
                     };
                     proc_stack.push(ast_builder.alloc_simple_type(simple_type_value), span);
+                }
+                kind!("fixed_point_pattern") => {
+                    // Bare `FixedPoint` has no scale child; `FixedPoint(<pat>)`
+                    // has one named "scale" sub-process we must parse first.
+                    match node.child_by_field_id(field!("scale")) {
+                        Some(scale_node) => {
+                            cont_stack.push(K::ConsumeFixedPointPattern { span });
+                            node = scale_node;
+                            continue 'parse;
+                        }
+                        None => {
+                            proc_stack
+                                .push(ast_builder.alloc_fixed_point_pattern(None), span);
+                        }
+                    }
                 }
                 kind!("bool_literal") => {
                     let lit_value = get_node_value(&node, source);
@@ -1532,6 +1555,9 @@ fn apply_cont<'tree, 'ast>(
                             }),
                         K::ConsumeUnaryExp { op, span } => proc_stack
                             .replace_top(|top| ast_builder.alloc_unary_exp(op, top).ann(span)),
+                        K::ConsumeFixedPointPattern { span } => proc_stack.replace_top(|scale| {
+                            ast_builder.alloc_fixed_point_pattern(Some(scale)).ann(span)
+                        }),
                         _ => unreachable!("Eval continuations are handled in another branch"),
                     };
 
@@ -1659,6 +1685,9 @@ enum K<'tree, 'ast> {
     },
     ConsumeUnaryExp {
         op: UnaryExpOp,
+        span: SourceSpan,
+    },
+    ConsumeFixedPointPattern {
         span: SourceSpan,
     },
     EvalDelayed(tree_sitter::Node<'tree>),
@@ -1806,6 +1835,10 @@ impl Debug for K<'_, '_> {
             Self::ConsumeUnaryExp { op, span } => f
                 .debug_struct("ConsumeUnaryExp")
                 .field("op", op)
+                .field("span", span)
+                .finish(),
+            Self::ConsumeFixedPointPattern { span } => f
+                .debug_struct("ConsumeFixedPointPattern")
                 .field("span", span)
                 .finish(),
             Self::EvalDelayed(arg0) => f.debug_tuple("EvalDelayed").field(arg0).finish(),
@@ -2851,6 +2884,11 @@ fn collect_ids_into<'ast>(root: AnnProc<'ast>, out: &mut BTreeSet<&'ast str>) {
                     }
                 }
             },
+            Proc::FixedPointPattern { scale } => {
+                if let Some(scale) = scale {
+                    stack.push(*scale);
+                }
+            }
             // Pure leaves without embedded identifiers.
             Proc::Nil
             | Proc::Unit

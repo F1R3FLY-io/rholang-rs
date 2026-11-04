@@ -133,6 +133,13 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
             Proc::Eval { name } => {
                 self.push_name(name);
             }
+
+            Proc::FixedPointPattern { scale } => {
+                if let Some(scale) = scale {
+                    self.stack.push(scale);
+                }
+            }
+
             // leaves
             Proc::Nil
             | Proc::Unit
@@ -384,6 +391,12 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
                     self.push_children(map_elements(elements));
                 }
             },
+
+            Proc::FixedPointPattern { scale } => {
+                if let Some(scale) = scale {
+                    self.push_children(iter::once(scale));
+                }
+            }
 
             // leaves: no children
             Proc::Nil
