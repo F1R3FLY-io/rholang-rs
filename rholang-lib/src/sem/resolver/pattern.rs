@@ -135,6 +135,11 @@ fn resolve_proc_pattern_rec<'a>(
         | UriLiteral(_)
         | SimpleType(_)
         | ProcVar(Var::Wildcard) => {}
+        FixedPointPattern { scale } => {
+            if let Some(scale) = scale {
+                resolve_proc_pattern_rec(db, env, res, scale);
+            }
+        }
         ProcVar(Var::Id(id)) => {
             res.resolve_or_introduce_var(*id, BinderKind::Proc, db);
         }

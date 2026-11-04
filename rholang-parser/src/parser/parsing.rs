@@ -156,8 +156,7 @@ pub(super) fn node_to_ast<'ast>(
                             continue 'parse;
                         }
                         None => {
-                            proc_stack
-                                .push(ast_builder.alloc_fixed_point_pattern(None), span);
+                            proc_stack.push(ast_builder.alloc_fixed_point_pattern(None), span);
                         }
                     }
                 }
