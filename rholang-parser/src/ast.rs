@@ -126,6 +126,13 @@ pub enum Proc<'ast> {
         var: Id<'ast>,
     },
 
+    // FixedPoint type pattern. Unlike the nullary `SimpleType` keywords,
+    // `FixedPoint(<pat>)` carries a full pattern for the scale. `None`
+    // denotes bare `FixedPoint`, which is sugar for `FixedPoint(_)`.
+    FixedPointPattern {
+        scale: Option<AnnProc<'ast>>,
+    },
+
     Bad, // bad process usually represents a parsing error
 }
 
@@ -152,6 +159,7 @@ impl<'a> Proc<'a> {
             | Proc::ProcVar(Var::Wildcard)
             | Proc::Bad => true,
             Proc::Collection(col) if col.is_empty() => true,
+            Proc::FixedPointPattern { scale: None } => true,
             _ => false,
         }
     }
@@ -714,6 +722,16 @@ impl<'a> From<&'a str> for Uri<'a> {
 pub enum SimpleType {
     Bool,
     Int,
+    Int64,
+    Int32,
+    UInt64,
+    UInt32,
+    UInt16,
+    UInt8,
+    Float64,
+    Float32,
+    BigInt,
+    BigRat,
     String,
     Uri,
     ByteArray,

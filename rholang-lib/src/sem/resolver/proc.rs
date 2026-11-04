@@ -43,6 +43,7 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
         SimpleType(_)
         | VarRef { .. }
         | ProcVar(Wildcard)
+        | FixedPointPattern { .. }
         | UnaryExp { op: Negation, .. }
         | BinaryExp {
             op: Conjunction | Disjunction,

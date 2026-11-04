@@ -1575,6 +1575,10 @@
           },
           {
             "type": "SYMBOL",
+            "name": "fixed_point_pattern"
+          },
+          {
+            "type": "SYMBOL",
             "name": "unit"
           }
         ]
@@ -2370,6 +2374,46 @@
         },
         {
           "type": "STRING",
+          "value": "Int64"
+        },
+        {
+          "type": "STRING",
+          "value": "Int32"
+        },
+        {
+          "type": "STRING",
+          "value": "UInt64"
+        },
+        {
+          "type": "STRING",
+          "value": "UInt32"
+        },
+        {
+          "type": "STRING",
+          "value": "UInt16"
+        },
+        {
+          "type": "STRING",
+          "value": "UInt8"
+        },
+        {
+          "type": "STRING",
+          "value": "Float64"
+        },
+        {
+          "type": "STRING",
+          "value": "Float32"
+        },
+        {
+          "type": "STRING",
+          "value": "BigInt"
+        },
+        {
+          "type": "STRING",
+          "value": "BigRat"
+        },
+        {
+          "type": "STRING",
           "value": "String"
         },
         {
@@ -2381,6 +2425,44 @@
           "value": "ByteArray"
         }
       ]
+    },
+    "fixed_point_pattern": {
+      "type": "PREC_LEFT",
+      "value": 16,
+      "content": {
+        "type": "CHOICE",
+        "members": [
+          {
+            "type": "STRING",
+            "value": "FixedPoint"
+          },
+          {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "FixedPoint"
+              },
+              {
+                "type": "STRING",
+                "value": "("
+              },
+              {
+                "type": "FIELD",
+                "name": "scale",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "_proc"
+                }
+              },
+              {
+                "type": "STRING",
+                "value": ")"
+              }
+            ]
+          }
+        ]
+      }
     },
     "_literal": {
       "type": "CHOICE",
