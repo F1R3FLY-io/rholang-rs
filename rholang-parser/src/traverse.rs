@@ -163,6 +163,11 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
                 }
                 self.remember(sig_procs.iter().copied());
             }
+            Proc::FixedPointPattern { scale } => {
+                if let Some(scale) = scale {
+                    self.stack.push(scale);
+                }
+            }
 
             // leaves
             Proc::Nil
@@ -427,6 +432,11 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
                     signature_proc_children(layer, &mut sig_procs);
                 }
                 self.push_children(sig_procs.iter().copied());
+            }
+            Proc::FixedPointPattern { scale } => {
+                if let Some(scale) = scale {
+                    self.push_children(iter::once(scale));
+                }
             }
 
             // leaves: no children

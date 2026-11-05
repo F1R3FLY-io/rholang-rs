@@ -128,6 +128,10 @@ impl<'ast> ASTBuilder<'ast> {
         self.arena.alloc(Proc::SimpleType(value))
     }
 
+    pub fn alloc_fixed_point_pattern(&self, scale: Option<AnnProc<'ast>>) -> &Proc<'ast> {
+        self.arena.alloc(Proc::FixedPointPattern { scale })
+    }
+
     pub fn alloc_list(&self, procs: &[AnnProc<'ast>]) -> &Proc<'ast> {
         if procs.is_empty() {
             return self.const_empty_list();

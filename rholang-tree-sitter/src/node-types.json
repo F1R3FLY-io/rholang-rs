@@ -208,6 +208,10 @@
           "named": true
         },
         {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -479,6 +483,10 @@
           "named": true
         },
         {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -682,6 +690,10 @@
           "named": true
         },
         {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -882,6 +894,10 @@
         },
         {
           "type": "eval",
+          "named": true
+        },
+        {
+          "type": "fixed_point_pattern",
           "named": true
         },
         {
@@ -1101,6 +1117,10 @@
             "named": true
           },
           {
+            "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
             "type": "gt",
             "named": true
           },
@@ -1302,6 +1322,10 @@
           },
           {
             "type": "eval",
+            "named": true
+          },
+          {
+            "type": "fixed_point_pattern",
             "named": true
           },
           {
@@ -1514,6 +1538,10 @@
             "named": true
           },
           {
+            "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
             "type": "gt",
             "named": true
           },
@@ -1720,6 +1748,10 @@
             "named": true
           },
           {
+            "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
             "type": "gt",
             "named": true
           },
@@ -1923,6 +1955,10 @@
           },
           {
             "type": "eval",
+            "named": true
+          },
+          {
+            "type": "fixed_point_pattern",
             "named": true
           },
           {
@@ -2249,6 +2285,10 @@
           "named": true
         },
         {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -2449,6 +2489,10 @@
         },
         {
           "type": "eval",
+          "named": true
+        },
+        {
+          "type": "fixed_point_pattern",
           "named": true
         },
         {
@@ -2783,6 +2827,10 @@
           "named": true
         },
         {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -2986,6 +3034,10 @@
           "named": true
         },
         {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -3186,6 +3238,10 @@
         },
         {
           "type": "eval",
+          "named": true
+        },
+        {
+          "type": "fixed_point_pattern",
           "named": true
         },
         {
@@ -3397,6 +3453,10 @@
           "named": true
         },
         {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -3543,6 +3603,222 @@
     }
   },
   {
+    "type": "fixed_point_pattern",
+    "named": true,
+    "fields": {
+      "scale": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "(",
+            "named": false
+          },
+          {
+            "type": ")",
+            "named": false
+          },
+          {
+            "type": "_literal",
+            "named": true
+          },
+          {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
+            "type": "add",
+            "named": true
+          },
+          {
+            "type": "agent_block",
+            "named": true
+          },
+          {
+            "type": "and",
+            "named": true
+          },
+          {
+            "type": "block",
+            "named": true
+          },
+          {
+            "type": "bundle",
+            "named": true
+          },
+          {
+            "type": "choice",
+            "named": true
+          },
+          {
+            "type": "collection",
+            "named": true
+          },
+          {
+            "type": "concat",
+            "named": true
+          },
+          {
+            "type": "conjunction",
+            "named": true
+          },
+          {
+            "type": "contract",
+            "named": true
+          },
+          {
+            "type": "diff",
+            "named": true
+          },
+          {
+            "type": "disjunction",
+            "named": true
+          },
+          {
+            "type": "div",
+            "named": true
+          },
+          {
+            "type": "eq",
+            "named": true
+          },
+          {
+            "type": "eval",
+            "named": true
+          },
+          {
+            "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
+            "type": "gt",
+            "named": true
+          },
+          {
+            "type": "gte",
+            "named": true
+          },
+          {
+            "type": "ifElse",
+            "named": true
+          },
+          {
+            "type": "input",
+            "named": true
+          },
+          {
+            "type": "interpolation",
+            "named": true
+          },
+          {
+            "type": "let",
+            "named": true
+          },
+          {
+            "type": "lt",
+            "named": true
+          },
+          {
+            "type": "lte",
+            "named": true
+          },
+          {
+            "type": "match",
+            "named": true
+          },
+          {
+            "type": "matches",
+            "named": true
+          },
+          {
+            "type": "method",
+            "named": true
+          },
+          {
+            "type": "mod",
+            "named": true
+          },
+          {
+            "type": "mult",
+            "named": true
+          },
+          {
+            "type": "neg",
+            "named": true
+          },
+          {
+            "type": "negation",
+            "named": true
+          },
+          {
+            "type": "neq",
+            "named": true
+          },
+          {
+            "type": "new",
+            "named": true
+          },
+          {
+            "type": "nil",
+            "named": true
+          },
+          {
+            "type": "not",
+            "named": true
+          },
+          {
+            "type": "or",
+            "named": true
+          },
+          {
+            "type": "par",
+            "named": true
+          },
+          {
+            "type": "send",
+            "named": true
+          },
+          {
+            "type": "send_method",
+            "named": true
+          },
+          {
+            "type": "send_sync",
+            "named": true
+          },
+          {
+            "type": "signed_term",
+            "named": true
+          },
+          {
+            "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "sub",
+            "named": true
+          },
+          {
+            "type": "token_stack",
+            "named": true
+          },
+          {
+            "type": "try_block",
+            "named": true
+          },
+          {
+            "type": "unit",
+            "named": true
+          },
+          {
+            "type": "var_ref",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "ground_sig",
     "named": true,
     "fields": {
@@ -3632,6 +3908,10 @@
         },
         {
           "type": "eval",
+          "named": true
+        },
+        {
+          "type": "fixed_point_pattern",
           "named": true
         },
         {
@@ -3838,6 +4118,10 @@
           "named": true
         },
         {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -3993,6 +4277,10 @@
             "named": true
           },
           {
+            "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
             "type": "nil",
             "named": true
           },
@@ -4090,6 +4378,10 @@
           },
           {
             "type": "eval",
+            "named": true
+          },
+          {
+            "type": "fixed_point_pattern",
             "named": true
           },
           {
@@ -4299,6 +4591,10 @@
             "named": true
           },
           {
+            "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
             "type": "gt",
             "named": true
           },
@@ -4502,6 +4798,10 @@
           },
           {
             "type": "eval",
+            "named": true
+          },
+          {
+            "type": "fixed_point_pattern",
             "named": true
           },
           {
@@ -4739,6 +5039,10 @@
           "named": true
         },
         {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -4939,6 +5243,10 @@
         },
         {
           "type": "eval",
+          "named": true
+        },
+        {
+          "type": "fixed_point_pattern",
           "named": true
         },
         {
@@ -5153,6 +5461,10 @@
             "named": true
           },
           {
+            "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
             "type": "gt",
             "named": true
           },
@@ -5356,6 +5668,10 @@
           },
           {
             "type": "eval",
+            "named": true
+          },
+          {
+            "type": "fixed_point_pattern",
             "named": true
           },
           {
@@ -5581,6 +5897,10 @@
             "named": true
           },
           {
+            "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
             "type": "gt",
             "named": true
           },
@@ -5782,6 +6102,10 @@
         },
         {
           "type": "eval",
+          "named": true
+        },
+        {
+          "type": "fixed_point_pattern",
           "named": true
         },
         {
@@ -6044,6 +6368,10 @@
           "named": true
         },
         {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -6247,6 +6575,10 @@
           "named": true
         },
         {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -6447,6 +6779,10 @@
         },
         {
           "type": "eval",
+          "named": true
+        },
+        {
+          "type": "fixed_point_pattern",
           "named": true
         },
         {
@@ -6681,6 +7017,10 @@
             "named": true
           },
           {
+            "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
             "type": "gt",
             "named": true
           },
@@ -6834,6 +7174,10 @@
         },
         {
           "type": "eval",
+          "named": true
+        },
+        {
+          "type": "fixed_point_pattern",
           "named": true
         },
         {
@@ -7037,6 +7381,10 @@
         },
         {
           "type": "eval",
+          "named": true
+        },
+        {
+          "type": "fixed_point_pattern",
           "named": true
         },
         {
@@ -7268,6 +7616,10 @@
           },
           {
             "type": "eval",
+            "named": true
+          },
+          {
+            "type": "fixed_point_pattern",
             "named": true
           },
           {
@@ -7521,6 +7873,10 @@
           "named": true
         },
         {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -7721,6 +8077,10 @@
         },
         {
           "type": "eval",
+          "named": true
+        },
+        {
+          "type": "fixed_point_pattern",
           "named": true
         },
         {
@@ -7998,6 +8358,10 @@
           "named": true
         },
         {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -8201,6 +8565,10 @@
           "named": true
         },
         {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -8401,6 +8769,10 @@
         },
         {
           "type": "eval",
+          "named": true
+        },
+        {
+          "type": "fixed_point_pattern",
           "named": true
         },
         {
@@ -8625,6 +8997,10 @@
             "named": true
           },
           {
+            "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
             "type": "gt",
             "named": true
           },
@@ -8826,6 +9202,10 @@
         },
         {
           "type": "eval",
+          "named": true
+        },
+        {
+          "type": "fixed_point_pattern",
           "named": true
         },
         {
@@ -9032,6 +9412,10 @@
           "named": true
         },
         {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -9235,6 +9619,10 @@
           "named": true
         },
         {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -9435,6 +9823,10 @@
         },
         {
           "type": "eval",
+          "named": true
+        },
+        {
+          "type": "fixed_point_pattern",
           "named": true
         },
         {
@@ -9649,6 +10041,10 @@
         },
         {
           "type": "eval",
+          "named": true
+        },
+        {
+          "type": "fixed_point_pattern",
           "named": true
         },
         {
@@ -9885,6 +10281,10 @@
           "named": true
         },
         {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -10085,6 +10485,10 @@
         },
         {
           "type": "eval",
+          "named": true
+        },
+        {
+          "type": "fixed_point_pattern",
           "named": true
         },
         {
@@ -10296,6 +10700,10 @@
           },
           {
             "type": "eval",
+            "named": true
+          },
+          {
+            "type": "fixed_point_pattern",
             "named": true
           },
           {
@@ -10805,6 +11213,10 @@
           "named": true
         },
         {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -11079,6 +11491,10 @@
             "named": true
           },
           {
+            "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
             "type": "gt",
             "named": true
           },
@@ -11288,6 +11704,10 @@
           },
           {
             "type": "eval",
+            "named": true
+          },
+          {
+            "type": "fixed_point_pattern",
             "named": true
           },
           {
@@ -11530,6 +11950,10 @@
           "named": true
         },
         {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -11753,6 +12177,10 @@
         },
         {
           "type": "eval",
+          "named": true
+        },
+        {
+          "type": "fixed_point_pattern",
           "named": true
         },
         {
@@ -12106,6 +12534,10 @@
           "named": true
         },
         {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -12421,6 +12853,14 @@
     "named": false
   },
   {
+    "type": "BigInt",
+    "named": false
+  },
+  {
+    "type": "BigRat",
+    "named": false
+  },
+  {
     "type": "Bool",
     "named": false
   },
@@ -12429,7 +12869,27 @@
     "named": false
   },
   {
+    "type": "FixedPoint",
+    "named": false
+  },
+  {
+    "type": "Float32",
+    "named": false
+  },
+  {
+    "type": "Float64",
+    "named": false
+  },
+  {
     "type": "Int",
+    "named": false
+  },
+  {
+    "type": "Int32",
+    "named": false
+  },
+  {
+    "type": "Int64",
     "named": false
   },
   {
@@ -12438,6 +12898,22 @@
   },
   {
     "type": "String",
+    "named": false
+  },
+  {
+    "type": "UInt16",
+    "named": false
+  },
+  {
+    "type": "UInt32",
+    "named": false
+  },
+  {
+    "type": "UInt64",
+    "named": false
+  },
+  {
+    "type": "UInt8",
     "named": false
   },
   {

@@ -200,7 +200,8 @@ impl<'a, 'ast> TypeValidator<'a, 'ast> {
             | Proc::BigRatLiteral(_)
             | Proc::FloatLiteral { .. }
             | Proc::FixedPointLiteral { .. }
-            | Proc::SimpleType(_) => Ok(MessageType::Ground),
+            | Proc::SimpleType(_)
+            | Proc::FixedPointPattern { .. } => Ok(MessageType::Ground),
 
             // Collections
             Proc::Collection(col) => match col {
