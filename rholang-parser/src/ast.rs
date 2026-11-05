@@ -132,6 +132,8 @@ pub enum Proc<'ast> {
     SignedTerm {
         proc: AnnProc<'ast>,
         sig: Signature<'ast>,
+        /// The declared per-firing phlo limit `; n`, if any (Decision 127).
+        limit: Option<u64>,
     },
     /// Token stack `() | s :: S` (Greg `app:concrete` `Stk`): a bare stack is
     /// directly a signed process — there is no `purse(...)` wrapper. Located /

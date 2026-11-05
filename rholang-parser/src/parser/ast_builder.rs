@@ -415,7 +415,16 @@ impl<'ast> ASTBuilder<'ast> {
     }
 
     pub fn alloc_signed_term(&self, proc: AnnProc<'ast>, sig: Signature<'ast>) -> &Proc<'ast> {
-        self.arena.alloc(Proc::SignedTerm { proc, sig })
+        self.alloc_signed_term_with_limit(proc, sig, None)
+    }
+
+    pub fn alloc_signed_term_with_limit(
+        &self,
+        proc: AnnProc<'ast>,
+        sig: Signature<'ast>,
+        limit: Option<u64>,
+    ) -> &Proc<'ast> {
+        self.arena.alloc(Proc::SignedTerm { proc, sig, limit })
     }
 
     pub fn alloc_token_stack(&self, stack: TokenStack<'ast>) -> &Proc<'ast> {

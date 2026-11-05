@@ -241,3 +241,32 @@ for( x <- a ) {% @"r"!(1) %}
         (send_single)
         (inputs
           (long_literal))))))
+
+==================
+Signed term with a declared per-firing limit
+==================
+
+{% for (_ <- x) { Nil } %}[ a -o b ; 5000 ]
+
+---
+
+(source_file
+  (signed_term
+    (input
+      (receipts
+        (receipt
+          (linear_bind
+            (names
+              (wildcard))
+            (simple_source
+              (var)))))
+      (block
+        (nil)))
+    (signature
+      (transfer_sig
+        (ground_sig
+          (var))
+        (signature
+          (ground_sig
+            (var)))))
+    (long_literal)))

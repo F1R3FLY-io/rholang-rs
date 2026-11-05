@@ -357,7 +357,7 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
         }
 
         // -- cost-accounted Rholang --
-        SignedTerm { proc, sig } => {
+        SignedTerm { proc, sig, .. } => {
             let this_pid = db[this];
             resolve_rec(db, stack, proc);
             resolve_signature(sig, this_pid, db, stack);

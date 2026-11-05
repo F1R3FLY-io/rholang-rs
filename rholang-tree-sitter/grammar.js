@@ -252,10 +252,13 @@ module.exports = grammar({
         // concrete ASCII delimiters here are a collision-safe rendering (bare
         // {P}_s collides with `block`; bare s:S with `map` key:value).
 
-        // Signed term {P}_s (worktree `Wrap`).
+        // Signed term {P}_s (worktree `Wrap`). An optional `; n` after the
+        // signature declares the seal's per-firing phlo limit (Decision 127).
         signed_term: $ => prec(2, seq(
             '{%', field('proc', $._proc), '%}',
-            '[', field('sig', $.signature), ']'
+            '[', field('sig', $.signature),
+            optional(seq(';', field('limit', $.long_literal))),
+            ']'
         )),
 
         // Token stack S ::= () | s :: S  (worktree `SNil`/`SCons`; Greg app:concrete

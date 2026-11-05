@@ -150,7 +150,7 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
                 self.push_name(name);
             }
 
-            Proc::SignedTerm { proc, sig } => {
+            Proc::SignedTerm { proc, sig, .. } => {
                 let mut sig_procs: SmallVec<[&AnnProc; 4]> = SmallVec::new();
                 signature_proc_children(sig, &mut sig_procs);
                 self.remember(sig_procs.iter().copied());
@@ -421,7 +421,7 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
                 }
             },
 
-            Proc::SignedTerm { proc, sig } => {
+            Proc::SignedTerm { proc, sig, .. } => {
                 let mut sig_procs: SmallVec<[&AnnProc; 4]> = SmallVec::new();
                 signature_proc_children(sig, &mut sig_procs);
                 self.push_children(iter::once(proc).chain(sig_procs.iter().copied()));

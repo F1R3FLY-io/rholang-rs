@@ -447,6 +447,21 @@ pub(super) fn node_to_ast<'ast>(
                 kind!("signed_term") => {
                     let proc_node = get_field(&node, field!("proc"));
                     let sig_node = get_field(&node, field!("sig"));
+                    let limit = match node.child_by_field_name("limit") {
+                        None => None,
+                        Some(limit_node) => {
+                            match get_node_value(&limit_node, source).parse::<u64>() {
+                                Ok(limit) => Some(limit),
+                                Err(_) => {
+                                    errors.push(AnnParsingError::new(
+                                        ParsingError::NumberOutOfRange,
+                                        &limit_node,
+                                    ));
+                                    None
+                                }
+                            }
+                        }
+                    };
 
                     let mut ops: SmallVec<[SigOp; 4]> = SmallVec::new();
                     let mut sig_procs: Vec<tree_sitter::Node> = Vec::new();
@@ -459,6 +474,7 @@ pub(super) fn node_to_ast<'ast>(
                     cont_stack.push(K::ConsumeSignedTerm {
                         ops,
                         sig_arity,
+                        limit,
                         span,
                     });
                     for n in sig_procs.iter().rev() {
@@ -1496,11 +1512,14 @@ fn apply_cont<'tree, 'ast>(
                         K::ConsumeSignedTerm {
                             ops,
                             sig_arity,
+                            limit,
                             span,
                         } => proc_stack.replace_top_slice(sig_arity + 1, |slice| {
                             let body = slice[0];
                             let sig = rebuild_signature(&ops, &slice[1..]);
-                            ast_builder.alloc_signed_term(body, sig).ann(span)
+                            ast_builder
+                                .alloc_signed_term_with_limit(body, sig, limit)
+                                .ann(span)
                         }),
                         K::ConsumeTokenStack {
                             all_ops,
@@ -1773,6 +1792,7 @@ enum K<'tree, 'ast> {
     ConsumeSignedTerm {
         ops: SmallVec<[SigOp; 4]>,
         sig_arity: usize,
+        limit: Option<u64>,
         span: SourceSpan,
     },
     // `layer_descs[i] = (op_start, op_len, proc_count)` slices `all_ops` and the
@@ -1912,11 +1932,13 @@ impl Debug for K<'_, '_> {
             Self::ConsumeSignedTerm {
                 ops,
                 sig_arity,
+                limit,
                 span,
             } => f
                 .debug_struct("ConsumeSignedTerm")
                 .field("ops", ops)
                 .field("sig_arity", sig_arity)
+                .field("limit", limit)
                 .field("span", span)
                 .finish(),
             Self::ConsumeTokenStack {
@@ -3236,7 +3258,9 @@ fn collect_ids_into<'ast>(root: AnnProc<'ast>, out: &mut BTreeSet<&'ast str>) {
             // Cost-accounted forms: walk the embedded process and
             // every funding signature so hygiene sees identifiers
             // inside `{% P %}[s]` terms and token stacks.
-            Proc::SignedTerm { proc: inner, sig } => {
+            Proc::SignedTerm {
+                proc: inner, sig, ..
+            } => {
                 stack.push(*inner);
                 collect_from_signature(sig, out, &mut stack);
             }

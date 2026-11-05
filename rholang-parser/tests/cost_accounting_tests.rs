@@ -34,7 +34,7 @@ fn signed_term_atomic_ground() {
     let parser = RholangParser::new();
     let proc = parse_one(&parser, "{% Nil %}[ s ]");
     match proc.proc {
-        Proc::SignedTerm { proc, sig } => {
+        Proc::SignedTerm { proc, sig, .. } => {
             assert!(matches!(proc.proc, Proc::Nil), "body should be Nil");
             assert_ground(sig, "s");
         }
@@ -200,7 +200,9 @@ fn nested_signed_term() {
     let parser = RholangParser::new();
     let proc = parse_one(&parser, "{% {% Nil %}[ a ] %}[ b ]");
     match proc.proc {
-        Proc::SignedTerm { proc: inner, sig } => {
+        Proc::SignedTerm {
+            proc: inner, sig, ..
+        } => {
             assert_ground(sig, "b");
             match inner.proc {
                 Proc::SignedTerm { sig: inner_sig, .. } => assert_ground(inner_sig, "a"),
@@ -312,4 +314,92 @@ fn ordinary_rholang_with_joins_still_parses() {
     let parser = RholangParser::new();
     let proc = parse_one(&parser, "for(x <- a & y <- b){ *x | *y }");
     assert!(matches!(proc.proc, Proc::ForComprehension { .. }));
+}
+
+fn signed_limit<'a>(proc: &rholang_parser::ast::AnnProc<'a>) -> Option<u64> {
+    match proc.proc {
+        Proc::SignedTerm { limit, .. } => *limit,
+        other => panic!("expected SignedTerm, got {other:?}"),
+    }
+}
+
+#[test]
+fn signed_term_without_a_limit_has_none() {
+    let parser = RholangParser::new();
+    assert_eq!(signed_limit(&parse_one(&parser, "{% Nil %}[ s ]")), None);
+}
+
+#[test]
+fn signed_term_declares_its_per_firing_limit() {
+    // Decision 127: `{% P %}[ s ; n ]` declares the seal's per-firing phlo limit.
+    let parser = RholangParser::new();
+    let proc = parse_one(&parser, "{% for (_ <- x) { Nil } %}[ s ; 5000 ]");
+    assert_eq!(signed_limit(&proc), Some(5000));
+    match proc.proc {
+        Proc::SignedTerm {
+            proc: body, sig, ..
+        } => {
+            assert_ground(sig, "s");
+            assert!(matches!(body.proc, Proc::ForComprehension { .. }));
+        }
+        other => panic!("expected SignedTerm, got {other:?}"),
+    }
+}
+
+#[test]
+fn the_limit_follows_every_signature_form() {
+    let parser = RholangParser::new();
+    for (src, expected) in [
+        ("{% Nil %}[ a (*) b ; 7 ]", 7),
+        ("{% Nil %}[ # x ; 8 ]", 8),
+        ("{% for (_ <- x) { Nil } %}[ a -o b ; 9 ]", 9),
+        ("{% Nil %}[s;0]", 0),
+        ("{% Nil %}[ s ; 18446744073709551615 ]", u64::MAX),
+    ] {
+        assert_eq!(
+            signed_limit(&parse_one(&parser, src)),
+            Some(expected),
+            "{src}"
+        );
+    }
+}
+
+#[test]
+fn a_nested_signed_term_keeps_its_own_limit() {
+    let parser = RholangParser::new();
+    let proc = parse_one(&parser, "{% {% Nil %}[ b ; 2 ] %}[ a ; 1 ]");
+    assert_eq!(signed_limit(&proc), Some(1));
+    match proc.proc {
+        Proc::SignedTerm { proc: inner, .. } => assert_eq!(signed_limit(inner), Some(2)),
+        other => panic!("expected SignedTerm, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_limit_that_is_not_a_u64_is_rejected() {
+    let parser = RholangParser::new();
+    for src in [
+        "{% Nil %}[ s ; -1 ]",
+        "{% Nil %}[ s ; 18446744073709551616 ]",
+        "{% Nil %}[ s ; x ]",
+        "{% Nil %}[ s ; ]",
+        "{% Nil %}[ ; 5 ]",
+        "{% Nil %}[ s ; 1 ; 2 ]",
+    ] {
+        assert!(
+            matches!(parser.parse(src), Validated::Fail(_)),
+            "`{src}` should fail to parse"
+        );
+    }
+}
+
+#[test]
+fn a_limit_is_not_allowed_on_a_signed_bind_or_a_stack() {
+    let parser = RholangParser::new();
+    for src in ["for ({% y <- x %}[ s ; 5 ]) { Nil }", "s ; 5 :: ()"] {
+        assert!(
+            matches!(parser.parse(src), Validated::Fail(_)),
+            "`{src}` should fail to parse"
+        );
+    }
 }
