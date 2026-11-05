@@ -265,7 +265,10 @@ impl<'a, 'ast> TypeValidator<'a, 'ast> {
             | Proc::Eval { .. }
             | Proc::Method { .. }
             | Proc::UnaryExp { .. }
-            | Proc::BinaryExp { .. } => Ok(MessageType::Unknown),
+            | Proc::BinaryExp { .. }
+            | Proc::Lambda { .. }
+            | Proc::App { .. }
+            | Proc::Pi { .. } => Ok(MessageType::Unknown),
 
             // Invalid patterns
             Proc::IfThenElse { .. } | Proc::Select { .. } | Proc::SendSync { .. } => {

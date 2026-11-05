@@ -18,6 +18,17 @@ module.exports = grammar({
 
     inline: $ => [$.name],
 
+    conflicts: $ => [
+        // `(x)` — parenthesized proc_var vs bare lambda_param (no type
+        // annotation). `prec.dynamic` on lambda_param biases GLR toward
+        // lambda when the enclosing `=>` completes the parse; otherwise
+        // the parenthesized interpretation wins.
+        [$.lambda_param, $._proc_var],
+        // `(x: A)` — lambda_param vs pi_param. GLR picks based on the
+        // outer rule's arrow: lambda uses `=>`, Pi uses `->`.
+        [$.lambda_param, $.pi_param],
+    ],
+
     reserved: {
         global: $ => [
             "new",
@@ -243,6 +254,7 @@ module.exports = grammar({
             $._parenthesized,
             $.add,
             $.and,
+            $.app,
             $.concat,
             $.conjunction,
             $.diff,
@@ -253,6 +265,7 @@ module.exports = grammar({
             $.gt,
             $.gte,
             $.interpolation,
+            $.lambda,
             $.lt,
             $.lte,
             $.matches,
@@ -264,6 +277,7 @@ module.exports = grammar({
             $.neq,
             $.not,
             $.or,
+            $.pi,
             $.sub,
             $.var_ref
         ),
@@ -297,6 +311,99 @@ module.exports = grammar({
             field('args', alias($._proc_list, $.args)))
         ),
         eval: $ => prec(12, seq('*', $.name)),
+
+        // Calculus of Constructions (Phase 1c): lambda abstraction.
+        //
+        // Surface: `(x_0, …, x_{n-1}) => body` or `() => body`.
+        // `prec.dynamic(100, ...)` to bias GLR toward the lambda parse
+        // in the ambiguous `match m { (x) => body }` position (where
+        // `(x)` could be a parenthesized pattern or lambda params). In
+        // practice the user writes match cases with simpler patterns,
+        // and the dynamic bias matches their likely intent. The
+        // `conflicts` declaration lets tree-sitter emit the GLR states.
+        lambda: $ => prec.dynamic(100, prec.right(1, seq(
+            '(',
+            optional(field('params', $.lambda_params)),
+            ')',
+            '=>',
+            field('body', $._proc)
+        ))),
+
+        // Named rule so tree-sitter keeps the var children addressable
+        // under the params node (alias would collapse single-element seqs).
+        lambda_params: $ => commaSep1($.lambda_param),
+
+        // Calculus of Constructions (Phase 2b): lambda param with optional
+        // type annotation `x: A`. Bare `x` is syntactic sugar for `x: _`
+        // (type inference placeholder — not yet implemented). The parser
+        // threads annotations through; the Phase 2c typechecker reads them.
+        // `prec.dynamic` biases the GLR parser toward lambda_param when
+        // `(x)` or `(x: T)` is ambiguous with alternatives (contract
+        // formals, map key-value, parenthesized var), but only when the
+        // enclosing lambda rule's `=>` completes the parse — otherwise
+        // the alternative wins via normal conflict resolution.
+        lambda_param: $ => prec.dynamic(100, seq(
+            field('name', $.var),
+            optional(seq(':', field('type', $._proc)))
+        )),
+
+        // Calculus of Constructions (Phase 2a): dependent function type.
+        //
+        // Surface forms:
+        //   `(x: A, y: B) -> C`  — dependent, codomain can reference the
+        //                           binders via their surface names
+        //   `A -> B`              — non-dependent sugar (no binder names)
+        //
+        // `->` is reserved for Pi types; lambda uses `=>`. The dependent
+        // form starts with `(` and a typed-param list; the sugar form
+        // starts with any expression and `->`.
+        pi: $ => prec.right(1, choice(
+            seq(
+                '(',
+                field('params', $.pi_params),
+                ')',
+                '->',
+                field('codomain', $._proc)
+            ),
+            seq(
+                field('dom', $._proc_expression),
+                '->',
+                field('codomain', $._proc)
+            )
+        )),
+
+        pi_params: $ => commaSep1($.pi_param),
+        pi_param: $ => seq(field('name', $.var), ':', field('type', $._proc)),
+
+        // Calculus of Constructions (Phase 1c): function application with
+        // paren-delimited args. Postfix `fun(args)`, whitespace-tolerant.
+        //
+        // `fun` is restricted to callable forms — a lambda, a
+        // parenthesized expression, a var, an eval, or a chained
+        // app/method — rather than the full `_proc_expression`. The
+        // restriction keeps literals (string, int, …) out of the `fun`
+        // slot, which in turn prevents `@"name"(formals)` from parsing
+        // as `quote(app("name", formals))` and stealing the formals of
+        // the surrounding `contract`.
+        app: $ => prec(11, seq(
+            field('fun', choice(
+                $._parenthesized,
+                $._proc_var,
+                $.eval,
+                $.method,
+                $.app
+            )),
+            token.immediate('('),
+            optional(field('args', $.app_args)),
+            ')'
+        )),
+
+        // Named rule so tree-sitter keeps a field with a stable kind under
+        // single-arg applications (alias would collapse the single-element
+        // seq). Empty-arg application has no field (tree-sitter disallows
+        // rules matching the empty string); parsing.rs handles the missing
+        // field case as zero arity.
+        app_args: $ => prec(20, commaSep1($._proc)),
         var_ref: $ => prec(13, seq(field('kind', $.var_ref_kind), field('var', $.var))),
         var_ref_kind: $ => choice('=', '=*'),
         disjunction: $ => prec.left(13, seq($._proc, '\\/', $._proc)),
@@ -436,7 +543,8 @@ module.exports = grammar({
             'BigRat',
             'String',
             'Uri',
-            'ByteArray'),
+            'ByteArray',
+            'Type'),
 
         // FixedPoint type pattern: bare `FixedPoint` matches any scale;
         // `FixedPoint(<pat>)` matches by pattern against the scale. The

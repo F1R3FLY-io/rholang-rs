@@ -160,6 +160,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -232,6 +236,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -293,6 +301,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -427,6 +439,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -499,6 +515,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -560,6 +580,395 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
+          "named": true
+        },
+        {
+          "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
+          "named": true
+        },
+        {
+          "type": "send_sync",
+          "named": true
+        },
+        {
+          "type": "simple_type",
+          "named": true
+        },
+        {
+          "type": "sub",
+          "named": true
+        },
+        {
+          "type": "try_block",
+          "named": true
+        },
+        {
+          "type": "unit",
+          "named": true
+        },
+        {
+          "type": "var_ref",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "app",
+    "named": true,
+    "fields": {
+      "args": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "app_args",
+            "named": true
+          }
+        ]
+      },
+      "fun": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "(",
+            "named": false
+          },
+          {
+            "type": ")",
+            "named": false
+          },
+          {
+            "type": "_literal",
+            "named": true
+          },
+          {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
+            "type": "add",
+            "named": true
+          },
+          {
+            "type": "and",
+            "named": true
+          },
+          {
+            "type": "app",
+            "named": true
+          },
+          {
+            "type": "block",
+            "named": true
+          },
+          {
+            "type": "collection",
+            "named": true
+          },
+          {
+            "type": "concat",
+            "named": true
+          },
+          {
+            "type": "conjunction",
+            "named": true
+          },
+          {
+            "type": "diff",
+            "named": true
+          },
+          {
+            "type": "disjunction",
+            "named": true
+          },
+          {
+            "type": "div",
+            "named": true
+          },
+          {
+            "type": "eq",
+            "named": true
+          },
+          {
+            "type": "eval",
+            "named": true
+          },
+          {
+            "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
+            "type": "gt",
+            "named": true
+          },
+          {
+            "type": "gte",
+            "named": true
+          },
+          {
+            "type": "interpolation",
+            "named": true
+          },
+          {
+            "type": "lambda",
+            "named": true
+          },
+          {
+            "type": "lt",
+            "named": true
+          },
+          {
+            "type": "lte",
+            "named": true
+          },
+          {
+            "type": "matches",
+            "named": true
+          },
+          {
+            "type": "method",
+            "named": true
+          },
+          {
+            "type": "mod",
+            "named": true
+          },
+          {
+            "type": "mult",
+            "named": true
+          },
+          {
+            "type": "neg",
+            "named": true
+          },
+          {
+            "type": "negation",
+            "named": true
+          },
+          {
+            "type": "neq",
+            "named": true
+          },
+          {
+            "type": "nil",
+            "named": true
+          },
+          {
+            "type": "not",
+            "named": true
+          },
+          {
+            "type": "or",
+            "named": true
+          },
+          {
+            "type": "pi",
+            "named": true
+          },
+          {
+            "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "sub",
+            "named": true
+          },
+          {
+            "type": "unit",
+            "named": true
+          },
+          {
+            "type": "var_ref",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "app_args",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "_literal",
+          "named": true
+        },
+        {
+          "type": "_proc_var",
+          "named": true
+        },
+        {
+          "type": "add",
+          "named": true
+        },
+        {
+          "type": "agent_block",
+          "named": true
+        },
+        {
+          "type": "and",
+          "named": true
+        },
+        {
+          "type": "app",
+          "named": true
+        },
+        {
+          "type": "block",
+          "named": true
+        },
+        {
+          "type": "bundle",
+          "named": true
+        },
+        {
+          "type": "choice",
+          "named": true
+        },
+        {
+          "type": "collection",
+          "named": true
+        },
+        {
+          "type": "concat",
+          "named": true
+        },
+        {
+          "type": "conjunction",
+          "named": true
+        },
+        {
+          "type": "contract",
+          "named": true
+        },
+        {
+          "type": "diff",
+          "named": true
+        },
+        {
+          "type": "disjunction",
+          "named": true
+        },
+        {
+          "type": "div",
+          "named": true
+        },
+        {
+          "type": "eq",
+          "named": true
+        },
+        {
+          "type": "eval",
+          "named": true
+        },
+        {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "gt",
+          "named": true
+        },
+        {
+          "type": "gte",
+          "named": true
+        },
+        {
+          "type": "ifElse",
+          "named": true
+        },
+        {
+          "type": "input",
+          "named": true
+        },
+        {
+          "type": "interpolation",
+          "named": true
+        },
+        {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "let",
+          "named": true
+        },
+        {
+          "type": "lt",
+          "named": true
+        },
+        {
+          "type": "lte",
+          "named": true
+        },
+        {
+          "type": "match",
+          "named": true
+        },
+        {
+          "type": "matches",
+          "named": true
+        },
+        {
+          "type": "method",
+          "named": true
+        },
+        {
+          "type": "mod",
+          "named": true
+        },
+        {
+          "type": "mult",
+          "named": true
+        },
+        {
+          "type": "neg",
+          "named": true
+        },
+        {
+          "type": "negation",
+          "named": true
+        },
+        {
+          "type": "neq",
+          "named": true
+        },
+        {
+          "type": "new",
+          "named": true
+        },
+        {
+          "type": "nil",
+          "named": true
+        },
+        {
+          "type": "not",
+          "named": true
+        },
+        {
+          "type": "or",
+          "named": true
+        },
+        {
+          "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -626,6 +1035,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -698,6 +1111,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -759,6 +1176,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -825,6 +1246,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -897,6 +1322,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -958,6 +1387,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -1037,6 +1470,10 @@
             "named": true
           },
           {
+            "type": "app",
+            "named": true
+          },
+          {
             "type": "block",
             "named": true
           },
@@ -1109,6 +1546,10 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
             "type": "let",
             "named": true
           },
@@ -1170,6 +1611,10 @@
           },
           {
             "type": "par",
+            "named": true
+          },
+          {
+            "type": "pi",
             "named": true
           },
           {
@@ -1249,6 +1694,10 @@
             "named": true
           },
           {
+            "type": "app",
+            "named": true
+          },
+          {
             "type": "block",
             "named": true
           },
@@ -1301,6 +1750,10 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
             "type": "lt",
             "named": true
           },
@@ -1346,6 +1799,10 @@
           },
           {
             "type": "or",
+            "named": true
+          },
+          {
+            "type": "pi",
             "named": true
           },
           {
@@ -1450,6 +1907,10 @@
             "named": true
           },
           {
+            "type": "app",
+            "named": true
+          },
+          {
             "type": "block",
             "named": true
           },
@@ -1522,6 +1983,10 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
             "type": "let",
             "named": true
           },
@@ -1583,6 +2048,10 @@
           },
           {
             "type": "par",
+            "named": true
+          },
+          {
+            "type": "pi",
             "named": true
           },
           {
@@ -1652,6 +2121,10 @@
             "named": true
           },
           {
+            "type": "app",
+            "named": true
+          },
+          {
             "type": "block",
             "named": true
           },
@@ -1724,6 +2197,10 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
             "type": "let",
             "named": true
           },
@@ -1785,6 +2262,10 @@
           },
           {
             "type": "par",
+            "named": true
+          },
+          {
+            "type": "pi",
             "named": true
           },
           {
@@ -1854,6 +2335,10 @@
             "named": true
           },
           {
+            "type": "app",
+            "named": true
+          },
+          {
             "type": "block",
             "named": true
           },
@@ -1926,6 +2411,10 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
             "type": "let",
             "named": true
           },
@@ -1987,6 +2476,10 @@
           },
           {
             "type": "par",
+            "named": true
+          },
+          {
+            "type": "pi",
             "named": true
           },
           {
@@ -2135,6 +2628,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -2207,6 +2704,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -2268,6 +2769,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -2334,6 +2839,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -2406,6 +2915,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -2467,6 +2980,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -2661,6 +3178,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -2733,6 +3254,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -2794,6 +3319,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -2860,6 +3389,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -2932,6 +3465,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -2993,6 +3530,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -3059,6 +3600,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -3131,6 +3676,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -3192,6 +3741,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -3263,6 +3816,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -3335,6 +3892,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -3396,6 +3957,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -3489,6 +4054,10 @@
             "named": true
           },
           {
+            "type": "app",
+            "named": true
+          },
+          {
             "type": "block",
             "named": true
           },
@@ -3561,6 +4130,10 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
             "type": "let",
             "named": true
           },
@@ -3622,6 +4195,10 @@
           },
           {
             "type": "par",
+            "named": true
+          },
+          {
+            "type": "pi",
             "named": true
           },
           {
@@ -3689,6 +4266,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -3761,6 +4342,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -3822,6 +4407,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -3888,6 +4477,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -3960,6 +4553,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -4021,6 +4618,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -4095,6 +4696,10 @@
             "named": true
           },
           {
+            "type": "app",
+            "named": true
+          },
+          {
             "type": "block",
             "named": true
           },
@@ -4167,6 +4772,10 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
             "type": "let",
             "named": true
           },
@@ -4228,6 +4837,10 @@
           },
           {
             "type": "par",
+            "named": true
+          },
+          {
+            "type": "pi",
             "named": true
           },
           {
@@ -4297,6 +4910,10 @@
             "named": true
           },
           {
+            "type": "app",
+            "named": true
+          },
+          {
             "type": "block",
             "named": true
           },
@@ -4369,6 +4986,10 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
             "type": "let",
             "named": true
           },
@@ -4430,6 +5051,10 @@
           },
           {
             "type": "par",
+            "named": true
+          },
+          {
+            "type": "pi",
             "named": true
           },
           {
@@ -4499,6 +5124,10 @@
             "named": true
           },
           {
+            "type": "app",
+            "named": true
+          },
+          {
             "type": "block",
             "named": true
           },
@@ -4571,6 +5200,10 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
             "type": "let",
             "named": true
           },
@@ -4632,6 +5265,10 @@
           },
           {
             "type": "par",
+            "named": true
+          },
+          {
+            "type": "pi",
             "named": true
           },
           {
@@ -4725,6 +5362,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -4797,6 +5438,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -4858,6 +5503,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -4924,6 +5573,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -4996,6 +5649,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -5057,6 +5714,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -5131,6 +5792,10 @@
             "named": true
           },
           {
+            "type": "app",
+            "named": true
+          },
+          {
             "type": "block",
             "named": true
           },
@@ -5203,6 +5868,10 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
             "type": "let",
             "named": true
           },
@@ -5264,6 +5933,10 @@
           },
           {
             "type": "par",
+            "named": true
+          },
+          {
+            "type": "pi",
             "named": true
           },
           {
@@ -5333,6 +6006,10 @@
             "named": true
           },
           {
+            "type": "app",
+            "named": true
+          },
+          {
             "type": "block",
             "named": true
           },
@@ -5405,6 +6082,10 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
             "type": "let",
             "named": true
           },
@@ -5469,6 +6150,10 @@
             "named": true
           },
           {
+            "type": "pi",
+            "named": true
+          },
+          {
             "type": "send",
             "named": true
           },
@@ -5502,6 +6187,481 @@
           }
         ]
       }
+    }
+  },
+  {
+    "type": "lambda",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "(",
+            "named": false
+          },
+          {
+            "type": ")",
+            "named": false
+          },
+          {
+            "type": "_literal",
+            "named": true
+          },
+          {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
+            "type": "add",
+            "named": true
+          },
+          {
+            "type": "agent_block",
+            "named": true
+          },
+          {
+            "type": "and",
+            "named": true
+          },
+          {
+            "type": "app",
+            "named": true
+          },
+          {
+            "type": "block",
+            "named": true
+          },
+          {
+            "type": "bundle",
+            "named": true
+          },
+          {
+            "type": "choice",
+            "named": true
+          },
+          {
+            "type": "collection",
+            "named": true
+          },
+          {
+            "type": "concat",
+            "named": true
+          },
+          {
+            "type": "conjunction",
+            "named": true
+          },
+          {
+            "type": "contract",
+            "named": true
+          },
+          {
+            "type": "diff",
+            "named": true
+          },
+          {
+            "type": "disjunction",
+            "named": true
+          },
+          {
+            "type": "div",
+            "named": true
+          },
+          {
+            "type": "eq",
+            "named": true
+          },
+          {
+            "type": "eval",
+            "named": true
+          },
+          {
+            "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
+            "type": "gt",
+            "named": true
+          },
+          {
+            "type": "gte",
+            "named": true
+          },
+          {
+            "type": "ifElse",
+            "named": true
+          },
+          {
+            "type": "input",
+            "named": true
+          },
+          {
+            "type": "interpolation",
+            "named": true
+          },
+          {
+            "type": "lambda",
+            "named": true
+          },
+          {
+            "type": "let",
+            "named": true
+          },
+          {
+            "type": "lt",
+            "named": true
+          },
+          {
+            "type": "lte",
+            "named": true
+          },
+          {
+            "type": "match",
+            "named": true
+          },
+          {
+            "type": "matches",
+            "named": true
+          },
+          {
+            "type": "method",
+            "named": true
+          },
+          {
+            "type": "mod",
+            "named": true
+          },
+          {
+            "type": "mult",
+            "named": true
+          },
+          {
+            "type": "neg",
+            "named": true
+          },
+          {
+            "type": "negation",
+            "named": true
+          },
+          {
+            "type": "neq",
+            "named": true
+          },
+          {
+            "type": "new",
+            "named": true
+          },
+          {
+            "type": "nil",
+            "named": true
+          },
+          {
+            "type": "not",
+            "named": true
+          },
+          {
+            "type": "or",
+            "named": true
+          },
+          {
+            "type": "par",
+            "named": true
+          },
+          {
+            "type": "pi",
+            "named": true
+          },
+          {
+            "type": "send",
+            "named": true
+          },
+          {
+            "type": "send_method",
+            "named": true
+          },
+          {
+            "type": "send_sync",
+            "named": true
+          },
+          {
+            "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "sub",
+            "named": true
+          },
+          {
+            "type": "try_block",
+            "named": true
+          },
+          {
+            "type": "unit",
+            "named": true
+          },
+          {
+            "type": "var_ref",
+            "named": true
+          }
+        ]
+      },
+      "params": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "lambda_params",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "lambda_param",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "var",
+            "named": true
+          }
+        ]
+      },
+      "type": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "(",
+            "named": false
+          },
+          {
+            "type": ")",
+            "named": false
+          },
+          {
+            "type": "_literal",
+            "named": true
+          },
+          {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
+            "type": "add",
+            "named": true
+          },
+          {
+            "type": "agent_block",
+            "named": true
+          },
+          {
+            "type": "and",
+            "named": true
+          },
+          {
+            "type": "app",
+            "named": true
+          },
+          {
+            "type": "block",
+            "named": true
+          },
+          {
+            "type": "bundle",
+            "named": true
+          },
+          {
+            "type": "choice",
+            "named": true
+          },
+          {
+            "type": "collection",
+            "named": true
+          },
+          {
+            "type": "concat",
+            "named": true
+          },
+          {
+            "type": "conjunction",
+            "named": true
+          },
+          {
+            "type": "contract",
+            "named": true
+          },
+          {
+            "type": "diff",
+            "named": true
+          },
+          {
+            "type": "disjunction",
+            "named": true
+          },
+          {
+            "type": "div",
+            "named": true
+          },
+          {
+            "type": "eq",
+            "named": true
+          },
+          {
+            "type": "eval",
+            "named": true
+          },
+          {
+            "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
+            "type": "gt",
+            "named": true
+          },
+          {
+            "type": "gte",
+            "named": true
+          },
+          {
+            "type": "ifElse",
+            "named": true
+          },
+          {
+            "type": "input",
+            "named": true
+          },
+          {
+            "type": "interpolation",
+            "named": true
+          },
+          {
+            "type": "lambda",
+            "named": true
+          },
+          {
+            "type": "let",
+            "named": true
+          },
+          {
+            "type": "lt",
+            "named": true
+          },
+          {
+            "type": "lte",
+            "named": true
+          },
+          {
+            "type": "match",
+            "named": true
+          },
+          {
+            "type": "matches",
+            "named": true
+          },
+          {
+            "type": "method",
+            "named": true
+          },
+          {
+            "type": "mod",
+            "named": true
+          },
+          {
+            "type": "mult",
+            "named": true
+          },
+          {
+            "type": "neg",
+            "named": true
+          },
+          {
+            "type": "negation",
+            "named": true
+          },
+          {
+            "type": "neq",
+            "named": true
+          },
+          {
+            "type": "new",
+            "named": true
+          },
+          {
+            "type": "nil",
+            "named": true
+          },
+          {
+            "type": "not",
+            "named": true
+          },
+          {
+            "type": "or",
+            "named": true
+          },
+          {
+            "type": "par",
+            "named": true
+          },
+          {
+            "type": "pi",
+            "named": true
+          },
+          {
+            "type": "send",
+            "named": true
+          },
+          {
+            "type": "send_method",
+            "named": true
+          },
+          {
+            "type": "send_sync",
+            "named": true
+          },
+          {
+            "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "sub",
+            "named": true
+          },
+          {
+            "type": "try_block",
+            "named": true
+          },
+          {
+            "type": "unit",
+            "named": true
+          },
+          {
+            "type": "var_ref",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "lambda_params",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "lambda_param",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -5551,6 +6711,10 @@
             "named": true
           },
           {
+            "type": "app",
+            "named": true
+          },
+          {
             "type": "block",
             "named": true
           },
@@ -5623,6 +6787,10 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
             "type": "let",
             "named": true
           },
@@ -5684,6 +6852,10 @@
           },
           {
             "type": "par",
+            "named": true
+          },
+          {
+            "type": "pi",
             "named": true
           },
           {
@@ -5748,6 +6920,10 @@
         },
         {
           "type": "and",
+          "named": true
+        },
+        {
+          "type": "app",
           "named": true
         },
         {
@@ -5823,6 +6999,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -5884,6 +7064,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -6006,6 +7190,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -6078,6 +7266,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -6139,6 +7331,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -6205,6 +7401,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -6277,6 +7477,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -6338,6 +7542,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -6404,6 +7612,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -6476,6 +7688,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -6537,6 +7753,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -6643,6 +7863,10 @@
             "named": true
           },
           {
+            "type": "app",
+            "named": true
+          },
+          {
             "type": "block",
             "named": true
           },
@@ -6695,6 +7919,10 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
             "type": "lt",
             "named": true
           },
@@ -6743,6 +7971,10 @@
             "named": true
           },
           {
+            "type": "pi",
+            "named": true
+          },
+          {
             "type": "simple_type",
             "named": true
           },
@@ -6788,6 +8020,10 @@
         },
         {
           "type": "and",
+          "named": true
+        },
+        {
+          "type": "app",
           "named": true
         },
         {
@@ -6863,6 +8099,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -6924,6 +8164,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -6990,6 +8234,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -7062,6 +8310,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -7123,6 +8375,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -7217,6 +8473,10 @@
             "named": true
           },
           {
+            "type": "app",
+            "named": true
+          },
+          {
             "type": "block",
             "named": true
           },
@@ -7289,6 +8549,10 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
             "type": "let",
             "named": true
           },
@@ -7350,6 +8614,10 @@
           },
           {
             "type": "par",
+            "named": true
+          },
+          {
+            "type": "pi",
             "named": true
           },
           {
@@ -7463,6 +8731,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -7535,6 +8807,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -7596,6 +8872,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -7662,6 +8942,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -7734,6 +9018,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -7795,6 +9083,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -7932,6 +9224,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -8004,6 +9300,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -8065,6 +9365,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -8131,6 +9435,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -8203,6 +9511,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -8264,6 +9576,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -8330,6 +9646,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -8402,6 +9722,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -8463,6 +9787,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -8547,6 +9875,10 @@
             "named": true
           },
           {
+            "type": "app",
+            "named": true
+          },
+          {
             "type": "block",
             "named": true
           },
@@ -8619,6 +9951,10 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
             "type": "let",
             "named": true
           },
@@ -8680,6 +10016,10 @@
           },
           {
             "type": "par",
+            "named": true
+          },
+          {
+            "type": "pi",
             "named": true
           },
           {
@@ -8747,6 +10087,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -8819,6 +10163,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -8880,6 +10228,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -8946,6 +10298,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -9018,6 +10374,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -9079,6 +10439,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -9145,6 +10509,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -9217,6 +10585,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -9278,6 +10650,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -9344,6 +10720,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -9416,6 +10796,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -9477,6 +10861,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -9554,6 +10942,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -9626,6 +11018,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -9687,6 +11083,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -9755,410 +11155,12 @@
     }
   },
   {
-    "type": "procs",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": false,
-      "types": [
-        {
-          "type": "_literal",
-          "named": true
-        },
-        {
-          "type": "_proc_var",
-          "named": true
-        },
-        {
-          "type": "add",
-          "named": true
-        },
-        {
-          "type": "agent_block",
-          "named": true
-        },
-        {
-          "type": "and",
-          "named": true
-        },
-        {
-          "type": "block",
-          "named": true
-        },
-        {
-          "type": "bundle",
-          "named": true
-        },
-        {
-          "type": "choice",
-          "named": true
-        },
-        {
-          "type": "collection",
-          "named": true
-        },
-        {
-          "type": "concat",
-          "named": true
-        },
-        {
-          "type": "conjunction",
-          "named": true
-        },
-        {
-          "type": "contract",
-          "named": true
-        },
-        {
-          "type": "diff",
-          "named": true
-        },
-        {
-          "type": "disjunction",
-          "named": true
-        },
-        {
-          "type": "div",
-          "named": true
-        },
-        {
-          "type": "eq",
-          "named": true
-        },
-        {
-          "type": "eval",
-          "named": true
-        },
-        {
-          "type": "fixed_point_pattern",
-          "named": true
-        },
-        {
-          "type": "gt",
-          "named": true
-        },
-        {
-          "type": "gte",
-          "named": true
-        },
-        {
-          "type": "ifElse",
-          "named": true
-        },
-        {
-          "type": "input",
-          "named": true
-        },
-        {
-          "type": "interpolation",
-          "named": true
-        },
-        {
-          "type": "let",
-          "named": true
-        },
-        {
-          "type": "lt",
-          "named": true
-        },
-        {
-          "type": "lte",
-          "named": true
-        },
-        {
-          "type": "match",
-          "named": true
-        },
-        {
-          "type": "matches",
-          "named": true
-        },
-        {
-          "type": "method",
-          "named": true
-        },
-        {
-          "type": "mod",
-          "named": true
-        },
-        {
-          "type": "mult",
-          "named": true
-        },
-        {
-          "type": "neg",
-          "named": true
-        },
-        {
-          "type": "negation",
-          "named": true
-        },
-        {
-          "type": "neq",
-          "named": true
-        },
-        {
-          "type": "new",
-          "named": true
-        },
-        {
-          "type": "nil",
-          "named": true
-        },
-        {
-          "type": "not",
-          "named": true
-        },
-        {
-          "type": "or",
-          "named": true
-        },
-        {
-          "type": "par",
-          "named": true
-        },
-        {
-          "type": "send",
-          "named": true
-        },
-        {
-          "type": "send_method",
-          "named": true
-        },
-        {
-          "type": "send_sync",
-          "named": true
-        },
-        {
-          "type": "simple_type",
-          "named": true
-        },
-        {
-          "type": "sub",
-          "named": true
-        },
-        {
-          "type": "try_block",
-          "named": true
-        },
-        {
-          "type": "unit",
-          "named": true
-        },
-        {
-          "type": "var_ref",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "quote",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": false,
-      "required": true,
-      "types": [
-        {
-          "type": "_literal",
-          "named": true
-        },
-        {
-          "type": "_proc_var",
-          "named": true
-        },
-        {
-          "type": "add",
-          "named": true
-        },
-        {
-          "type": "agent_block",
-          "named": true
-        },
-        {
-          "type": "and",
-          "named": true
-        },
-        {
-          "type": "block",
-          "named": true
-        },
-        {
-          "type": "bundle",
-          "named": true
-        },
-        {
-          "type": "choice",
-          "named": true
-        },
-        {
-          "type": "collection",
-          "named": true
-        },
-        {
-          "type": "concat",
-          "named": true
-        },
-        {
-          "type": "conjunction",
-          "named": true
-        },
-        {
-          "type": "contract",
-          "named": true
-        },
-        {
-          "type": "diff",
-          "named": true
-        },
-        {
-          "type": "disjunction",
-          "named": true
-        },
-        {
-          "type": "div",
-          "named": true
-        },
-        {
-          "type": "eq",
-          "named": true
-        },
-        {
-          "type": "eval",
-          "named": true
-        },
-        {
-          "type": "fixed_point_pattern",
-          "named": true
-        },
-        {
-          "type": "gt",
-          "named": true
-        },
-        {
-          "type": "gte",
-          "named": true
-        },
-        {
-          "type": "ifElse",
-          "named": true
-        },
-        {
-          "type": "input",
-          "named": true
-        },
-        {
-          "type": "interpolation",
-          "named": true
-        },
-        {
-          "type": "let",
-          "named": true
-        },
-        {
-          "type": "lt",
-          "named": true
-        },
-        {
-          "type": "lte",
-          "named": true
-        },
-        {
-          "type": "match",
-          "named": true
-        },
-        {
-          "type": "matches",
-          "named": true
-        },
-        {
-          "type": "method",
-          "named": true
-        },
-        {
-          "type": "mod",
-          "named": true
-        },
-        {
-          "type": "mult",
-          "named": true
-        },
-        {
-          "type": "neg",
-          "named": true
-        },
-        {
-          "type": "negation",
-          "named": true
-        },
-        {
-          "type": "neq",
-          "named": true
-        },
-        {
-          "type": "new",
-          "named": true
-        },
-        {
-          "type": "nil",
-          "named": true
-        },
-        {
-          "type": "not",
-          "named": true
-        },
-        {
-          "type": "or",
-          "named": true
-        },
-        {
-          "type": "par",
-          "named": true
-        },
-        {
-          "type": "send",
-          "named": true
-        },
-        {
-          "type": "send_method",
-          "named": true
-        },
-        {
-          "type": "send_sync",
-          "named": true
-        },
-        {
-          "type": "simple_type",
-          "named": true
-        },
-        {
-          "type": "sub",
-          "named": true
-        },
-        {
-          "type": "try_block",
-          "named": true
-        },
-        {
-          "type": "unit",
-          "named": true
-        },
-        {
-          "type": "var_ref",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "receipt",
+    "type": "pi",
     "named": true,
     "fields": {
-      "guard": {
+      "codomain": {
         "multiple": true,
-        "required": false,
+        "required": true,
         "types": [
           {
             "type": "(",
@@ -10186,6 +11188,10 @@
           },
           {
             "type": "and",
+            "named": true
+          },
+          {
+            "type": "app",
             "named": true
           },
           {
@@ -10261,6 +11267,10 @@
             "named": true
           },
           {
+            "type": "lambda",
+            "named": true
+          },
+          {
             "type": "let",
             "named": true
           },
@@ -10322,6 +11332,1065 @@
           },
           {
             "type": "par",
+            "named": true
+          },
+          {
+            "type": "pi",
+            "named": true
+          },
+          {
+            "type": "send",
+            "named": true
+          },
+          {
+            "type": "send_method",
+            "named": true
+          },
+          {
+            "type": "send_sync",
+            "named": true
+          },
+          {
+            "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "sub",
+            "named": true
+          },
+          {
+            "type": "try_block",
+            "named": true
+          },
+          {
+            "type": "unit",
+            "named": true
+          },
+          {
+            "type": "var_ref",
+            "named": true
+          }
+        ]
+      },
+      "dom": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "(",
+            "named": false
+          },
+          {
+            "type": ")",
+            "named": false
+          },
+          {
+            "type": "_literal",
+            "named": true
+          },
+          {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
+            "type": "add",
+            "named": true
+          },
+          {
+            "type": "and",
+            "named": true
+          },
+          {
+            "type": "app",
+            "named": true
+          },
+          {
+            "type": "block",
+            "named": true
+          },
+          {
+            "type": "collection",
+            "named": true
+          },
+          {
+            "type": "concat",
+            "named": true
+          },
+          {
+            "type": "conjunction",
+            "named": true
+          },
+          {
+            "type": "diff",
+            "named": true
+          },
+          {
+            "type": "disjunction",
+            "named": true
+          },
+          {
+            "type": "div",
+            "named": true
+          },
+          {
+            "type": "eq",
+            "named": true
+          },
+          {
+            "type": "eval",
+            "named": true
+          },
+          {
+            "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
+            "type": "gt",
+            "named": true
+          },
+          {
+            "type": "gte",
+            "named": true
+          },
+          {
+            "type": "interpolation",
+            "named": true
+          },
+          {
+            "type": "lambda",
+            "named": true
+          },
+          {
+            "type": "lt",
+            "named": true
+          },
+          {
+            "type": "lte",
+            "named": true
+          },
+          {
+            "type": "matches",
+            "named": true
+          },
+          {
+            "type": "method",
+            "named": true
+          },
+          {
+            "type": "mod",
+            "named": true
+          },
+          {
+            "type": "mult",
+            "named": true
+          },
+          {
+            "type": "neg",
+            "named": true
+          },
+          {
+            "type": "negation",
+            "named": true
+          },
+          {
+            "type": "neq",
+            "named": true
+          },
+          {
+            "type": "nil",
+            "named": true
+          },
+          {
+            "type": "not",
+            "named": true
+          },
+          {
+            "type": "or",
+            "named": true
+          },
+          {
+            "type": "pi",
+            "named": true
+          },
+          {
+            "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "sub",
+            "named": true
+          },
+          {
+            "type": "unit",
+            "named": true
+          },
+          {
+            "type": "var_ref",
+            "named": true
+          }
+        ]
+      },
+      "params": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "pi_params",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "pi_param",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "var",
+            "named": true
+          }
+        ]
+      },
+      "type": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "(",
+            "named": false
+          },
+          {
+            "type": ")",
+            "named": false
+          },
+          {
+            "type": "_literal",
+            "named": true
+          },
+          {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
+            "type": "add",
+            "named": true
+          },
+          {
+            "type": "agent_block",
+            "named": true
+          },
+          {
+            "type": "and",
+            "named": true
+          },
+          {
+            "type": "app",
+            "named": true
+          },
+          {
+            "type": "block",
+            "named": true
+          },
+          {
+            "type": "bundle",
+            "named": true
+          },
+          {
+            "type": "choice",
+            "named": true
+          },
+          {
+            "type": "collection",
+            "named": true
+          },
+          {
+            "type": "concat",
+            "named": true
+          },
+          {
+            "type": "conjunction",
+            "named": true
+          },
+          {
+            "type": "contract",
+            "named": true
+          },
+          {
+            "type": "diff",
+            "named": true
+          },
+          {
+            "type": "disjunction",
+            "named": true
+          },
+          {
+            "type": "div",
+            "named": true
+          },
+          {
+            "type": "eq",
+            "named": true
+          },
+          {
+            "type": "eval",
+            "named": true
+          },
+          {
+            "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
+            "type": "gt",
+            "named": true
+          },
+          {
+            "type": "gte",
+            "named": true
+          },
+          {
+            "type": "ifElse",
+            "named": true
+          },
+          {
+            "type": "input",
+            "named": true
+          },
+          {
+            "type": "interpolation",
+            "named": true
+          },
+          {
+            "type": "lambda",
+            "named": true
+          },
+          {
+            "type": "let",
+            "named": true
+          },
+          {
+            "type": "lt",
+            "named": true
+          },
+          {
+            "type": "lte",
+            "named": true
+          },
+          {
+            "type": "match",
+            "named": true
+          },
+          {
+            "type": "matches",
+            "named": true
+          },
+          {
+            "type": "method",
+            "named": true
+          },
+          {
+            "type": "mod",
+            "named": true
+          },
+          {
+            "type": "mult",
+            "named": true
+          },
+          {
+            "type": "neg",
+            "named": true
+          },
+          {
+            "type": "negation",
+            "named": true
+          },
+          {
+            "type": "neq",
+            "named": true
+          },
+          {
+            "type": "new",
+            "named": true
+          },
+          {
+            "type": "nil",
+            "named": true
+          },
+          {
+            "type": "not",
+            "named": true
+          },
+          {
+            "type": "or",
+            "named": true
+          },
+          {
+            "type": "par",
+            "named": true
+          },
+          {
+            "type": "pi",
+            "named": true
+          },
+          {
+            "type": "send",
+            "named": true
+          },
+          {
+            "type": "send_method",
+            "named": true
+          },
+          {
+            "type": "send_sync",
+            "named": true
+          },
+          {
+            "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "sub",
+            "named": true
+          },
+          {
+            "type": "try_block",
+            "named": true
+          },
+          {
+            "type": "unit",
+            "named": true
+          },
+          {
+            "type": "var_ref",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "pi_params",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "pi_param",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "procs",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "_literal",
+          "named": true
+        },
+        {
+          "type": "_proc_var",
+          "named": true
+        },
+        {
+          "type": "add",
+          "named": true
+        },
+        {
+          "type": "agent_block",
+          "named": true
+        },
+        {
+          "type": "and",
+          "named": true
+        },
+        {
+          "type": "app",
+          "named": true
+        },
+        {
+          "type": "block",
+          "named": true
+        },
+        {
+          "type": "bundle",
+          "named": true
+        },
+        {
+          "type": "choice",
+          "named": true
+        },
+        {
+          "type": "collection",
+          "named": true
+        },
+        {
+          "type": "concat",
+          "named": true
+        },
+        {
+          "type": "conjunction",
+          "named": true
+        },
+        {
+          "type": "contract",
+          "named": true
+        },
+        {
+          "type": "diff",
+          "named": true
+        },
+        {
+          "type": "disjunction",
+          "named": true
+        },
+        {
+          "type": "div",
+          "named": true
+        },
+        {
+          "type": "eq",
+          "named": true
+        },
+        {
+          "type": "eval",
+          "named": true
+        },
+        {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "gt",
+          "named": true
+        },
+        {
+          "type": "gte",
+          "named": true
+        },
+        {
+          "type": "ifElse",
+          "named": true
+        },
+        {
+          "type": "input",
+          "named": true
+        },
+        {
+          "type": "interpolation",
+          "named": true
+        },
+        {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "let",
+          "named": true
+        },
+        {
+          "type": "lt",
+          "named": true
+        },
+        {
+          "type": "lte",
+          "named": true
+        },
+        {
+          "type": "match",
+          "named": true
+        },
+        {
+          "type": "matches",
+          "named": true
+        },
+        {
+          "type": "method",
+          "named": true
+        },
+        {
+          "type": "mod",
+          "named": true
+        },
+        {
+          "type": "mult",
+          "named": true
+        },
+        {
+          "type": "neg",
+          "named": true
+        },
+        {
+          "type": "negation",
+          "named": true
+        },
+        {
+          "type": "neq",
+          "named": true
+        },
+        {
+          "type": "new",
+          "named": true
+        },
+        {
+          "type": "nil",
+          "named": true
+        },
+        {
+          "type": "not",
+          "named": true
+        },
+        {
+          "type": "or",
+          "named": true
+        },
+        {
+          "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
+          "named": true
+        },
+        {
+          "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
+          "named": true
+        },
+        {
+          "type": "send_sync",
+          "named": true
+        },
+        {
+          "type": "simple_type",
+          "named": true
+        },
+        {
+          "type": "sub",
+          "named": true
+        },
+        {
+          "type": "try_block",
+          "named": true
+        },
+        {
+          "type": "unit",
+          "named": true
+        },
+        {
+          "type": "var_ref",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "quote",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "_literal",
+          "named": true
+        },
+        {
+          "type": "_proc_var",
+          "named": true
+        },
+        {
+          "type": "add",
+          "named": true
+        },
+        {
+          "type": "agent_block",
+          "named": true
+        },
+        {
+          "type": "and",
+          "named": true
+        },
+        {
+          "type": "app",
+          "named": true
+        },
+        {
+          "type": "block",
+          "named": true
+        },
+        {
+          "type": "bundle",
+          "named": true
+        },
+        {
+          "type": "choice",
+          "named": true
+        },
+        {
+          "type": "collection",
+          "named": true
+        },
+        {
+          "type": "concat",
+          "named": true
+        },
+        {
+          "type": "conjunction",
+          "named": true
+        },
+        {
+          "type": "contract",
+          "named": true
+        },
+        {
+          "type": "diff",
+          "named": true
+        },
+        {
+          "type": "disjunction",
+          "named": true
+        },
+        {
+          "type": "div",
+          "named": true
+        },
+        {
+          "type": "eq",
+          "named": true
+        },
+        {
+          "type": "eval",
+          "named": true
+        },
+        {
+          "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "gt",
+          "named": true
+        },
+        {
+          "type": "gte",
+          "named": true
+        },
+        {
+          "type": "ifElse",
+          "named": true
+        },
+        {
+          "type": "input",
+          "named": true
+        },
+        {
+          "type": "interpolation",
+          "named": true
+        },
+        {
+          "type": "lambda",
+          "named": true
+        },
+        {
+          "type": "let",
+          "named": true
+        },
+        {
+          "type": "lt",
+          "named": true
+        },
+        {
+          "type": "lte",
+          "named": true
+        },
+        {
+          "type": "match",
+          "named": true
+        },
+        {
+          "type": "matches",
+          "named": true
+        },
+        {
+          "type": "method",
+          "named": true
+        },
+        {
+          "type": "mod",
+          "named": true
+        },
+        {
+          "type": "mult",
+          "named": true
+        },
+        {
+          "type": "neg",
+          "named": true
+        },
+        {
+          "type": "negation",
+          "named": true
+        },
+        {
+          "type": "neq",
+          "named": true
+        },
+        {
+          "type": "new",
+          "named": true
+        },
+        {
+          "type": "nil",
+          "named": true
+        },
+        {
+          "type": "not",
+          "named": true
+        },
+        {
+          "type": "or",
+          "named": true
+        },
+        {
+          "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
+          "named": true
+        },
+        {
+          "type": "send",
+          "named": true
+        },
+        {
+          "type": "send_method",
+          "named": true
+        },
+        {
+          "type": "send_sync",
+          "named": true
+        },
+        {
+          "type": "simple_type",
+          "named": true
+        },
+        {
+          "type": "sub",
+          "named": true
+        },
+        {
+          "type": "try_block",
+          "named": true
+        },
+        {
+          "type": "unit",
+          "named": true
+        },
+        {
+          "type": "var_ref",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "receipt",
+    "named": true,
+    "fields": {
+      "guard": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "(",
+            "named": false
+          },
+          {
+            "type": ")",
+            "named": false
+          },
+          {
+            "type": "_literal",
+            "named": true
+          },
+          {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
+            "type": "add",
+            "named": true
+          },
+          {
+            "type": "agent_block",
+            "named": true
+          },
+          {
+            "type": "and",
+            "named": true
+          },
+          {
+            "type": "app",
+            "named": true
+          },
+          {
+            "type": "block",
+            "named": true
+          },
+          {
+            "type": "bundle",
+            "named": true
+          },
+          {
+            "type": "choice",
+            "named": true
+          },
+          {
+            "type": "collection",
+            "named": true
+          },
+          {
+            "type": "concat",
+            "named": true
+          },
+          {
+            "type": "conjunction",
+            "named": true
+          },
+          {
+            "type": "contract",
+            "named": true
+          },
+          {
+            "type": "diff",
+            "named": true
+          },
+          {
+            "type": "disjunction",
+            "named": true
+          },
+          {
+            "type": "div",
+            "named": true
+          },
+          {
+            "type": "eq",
+            "named": true
+          },
+          {
+            "type": "eval",
+            "named": true
+          },
+          {
+            "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
+            "type": "gt",
+            "named": true
+          },
+          {
+            "type": "gte",
+            "named": true
+          },
+          {
+            "type": "ifElse",
+            "named": true
+          },
+          {
+            "type": "input",
+            "named": true
+          },
+          {
+            "type": "interpolation",
+            "named": true
+          },
+          {
+            "type": "lambda",
+            "named": true
+          },
+          {
+            "type": "let",
+            "named": true
+          },
+          {
+            "type": "lt",
+            "named": true
+          },
+          {
+            "type": "lte",
+            "named": true
+          },
+          {
+            "type": "match",
+            "named": true
+          },
+          {
+            "type": "matches",
+            "named": true
+          },
+          {
+            "type": "method",
+            "named": true
+          },
+          {
+            "type": "mod",
+            "named": true
+          },
+          {
+            "type": "mult",
+            "named": true
+          },
+          {
+            "type": "neg",
+            "named": true
+          },
+          {
+            "type": "negation",
+            "named": true
+          },
+          {
+            "type": "neq",
+            "named": true
+          },
+          {
+            "type": "new",
+            "named": true
+          },
+          {
+            "type": "nil",
+            "named": true
+          },
+          {
+            "type": "not",
+            "named": true
+          },
+          {
+            "type": "or",
+            "named": true
+          },
+          {
+            "type": "par",
+            "named": true
+          },
+          {
+            "type": "pi",
             "named": true
           },
           {
@@ -10687,6 +12756,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -10759,6 +12832,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -10820,6 +12897,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -10911,6 +12992,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -10983,6 +13068,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -11044,6 +13133,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -11110,6 +13203,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -11182,6 +13279,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -11243,6 +13344,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -11392,6 +13497,10 @@
           "named": true
         },
         {
+          "type": "app",
+          "named": true
+        },
+        {
           "type": "block",
           "named": true
         },
@@ -11464,6 +13573,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "let",
           "named": true
         },
@@ -11525,6 +13638,10 @@
         },
         {
           "type": "par",
+          "named": true
+        },
+        {
+          "type": "pi",
           "named": true
         },
         {
@@ -11659,6 +13776,10 @@
     "named": false
   },
   {
+    "type": "->",
+    "named": false
+  },
+  {
     "type": ".",
     "named": false
   },
@@ -11776,6 +13897,10 @@
   },
   {
     "type": "String",
+    "named": false
+  },
+  {
+    "type": "Type",
     "named": false
   },
   {
