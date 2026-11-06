@@ -216,6 +216,10 @@
           "named": true
         },
         {
+          "type": "foreach",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -492,6 +496,10 @@
         },
         {
           "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "foreach",
           "named": true
         },
         {
@@ -880,6 +888,10 @@
           "named": true
         },
         {
+          "type": "foreach",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -1091,6 +1103,10 @@
           "named": true
         },
         {
+          "type": "foreach",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -1299,6 +1315,10 @@
         },
         {
           "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "foreach",
           "named": true
         },
         {
@@ -1523,6 +1543,10 @@
           },
           {
             "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
+            "type": "foreach",
             "named": true
           },
           {
@@ -1963,6 +1987,10 @@
             "named": true
           },
           {
+            "type": "foreach",
+            "named": true
+          },
+          {
             "type": "gt",
             "named": true
           },
@@ -2177,6 +2205,10 @@
             "named": true
           },
           {
+            "type": "foreach",
+            "named": true
+          },
+          {
             "type": "gt",
             "named": true
           },
@@ -2388,6 +2420,10 @@
           },
           {
             "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
+            "type": "foreach",
             "named": true
           },
           {
@@ -2684,6 +2720,10 @@
           "named": true
         },
         {
+          "type": "foreach",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -2892,6 +2932,10 @@
         },
         {
           "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "foreach",
           "named": true
         },
         {
@@ -3234,6 +3278,10 @@
           "named": true
         },
         {
+          "type": "foreach",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -3445,6 +3493,10 @@
           "named": true
         },
         {
+          "type": "foreach",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -3653,6 +3705,10 @@
         },
         {
           "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "foreach",
           "named": true
         },
         {
@@ -3869,6 +3925,10 @@
         },
         {
           "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "foreach",
           "named": true
         },
         {
@@ -4110,6 +4170,10 @@
             "named": true
           },
           {
+            "type": "foreach",
+            "named": true
+          },
+          {
             "type": "gt",
             "named": true
           },
@@ -4238,6 +4302,200 @@
     }
   },
   {
+    "type": "foreach",
+    "named": true,
+    "fields": {
+      "binder": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "var",
+            "named": true
+          }
+        ]
+      },
+      "proc": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "source": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "(",
+            "named": false
+          },
+          {
+            "type": ")",
+            "named": false
+          },
+          {
+            "type": "_literal",
+            "named": true
+          },
+          {
+            "type": "_proc_var",
+            "named": true
+          },
+          {
+            "type": "add",
+            "named": true
+          },
+          {
+            "type": "and",
+            "named": true
+          },
+          {
+            "type": "app",
+            "named": true
+          },
+          {
+            "type": "block",
+            "named": true
+          },
+          {
+            "type": "collection",
+            "named": true
+          },
+          {
+            "type": "concat",
+            "named": true
+          },
+          {
+            "type": "conjunction",
+            "named": true
+          },
+          {
+            "type": "diff",
+            "named": true
+          },
+          {
+            "type": "disjunction",
+            "named": true
+          },
+          {
+            "type": "div",
+            "named": true
+          },
+          {
+            "type": "eq",
+            "named": true
+          },
+          {
+            "type": "eval",
+            "named": true
+          },
+          {
+            "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
+            "type": "gt",
+            "named": true
+          },
+          {
+            "type": "gte",
+            "named": true
+          },
+          {
+            "type": "interpolation",
+            "named": true
+          },
+          {
+            "type": "lambda",
+            "named": true
+          },
+          {
+            "type": "lt",
+            "named": true
+          },
+          {
+            "type": "lte",
+            "named": true
+          },
+          {
+            "type": "matches",
+            "named": true
+          },
+          {
+            "type": "method",
+            "named": true
+          },
+          {
+            "type": "mod",
+            "named": true
+          },
+          {
+            "type": "mult",
+            "named": true
+          },
+          {
+            "type": "neg",
+            "named": true
+          },
+          {
+            "type": "negation",
+            "named": true
+          },
+          {
+            "type": "neq",
+            "named": true
+          },
+          {
+            "type": "nil",
+            "named": true
+          },
+          {
+            "type": "not",
+            "named": true
+          },
+          {
+            "type": "or",
+            "named": true
+          },
+          {
+            "type": "pi",
+            "named": true
+          },
+          {
+            "type": "simple_type",
+            "named": true
+          },
+          {
+            "type": "sub",
+            "named": true
+          },
+          {
+            "type": "unit",
+            "named": true
+          },
+          {
+            "type": "var_ref",
+            "named": true
+          }
+        ]
+      },
+      "yield_name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "var",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "gt",
     "named": true,
     "fields": {},
@@ -4319,6 +4577,10 @@
         },
         {
           "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "foreach",
           "named": true
         },
         {
@@ -4530,6 +4792,10 @@
         },
         {
           "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "foreach",
           "named": true
         },
         {
@@ -4752,6 +5018,10 @@
             "named": true
           },
           {
+            "type": "foreach",
+            "named": true
+          },
+          {
             "type": "gt",
             "named": true
           },
@@ -4966,6 +5236,10 @@
             "named": true
           },
           {
+            "type": "foreach",
+            "named": true
+          },
+          {
             "type": "gt",
             "named": true
           },
@@ -5177,6 +5451,10 @@
           },
           {
             "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
+            "type": "foreach",
             "named": true
           },
           {
@@ -5418,6 +5696,10 @@
           "named": true
         },
         {
+          "type": "foreach",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -5626,6 +5908,10 @@
         },
         {
           "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "foreach",
           "named": true
         },
         {
@@ -5848,6 +6134,10 @@
             "named": true
           },
           {
+            "type": "foreach",
+            "named": true
+          },
+          {
             "type": "gt",
             "named": true
           },
@@ -6059,6 +6349,10 @@
           },
           {
             "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
+            "type": "foreach",
             "named": true
           },
           {
@@ -6279,6 +6573,10 @@
           },
           {
             "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
+            "type": "foreach",
             "named": true
           },
           {
@@ -6519,6 +6817,10 @@
           },
           {
             "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
+            "type": "foreach",
             "named": true
           },
           {
@@ -6767,6 +7069,10 @@
             "named": true
           },
           {
+            "type": "foreach",
+            "named": true
+          },
+          {
             "type": "gt",
             "named": true
           },
@@ -6976,6 +7282,10 @@
         },
         {
           "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "foreach",
           "named": true
         },
         {
@@ -7246,6 +7556,10 @@
           "named": true
         },
         {
+          "type": "foreach",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -7457,6 +7771,10 @@
           "named": true
         },
         {
+          "type": "foreach",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -7665,6 +7983,10 @@
         },
         {
           "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "foreach",
           "named": true
         },
         {
@@ -8079,6 +8401,10 @@
           "named": true
         },
         {
+          "type": "foreach",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -8287,6 +8613,10 @@
         },
         {
           "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "foreach",
           "named": true
         },
         {
@@ -8526,6 +8856,10 @@
           },
           {
             "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
+            "type": "foreach",
             "named": true
           },
           {
@@ -8787,6 +9121,10 @@
           "named": true
         },
         {
+          "type": "foreach",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -8995,6 +9333,10 @@
         },
         {
           "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "foreach",
           "named": true
         },
         {
@@ -9280,6 +9622,10 @@
           "named": true
         },
         {
+          "type": "foreach",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -9491,6 +9837,10 @@
           "named": true
         },
         {
+          "type": "foreach",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -9699,6 +10049,10 @@
         },
         {
           "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "foreach",
           "named": true
         },
         {
@@ -9931,6 +10285,10 @@
             "named": true
           },
           {
+            "type": "foreach",
+            "named": true
+          },
+          {
             "type": "gt",
             "named": true
           },
@@ -10140,6 +10498,10 @@
         },
         {
           "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "foreach",
           "named": true
         },
         {
@@ -10354,6 +10716,10 @@
           "named": true
         },
         {
+          "type": "foreach",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -10565,6 +10931,10 @@
           "named": true
         },
         {
+          "type": "foreach",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -10773,6 +11143,10 @@
         },
         {
           "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "foreach",
           "named": true
         },
         {
@@ -10995,6 +11369,10 @@
         },
         {
           "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "foreach",
           "named": true
         },
         {
@@ -11244,6 +11622,10 @@
           },
           {
             "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
+            "type": "foreach",
             "named": true
           },
           {
@@ -11645,6 +12027,10 @@
             "named": true
           },
           {
+            "type": "foreach",
+            "named": true
+          },
+          {
             "type": "gt",
             "named": true
           },
@@ -11872,6 +12258,10 @@
           "named": true
         },
         {
+          "type": "foreach",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -12080,6 +12470,10 @@
         },
         {
           "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "foreach",
           "named": true
         },
         {
@@ -12299,6 +12693,10 @@
           },
           {
             "type": "fixed_point_pattern",
+            "named": true
+          },
+          {
+            "type": "foreach",
             "named": true
           },
           {
@@ -12812,6 +13210,10 @@
           "named": true
         },
         {
+          "type": "foreach",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -13048,6 +13450,10 @@
           "named": true
         },
         {
+          "type": "foreach",
+          "named": true
+        },
+        {
           "type": "gt",
           "named": true
         },
@@ -13256,6 +13662,10 @@
         },
         {
           "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "foreach",
           "named": true
         },
         {
@@ -13550,6 +13960,10 @@
         },
         {
           "type": "fixed_point_pattern",
+          "named": true
+        },
+        {
+          "type": "foreach",
           "named": true
         },
         {
@@ -14004,6 +14418,10 @@
     "named": false
   },
   {
+    "type": "foreach",
+    "named": false
+  },
+  {
     "type": "if",
     "named": false
   },
@@ -14094,6 +14512,10 @@
   {
     "type": "wildcard",
     "named": true
+  },
+  {
+    "type": "yield",
+    "named": false
   },
   {
     "type": "{",

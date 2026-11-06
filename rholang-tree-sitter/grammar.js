@@ -77,6 +77,7 @@ module.exports = grammar({
             $.agent_block,
             $.try_block,
             $.input,
+            $.foreach,
             $.send,
             $._proc_expression
         ),
@@ -240,6 +241,21 @@ module.exports = grammar({
 
         input: $ => prec(2, seq(
             'for', '(', field('receipts', $.receipts), ')',
+            field('proc', $.block)
+        )),
+
+        // f1r3lang-with-monads Stage B: the `foreach` comprehension.
+        // Minimal surface — single binder, no `where`, no `&`, no `;`,
+        // no `by`. Source is a term of a monadic sort (not a channel);
+        // yield-name is the result channel the aggregator publishes on.
+        // Richer surface awaits the DDL on feature/f1r3lang-mettail-only.
+        foreach: $ => prec(2, seq(
+            'foreach', '(',
+                field('binder', $.var),
+                '<-',
+                field('source', $._proc_expression),
+            ')',
+            'yield', '(', field('yield_name', $.var), ')',
             field('proc', $.block)
         )),
 

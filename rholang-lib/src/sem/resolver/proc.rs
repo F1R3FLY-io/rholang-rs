@@ -385,6 +385,15 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
             }
             resolve_unguarded(db, stack, codomain);
         }
+        // f1r3lang-with-monads Stage B: `foreach ( binder <- source )
+        // yield ( yield_name ) body`. Source and body are walked under
+        // the surrounding scope; binder/yield_name scope management
+        // lands with the normalizer that elaborates this into the
+        // reference translation (§4.7).
+        Foreach { source, proc, .. } => {
+            resolve_unguarded(db, stack, source);
+            resolve_unguarded(db, stack, proc);
+        }
     }
 }
 

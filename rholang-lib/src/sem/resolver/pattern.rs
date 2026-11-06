@@ -424,6 +424,10 @@ fn resolve_proc_pattern_rec<'a>(
             }
             resolve_proc_pattern_rec(db, env, res, codomain);
         }
+        Foreach { source, proc, .. } => {
+            resolve_proc_pattern_rec(db, env, res, source);
+            resolve_proc_pattern_rec(db, env, res, proc);
+        }
         Bad => unreachable!(),
     }
 }

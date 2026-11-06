@@ -158,6 +158,23 @@ pub enum Proc<'ast> {
         codomain: AnnProc<'ast>,
     },
 
+    // f1r3lang-with-monads Stage B: the `foreach` comprehension.
+    // Minimal surface: `foreach ( binder <- source ) yield ( yield_name )
+    // body`. The source is a term of a monadic sort (not a channel);
+    // every binding contributes to a declared aggregator, and the
+    // combined result is published once on `yield_name`.
+    //
+    // The richer surface the paper defines — `where` guards, multiple
+    // binds via `&`, multiple groups via `;`, `by TheoryInstance` for a
+    // non-default aggregator, monad-qualifier `[M]` — is deferred
+    // pending the DDL on the `feature/f1r3lang-mettail-only` branch.
+    Foreach {
+        binder: Id<'ast>,
+        source: AnnProc<'ast>,
+        yield_name: Id<'ast>,
+        proc: AnnProc<'ast>,
+    },
+
     Bad, // bad process usually represents a parsing error
 }
 
