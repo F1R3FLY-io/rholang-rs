@@ -141,9 +141,7 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
                     self.stack.push(ty);
                 }
             }
-            Proc::Foreach {
-                source, proc, ..
-            } => {
+            Proc::Foreach { source, proc, .. } => {
                 // Walk source first (pushed last ≡ popped first), then
                 // the body.
                 self.stack.push(proc);
@@ -423,9 +421,7 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
                 let types = params.iter().map(|(_id, ty)| ty);
                 self.push_children(types.chain(iter::once(codomain)));
             }
-            Proc::Foreach {
-                source, proc, ..
-            } => {
+            Proc::Foreach { source, proc, .. } => {
                 self.push_children(iter::once(source).chain(iter::once(proc)));
             }
 
