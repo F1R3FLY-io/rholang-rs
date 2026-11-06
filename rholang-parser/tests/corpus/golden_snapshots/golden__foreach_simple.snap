@@ -1,0 +1,152 @@
+---
+source: rholang-parser/tests/golden.rs
+assertion_line: 23
+expression: result
+---
+Good(
+    [
+        AnnProc {
+            proc: Foreach {
+                binder: Id {
+                    name: "x",
+                    pos: SourcePos {
+                        line: 1,
+                        col: 11,
+                    },
+                },
+                source: AnnProc {
+                    proc: Collection(
+                        List {
+                            elements: [
+                                AnnProc {
+                                    proc: LongLiteral(
+                                        1,
+                                    ),
+                                    span: SourceSpan {
+                                        start: SourcePos {
+                                            line: 1,
+                                            col: 17,
+                                        },
+                                        end: SourcePos {
+                                            line: 1,
+                                            col: 18,
+                                        },
+                                    },
+                                },
+                                AnnProc {
+                                    proc: LongLiteral(
+                                        2,
+                                    ),
+                                    span: SourceSpan {
+                                        start: SourcePos {
+                                            line: 1,
+                                            col: 20,
+                                        },
+                                        end: SourcePos {
+                                            line: 1,
+                                            col: 21,
+                                        },
+                                    },
+                                },
+                                AnnProc {
+                                    proc: LongLiteral(
+                                        3,
+                                    ),
+                                    span: SourceSpan {
+                                        start: SourcePos {
+                                            line: 1,
+                                            col: 23,
+                                        },
+                                        end: SourcePos {
+                                            line: 1,
+                                            col: 24,
+                                        },
+                                    },
+                                },
+                            ],
+                            remainder: None,
+                        },
+                    ),
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 1,
+                            col: 16,
+                        },
+                        end: SourcePos {
+                            line: 1,
+                            col: 25,
+                        },
+                    },
+                },
+                yield_name: Id {
+                    name: "rslt",
+                    pos: SourcePos {
+                        line: 1,
+                        col: 36,
+                    },
+                },
+                proc: AnnProc {
+                    proc: Send {
+                        channel: NameVar(
+                            Id(
+                                Id {
+                                    name: "rslt",
+                                    pos: SourcePos {
+                                        line: 2,
+                                        col: 3,
+                                    },
+                                },
+                            ),
+                        ),
+                        send_type: Single,
+                        inputs: [
+                            AnnProc {
+                                proc: ProcVar(
+                                    Id(
+                                        Id {
+                                            name: "x",
+                                            pos: SourcePos {
+                                                line: 2,
+                                                col: 9,
+                                            },
+                                        },
+                                    ),
+                                ),
+                                span: SourceSpan {
+                                    start: SourcePos {
+                                        line: 2,
+                                        col: 9,
+                                    },
+                                    end: SourcePos {
+                                        line: 2,
+                                        col: 10,
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                    span: SourceSpan {
+                        start: SourcePos {
+                            line: 2,
+                            col: 3,
+                        },
+                        end: SourcePos {
+                            line: 2,
+                            col: 11,
+                        },
+                    },
+                },
+            },
+            span: SourceSpan {
+                start: SourcePos {
+                    line: 1,
+                    col: 1,
+                },
+                end: SourcePos {
+                    line: 3,
+                    col: 2,
+                },
+            },
+        },
+    ],
+)

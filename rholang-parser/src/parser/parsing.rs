@@ -348,6 +348,34 @@ pub(super) fn node_to_ast<'ast>(
                     };
                     continue 'parse;
                 }
+                // f1r3lang-with-monads Stage B: `foreach ( binder <-
+                // source ) yield ( yield_name ) proc`. Collects binder
+                // and yield name from the surface; schedules source then
+                // proc on proc_stack so ConsumeForeach can pop both.
+                kind!("foreach") => {
+                    let binder_node = get_field(&node, field!("binder"));
+                    let yield_node = get_field(&node, field!("yield_name"));
+                    let source_node = get_field(&node, field!("source"));
+                    let proc_node = get_field(&node, field!("proc"));
+                    let binder = Id {
+                        name: get_node_value(&binder_node, source),
+                        pos: binder_node.start_position().into(),
+                    };
+                    let yield_name = Id {
+                        name: get_node_value(&yield_node, source),
+                        pos: yield_node.start_position().into(),
+                    };
+                    cont_stack.push(K::ConsumeForeach {
+                        binder,
+                        yield_name,
+                        span,
+                    });
+                    // Body parses after source. Push proc last → popped
+                    // second-to-last → ends up on top of proc_stack.
+                    cont_stack.push(K::EvalDelayed(proc_node));
+                    node = source_node;
+                    continue 'parse;
+                }
                 kind!("app") => {
                     let fun_node = get_field(&node, field!("fun"));
                     // Zero-arg applications have no `args` field (tree-sitter
@@ -1652,6 +1680,18 @@ fn apply_cont<'tree, 'ast>(
                                 ast_builder.alloc_pi(&pairs, *codomain).ann(span)
                             })
                         }
+                        K::ConsumeForeach {
+                            binder,
+                            yield_name,
+                            span,
+                        } => {
+                            // proc_stack bottom→top: source, body.
+                            proc_stack.replace_top2(|source, proc| {
+                                ast_builder
+                                    .alloc_foreach(binder, source, yield_name, proc)
+                                    .ann(span)
+                            })
+                        }
                         K::ConsumeNew { decls, span } => proc_stack
                             .replace_top(|body| ast_builder.alloc_new(body, decls).ann(span)),
                         K::ConsumePar { span } => proc_stack.replace_top2(|left, right| {
@@ -1844,6 +1884,14 @@ enum K<'tree, 'ast> {
         param_ids: SmallVec<[Id<'ast>; 1]>,
         span: SourceSpan,
     },
+    // f1r3lang-with-monads Stage B. Foreach carries the surface binder
+    // and yield-name; two AnnProcs (source, then body) are popped from
+    // proc_stack when this fires.
+    ConsumeForeach {
+        binder: Id<'ast>,
+        yield_name: Id<'ast>,
+        span: SourceSpan,
+    },
     ConsumeNew {
         decls: Vec<NameDecl<'ast>>,
         span: SourceSpan,
@@ -1998,6 +2046,16 @@ impl Debug for K<'_, '_> {
                     .field("span", span)
                     .finish()
             }
+            Self::ConsumeForeach {
+                binder,
+                yield_name,
+                span,
+            } => f
+                .debug_struct("ConsumeForeach")
+                .field("binder", &binder.name)
+                .field("yield_name", &yield_name.name)
+                .field("span", span)
+                .finish(),
             Self::ConsumeNew { decls, span } => f
                 .debug_struct("ConsumeNew")
                 .field("decls", decls)
@@ -3094,6 +3152,17 @@ fn collect_ids_into<'ast>(root: AnnProc<'ast>, out: &mut BTreeSet<&'ast str>) {
                     stack.push(*ty);
                 }
                 stack.push(*codomain);
+            }
+            Proc::Foreach {
+                binder,
+                source,
+                yield_name,
+                proc,
+            } => {
+                out.insert(binder.name);
+                out.insert(yield_name.name);
+                stack.push(*source);
+                stack.push(*proc);
             }
             Proc::Collection(coll) => match coll {
                 Collection::List {

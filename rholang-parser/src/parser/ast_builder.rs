@@ -481,6 +481,23 @@ impl<'ast> ASTBuilder<'ast> {
         })
     }
 
+    /// f1r3lang-with-monads Stage B: allocate a `foreach` comprehension
+    /// `foreach ( binder <- source ) yield ( yield_name ) body`.
+    pub fn alloc_foreach(
+        &self,
+        binder: Id<'ast>,
+        source: AnnProc<'ast>,
+        yield_name: Id<'ast>,
+        proc: AnnProc<'ast>,
+    ) -> &Proc<'ast> {
+        self.arena.alloc(Proc::Foreach {
+            binder,
+            source,
+            yield_name,
+            proc,
+        })
+    }
+
     pub fn alloc_str(&'ast self, s: &str) -> &'ast str {
         let allocated_string = self.string_arena.alloc(s.to_string());
         allocated_string.as_str()
