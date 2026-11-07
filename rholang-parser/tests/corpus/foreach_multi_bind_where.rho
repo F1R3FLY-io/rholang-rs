@@ -1,0 +1,3 @@
+foreach ( x <- [1, 2, 3] & y <- [10, 20] where x > 1 ) yield ( rslt ) {
+  rslt!(x + y)
+}

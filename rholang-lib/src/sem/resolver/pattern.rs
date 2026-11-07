@@ -424,8 +424,18 @@ fn resolve_proc_pattern_rec<'a>(
             }
             resolve_proc_pattern_rec(db, env, res, codomain);
         }
-        Foreach { source, proc, .. } => {
-            resolve_proc_pattern_rec(db, env, res, source);
+        Foreach {
+            binds,
+            where_cond,
+            proc,
+            ..
+        } => {
+            for (_id, src) in binds.iter() {
+                resolve_proc_pattern_rec(db, env, res, src);
+            }
+            if let Some(c) = where_cond {
+                resolve_proc_pattern_rec(db, env, res, c);
+            }
             resolve_proc_pattern_rec(db, env, res, proc);
         }
         Bad => unreachable!(),

@@ -385,13 +385,23 @@ fn resolve_unguarded<'a>(db: &mut SemanticDb<'a>, stack: &mut BindingStack, this
             }
             resolve_unguarded(db, stack, codomain);
         }
-        // f1r3lang-with-monads Stage B: `foreach ( binder <- source )
-        // yield ( yield_name ) body`. Source and body are walked under
+        // f1r3lang-with-monads Stage B (single group, §4.4 + §4.5):
+        // `foreach ( b_0 <- m_0 & … where c? ) yield ( yield_name )
+        // body`. Sources, optional guard, and body are walked under
         // the surrounding scope; binder/yield_name scope management
-        // lands with the normalizer that elaborates this into the
-        // reference translation (§4.7).
-        Foreach { source, proc, .. } => {
-            resolve_unguarded(db, stack, source);
+        // lands with the normalizer.
+        Foreach {
+            binds,
+            where_cond,
+            proc,
+            ..
+        } => {
+            for (_id, src) in binds.iter() {
+                resolve_unguarded(db, stack, src);
+            }
+            if let Some(c) = where_cond {
+                resolve_unguarded(db, stack, c);
+            }
             resolve_unguarded(db, stack, proc);
         }
     }
