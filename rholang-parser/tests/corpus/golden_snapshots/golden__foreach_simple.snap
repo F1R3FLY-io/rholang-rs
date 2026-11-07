@@ -1,83 +1,87 @@
 ---
 source: rholang-parser/tests/golden.rs
-assertion_line: 23
 expression: result
 ---
 Good(
     [
         AnnProc {
             proc: Foreach {
-                binder: Id {
-                    name: "x",
-                    pos: SourcePos {
-                        line: 1,
-                        col: 11,
-                    },
-                },
-                source: AnnProc {
-                    proc: Collection(
-                        List {
-                            elements: [
-                                AnnProc {
-                                    proc: LongLiteral(
-                                        1,
-                                    ),
-                                    span: SourceSpan {
-                                        start: SourcePos {
-                                            line: 1,
-                                            col: 17,
+                binds: [
+                    (
+                        Id {
+                            name: "x",
+                            pos: SourcePos {
+                                line: 1,
+                                col: 11,
+                            },
+                        },
+                        AnnProc {
+                            proc: Collection(
+                                List {
+                                    elements: [
+                                        AnnProc {
+                                            proc: LongLiteral(
+                                                1,
+                                            ),
+                                            span: SourceSpan {
+                                                start: SourcePos {
+                                                    line: 1,
+                                                    col: 17,
+                                                },
+                                                end: SourcePos {
+                                                    line: 1,
+                                                    col: 18,
+                                                },
+                                            },
                                         },
-                                        end: SourcePos {
-                                            line: 1,
-                                            col: 18,
+                                        AnnProc {
+                                            proc: LongLiteral(
+                                                2,
+                                            ),
+                                            span: SourceSpan {
+                                                start: SourcePos {
+                                                    line: 1,
+                                                    col: 20,
+                                                },
+                                                end: SourcePos {
+                                                    line: 1,
+                                                    col: 21,
+                                                },
+                                            },
                                         },
-                                    },
+                                        AnnProc {
+                                            proc: LongLiteral(
+                                                3,
+                                            ),
+                                            span: SourceSpan {
+                                                start: SourcePos {
+                                                    line: 1,
+                                                    col: 23,
+                                                },
+                                                end: SourcePos {
+                                                    line: 1,
+                                                    col: 24,
+                                                },
+                                            },
+                                        },
+                                    ],
+                                    remainder: None,
                                 },
-                                AnnProc {
-                                    proc: LongLiteral(
-                                        2,
-                                    ),
-                                    span: SourceSpan {
-                                        start: SourcePos {
-                                            line: 1,
-                                            col: 20,
-                                        },
-                                        end: SourcePos {
-                                            line: 1,
-                                            col: 21,
-                                        },
-                                    },
+                            ),
+                            span: SourceSpan {
+                                start: SourcePos {
+                                    line: 1,
+                                    col: 16,
                                 },
-                                AnnProc {
-                                    proc: LongLiteral(
-                                        3,
-                                    ),
-                                    span: SourceSpan {
-                                        start: SourcePos {
-                                            line: 1,
-                                            col: 23,
-                                        },
-                                        end: SourcePos {
-                                            line: 1,
-                                            col: 24,
-                                        },
-                                    },
+                                end: SourcePos {
+                                    line: 1,
+                                    col: 25,
                                 },
-                            ],
-                            remainder: None,
+                            },
                         },
                     ),
-                    span: SourceSpan {
-                        start: SourcePos {
-                            line: 1,
-                            col: 16,
-                        },
-                        end: SourcePos {
-                            line: 1,
-                            col: 25,
-                        },
-                    },
-                },
+                ],
+                where_cond: None,
                 yield_name: Id {
                     name: "rslt",
                     pos: SourcePos {

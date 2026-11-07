@@ -482,17 +482,18 @@ impl<'ast> ASTBuilder<'ast> {
     }
 
     /// f1r3lang-with-monads Stage B: allocate a `foreach` comprehension
-    /// `foreach ( binder <- source ) yield ( yield_name ) body`.
+    /// `foreach ( b_0 <- m_0 & … & b_{n-1} <- m_{n-1} where c? )
+    ///  yield ( yield_name ) body`.
     pub fn alloc_foreach(
         &self,
-        binder: Id<'ast>,
-        source: AnnProc<'ast>,
+        binds: &[(Id<'ast>, AnnProc<'ast>)],
+        where_cond: Option<AnnProc<'ast>>,
         yield_name: Id<'ast>,
         proc: AnnProc<'ast>,
     ) -> &Proc<'ast> {
         self.arena.alloc(Proc::Foreach {
-            binder,
-            source,
+            binds: binds.to_smallvec(),
+            where_cond,
             yield_name,
             proc,
         })

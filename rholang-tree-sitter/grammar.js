@@ -244,20 +244,31 @@ module.exports = grammar({
             field('proc', $.block)
         )),
 
-        // f1r3lang-with-monads Stage B: the `foreach` comprehension.
-        // Minimal surface — single binder, no `where`, no `&`, no `;`,
-        // no `by`. Source is a term of a monadic sort (not a channel);
-        // yield-name is the result channel the aggregator publishes on.
-        // Richer surface awaits the DDL on feature/f1r3lang-mettail-only.
+        // f1r3lang-with-monads Stage B (single `group` with §4.4 `&`
+        // and §4.5 `where`): the `foreach` comprehension.
+        //
+        //   foreach ( b_0 <- m_0 & … & b_{n-1} <- m_{n-1} where c? )
+        //   yield ( yield_name ) proc
+        //
+        // Still deferred: `;`-separated dependent groups, `by
+        // TheoryInstance`, `[MonadName]` qualifier. Those land once
+        // the DDL on feature/f1r3lang-mettail-only ships.
         foreach: $ => prec(2, seq(
             'foreach', '(',
-                field('binder', $.var),
-                '<-',
-                field('source', $._proc_expression),
+                field('binds', $.foreach_binds),
+                optional(seq('where', field('guard', $._proc))),
             ')',
             'yield', '(', field('yield_name', $.var), ')',
             field('proc', $.block)
         )),
+
+        foreach_binds: $ => seq($.foreach_bind, repeat(seq('&', $.foreach_bind))),
+
+        foreach_bind: $ => seq(
+            field('binder', $.var),
+            '<-',
+            field('source', $._proc_expression)
+        ),
 
         send: $ => prec(3, seq(
             field('channel', $.name),

@@ -141,11 +141,21 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
                     self.stack.push(ty);
                 }
             }
-            Proc::Foreach { source, proc, .. } => {
-                // Walk source first (pushed last ≡ popped first), then
-                // the body.
+            Proc::Foreach {
+                binds,
+                where_cond,
+                proc,
+                ..
+            } => {
+                // Walk sources first (popped first), then optional
+                // guard, then the body.
                 self.stack.push(proc);
-                self.stack.push(source);
+                if let Some(c) = where_cond {
+                    self.stack.push(c);
+                }
+                for (_id, src) in binds.iter().rev() {
+                    self.stack.push(src);
+                }
             }
 
             Proc::Collection(collection) => match collection {
@@ -421,8 +431,15 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
                 let types = params.iter().map(|(_id, ty)| ty);
                 self.push_children(types.chain(iter::once(codomain)));
             }
-            Proc::Foreach { source, proc, .. } => {
-                self.push_children(iter::once(source).chain(iter::once(proc)));
+            Proc::Foreach {
+                binds,
+                where_cond,
+                proc,
+                ..
+            } => {
+                let sources = binds.iter().map(|(_id, src)| src);
+                let guard = where_cond.iter();
+                self.push_children(sources.chain(guard).chain(iter::once(proc)));
             }
 
             Proc::Collection(collection) => match collection {

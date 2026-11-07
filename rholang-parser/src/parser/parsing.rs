@@ -348,32 +348,62 @@ pub(super) fn node_to_ast<'ast>(
                     };
                     continue 'parse;
                 }
-                // f1r3lang-with-monads Stage B: `foreach ( binder <-
-                // source ) yield ( yield_name ) proc`. Collects binder
-                // and yield name from the surface; schedules source then
-                // proc on proc_stack so ConsumeForeach can pop both.
+                // f1r3lang-with-monads Stage B: `foreach ( b_0 <- m_0 &
+                // … & b_{n-1} <- m_{n-1} where c? ) yield ( yield_name )
+                // proc`. Collects binder identifiers + yield name from
+                // the surface; schedules each source, then the optional
+                // where-guard, then the body for proc_stack so
+                // ConsumeForeach can pop them in a known order.
                 kind!("foreach") => {
-                    let binder_node = get_field(&node, field!("binder"));
+                    let binds_node = get_field(&node, field!("binds"));
                     let yield_node = get_field(&node, field!("yield_name"));
-                    let source_node = get_field(&node, field!("source"));
                     let proc_node = get_field(&node, field!("proc"));
-                    let binder = Id {
-                        name: get_node_value(&binder_node, source),
-                        pos: binder_node.start_position().into(),
-                    };
+                    let guard_node = node.child_by_field_name("guard");
+
+                    let mut walker = binds_node.walk();
+                    let mut binder_ids: SmallVec<[Id<'ast>; 1]> = SmallVec::new();
+                    let mut source_nodes: Vec<tree_sitter::Node<'_>> = Vec::new();
+                    for bind_node in binds_node.named_children(&mut walker) {
+                        let binder_node = get_field(&bind_node, field!("binder"));
+                        let source_node = get_field(&bind_node, field!("source"));
+                        binder_ids.push(Id {
+                            name: get_node_value(&binder_node, source),
+                            pos: binder_node.start_position().into(),
+                        });
+                        source_nodes.push(source_node);
+                    }
+                    let n_binds = binder_ids.len();
+                    debug_assert!(n_binds >= 1, "foreach must have >=1 bind");
+
                     let yield_name = Id {
                         name: get_node_value(&yield_node, source),
                         pos: yield_node.start_position().into(),
                     };
+                    let has_guard = guard_node.is_some();
+
                     cont_stack.push(K::ConsumeForeach {
-                        binder,
+                        binder_ids,
+                        has_guard,
                         yield_name,
                         span,
                     });
-                    // Body parses after source. Push proc last → popped
-                    // second-to-last → ends up on top of proc_stack.
+
+                    // proc_stack after this foreach's inner parses will
+                    // hold, bottom→top: source_0, …, source_{n-1},
+                    // [guard], body. We push onto cont_stack in REVERSE
+                    // order of parse so the right items land in the
+                    // right places.
                     cont_stack.push(K::EvalDelayed(proc_node));
-                    node = source_node;
+                    if let Some(g) = guard_node {
+                        cont_stack.push(K::EvalDelayed(g));
+                    }
+                    // Push source nodes in reverse so source_0 is
+                    // parsed first (lands at the bottom of proc_stack).
+                    for sn in source_nodes.iter().skip(1).rev() {
+                        cont_stack.push(K::EvalDelayed(*sn));
+                    }
+                    // Kick off with the first source directly.
+                    node = source_nodes[0];
                     continue 'parse;
                 }
                 kind!("app") => {
@@ -1681,14 +1711,29 @@ fn apply_cont<'tree, 'ast>(
                             })
                         }
                         K::ConsumeForeach {
-                            binder,
+                            binder_ids,
+                            has_guard,
                             yield_name,
                             span,
                         } => {
-                            // proc_stack bottom→top: source, body.
-                            proc_stack.replace_top2(|source, proc| {
+                            let n_binds = binder_ids.len();
+                            let total = n_binds + if has_guard { 2 } else { 1 };
+                            proc_stack.replace_top_slice(total, |slice| {
+                                // Layout: sources[0..n_binds] ++
+                                //         [guard?] ++ [body]
+                                let sources = &slice[..n_binds];
+                                let (guard, body) = if has_guard {
+                                    (Some(slice[n_binds]), slice[n_binds + 1])
+                                } else {
+                                    (None, slice[n_binds])
+                                };
+                                let binds: Vec<(Id<'_>, AnnProc<'_>)> = binder_ids
+                                    .iter()
+                                    .zip(sources.iter())
+                                    .map(|(id, src)| (*id, *src))
+                                    .collect();
                                 ast_builder
-                                    .alloc_foreach(binder, source, yield_name, proc)
+                                    .alloc_foreach(&binds, guard, yield_name, body)
                                     .ann(span)
                             })
                         }
@@ -1884,11 +1929,13 @@ enum K<'tree, 'ast> {
         param_ids: SmallVec<[Id<'ast>; 1]>,
         span: SourceSpan,
     },
-    // f1r3lang-with-monads Stage B. Foreach carries the surface binder
-    // and yield-name; two AnnProcs (source, then body) are popped from
-    // proc_stack when this fires.
+    // f1r3lang-with-monads Stage B. Foreach carries the surface
+    // binder ids + yield-name + a flag for whether a `where` guard
+    // was present. When this fires, proc_stack holds (bottom→top):
+    //   source_0, …, source_{n-1}, [guard], body.
     ConsumeForeach {
-        binder: Id<'ast>,
+        binder_ids: SmallVec<[Id<'ast>; 1]>,
+        has_guard: bool,
         yield_name: Id<'ast>,
         span: SourceSpan,
     },
@@ -2047,15 +2094,19 @@ impl Debug for K<'_, '_> {
                     .finish()
             }
             Self::ConsumeForeach {
-                binder,
+                binder_ids,
+                has_guard,
                 yield_name,
                 span,
-            } => f
-                .debug_struct("ConsumeForeach")
-                .field("binder", &binder.name)
-                .field("yield_name", &yield_name.name)
-                .field("span", span)
-                .finish(),
+            } => {
+                let names: Vec<&str> = binder_ids.iter().map(|id| id.name).collect();
+                f.debug_struct("ConsumeForeach")
+                    .field("binder_ids", &names)
+                    .field("has_guard", has_guard)
+                    .field("yield_name", &yield_name.name)
+                    .field("span", span)
+                    .finish()
+            }
             Self::ConsumeNew { decls, span } => f
                 .debug_struct("ConsumeNew")
                 .field("decls", decls)
@@ -3154,14 +3205,19 @@ fn collect_ids_into<'ast>(root: AnnProc<'ast>, out: &mut BTreeSet<&'ast str>) {
                 stack.push(*codomain);
             }
             Proc::Foreach {
-                binder,
-                source,
+                binds,
+                where_cond,
                 yield_name,
                 proc,
             } => {
-                out.insert(binder.name);
+                for (id, src) in binds.iter() {
+                    out.insert(id.name);
+                    stack.push(*src);
+                }
                 out.insert(yield_name.name);
-                stack.push(*source);
+                if let Some(c) = where_cond {
+                    stack.push(*c);
+                }
                 stack.push(*proc);
             }
             Proc::Collection(coll) => match coll {
