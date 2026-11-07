@@ -134,6 +134,30 @@ impl<'a, const S: usize> Iterator for PreorderDfsIter<'a, S> {
                 self.stack.push(receiver);
             }
 
+            Proc::Lambda { params, body } => {
+                // Descend into the body first (popped first), then each
+                // param's type expression in forward order. Untyped
+                // params are skipped.
+                self.stack.push(body);
+                for (_id, ty) in params.iter().rev() {
+                    if let Some(t) = ty {
+                        self.stack.push(t);
+                    }
+                }
+            }
+            Proc::App { fun, args } => {
+                self.remember(args);
+                self.stack.push(fun);
+            }
+            Proc::Pi { params, codomain } => {
+                // Walk codomain first (pushed last ≡ popped first), then
+                // each param's type expression in forward order.
+                self.stack.push(codomain);
+                for (_id, ty) in params.iter().rev() {
+                    self.stack.push(ty);
+                }
+            }
+
             Proc::Collection(collection) => match collection {
                 Collection::List { elements, .. }
                 | Collection::Set { elements, .. }
@@ -407,6 +431,18 @@ impl<'a, const S: usize> DfsEventIter<'a, S> {
 
             Proc::Method { receiver, args, .. } => {
                 self.push_children(iter::once(receiver).chain(args));
+            }
+
+            Proc::Lambda { params, body } => {
+                let types = params.iter().filter_map(|(_id, ty)| ty.as_ref());
+                self.push_children(types.chain(iter::once(body)));
+            }
+            Proc::App { fun, args } => {
+                self.push_children(iter::once(fun).chain(args));
+            }
+            Proc::Pi { params, codomain } => {
+                let types = params.iter().map(|(_id, ty)| ty);
+                self.push_children(types.chain(iter::once(codomain)));
             }
 
             Proc::Collection(collection) => match collection {

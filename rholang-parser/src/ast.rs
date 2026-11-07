@@ -151,6 +151,31 @@ pub enum Proc<'ast> {
         scale: Option<AnnProc<'ast>>,
     },
 
+    // Calculus of Constructions (Phase 1b + 2b): lambda abstraction with
+    // optionally-typed parameters. Each param is `(id, Option<type>)`;
+    // bare `x` has no annotation, `x: A` has one. Type annotations are
+    // threaded through for the Phase 2c typechecker; the normalizer
+    // currently discards them.
+    Lambda {
+        params: SmallVec<[(Id<'ast>, Option<AnnProc<'ast>>); 1]>,
+        body: AnnProc<'ast>,
+    },
+    App {
+        fun: AnnProc<'ast>,
+        args: ProcList<'ast>,
+    },
+
+    // Calculus of Constructions (Phase 2a): dependent function type
+    // `(x_0: A_0, …, x_{n-1}: A_{n-1}) -> B`. Each binder gets a name and
+    // a parameter type; the codomain `B` is evaluated under `params.len()`
+    // De Bruijn levels. Non-dependent sugar `A -> B` is represented with
+    // a single anonymous binder (name `_`) whose codomain doesn't
+    // reference the binder.
+    Pi {
+        params: SmallVec<[(Id<'ast>, AnnProc<'ast>); 1]>,
+        codomain: AnnProc<'ast>,
+    },
+
     Bad, // bad process usually represents a parsing error
 }
 
@@ -792,6 +817,10 @@ pub enum SimpleType {
     String,
     Uri,
     ByteArray,
+    // CoC Phase 2c: the universe. `Type` is the type of types; base
+    // types inhabit it. Treated as a SimpleType so it flows through
+    // the existing simple-type connective machinery.
+    Type,
 }
 
 // collections

@@ -2,7 +2,7 @@ use bitvec::slice::BitSlice;
 use bitvec::vec::BitVec;
 use nonempty_collections::NEVec;
 use rholang_tree_sitter_proc_macro::{field, kind};
-use smallvec::{SmallVec, ToSmallVec};
+use smallvec::{SmallVec, ToSmallVec, smallvec};
 use std::collections::BTreeSet;
 use std::fmt::Debug;
 use std::iter::FusedIterator;
@@ -142,7 +142,10 @@ pub(super) fn node_to_ast<'ast>(
                         "String" => SimpleType::String,
                         "Uri" => SimpleType::Uri,
                         "ByteArray" => SimpleType::ByteArray,
-                        _ => unreachable!("Simple type is one of the known keywords"),
+                        "Type" => SimpleType::Type,
+                        _ => unreachable!(
+                            "Simple type is one of the known keywords (Bool, Int, …, Type)"
+                        ),
                     };
                     proc_stack.push(ast_builder.alloc_simple_type(simple_type_value), span);
                 }
@@ -282,6 +285,137 @@ pub(super) fn node_to_ast<'ast>(
                         cont_stack.push(K::EvalList(args_node.walk()));
                     }
                     node = receiver_node;
+                    continue 'parse;
+                }
+                kind!("lambda") => {
+                    // Walk each lambda_param to collect (name, Option<type_node>)
+                    // — type annotations are optional per CoC Phase 2b.
+                    let body_node = get_field(&node, field!("body"));
+                    let params_data: Vec<(Id<'ast>, Option<tree_sitter::Node<'_>>)> = node
+                        .child_by_field_name("params")
+                        .map(|params_node| {
+                            let mut walker = params_node.walk();
+                            params_node
+                                .named_children(&mut walker)
+                                .map(|param_node| {
+                                    let name_node = get_field(&param_node, field!("name"));
+                                    let id = Id {
+                                        name: get_node_value(&name_node, source),
+                                        pos: name_node.start_position().into(),
+                                    };
+                                    let type_node = param_node.child_by_field_name("type");
+                                    (id, type_node)
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default();
+
+                    // Store the shape (id + whether it carries a type) so
+                    // the consume step can pair each type Par back with
+                    // its id. Type nodes get scheduled on cont_stack now
+                    // and resolve to AnnProcs on proc_stack.
+                    let typed_mask: SmallVec<[(Id<'ast>, bool); 1]> = params_data
+                        .iter()
+                        .map(|(id, t)| (*id, t.is_some()))
+                        .collect();
+                    let type_nodes: Vec<_> = params_data.iter().filter_map(|(_, t)| *t).collect();
+
+                    cont_stack.push(K::ConsumeLambda {
+                        params: typed_mask,
+                        span,
+                    });
+                    // Body gets parsed LAST (popped last from cont_stack
+                    // means it's on top after type nodes are added).
+                    cont_stack.push(K::EvalDelayed(body_node));
+                    // Push type nodes in reverse so the first-typed-param's
+                    // type lands on top.
+                    for tn in type_nodes.iter().rev() {
+                        cont_stack.push(K::EvalDelayed(*tn));
+                    }
+
+                    // Continue by popping the next scheduled subtree. The
+                    // top of cont_stack after the pushes above is either
+                    // the first type node (typed param case) or the body
+                    // (zero-typed-params case). If it's K::EvalDelayed we
+                    // consume it; otherwise restore and parse the body.
+                    node = match cont_stack.pop() {
+                        Some(K::EvalDelayed(n)) => n,
+                        Some(other) => {
+                            cont_stack.push(other);
+                            body_node
+                        }
+                        None => body_node,
+                    };
+                    continue 'parse;
+                }
+                kind!("app") => {
+                    let fun_node = get_field(&node, field!("fun"));
+                    // Zero-arg applications have no `args` field (tree-sitter
+                    // forbids empty-matching rules); use optional access.
+                    let args_node = node.child_by_field_name("args");
+
+                    let arity = args_node
+                        .as_ref()
+                        .map(|n| n.named_child_count())
+                        .unwrap_or(0);
+                    cont_stack.push(K::ConsumeApp { arity, span });
+
+                    if let Some(args) = args_node
+                        && arity > 0
+                    {
+                        cont_stack.push(K::EvalList(args.walk()));
+                    }
+                    node = fun_node;
+                    continue 'parse;
+                }
+                kind!("pi") => {
+                    let codomain_node = get_field(&node, field!("codomain"));
+                    let params_node = node.child_by_field_name("params");
+                    let dom_node = node.child_by_field_name("dom");
+
+                    // Two surface forms:
+                    //   dependent `(x: A, y: B, …) -> C` — `params` field
+                    //     is a `pi_params` node of `pi_param(name, type)`
+                    //     children
+                    //   sugar `A -> B` — `dom` field holds the single
+                    //     param type; synthesize a `_` binder so downstream
+                    //     sees a uniform Pi shape
+                    let (param_ids, param_type_nodes): (
+                        SmallVec<[Id<'ast>; 1]>,
+                        Vec<tree_sitter::Node<'_>>,
+                    ) = if let Some(pp) = params_node {
+                        let mut walker = pp.walk();
+                        let mut ids: SmallVec<[Id<'ast>; 1]> = SmallVec::new();
+                        let mut types: Vec<tree_sitter::Node<'_>> = Vec::new();
+                        for child in pp.named_children(&mut walker) {
+                            let name_node = get_field(&child, field!("name"));
+                            ids.push(Id {
+                                name: get_node_value(&name_node, source),
+                                pos: name_node.start_position().into(),
+                            });
+                            types.push(get_field(&child, field!("type")));
+                        }
+                        (ids, types)
+                    } else {
+                        let anon = Id {
+                            name: "_",
+                            pos: node.start_position().into(),
+                        };
+                        let dom = dom_node.expect("Pi must carry either params or dom");
+                        let types: Vec<tree_sitter::Node<'_>> = vec![dom];
+                        (smallvec![anon], types)
+                    };
+
+                    cont_stack.push(K::ConsumePi { param_ids, span });
+                    // Push codomain first (popped last, parsed last after
+                    // all param types are on proc_stack).
+                    cont_stack.push(K::EvalDelayed(codomain_node));
+                    // Push param types in reverse so index-0 pops first.
+                    for tn in param_type_nodes.iter().skip(1).rev() {
+                        cont_stack.push(K::EvalDelayed(*tn));
+                    }
+                    // First param type continues the parse loop directly.
+                    node = param_type_nodes[0];
                     continue 'parse;
                 }
                 kind!("or")
@@ -1656,6 +1790,52 @@ fn apply_cont<'tree, 'ast>(
                                 ast_builder.alloc_method(id, recv, args).ann(span)
                             })
                         }
+                        K::ConsumeLambda { params, span } => {
+                            // proc_stack layout bottom→top:
+                            //   type_0, type_1, …, type_{k-1}, body
+                            // where k = count of params with a type.
+                            let typed_count = params.iter().filter(|(_, t)| *t).count();
+                            proc_stack.replace_top_slice(typed_count + 1, |slice| {
+                                let (body, types) = slice.split_last().expect("lambda body on top");
+                                let mut types_iter = types.iter();
+                                let paired: Vec<(Id<'_>, Option<AnnProc<'_>>)> = params
+                                    .iter()
+                                    .map(|(id, has_type)| {
+                                        let ty = if *has_type {
+                                            Some(
+                                                *types_iter
+                                                    .next()
+                                                    .expect("typed param missing proc_stack entry"),
+                                            )
+                                        } else {
+                                            None
+                                        };
+                                        (*id, ty)
+                                    })
+                                    .collect();
+                                ast_builder.alloc_lambda(&paired, *body).ann(span)
+                            })
+                        }
+                        K::ConsumeApp { arity, span } => {
+                            proc_stack.replace_top_slice(arity + 1, |fun_args| {
+                                let fun = fun_args[0];
+                                let args = &fun_args[1..];
+                                ast_builder.alloc_app(fun, args).ann(span)
+                            })
+                        }
+                        K::ConsumePi { param_ids, span } => {
+                            let total = param_ids.len() + 1;
+                            proc_stack.replace_top_slice(total, |slice| {
+                                let (codomain, types) =
+                                    slice.split_last().expect("Pi slice non-empty");
+                                let pairs: Vec<(Id<'_>, AnnProc<'_>)> = param_ids
+                                    .iter()
+                                    .zip(types.iter())
+                                    .map(|(id, ty)| (*id, *ty))
+                                    .collect();
+                                ast_builder.alloc_pi(&pairs, *codomain).ann(span)
+                            })
+                        }
                         K::ConsumeNew { decls, span } => proc_stack
                             .replace_top(|body| ast_builder.alloc_new(body, decls).ann(span)),
                         K::ConsumePar { span } => proc_stack.replace_top2(|left, right| {
@@ -1842,6 +2022,28 @@ enum K<'tree, 'ast> {
         id: Id<'ast>,
         arity: usize,
     },
+    // Calculus of Constructions (Phase 1c). Lambda carries its surface
+    // params so they can be plumbed into Proc::Lambda; application carries
+    // the argument arity so the dispatcher knows how many entries to pop
+    // off proc_stack.
+    // params carries `(id, has_type)`; each `true` in the mask means a
+    // matching AnnProc<type> sits on proc_stack in parse order below the
+    // body. The consume step zips them back together.
+    ConsumeLambda {
+        params: SmallVec<[(Id<'ast>, bool); 1]>,
+        span: SourceSpan,
+    },
+    ConsumeApp {
+        arity: usize,
+        span: SourceSpan,
+    },
+    // Calculus of Constructions (Phase 2a). Pi carries the surface
+    // identifiers of its binders; `param_ids.len()` param types plus the
+    // codomain are popped from proc_stack when this fires.
+    ConsumePi {
+        param_ids: SmallVec<[Id<'ast>; 1]>,
+        span: SourceSpan,
+    },
     ConsumeNew {
         decls: Vec<NameDecl<'ast>>,
         span: SourceSpan,
@@ -2000,6 +2202,25 @@ impl Debug for K<'_, '_> {
                 .field("arity", arity)
                 .field("span", span)
                 .finish(),
+            Self::ConsumeLambda { params, span } => {
+                let names: Vec<(&str, bool)> = params.iter().map(|(id, t)| (id.name, *t)).collect();
+                f.debug_struct("ConsumeLambda")
+                    .field("params", &names)
+                    .field("span", span)
+                    .finish()
+            }
+            Self::ConsumeApp { arity, span } => f
+                .debug_struct("ConsumeApp")
+                .field("arity", arity)
+                .field("span", span)
+                .finish(),
+            Self::ConsumePi { param_ids, span } => {
+                let names: Vec<&str> = param_ids.iter().map(|id| id.name).collect();
+                f.debug_struct("ConsumePi")
+                    .field("param_ids", &names)
+                    .field("span", span)
+                    .finish()
+            }
             Self::ConsumeNew { decls, span } => f
                 .debug_struct("ConsumeNew")
                 .field("decls", decls)
@@ -3220,6 +3441,31 @@ fn collect_ids_into<'ast>(root: AnnProc<'ast>, out: &mut BTreeSet<&'ast str>) {
                     }
                     stack.push(*body);
                 }
+            }
+            // Lambda binders introduce surface identifiers scoped to body;
+            // collect them (the walker is a "names mentioned anywhere" sweep,
+            // not scope-sensitive).
+            Proc::Lambda { params, body } => {
+                for (id, ty) in params.iter() {
+                    out.insert(id.name);
+                    if let Some(t) = ty {
+                        stack.push(*t);
+                    }
+                }
+                stack.push(*body);
+            }
+            Proc::App { fun, args } => {
+                stack.push(*fun);
+                for a in args.iter() {
+                    stack.push(*a);
+                }
+            }
+            Proc::Pi { params, codomain } => {
+                for (id, ty) in params.iter() {
+                    out.insert(id.name);
+                    stack.push(*ty);
+                }
+                stack.push(*codomain);
             }
             Proc::Collection(coll) => match coll {
                 Collection::List {

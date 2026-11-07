@@ -1,5 +1,6 @@
 ---
 source: rholang-parser/tests/golden.rs
+assertion_line: 23
 expression: result
 ---
 Fail(
@@ -39,34 +40,18 @@ Fail(
                     error: UnexpectedVar,
                     span: SourceSpan {
                         start: SourcePos {
-                            line: 5,
-                            col: 37,
+                            line: 4,
+                            col: 9,
                         },
                         end: SourcePos {
-                            line: 5,
-                            col: 41,
+                            line: 4,
+                            col: 12,
                         },
                     },
-                    byte_range: 161..165,
+                    byte_range: 108..111,
                 },
                 AnnParsingError {
                     error: UnexpectedVar,
-                    span: SourceSpan {
-                        start: SourcePos {
-                            line: 8,
-                            col: 31,
-                        },
-                        end: SourcePos {
-                            line: 8,
-                            col: 35,
-                        },
-                    },
-                    byte_range: 252..256,
-                },
-                AnnParsingError {
-                    error: SyntaxError {
-                        sexp: "(ERROR (ground_sig name: (var)) (block (var)))",
-                    },
                     span: SourceSpan {
                         start: SourcePos {
                             line: 7,
@@ -74,10 +59,10 @@ Fail(
                         },
                         end: SourcePos {
                             line: 7,
-                            col: 27,
+                            col: 12,
                         },
                     },
-                    byte_range: 201..219,
+                    byte_range: 201..204,
                 },
             ],
         },
