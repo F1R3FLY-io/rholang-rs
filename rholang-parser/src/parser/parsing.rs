@@ -578,21 +578,24 @@ pub(super) fn node_to_ast<'ast>(
                 }
 
                 kind!("new") => {
+                    /// The earliest declaration whose name is declared again,
+                    /// with the next declaration of that name.
                     fn check_for_duplicate_decls(
                         decls: &[NameDecl],
                     ) -> Option<(SourcePos, SourcePos)> {
-                        // Check for duplicates without requiring sorted input
-                        // Use O(n^2) comparison since n is typically small
-                        for i in 0..decls.len() {
-                            for j in (i + 1)..decls.len() {
-                                if decls[i].id.name == decls[j].id.name {
-                                    let first = decls[i].id.pos;
-                                    let second = decls[j].id.pos;
-                                    return Some((first, second));
-                                }
-                            }
+                        let mut seen: std::collections::HashMap<&str, (usize, Option<usize>)> =
+                            std::collections::HashMap::with_capacity(decls.len());
+                        for (index, decl) in decls.iter().enumerate() {
+                            seen.entry(decl.id.name)
+                                .and_modify(|(_, second)| {
+                                    second.get_or_insert(index);
+                                })
+                                .or_insert((index, None));
                         }
-                        None
+                        seen.into_values()
+                            .filter_map(|(first, second)| second.map(|second| (first, second)))
+                            .min()
+                            .map(|(first, second)| (decls[first].id.pos, decls[second].id.pos))
                     }
 
                     let decls_node = get_field(&node, field!("decls"));
