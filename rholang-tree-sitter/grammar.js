@@ -77,6 +77,7 @@ module.exports = grammar({
             $.agent_block,
             $.try_block,
             $.input,
+            $.foreach,
             $.send,
             $._proc_expression
         ),
@@ -242,6 +243,32 @@ module.exports = grammar({
             'for', '(', field('receipts', $.receipts), ')',
             field('proc', $.block)
         )),
+
+        // f1r3lang-with-monads Stage B (single `group` with §4.4 `&`
+        // and §4.5 `where`): the `foreach` comprehension.
+        //
+        //   foreach ( b_0 <- m_0 & … & b_{n-1} <- m_{n-1} where c? )
+        //   yield ( yield_name ) proc
+        //
+        // Still deferred: `;`-separated dependent groups, `by
+        // TheoryInstance`, `[MonadName]` qualifier. Those land once
+        // the DDL on feature/f1r3lang-mettail-only ships.
+        foreach: $ => prec(2, seq(
+            'foreach', '(',
+                field('binds', $.foreach_binds),
+                optional(seq('where', field('guard', $._proc))),
+            ')',
+            'yield', '(', field('yield_name', $.var), ')',
+            field('proc', $.block)
+        )),
+
+        foreach_binds: $ => seq($.foreach_bind, repeat(seq('&', $.foreach_bind))),
+
+        foreach_bind: $ => seq(
+            field('binder', $.var),
+            '<-',
+            field('source', $._proc_expression)
+        ),
 
         send: $ => prec(3, seq(
             field('channel', $.name),

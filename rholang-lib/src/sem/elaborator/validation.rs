@@ -268,7 +268,8 @@ impl<'a, 'ast> TypeValidator<'a, 'ast> {
             | Proc::BinaryExp { .. }
             | Proc::Lambda { .. }
             | Proc::App { .. }
-            | Proc::Pi { .. } => Ok(MessageType::Unknown),
+            | Proc::Pi { .. }
+            | Proc::Foreach { .. } => Ok(MessageType::Unknown),
 
             // Invalid patterns
             Proc::IfThenElse { .. } | Proc::Select { .. } | Proc::SendSync { .. } => {
