@@ -77,6 +77,7 @@ module.exports = grammar({
             $.agent_block,
             $.try_block,
             $.input,
+            $.foreach,
             $.send,
             $.signed_term,
             $.token_stack,
@@ -249,6 +250,32 @@ module.exports = grammar({
         // `for(...) {% SignedProc %}` (the body is a signed process, no trailing
         // `[s]` — the wrapper-with-signature `{% P %}[s]` is the OUTER signed_term).
         signed_cont: $ => prec(2, seq('{%', field('proc', $._proc), '%}')),
+
+        // f1r3lang-with-monads Stage B (single `group` with §4.4 `&`
+        // and §4.5 `where`): the `foreach` comprehension.
+        //
+        //   foreach ( b_0 <- m_0 & … & b_{n-1} <- m_{n-1} where c? )
+        //   yield ( yield_name ) proc
+        //
+        // Still deferred: `;`-separated dependent groups, `by
+        // TheoryInstance`, `[MonadName]` qualifier. Those land once
+        // the DDL on feature/f1r3lang-mettail-only ships.
+        foreach: $ => prec(2, seq(
+            'foreach', '(',
+                field('binds', $.foreach_binds),
+                optional(seq('where', field('guard', $._proc))),
+            ')',
+            'yield', '(', field('yield_name', $.var), ')',
+            field('proc', $.block)
+        )),
+
+        foreach_binds: $ => seq($.foreach_bind, repeat(seq('&', $.foreach_bind))),
+
+        foreach_bind: $ => seq(
+            field('binder', $.var),
+            '<-',
+            field('source', $._proc_expression)
+        ),
 
         send: $ => prec(3, seq(
             field('channel', $.name),

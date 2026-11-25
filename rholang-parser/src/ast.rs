@@ -176,6 +176,30 @@ pub enum Proc<'ast> {
         codomain: AnnProc<'ast>,
     },
 
+    // f1r3lang-with-monads Stage B (single `group`): the `foreach`
+    // comprehension.
+    //
+    // Surface:
+    //   `foreach ( b_0 <- m_0 & … & b_{n-1} <- m_{n-1} where c? )
+    //    yield ( yield_name ) body`
+    //
+    // The binds are independent (`&`, §4.4): no source may mention a
+    // binder of its own group; the reducer iterates their cartesian
+    // product. The optional `where` guard (§4.5) is checked under all
+    // binders; a failed guard contributes the aggregator's unit
+    // instead of the body's normal form.
+    //
+    // Deferred (still pending the DDL on
+    // `feature/f1r3lang-mettail-only`): `;`-separated dependent groups,
+    // `by TheoryInstance` for a non-default aggregator, monad-qualifier
+    // `[M]`.
+    Foreach {
+        binds: SmallVec<[(Id<'ast>, AnnProc<'ast>); 1]>,
+        where_cond: Option<AnnProc<'ast>>,
+        yield_name: Id<'ast>,
+        proc: AnnProc<'ast>,
+    },
+
     Bad, // bad process usually represents a parsing error
 }
 
