@@ -35,13 +35,30 @@ print_hook_summary() {
     echo "  pre-push:   cargo clippy, script tests, cargo test (full workspace)"
 }
 
+# Only names that git runs as hooks (githooks(5)) count. Other executables in
+# .git/hooks/, such as a ctags helper that post-* hooks call, are not hooks.
+is_git_hook_name() {
+    case "$1" in
+    applypatch-msg | pre-applypatch | post-applypatch | pre-commit | \
+        pre-merge-commit | prepare-commit-msg | commit-msg | post-commit | \
+        pre-rebase | post-checkout | post-merge | pre-push | pre-receive | \
+        update | proc-receive | post-receive | post-update | reference-transaction | \
+        push-to-checkout | pre-auto-gc | post-rewrite | sendemail-validate | \
+        fsmonitor-watchman | p4-changelist | p4-prepare-changelist | \
+        p4-post-changelist | p4-pre-submit | post-index-change)
+        return 0
+        ;;
+    *) return 1 ;;
+    esac
+}
+
 # Hooks in .git/hooks/ that core.hooksPath would stop running.
 shadowed_local_hooks() {
     local hook name
     for hook in "$HOOKS_TARGET"/*; do
         [[ -f "$hook" && -x "$hook" ]] || continue
         name=$(basename "$hook")
-        [[ "$name" == *.sample ]] && continue
+        is_git_hook_name "$name" || continue
         [[ -f "$HOOKS_SOURCE/$name" ]] && continue
         echo "$name"
     done
