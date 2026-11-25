@@ -354,7 +354,7 @@ pub(super) fn node_to_ast<'ast>(
                 // the surface; schedules each source, then the optional
                 // where-guard, then the body for proc_stack so
                 // ConsumeForeach can pop them in a known order.
-                kind!("foreach") => {
+                kind!("foreach") => 'foreach: {
                     let binds_node = get_field(&node, field!("binds"));
                     let yield_node = get_field(&node, field!("yield_name"));
                     let proc_node = get_field(&node, field!("proc"));
@@ -363,17 +363,32 @@ pub(super) fn node_to_ast<'ast>(
                     let mut walker = binds_node.walk();
                     let mut binder_ids: SmallVec<[Id<'ast>; 1]> = SmallVec::new();
                     let mut source_nodes: Vec<tree_sitter::Node<'_>> = Vec::new();
-                    for bind_node in binds_node.named_children(&mut walker) {
-                        let binder_node = get_field(&bind_node, field!("binder"));
-                        let source_node = get_field(&bind_node, field!("source"));
+                    // Malformed binds (`a & & b`, `a && b`, `a & 1 & b`)
+                    // arrive as ERROR siblings of the foreach_bind nodes,
+                    // or as binds that lack a field. Skip them;
+                    // query_errors reports the ERROR nodes once the parse
+                    // completes.
+                    for bind_node in
+                        named_children_of_kind(&binds_node, kind!("foreach_bind"), &mut walker)
+                    {
+                        let (Some(binder_node), Some(source_node)) = (
+                            bind_node.child_by_field_id(field!("binder")),
+                            bind_node.child_by_field_id(field!("source")),
+                        ) else {
+                            continue;
+                        };
                         binder_ids.push(Id {
                             name: get_node_value(&binder_node, source),
                             pos: binder_node.start_position().into(),
                         });
                         source_nodes.push(source_node);
                     }
-                    let n_binds = binder_ids.len();
-                    debug_assert!(n_binds >= 1, "foreach must have >=1 bind");
+                    // Without a usable bind there is nothing to build: the
+                    // tree holds an error, so mark this node bad.
+                    let Some(&first_source) = source_nodes.first() else {
+                        bad = true;
+                        break 'foreach;
+                    };
 
                     let yield_name = Id {
                         name: get_node_value(&yield_node, source),
@@ -403,7 +418,7 @@ pub(super) fn node_to_ast<'ast>(
                         cont_stack.push(K::EvalDelayed(*sn));
                     }
                     // Kick off with the first source directly.
-                    node = source_nodes[0];
+                    node = first_source;
                     continue 'parse;
                 }
                 kind!("app") => {
