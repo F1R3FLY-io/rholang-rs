@@ -165,6 +165,21 @@ container-fix:
 container-shell:
 	./scripts/run-in-container.sh
 
+# Install the git hooks in .githooks/ (pre-commit, commit-msg, pre-push)
+.PHONY: hooks
+hooks:
+	./scripts/setup-hooks.sh
+
+# Run the hook and CI script tests (no Rust build)
+.PHONY: test-scripts
+test-scripts:
+	@set -e; for t in .github/scripts/test-*.sh; do bash "$$t"; done
+
+# Run the CI markdown link check locally (needs lychee)
+.PHONY: check-links
+check-links:
+	./scripts/check-links.sh
+
 # Help target
 .PHONY: help
 help:
@@ -198,6 +213,9 @@ help:
 	@echo "  wasm-build      Build the rholang-wasm package (RELEASE=1 TARGET=web OUT_DIR=pkg FEATURES=...)"
 	@echo "  wasm-serve      Build and serve rholang-wasm demo (PORT=8000 RELEASE=1 OPEN=1)"
 	@echo "  setup           Install development dependencies"
+	@echo "  hooks           Install the git hooks in .githooks/"
+	@echo "  test-scripts    Run the git hook and CI script tests"
+	@echo "  check-links     Run the CI markdown link check locally (needs lychee)"
 	@echo "  help            Show this help message"
 	@echo ""
 	@echo "Container Targets:"

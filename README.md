@@ -217,6 +217,34 @@ cargo test --all-features && \
 cargo build --release
 ```
 
+### Git Hooks
+
+Install the repository git hooks once per clone:
+
+```bash
+./scripts/setup-hooks.sh           # or: make hooks
+./scripts/setup-hooks.sh --status  # show the current configuration
+./scripts/setup-hooks.sh --copy    # copy into .git/hooks/ (keeps other local hooks)
+./scripts/setup-hooks.sh --remove  # remove the hooks
+```
+
+| Hook | Checks |
+|------|--------|
+| `pre-commit` | `cargo fmt --check` and `cargo clippy --workspace --all-features --all-targets -- -D warnings` |
+| `commit-msg` | Rejects `Claude-Session` trailers, denied identities (`.github/denied-identities.txt`), and `Co-authored-by` identities that have not authored a commit in this history |
+| `pre-push` | Clippy, the script tests in `.github/scripts/test-*.sh`, and `cargo test --workspace` |
+
+The default install sets `core.hooksPath`, so git stops running any other hooks in `.git/hooks/`. The installer lists those hooks. Use `--copy` to keep them.
+
+The hooks skip in CI. Each hook prints its `SKIP_*` options when a check fails. For example, `SKIP_TESTS=1 git push` or `TEST_CRATES="rholang-vm" git push`.
+
+Other checks:
+
+```bash
+make test-scripts   # hook and CI script tests (no Rust build)
+make check-links    # markdown link check with the CI lychee settings
+```
+
 ## Rholang Language Example
 
 ```rholang

@@ -1,0 +1,51 @@
+# Behavioral tests of the git hooks and CI scripts. They need no Rust build.
+# The same tests run locally from .githooks/pre-push and `make test-scripts`.
+name: Script Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  script_tests:
+    name: Script Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Shellcheck hooks and scripts
+        shell: bash -euo pipefail {0}
+        run: shellcheck -S warning .githooks/* .github/scripts/*.sh scripts/setup-hooks.sh scripts/check-links.sh
+
+      - name: Verify commit trailer check
+        shell: bash -euo pipefail {0}
+        run: .github/scripts/test-check-commit-trailers.sh
+
+      - name: Verify pre-commit hook
+        shell: bash -euo pipefail {0}
+        run: .github/scripts/test-pre-commit-hook.sh
+
+      - name: Verify pre-push hook
+        shell: bash -euo pipefail {0}
+        run: .github/scripts/test-pre-push-hook.sh
+
+      - name: Verify hook installer
+        shell: bash -euo pipefail {0}
+        run: .github/scripts/test-setup-hooks.sh
+
+      - name: Verify link check configuration
+        shell: bash -euo pipefail {0}
+        run: .github/scripts/test-link-check.sh

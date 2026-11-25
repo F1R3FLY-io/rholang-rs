@@ -1,0 +1,10 @@
+# Denied commit identities (CLAUDE.md "Commit Messages").
+#
+# One lowercase entry per line: an exact email address, or @domain for every
+# address in that domain. A denied identity is rejected as a commit author
+# or co-author even when the base history ratifies it. CI reads this file
+# from the base branch, so a pull request cannot remove its own block.
+#
+# AI tool identities (an AI co-author put an account in the GitHub
+# contributors graph; see F1R3FLY-io/f1r3node-rust PR #657).
+@anthropic.com

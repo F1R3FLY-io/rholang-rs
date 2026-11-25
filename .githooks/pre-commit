@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+#
+# pre-commit hook - Run formatting and lint checks before committing
+#
+# Runs cargo fmt (check mode) and cargo clippy to catch style and lint
+# issues before they enter the repository.
+#
+# To bypass (use sparingly): git commit --no-verify
+#
+# Environment variables:
+#   SKIP_FMT=1      - Skip cargo fmt check
+#   SKIP_CLIPPY=1   - Skip cargo clippy
+#   VERBOSE=1       - Show full command output
+#
+# CI environment detection:
+#   Automatically skips in CI environments (CI, GITLAB_CI, GITHUB_ACTIONS).
+#
+
+set -euo pipefail
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+# git exports GIT_INDEX_FILE=<repo>/.git/index.lock into this hook's
+# environment. cargo shells out to git for git dependencies, and those child
+# git processes inherit the variable and write into this repository's pending
+# lock index, which makes the commit fail with "Error building trees". Drop
+# the inherited git environment before running any cargo command.
+unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE
+
+SKIP_FMT="${SKIP_FMT:-0}"
+SKIP_CLIPPY="${SKIP_CLIPPY:-0}"
+VERBOSE="${VERBOSE:-0}"
+
+# Skip in CI
+if [ -n "${CI:-}" ] || [ -n "${GITLAB_CI:-}" ] || [ -n "${GITHUB_ACTIONS:-}" ]; then
+    echo "Skipping pre-commit hooks in CI environment"
+    exit 0
+fi
+
+cd "$REPO_ROOT"
+
+FAILED=0
+
+echo ""
+echo -e "${CYAN}Running pre-commit checks...${NC}"
+echo "================================"
+
+# --- cargo fmt ---
+if [[ "$SKIP_FMT" == "1" ]]; then
+    echo -e "  ${CYAN}[fmt]${NC}    ${YELLOW}SKIP${NC} (SKIP_FMT=1)"
+else
+    fmt_out=$(mktemp)
+    if cargo fmt --all -- --check >"$fmt_out" 2>&1; then
+        echo -e "  ${CYAN}[fmt]${NC}    ${GREEN}PASS${NC}"
+    else
+        echo -e "  ${CYAN}[fmt]${NC}    ${RED}FAIL${NC}"
+        FAILED=1
+        if [[ "$VERBOSE" == "1" ]]; then
+            cat "$fmt_out"
+        else
+            echo ""
+            echo -e "  ${YELLOW}Unformatted files detected. Run:${NC}"
+            echo "    cargo fmt --all"
+            echo ""
+        fi
+    fi
+    rm -f "$fmt_out"
+fi
+
+# --- cargo clippy ---
+if [[ "$SKIP_CLIPPY" == "1" ]]; then
+    echo -e "  ${CYAN}[clippy]${NC} ${YELLOW}SKIP${NC} (SKIP_CLIPPY=1)"
+else
+    clippy_out=$(mktemp)
+    if cargo clippy --workspace --all-features --all-targets -- -D warnings >"$clippy_out" 2>&1; then
+        echo -e "  ${CYAN}[clippy]${NC} ${GREEN}PASS${NC}"
+    else
+        echo -e "  ${CYAN}[clippy]${NC} ${RED}FAIL${NC}"
+        FAILED=1
+        if [[ "$VERBOSE" == "1" ]]; then
+            cat "$clippy_out"
+        else
+            # Show just the error lines
+            grep -E "^error" "$clippy_out" | head -20 || true
+            echo ""
+            echo -e "  ${YELLOW}Run for details:${NC}"
+            echo "    cargo clippy --workspace --all-features --all-targets -- -D warnings"
+            echo ""
+        fi
+    fi
+    rm -f "$clippy_out"
+fi
+
+# Summary
+echo "================================"
+if [[ $FAILED -eq 0 ]]; then
+    echo -e "${GREEN}All pre-commit checks passed!${NC}"
+    exit 0
+else
+    echo -e "${RED}Pre-commit checks failed! Commit aborted.${NC}"
+    echo ""
+    echo "Fix the issues and try again, or bypass with: git commit --no-verify"
+    echo ""
+    echo "Options:"
+    echo "  SKIP_FMT=1 git commit       - Skip formatting check"
+    echo "  SKIP_CLIPPY=1 git commit    - Skip clippy lint check"
+    echo "  VERBOSE=1 git commit        - Show full output"
+    exit 1
+fi
