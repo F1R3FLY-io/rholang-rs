@@ -22,9 +22,11 @@ SETUP="$REPO/scripts/setup-hooks.sh"
 HOOKS_DIR="$REPO/.git/hooks"
 mkdir -p "$HOOKS_DIR"
 
-# A local hook that core.hooksPath would shadow.
+# A local hook that core.hooksPath would shadow, and an executable helper
+# script that is not a hook (ctags setups call one from their post-* hooks).
 printf '#!/bin/sh\nexit 0\n' >"$HOOKS_DIR/post-checkout"
-chmod +x "$HOOKS_DIR/post-checkout"
+printf '#!/bin/sh\nexit 0\n' >"$HOOKS_DIR/ctags"
+chmod +x "$HOOKS_DIR/post-checkout" "$HOOKS_DIR/ctags"
 
 in_repo() { (cd "$REPO" && "$@"); }
 
@@ -32,7 +34,8 @@ in_repo() { (cd "$REPO" && "$@"); }
 in_repo bash "$SETUP" >"$TMP/install.out" 2>&1
 [[ "$(git -C "$REPO" config --local core.hooksPath)" == .githooks ]] || fail 'core.hooksPath must point at .githooks'
 [[ -x "$REPO/.githooks/pre-commit" ]] || fail 'install must make the hooks executable'
-grep -q 'post-checkout' "$TMP/install.out" || fail 'install must warn about shadowed .git/hooks entries'
+grep -q -- '- post-checkout$' "$TMP/install.out" || fail 'install must warn about shadowed .git/hooks entries'
+if grep -q -- '- ctags$' "$TMP/install.out"; then fail 'install must not list helper scripts that are not git hooks'; fi
 in_repo bash "$SETUP" --status >"$TMP/status.out" 2>&1
 grep -q 'core.hooksPath: .*\.githooks' "$TMP/status.out" || fail 'status must report core.hooksPath'
 
