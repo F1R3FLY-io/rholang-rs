@@ -1,0 +1,299 @@
+#!/usr/bin/env bash
+#
+# pre-push hook - Run lint, script tests, and the test suite before pushing
+#
+# Prevents pushing code with regressions. Mirrors the checks in
+# .github/workflows/rust.yaml and .github/workflows/script-tests.yml.
+# To bypass (use sparingly): git push --no-verify
+#
+# Installation (run from repo root):
+#   ./scripts/setup-hooks.sh           # Recommended: uses git core.hooksPath
+#   ./scripts/setup-hooks.sh --copy    # Alternative: copies to .git/hooks/
+#
+# Environment variables:
+#   SKIP_TESTS=1          - Skip cargo tests
+#   SKIP_CLIPPY=1         - Skip clippy (already runs on commit)
+#   SKIP_SCRIPT_TESTS=1   - Skip the hook and CI script tests (.github/scripts/test-*.sh)
+#   VERBOSE=1             - Show full output of failing steps
+#   TEST_TIMEOUT=1800     - Per-command timeout in seconds (default: 1800)
+#   TEST_CRATES="rholang-vm rholang-parser" - Test only these crates
+#   TEST_RUNNER=cargo     - cargo (default, includes doctests) or nextest
+#
+# CI environment detection:
+#   Automatically skips in CI environments (CI, GITLAB_CI, GITHUB_ACTIONS)
+#   since the same checks run in the pipeline.
+#
+# The script keeps to bash 3.2 features (the macOS system bash).
+#
+
+set -euo pipefail
+
+# Diagnostic: trace hook exit to stderr
+_hook_t0=$(date +%s)
+trap 'rc=$?; echo "[pre-push hook: exit $rc after $(($(date +%s) - _hook_t0))s]" >&2' EXIT
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+# Configuration from environment
+SKIP_TESTS="${SKIP_TESTS:-0}"
+SKIP_CLIPPY="${SKIP_CLIPPY:-0}"
+SKIP_SCRIPT_TESTS="${SKIP_SCRIPT_TESTS:-0}"
+VERBOSE="${VERBOSE:-0}"
+TEST_TIMEOUT="${TEST_TIMEOUT:-1800}"
+TEST_CRATES="${TEST_CRATES:-}"
+TEST_RUNNER="${TEST_RUNNER:-cargo}"
+
+# Skip in CI environments (checks run separately in the pipeline)
+if [ -n "${CI:-}" ] || [ -n "${GITLAB_CI:-}" ] || [ -n "${GITHUB_ACTIONS:-}" ]; then
+    echo "Skipping pre-push hooks in CI environment"
+    exit 0
+fi
+
+# Remote name is the hook's first argument (falls back to origin only if
+# git ever invokes the hook without args).
+remote_name="${1:-origin}"
+zero="0000000000000000000000000000000000000000"
+
+# Check if there are actually new commits to push
+has_new_commits=0
+push_info=""
+while IFS=' ' read -r local_ref local_oid remote_ref remote_oid; do
+    push_info+="$local_ref $local_oid $remote_ref $remote_oid"$'\n'
+    if [ "$local_oid" != "$remote_oid" ] && [ "$local_oid" != "$zero" ]; then
+        has_new_commits=1
+    fi
+done
+if [ -z "$push_info" ] || [ "$has_new_commits" -eq 0 ]; then
+    echo -e "${CYAN}No new commits to push. Skipping checks.${NC}"
+    exit 0
+fi
+
+# True when every ref being pushed already sits at its local OID on the
+# remote (racing push landed first). Keyed off the stdin refspecs, never
+# HEAD: HEAD may be detached or on a different branch than the refs being
+# pushed, and a ref that is absent on the remote (new branch) must count
+# as needing a push.
+refs_already_on_remote() {
+    local local_ref local_oid remote_ref remote_oid actual_oid
+    while IFS=' ' read -r local_ref local_oid remote_ref remote_oid; do
+        [ -z "$local_ref" ] && continue
+        [ "$local_oid" = "$zero" ] && continue
+        actual_oid=$(git ls-remote "$remote_name" "$remote_ref" 2>/dev/null | awk '{print $1}') || actual_oid=""
+        if [ "$actual_oid" != "$local_oid" ]; then
+            return 1
+        fi
+    done <<<"$push_info"
+    return 0
+}
+
+# Double-check against the actual remote to catch racing pushes
+if refs_already_on_remote; then
+    git fetch "$remote_name" 2>/dev/null || true
+    echo -e "${CYAN}Already up to date with remote. Nothing to push.${NC}"
+    exit 1
+fi
+
+# Unset git environment variables that leak from hook context
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE 2>/dev/null || true
+
+cd "$REPO_ROOT"
+
+if [[ "$TEST_RUNNER" != "nextest" && "$TEST_RUNNER" != "cargo" ]]; then
+    echo -e "${RED}Invalid TEST_RUNNER: ${TEST_RUNNER}. Use cargo or nextest.${NC}" >&2
+    exit 1
+fi
+
+if [[ "$SKIP_TESTS" != "1" && "$TEST_RUNNER" == "nextest" ]] && ! cargo nextest --version >/dev/null 2>&1; then
+    echo -e "${RED}TEST_RUNNER=nextest needs cargo-nextest.${NC}" >&2
+    echo "Install it with: cargo install cargo-nextest --locked" >&2
+    exit 1
+fi
+
+# GNU timeout is optional: without it, steps run without a time limit.
+TIMEOUT_CMD=()
+if command -v timeout >/dev/null 2>&1; then
+    TIMEOUT_CMD=(timeout "$TEST_TIMEOUT")
+fi
+
+RESULTS_DIR="$(mktemp -d)"
+step_pid=""
+
+terminate_process_tree() {
+    local pid="$1" child
+    kill -0 "$pid" 2>/dev/null || return 0
+    kill -STOP "$pid" 2>/dev/null || true
+    while IFS= read -r child; do
+        [[ -n "$child" ]] && terminate_process_tree "$child"
+    done < <(pgrep -P "$pid" 2>/dev/null || true)
+    kill -TERM "$pid" 2>/dev/null || true
+    kill -CONT "$pid" 2>/dev/null || true
+}
+
+cleanup() {
+    local rc="$1"
+    trap - EXIT INT TERM
+    if [[ -n "$step_pid" ]]; then
+        terminate_process_tree "$step_pid"
+        wait "$step_pid" 2>/dev/null || true
+    fi
+    rm -rf "$RESULTS_DIR"
+    echo "[pre-push hook: exit $rc after $(($(date +%s) - _hook_t0))s]" >&2
+    exit "$rc"
+}
+
+trap 'cleanup $?' EXIT
+trap 'cleanup 130' INT
+trap 'cleanup 143' TERM
+
+TOTAL=0
+PASSED=0
+FAILED_COUNT=0
+SKIPPED=0
+FAILED=0
+
+# run_step LABEL CMD...: run one check. The command runs in the background
+# and the hook waits for it, so an INT or TERM to the hook is handled at once
+# and stops the whole process tree.
+run_step() {
+    local label="$1"
+    shift
+    local out="$RESULTS_DIR/step.out" started elapsed rc
+    TOTAL=$((TOTAL + 1))
+    echo -e "  ${CYAN}[${label}]${NC} ..."
+    started=$(date +%s)
+    "${TIMEOUT_CMD[@]+"${TIMEOUT_CMD[@]}"}" "$@" >"$out" 2>&1 &
+    step_pid=$!
+    if wait "$step_pid"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    step_pid=""
+    elapsed=$(($(date +%s) - started))
+    if [[ $rc -eq 0 ]]; then
+        echo -e "  ${CYAN}[${label}]${NC} ${GREEN}PASS${NC} (${elapsed}s)"
+        PASSED=$((PASSED + 1))
+    else
+        if [[ $rc -eq 124 ]]; then
+            echo -e "  ${CYAN}[${label}]${NC} ${RED}TIMEOUT${NC} (${TEST_TIMEOUT}s)"
+        else
+            echo -e "  ${CYAN}[${label}]${NC} ${RED}FAIL${NC} (${elapsed}s)"
+        fi
+        FAILED_COUNT=$((FAILED_COUNT + 1))
+        FAILED=1
+        {
+            echo ""
+            echo -e "${RED}FAIL${NC}: $*"
+            if [[ "$VERBOSE" == "1" ]]; then
+                echo "--- Output ---"
+                cat "$out"
+            else
+                echo "--- Output (last 80 lines) ---"
+                tail -80 "$out"
+            fi
+            echo "--------------"
+        } >>"$RESULTS_DIR/failures.out"
+    fi
+    rm -f "$out"
+}
+
+skip_step() {
+    echo -e "  ${CYAN}[$1]${NC} ${YELLOW}SKIP${NC} ($2)"
+    SKIPPED=$((SKIPPED + 1))
+}
+
+echo ""
+echo -e "${CYAN}Running pre-push checks...${NC}"
+echo "================================"
+
+# --- Clippy ---
+if [[ "$SKIP_CLIPPY" == "1" ]]; then
+    skip_step clippy "SKIP_CLIPPY=1"
+else
+    run_step clippy cargo clippy --workspace --all-features --all-targets -- -D warnings
+fi
+
+# --- Hook and CI script tests ---
+if [[ "$SKIP_SCRIPT_TESTS" == "1" ]]; then
+    skip_step scripts "SKIP_SCRIPT_TESTS=1"
+else
+    for script_test in .github/scripts/test-*.sh; do
+        [[ -f "$script_test" ]] || continue
+        run_step "script $(basename "$script_test" .sh)" bash "$script_test"
+    done
+fi
+
+# --- Rust tests ---
+if [[ "$SKIP_TESTS" == "1" ]]; then
+    skip_step test "SKIP_TESTS=1"
+else
+    if [[ "$TEST_RUNNER" == "nextest" ]]; then
+        test_cmd=(cargo nextest run --no-tests=pass)
+    else
+        test_cmd=(cargo test)
+    fi
+    if [[ -n "$TEST_CRATES" ]]; then
+        for crate in $TEST_CRATES; do
+            run_step "test ${crate}" "${test_cmd[@]}" -p "$crate"
+        done
+    else
+        run_step test "${test_cmd[@]}" --workspace
+    fi
+fi
+
+if [[ -f "$RESULTS_DIR/failures.out" ]]; then
+    echo ""
+    echo -e "${CYAN}Failure Details:${NC}"
+    cat "$RESULTS_DIR/failures.out"
+fi
+
+# Summary
+echo ""
+echo "================================"
+echo -e "${CYAN}Pre-Push Summary${NC}"
+echo "================================"
+echo "Total:   $TOTAL"
+echo -e "Passed:  ${GREEN}$PASSED${NC}"
+if [[ $FAILED_COUNT -gt 0 ]]; then
+    echo -e "Failed:  ${RED}$FAILED_COUNT${NC}"
+else
+    echo "Failed:  $FAILED_COUNT"
+fi
+if [[ $SKIPPED -gt 0 ]]; then
+    echo -e "Skipped: ${YELLOW}$SKIPPED${NC}"
+fi
+echo ""
+
+if [[ $FAILED -eq 0 ]]; then
+    # Re-check remote after tests for race condition
+    if refs_already_on_remote; then
+        git fetch "$remote_name" 2>/dev/null || true
+        echo -e "${GREEN}All checks passed!${NC}"
+        echo -e "${CYAN}Remote already up to date (pushed by prior attempt). Nothing to push.${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}All checks passed! Proceeding with push.${NC}"
+    exit 0
+else
+    echo -e "${RED}Pre-push checks failed! Push aborted.${NC}"
+    echo ""
+    echo "Fix the failing checks and try again."
+    echo "To bypass (not recommended): git push --no-verify"
+    echo ""
+    echo "Options:"
+    echo "  SKIP_TESTS=1 git push          - Skip cargo tests"
+    echo "  SKIP_CLIPPY=1 git push         - Skip clippy"
+    echo "  SKIP_SCRIPT_TESTS=1 git push   - Skip hook and CI script tests"
+    echo "  VERBOSE=1 git push             - Show full output of failing steps"
+    echo "  TEST_CRATES=\"rholang-vm\" git push - Test specific crates"
+    echo "  TEST_RUNNER=nextest git push   - Use cargo-nextest (skips doctests)"
+    echo "  TEST_TIMEOUT=600 git push      - Adjust the per-step timeout (default: 1800s)"
+    exit 1
+fi

@@ -1,0 +1,56 @@
+# Markdown link check (lychee)
+# Canonical standard: docs/common/markdown-link-check-standard.md
+# Scope follows f1r3node-rust (ci.yml "Link Checker"): local file links plus
+# repository-hosting URLs only. Run the same check locally with:
+#   scripts/check-links.sh
+name: Markdown Link Check
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  markdown_link_check:
+    name: Markdown Link Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Link Checker
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          lycheeVersion: v0.24.2
+          # The broad exclude drops every http(s) URL; the includes add back
+          # github.com, raw.githubusercontent.com, and gitlab.com (lychee
+          # includes take precedence over excludes). Local file links are not
+          # http and are always checked. General-web URLs are left out of the
+          # blocking gate because several domains answer GitHub runner IPs
+          # differently from developer machines. The accept list keeps 403/429
+          # (rate limits, bot checks) and 503/504 (transient gateway states)
+          # from failing hosting-domain checks. Keep these arguments in sync
+          # with scripts/check-links.sh (.github/scripts/test-link-check.sh verifies).
+          args: >-
+            --no-progress
+            --exclude '^https?://'
+            --include '^https?://(www\.)?github\.com'
+            --include '^https?://raw\.githubusercontent\.com'
+            --include '^https?://(www\.)?gitlab\.com'
+            --max-retries 2
+            --retry-wait-time 5
+            --timeout 45
+            --accept 200..=299,403,429,503,504
+            './**/*.md'
+          fail: true

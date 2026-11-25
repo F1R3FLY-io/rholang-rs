@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+#
+# commit-msg hook - Reject unratified co-authors and session trailers
+#
+# Every Co-authored-by trailer must be ratified: an email that already
+# authored a commit in this history (CLAUDE.md "Commit Messages"). The hook
+# does not check the commit author, so a first-time contributor can commit;
+# CI checks authors and co-authors on pull requests.
+#
+
+set -euo pipefail
+
+checker="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.github/scripts/check-commit-trailers.sh"
+[ -x "$checker" ] || checker="$(git rev-parse --show-toplevel)/.github/scripts/check-commit-trailers.sh"
+exec "$checker" message "$1"
