@@ -27,6 +27,11 @@ module.exports = grammar({
         // `(x: A)` — lambda_param vs pi_param. GLR picks based on the
         // outer rule's arrow: lambda uses `=>`, Pi uses `->`.
         [$.lambda_param, $.pi_param],
+        // `try` — try_block vs `try` used as an ordinary identifier
+        // (`_contextual_keyword_var`): `try x <- …` and `try x` both
+        // start with a name. GLR keeps both until `<-` or a block decides.
+        // (`foreach` and `agent` need no entry: the next token decides.)
+        [$.try_block, $._contextual_keyword_var],
     ],
 
     reserved: {
@@ -632,7 +637,14 @@ module.exports = grammar({
 
         // process variables and names
         name: $ => choice($._proc_var, $.quote),
-        _proc_var: $ => choice($.wildcard, $.var),
+        _proc_var: $ => choice($.wildcard, $.var, $._contextual_keyword_var),
+        // `foreach`, `try` and `agent` are not reserved, but `word: $.var`
+        // keyword extraction lexes them as keyword tokens wherever their
+        // block forms can start (process position). Accept those tokens
+        // here as an ordinary `var`, so `foreach(1)`, `try!(1)` and
+        // `agent(1)` keep parsing. GLR (see `conflicts`) picks the block
+        // form only when the following tokens match it.
+        _contextual_keyword_var: $ => alias(choice('foreach', 'try', 'agent'), $.var),
         quote: $ => prec(12, seq('@', $._proc)),
         wildcard: $ => '_',
         var: $ => token(/[a-zA-Z]([a-zA-Z0-9_'])*|_([a-zA-Z0-9_'])+/),

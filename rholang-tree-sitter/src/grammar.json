@@ -3621,8 +3621,34 @@
         {
           "type": "SYMBOL",
           "name": "var"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_contextual_keyword_var"
         }
       ]
+    },
+    "_contextual_keyword_var": {
+      "type": "ALIAS",
+      "content": {
+        "type": "CHOICE",
+        "members": [
+          {
+            "type": "STRING",
+            "value": "foreach"
+          },
+          {
+            "type": "STRING",
+            "value": "try"
+          },
+          {
+            "type": "STRING",
+            "value": "agent"
+          }
+        ]
+      },
+      "named": true,
+      "value": "var"
     },
     "quote": {
       "type": "PREC",
@@ -3795,6 +3821,10 @@
     [
       "lambda_param",
       "pi_param"
+    ],
+    [
+      "try_block",
+      "_contextual_keyword_var"
     ]
   ],
   "precedences": [],

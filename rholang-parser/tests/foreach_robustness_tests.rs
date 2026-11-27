@@ -1,5 +1,6 @@
-//! Malformed `foreach` binds are reported as parse failures, never as
-//! panics, and well-formed comprehensions still parse.
+//! `foreach`, `try` and `agent` are contextual keywords: they start their
+//! block forms, but stay usable as ordinary identifiers elsewhere. Malformed
+//! `foreach` binds are reported as parse failures, never as panics.
 
 use rholang_parser::RholangParser;
 use rholang_parser::ast::Proc;
@@ -15,8 +16,22 @@ fn parses(source: &str) -> bool {
     result.unwrap_or_else(|_| panic!("parser panicked on {source:?}"))
 }
 
+#[rstest]
+#[case::foreach_applied("foreach(1)")]
+#[case::foreach_channel("new foreach in { foreach!(1) }")]
+#[case::foreach_payload("new x in { x!(foreach) }")]
+#[case::foreach_receive_binder("new c in { for (foreach <- c) { foreach!(1) } }")]
+#[case::try_applied("try(1)")]
+#[case::try_channel("new try in { try!(1) }")]
+#[case::agent_applied("agent(1)")]
+#[case::agent_channel("new agent in { agent!(1) }")]
+#[case::all_as_payload("new x in { x!(foreach, try, agent) }")]
+fn contextual_keywords_parse_as_identifiers(#[case] source: &str) {
+    assert!(parses(source), "expected {source:?} to parse");
+}
+
 #[test]
-fn foreach_with_binds_is_a_comprehension() {
+fn foreach_with_binds_is_still_a_comprehension() {
     let parser = RholangParser::new();
     let source = "new a, b in { foreach (x <- a & y <- b where x) yield (r) { r!(x) } }";
     let Validated::Good(procs) = parser.parse(source) else {
@@ -26,6 +41,15 @@ fn foreach_with_binds_is_a_comprehension() {
         panic!("expected a `new` at the top level");
     };
     assert!(matches!(proc.proc, Proc::Foreach { .. }));
+}
+
+#[rstest]
+#[case::try_block("new s in { try @v <- s { Nil } catch @e { Nil } }")]
+#[case::agent_block(
+    "new foo in { agent foo { constructor() { Nil } | default(...@args) { Nil } } }"
+)]
+fn keyword_block_forms_still_parse(#[case] source: &str) {
+    assert!(parses(source), "expected {source:?} to parse");
 }
 
 #[rstest]
